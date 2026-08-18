@@ -1,0 +1,2 @@
+"use strict";function double(x){if(typeof x!=="number"){throw new TypeError("input to `double/1` must be a `number`")}return x*2}function unhandled_external(){}exports.double=double;exports.unhandled_external=unhandled_external;
+//# sourceMappingURL=index.cjs.map

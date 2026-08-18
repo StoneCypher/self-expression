@@ -1,0 +1,99 @@
+{
+  "name": "react_ts_with_claude_gh_template",
+  "version": "0.10.8",
+  "description": "react_ts_with_claude_gh_template",
+  "keywords": [
+    "react_ts_with_claude_gh_template",
+    "stonecypher"
+  ],
+  "homepage": "https://github.com/StoneCypher/react_ts_with_claude_gh_template#readme",
+  "bugs": {
+    "url": "https://github.com/StoneCypher/react_ts_with_claude_gh_template/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StoneCypher/react_ts_with_claude_gh_template.git"
+  },
+  "license": "MIT",
+  "author": "John Haugeland <stonecypher@gmail.com>",
+  "type": "module",
+  "module": "dist/index.mjs",
+  "main": "dist/index.cjs",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      },
+      "default": {
+        "default": "./dist/index.mjs"
+      }
+    }
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "postinstall": "npx playwright install --with-deps",
+    "clean": "cd src && cd ts && rimraf generated_code && mkdir generated_code && cd .. && cd .. && rimraf build && mkdir build && cd build && mkdir rollup && cd rollup && mkdir visualizations && cd .. && cd .. && rimraf dist && mkdir dist && rimraf docs && mkdir docs && cd docs && mkdir dist && mkdir docs && cd .. && rimraf coverage-typedoc && mkdir coverage-typedoc && rm -f bundle_sunburst.png bundle_treemap.png bundle_network.png bundle_flamegraph.png",
+    "update_madlibs": "node src/build_js/update_madlibs.js && cp README.md docs",
+    "typescript": "tsc --build tsconfig.json",
+    "terser": "terser -o dist/index.mjs --source-map \"content='build/rollup/index.mjs.map',url='index.mjs.map'\" build/rollup/index.mjs && terser -o dist/index.cjs --source-map \"content='build/rollup/index.cjs.map',url='index.cjs.map'\" build/rollup/index.cjs && terser -o dist/index.iife.js --source-map \"content='build/rollup/index.iife.js.map',url='index.iife.js.map'\" build/rollup/index.iife.js && cp dist/index.iife.js dist/index.iife.js.map docs",
+    "dts": "cp build/ts/*.d.ts build/ts/*.d.ts.map dist/",
+    "rollup": "rollup -c",
+    "rollup-cts": "rollup -c rollup.ctsphase.config.js",
+    "viz_png": "node src/build_js/html_to_png.js --url build/rollup/visualizations/bundle_sunburst.html --width 768 --height 480 --out build/rollup/visualizations/bundle_sunburst.png && node src/build_js/html_to_png.js --url build/rollup/visualizations/bundle_treemap.html --width 768 --height 480 --out build/rollup/visualizations/bundle_treemap.png && node src/build_js/html_to_png.js --url build/rollup/visualizations/bundle_network.html --width 768 --height 480 --out build/rollup/visualizations/bundle_network.png && node src/build_js/html_to_png.js --url build/rollup/visualizations/bundle_flamegraph.html --width 768 --height 480 --out build/rollup/visualizations/bundle_flamegraph.png && cp build/rollup/visualizations/bundle_*.png . && cp build/rollup/visualizations/bundle_*.png docs/ && cp build/rollup/visualizations/bundle_*.png docs/docs/",
+    "site": "cp src/html/* docs && cp src/html/.nojekyll docs && cp README.md docs/ && cp dist/index.mjs docs/docs/ && cp src/html/*.png docs/docs",
+    "docs": "typedoc src/ts/index.ts --options typedoc-options.cjs --out docs/docs",
+    "test": "npm run build",
+    "stryker": "npx stryker run",
+    "just_test": "vitest run --coverage && vitest run --config vitest-stoch.config.ts --coverage && vitest run --config vitest-stoch.mutat.ts --coverage",
+    "just_test_save": "node src/build_js/run_tests_save.js",
+    "eslint": "eslint",
+    "attw": "attw --pack .",
+    "cloc": "cloc --quiet ./src/** --exclude-list-file=./.clocignore --3 --json --out=./coverage/cloc/report_wt.json && cloc --quiet ./src/** --exclude-list-file=./.clocignore --exclude-dir=tests --3 --json --out=./coverage/cloc/report_nt.json && node ./src/build_js/cloc_report.cjs",
+    "changelog": "rm -f CHANGELOG.md && rm -f CHANGELOG.long.md && rm -f ./src/doc_md/CHANGELOG.md && rm -f ./src/doc_md/CHANGELOG.long.md && better_git_changelog -b && cp CHANGELOG.* ./src/doc_md/",
+    "build": "npm run clean && npm run just_test_save && npm run typescript && npm run docs && npm run update_madlibs && npm run eslint && npm run rollup && npm run viz_png && npm run docs && npm run terser && npm run dts && npm run rollup-cts && npm run attw && npm run cloc && npm run site && npm run changelog",
+    "ci": "echo starting && node -e \"console.log(new Date().toLocaleString())\" && npm run build && echo finishing && node -e \"console.log(new Date().toLocaleString())\""
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@eslint/css": "^1.0.0",
+    "@eslint/markdown": "^8.0.0",
+    "@faker-js/faker": "^10.4.0",
+    "@playwright/test": "^1.58.2",
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@stryker-mutator/core": "^9.6.0",
+    "@stryker-mutator/vitest-runner": "^9.6.0",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "better_git_changelog": "^1.6.5",
+    "cloc": "^2.6.0-cloc",
+    "commitlint": "^20.5.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "fast-check": "^4.6.0",
+    "globals": "^17.4.0",
+    "jiti": "^2.6.1",
+    "playwright": "^1.58.2",
+    "rimraf": "^6.1.3",
+    "rollup": "^4.60.0",
+    "rollup-plugin-dts": "^6.4.1",
+    "rollup-plugin-visualizer": "^7.0.1",
+    "servehere": "^1.10.1",
+    "terser": "^5.46.1",
+    "typedoc": "^0.28.18",
+    "typedoc-plugin-coverage": "^4.0.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.2",
+    "typescript-language-server": "^5.1.3",
+    "vitest": "^4.1.2",
+    "zod": "^4.3.6"
+  }
+}

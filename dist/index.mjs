@@ -1,0 +1,2 @@
+function double(x){if(typeof x!=="number"){throw new TypeError("input to `double/1` must be a `number`")}return x*2}function unhandled_external(){}export{double,unhandled_external};
+//# sourceMappingURL=index.mjs.map
