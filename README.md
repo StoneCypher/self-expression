@@ -1,10 +1,10 @@
 # self-expression v0.2.0
 
-> Version 0.2.0 was built on Tuesday, August 18, 2026 at GMT-07:00 `1787089537208` from hash `5d0f677`.
+> Version 0.2.0 was built on Tuesday, August 18, 2026 at GMT-07:00 `1787094353549` from hash `f721908`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787089537208 Tuesday, August 18, 2026 at GMT-07:00 83.33 N/A N/A 5d0f677 {{stochbranch}} 66.66 {{stochfunc}} {{stochline}} 7 49 {{unitbranch}} {{unitfunc}} {{unitline}} 42 0.2.0 -->
+<!-- Supported embeds: 1787094353549 Tuesday, August 18, 2026 at GMT-07:00 83.33 N/A N/A f721908 71.42 66.66 50 71.42 7 49 92.85 50 80.95 42 0.2.0 -->
 
 
 
@@ -29,17 +29,17 @@ TODO Put the project description here, please.
     <th>Unit</th>
     <td>42</td>
     <td>83.33<small>%</small></td>
-    <td>{{unitbranch}}<small>%</small></td>
-    <td>{{unitfunc}}<small>%</small></td>
-    <td>{{unitline}}<small>%</small></td>
+    <td>92.85<small>%</small></td>
+    <td>50<small>%</small></td>
+    <td>80.95<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
     <td>7</td>
     <td>83.33<small>%</small></td>
-    <td>{{stochbranch}}<small>%</small></td>
-    <td>{{stochfunc}}<small>%</small></td>
-    <td>{{stochline}}<small>%</small></td>
+    <td>71.42<small>%</small></td>
+    <td>50<small>%</small></td>
+    <td>71.42<small>%</small></td>
   </tr>
 </table>
 

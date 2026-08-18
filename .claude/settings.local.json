@@ -84,7 +84,11 @@
       "Bash(gh label *)",
       "Bash(gh pr create --repo StoneCypher/issue_labels --base main --head docs_26-08-18_label-install-guide --title 'docs: document how to install the taxonomy into a repo' --body 'The README covers generating and colouring the taxonomy but never covers applying it to a repo — which is the step every consumer actually needs, and the one that kept getting rediscovered the slow way. *)",
       "Bash(node /Users/john/projects/self-expression/dist/cli.cjs help)",
-      "Bash(node dist/cli.cjs mcp)"
+      "Bash(node dist/cli.cjs mcp)",
+      "Bash(node sess.mjs)",
+      "Bash(sort -k1 -n)",
+      "Bash(python3 -)",
+      "Bash(git merge *)"
     ],
     "additionalDirectories": [
       "/Users/john/.claude"

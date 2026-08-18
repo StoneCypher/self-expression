@@ -27,7 +27,7 @@ compatible across all three, so **every skill is written once and read by all th
 
 ## Tree
 
-```
+```text
 self-expression/
 ├── .claude-plugin/
 │   ├── plugin.json          Claude manifest
