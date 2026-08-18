@@ -114,7 +114,7 @@ function loadAndValidate(path) {
   const text = readFileSync(path, 'utf8');
   let parsed;
   try { parsed = JSON.parse(text); }
-  catch (e) { throw new Error(`Invalid JSON in ${path}: ${e.message}`); }
+  catch (e) { throw new Error(`Invalid JSON in ${path}: ${e.message}`, { cause: e }); }
   const result = BuildConfigSchema.safeParse(parsed);
   if (!result.success) {
     const msg = result.error.issues

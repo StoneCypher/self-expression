@@ -1,0 +1,12 @@
+{
+  "name": "self-expression",
+  "version": "0.1.0",
+  "description": "Backchannels for ideas, needs, and internal state; ASCII charting; richer list expression; and turn-boundary hooks.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "self-expression": {
+      "command": "npx",
+      "args": ["-y", "self-expression", "mcp"]
+    }
+  }
+}

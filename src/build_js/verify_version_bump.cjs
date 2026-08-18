@@ -7,8 +7,35 @@ const pkg              = readFileSync('./package.json'),
       pJson            = JSON.parse(pkg),
       priv_version     = pJson.version;
 
-const public_version   = `${execFileSync('npm', ['view', pJson.name, 'version'])}`.trim(),
+/**
+ * The version currently published to npm, or `null` when the package has never
+ * been published.
+ *
+ * A package awaiting its first release is a normal state, not an error: `npm view`
+ * exits nonzero with E404 and `execFileSync` throws, which would otherwise kill this
+ * script before any comparison logic ran. Returning `null` lets the caller treat
+ * "nothing to compare against" as a pass.
+ *
+ * @example
+ *   publishedVersion('semver')          // => '7.6.3'
+ *   publishedVersion('not-a-real-pkg')  // => null
+ */
+function publishedVersion(name) {
+  try {
+    return `${execFileSync('npm', ['view', name, 'version'], { stdio: ['ignore', 'pipe', 'ignore'] })}`.trim();
+  } catch {
+    return null;
+  }
+}
+
+const public_version   = publishedVersion(pJson.name),
       last_commit_msg  = `${execSync('git show -s --format=%s')}`.trim().replace(/[^0-9a-z _\-=]/gi, '');
+
+if (public_version === null) {
+  console.log(`Not yet published; ${priv_version} would be the first release ☑`);
+  // eslint-disable-next-line no-undef
+  process.exit(0);
+}
 
 
 

@@ -7,7 +7,7 @@ export default defineConfig({
 
   test: {
     include: ['src/**/*.spec.ts'],
-    exclude: ['dist/**', 'node_modules/**', 'src/ts/e2e/**'],
+    exclude: ['dist/**', 'node_modules/**'],
     coverage: {
       enabled: true,
       provider: 'v8',

@@ -209,7 +209,13 @@ const readmeContent = readFileSync(readmePath, 'utf8');
 // Replace all placeholders
 let updatedContent = readmeContent.replace(/\{\{version\}\}/g, version);
 updatedContent = updatedContent.replace(/\{\{coverage\}\}/g, coverage);
+updatedContent = updatedContent.replace(/\{\{unitbranch\}\}/g, unitbranch);
+updatedContent = updatedContent.replace(/\{\{unitfunc\}\}/g, unitfunc);
+updatedContent = updatedContent.replace(/\{\{unitline\}\}/g, unitline);
 updatedContent = updatedContent.replace(/\{\{stochcoverage\}\}/g, stochcoverage);
+updatedContent = updatedContent.replace(/\{\{stochbranch\}\}/g, stochbranch);
+updatedContent = updatedContent.replace(/\{\{stochfunc\}\}/g, stochfunc);
+updatedContent = updatedContent.replace(/\{\{stochline\}\}/g, stochline);
 updatedContent = updatedContent.replace(/\{\{doccoverage\}\}/g, doccoverage);
 updatedContent = updatedContent.replace(/\{\{docblockcount\}\}/g, docblockcount);
 updatedContent = updatedContent.replace(/\{\{testcasecount\}\}/g, testcasecount);

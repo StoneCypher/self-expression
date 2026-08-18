@@ -1,0 +1,123 @@
+# Plugin layout
+
+How this repository is simultaneously a Claude Code plugin, a Codex plugin, and a Gemini CLI
+extension, and why the files sit where they do.
+
+&nbsp;
+
+## The core trick
+
+The three hosts converged on nearly the same plugin shape, and — critically — their manifests
+have **non-colliding names**. So one directory can be all three plugins at once, with no build
+step and no per-host branch:
+
+| | Claude Code | Codex | Gemini CLI |
+|---|---|---|---|
+| Manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` | `gemini-extension.json` |
+| Skills | `skills/*/SKILL.md` | `skills/*/SKILL.md` | `skills/*/SKILL.md` |
+| MCP | `.mcp.json` | `.mcp.json` | inline in manifest |
+| Hooks | `hooks/hooks.claude.json` | *(pending)* | *(pending)* |
+| Slash commands | `claude-commands/*.md` | *(via skills)* | `commands/*.toml` |
+| Context file | `CLAUDE.md` | `AGENTS.md` | `GEMINI.md` |
+
+`skills/` is the big win: the `SKILL.md` format and its `name` / `description` frontmatter are
+compatible across all three, so **every skill is written once and read by all three hosts**.
+
+&nbsp;
+
+## Tree
+
+```text
+self-expression/
+├── .claude-plugin/
+│   ├── plugin.json          Claude manifest
+│   └── marketplace.json     lets `/plugin marketplace add StoneCypher/self-expression` work
+├── .codex-plugin/
+│   └── plugin.json          Codex manifest
+├── gemini-extension.json    Gemini manifest
+├── .mcp.json                MCP server registration; read by Claude and Codex
+│
+├── skills/                  SHARED — all three hosts read this verbatim
+│
+├── commands/                Gemini slash commands (.toml) — Gemini hardcodes this path
+├── claude-commands/         Claude slash commands (.md) — Claude's path is configurable
+│
+├── hooks/
+│   └── hooks.claude.json    per-host, because event vocabularies differ
+├── scripts/                 hook implementations — Node, never shell (Windows machine)
+│   └── time-of-day.mjs
+│
+├── src/ts/
+│   ├── channels/            backchannel capture and storage
+│   ├── charts/              pure ASCII renderers
+│   ├── mcp/                 MCP server exposing channels + charts as tools
+│   └── tests/               unit and stochastic tests
+├── src/build_js/            template build pipeline
+└── dist/                    committed build output (dist is intentionally not gitignored)
+```
+
+&nbsp;
+
+## Decisions and why
+
+**The repo root is the plugin root.** Both `/plugin marketplace add owner/repo` and
+`gemini extensions install <github-url>` expect the manifest at the repository root. Building
+into `dist/plugin/` would break both installers. The build machinery living alongside is the
+normal cost of that, and it is the shape essentially every published plugin uses.
+
+**The MCP server ships over `npx`, not a path.** Each host uses a different variable for the
+plugin directory — Claude has `${CLAUDE_PLUGIN_ROOT}`, Gemini has `${extensionPath}`, Codex's
+is unconfirmed. `npx -y self-expression mcp` needs no variable at all, so one identical
+registration block works everywhere, including Windows. The server starts once per session, so
+the npx resolution cost is paid once and does not affect per-turn latency.
+
+**Hooks use plugin-root paths, not `npx`.** The opposite call, for the opposite reason: a
+`UserPromptSubmit` hook fires every single turn, and npx resolution would add a few hundred
+milliseconds to each one. Bare `node <path>` is roughly an order of magnitude cheaper. Hooks
+files are per-host anyway, since the three hosts' event vocabularies are not verified to match.
+
+**Hook scripts are Node, never shell.** The machine this plugin actually lives on is Windows.
+`.sh` hooks would silently fail there.
+
+**Using a channel is an obligation, not an option.** The rule: when the assistant stops
+responding and is *not* waiting on an answer — when it is done — it ends by using one of the
+specific channels. Responses that hand a question back are exempt, because the work is not
+finished and the assistant is blocked rather than complete.
+
+That boundary is easy for the assistant to evaluate and hard for a hook to detect: `Stop` fires
+identically whether the response finished the work or asked a question. So the assistant
+applies the rule and the `Stop` hook acts as a backstop, not as the arbiter.
+
+**A no-op entry must be a valid way to satisfy the obligation.** This is what keeps a mandatory
+channel from becoming a confabulation engine. If "nothing notable this response" is itself a
+recordable entry, the requirement is to *look*, and the log stays honest. If it is not — if the
+only way to satisfy the hook is to produce content — then every response with nothing behind it
+still produces a well-formed entry, and the log fills with fluent noise indistinguishable from
+signal. The obligation is safe exactly to the degree that silence is expressible.
+
+**Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
+Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
+there is no sharing to be had, so Claude is pointed at `claude-commands/` and Gemini keeps
+`commands/`. Codex has no separate command concept — skills cover that ground.
+
+&nbsp;
+
+## Unresolved
+
+- **Codex hooks.** Codex documents `hooks/hooks.json`, but its event names and plugin-root
+  variable are not verified. The `hooks` field is deliberately absent from the Codex manifest
+  rather than pointing at a guess.
+- **Gemini hooks.** Same situation.
+- **DeepSeek.** No plugin format is known. It is reachable through MCP if its client speaks MCP,
+  which would give it the backchannels and charts but neither skills nor hooks.
+- **`~/.claude/CLAUDE.md` hardcodes `~/.claude/skills/status-checklists/`, which no longer
+  exists.** Until this plugin ships its list-expression skill, that line sends every session
+  hunting for a skill that isn't there. Nothing should be rebuilt from the old skill — a newer
+  codebase supersedes it — so the reference wants repointing at the replacement, not restoring.
+- **npm name.** `.mcp.json` assumes the package publishes as `self-expression`. Unverified as
+  available.
+- **Mutation testing is kept, deliberately.** Unlike the Playwright suite, Stryker earns its
+  place here: the ASCII renderers will be pure functions emitting exact strings across dense
+  threshold bands, which is the case mutation testing is actually for. It stays opt-in
+  (`ci.stryker: false`) until there is chart code worth mutating, and `mutate` should then be
+  narrowed to the pure directories so runs stay fast.

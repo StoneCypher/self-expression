@@ -1,0 +1,15 @@
+{
+  "name": "stonecypher",
+  "owner": {
+    "name": "John Haugeland",
+    "email": "stonecypher@gmail.com",
+    "url": "https://github.com/StoneCypher"
+  },
+  "plugins": [
+    {
+      "name": "self-expression",
+      "source": "./",
+      "description": "Backchannels for ideas, needs, and internal state; ASCII charting; richer list expression; and turn-boundary hooks."
+    }
+  ]
+}

@@ -24,7 +24,6 @@
     "!src/ts/**/*.spec.ts",
     "!src/ts/**/*.stoch.ts",
     "!src/ts/**/*.mutat.ts",
-    "!src/ts/e2e/**",
     "!src/ts/generated_code/**"
   ],
   "coverageAnalysis": "perTest"

@@ -64,7 +64,35 @@
       "Bash(npm install *)",
       "Bash(gh api *)",
       "Bash(curl *)",
-      "Bash(npm pkg *)"
+      "Bash(npm pkg *)",
+      "Bash(git -C /Users/john/projects/self-expression remote -v)",
+      "Bash(find /Users/john -maxdepth 4 -iname '*self*expression*' -not -path '*/node_modules/*' 2>/dev/null)",
+      "Read(//Users/john/**)",
+      "Bash(grep -rl -iE 'self.?expression|backchannel|emotional.state' /Users/john/.claude /Users/john/projects --include='*.md' --include='*.json' --include='*.js' --include='*.ts' -s 2>/dev/null | grep -v node_modules | head -20)",
+      "Read(//Users/john/projects/**)",
+      "Bash(node /Users/john/projects/self-expression/scripts/time-of-day.mjs)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Bash(git restore *)",
+      "Bash(git check-ignore *)",
+      "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze.mjs)",
+      "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze2.mjs)",
+      "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze3.mjs)",
+      "Bash(cat)",
+      "Bash(node pad.mjs sm.txt)",
+      "Bash(node frame.mjs sm.txt)",
+      "Bash(gh label *)",
+      "Bash(gh pr create --repo StoneCypher/issue_labels --base main --head docs_26-08-18_label-install-guide --title 'docs: document how to install the taxonomy into a repo' --body 'The README covers generating and colouring the taxonomy but never covers applying it to a repo — which is the step every consumer actually needs, and the one that kept getting rediscovered the slow way. *)",
+      "Bash(node /Users/john/projects/self-expression/dist/cli.cjs help)",
+      "Bash(node dist/cli.cjs mcp)",
+      "Bash(node sess.mjs)",
+      "Bash(sort -k1 -n)",
+      "Bash(python3 -)",
+      "Bash(git merge *)",
+      "Bash(node ./src/build_js/verify_version_bump.cjs)"
+    ],
+    "additionalDirectories": [
+      "/Users/john/.claude"
     ]
   }
 }
