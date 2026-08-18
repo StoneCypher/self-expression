@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+
+
+
+
+jobs:
+
+
+  test:
+    name: Node ${{ matrix.node_version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node_version: [24, 23]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install && npm run ci
+
+
+
+  stryker:
+    name: Stryker tests
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        node_version: [24]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install && npm run ci && npm run stryker
+
+
+
+  verify-version-bump:
+
+    # Skip this job on the template repository itself — the template package
+    # isn't published, so `npm view <name> version` returns nothing and the
+    # verification script exits non-zero. "Use this template" creates a new
+    # repo with is_template: false, so clones still run this job normally.
+    if: github.event.repository.is_template != true
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24.x
+
+    - name: Verify the version was bumped
+      run: |
+        npm install
+        git config --global user.email "stonecypher@users.noreply.github.com"
+        git config --global user.name "John Haugeland through Github Actions"
+        node ./src/build_js/verify_version_bump.cjs
+
+
+
+  release:
+
+    if: (github.event.pusher.name == github.event.repository.owner.name) && (github.ref == 'refs/heads/main')
+
+    needs: [test, stryker, verify-version-bump]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Export tag to envvars
+      run: |
+        export TAG=$(awk -F'"' '/"version": ".+"/{ print $4; exit; }' package.json)
+        echo "TAG=$TAG" >> $GITHUB_ENV
+        echo $TAG
+
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24.x
+        registry-url: https://registry.npmjs.org/
+
+    - name: Push tags
+      run: git push origin --tags
+
+    - name: Create the release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.TAG }}
+        release_name: ${{ env.TAG }}
+        body_path: CHANGELOG.md
+
+    # - name: Publish to npm
+    #   run: |
+    #     npm publish
+    #   env:
+    #     NODE_AUTH_TOKEN: ${{ secrets.TODO_TOKEN_FOR_GH_CI_CD }}
+
+    - name: Results page
+      run: |
+        export TAG=$(awk -F'"' '/"version": ".+"/{ print $4; exit; }' package.json)
+        echo '### Results!' >> $GITHUB_STEP_SUMMARY
+        echo "* Published $TAG to NPM" >> $GITHUB_STEP_SUMMARY
