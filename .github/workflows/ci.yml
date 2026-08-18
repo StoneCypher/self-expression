@@ -1,0 +1,384 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    # Skip CI for PRs that only touch non-build documentation.
+    paths-ignore:
+      - 'src/superpowers/**/*.md'
+      - 'CONTRIBUTING.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'LICENSE'
+      - 'CHANGELOG.md'
+      - 'CHANGELOG.long.md'
+
+# Cancel in-progress PR runs when new commits land on the same branch.
+# Main pushes are never cancelled — releases must run to completion.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+
+jobs:
+
+
+  # Single setup job: reads build.config.json (the source of truth for which
+  # optional jobs run) and the #fullbuild opt-in token, and exposes them as
+  # outputs the other jobs gate on. Subsumes the former detect-fullbuild job.
+  # Runs on push and PR; a skipped setup job would cascade-skip its dependents.
+  config:
+    if: >-
+      github.event_name == 'pull_request'
+      || github.event_name == 'push'
+    name: Resolve config
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      e2e:         ${{ steps.cfg.outputs.e2e }}
+      stryker:     ${{ steps.cfg.outputs.stryker }}
+      matrix_os:   ${{ steps.cfg.outputs.matrix_os }}
+      matrix_node: ${{ steps.cfg.outputs.matrix_node }}
+      has_matrix:  ${{ steps.cfg.outputs.has_matrix }}
+      fullbuild:   ${{ steps.cfg.outputs.fullbuild }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - id: cfg
+        shell: bash
+        run: |
+          node -e '
+            var fs = require("fs");
+            var c  = JSON.parse(fs.readFileSync("build.config.json", "utf8"));
+            var ci = c.ci || {};
+            var os = (ci.matrix && ci.matrix.os)   || ["ubuntu-latest"];
+            var nd = (ci.matrix && ci.matrix.node) || [22];
+            var out = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(out, "e2e="         + !!(c.features && c.features.e2e) + "\n");
+            fs.appendFileSync(out, "stryker="     + !!ci.stryker + "\n");
+            fs.appendFileSync(out, "matrix_os="   + JSON.stringify(os) + "\n");
+            fs.appendFileSync(out, "matrix_node=" + JSON.stringify(nd) + "\n");
+            fs.appendFileSync(out, "has_matrix="  + (os.length > 1 || nd.length > 1) + "\n");
+          '
+          MSG=$(git log -1 --pretty=%B)
+          if echo "$MSG" | grep -q '#fullbuild'; then
+            echo "fullbuild=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fullbuild=false" >> "$GITHUB_OUTPUT"
+          fi
+
+
+
+  # PR check: one cheap ubuntu job with the ci-lite profile. Browser-free.
+  # Skipped when #fullbuild opts a PR into the full push-style run.
+  test-pr:
+    needs: [config]
+    if: github.event_name == 'pull_request' && needs.config.outputs.fullbuild != 'true'
+    name: PR check (Ubuntu, Node 22, ci-lite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lite build
+        run: npm run build -- --profile=ci-lite
+
+
+
+  # Push to main (or #fullbuild PR): full artifact build on the canonical
+  # platform. Browser-free — the ci profile pins e2e off.
+  test-main-full:
+    needs: [config]
+    if: github.event_name == 'push' || needs.config.outputs.fullbuild == 'true'
+    name: Main full build (Ubuntu, Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run full build
+        run: npm run ci
+
+      # include-hidden-files keeps docs/.nojekyll in the artifact.
+      - name: Upload built site for gh-pages publish
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: docs
+          include-hidden-files: true
+
+
+
+  # Push to main: publish the built site (the docs/ tree from test-main-full)
+  # to the gh-pages branch. Pages serves gh-pages@root, so publishing the
+  # CONTENTS of docs/ keeps every URL identical to the old main:/docs layout.
+  # docs/ is untracked in git; this job is the only publication path.
+  publish-docs:
+    needs: [test-main-full]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Publish docs to gh-pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download built site
+        uses: actions/download-artifact@v8
+        with:
+          name: site
+          path: docs
+
+      - name: Push to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          # Single-commit branch: generated output has no useful history and
+          # an ever-growing gh-pages would bloat clones.
+          force_orphan: true
+
+
+
+  # Opt-in (features.e2e): Playwright e2e suite — the ONLY job that installs a
+  # browser. All jobs run Node 22: Node 24 stalls the Playwright browser
+  # download; ensure_chromium provisions Chromium on demand.
+  e2e:
+    needs: [config]
+    if: needs.config.outputs.e2e == 'true' && (github.event_name == 'push' || needs.config.outputs.fullbuild == 'true')
+    name: E2E (Ubuntu, Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: .playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the site (browser-free)
+        run: npm run build -- --profile=ci
+
+      - name: Run e2e
+        run: npm run hosted_test
+
+
+
+  # Opt-in (ci.matrix has >1 os or >1 node): cross-platform / multi-Node
+  # verification with the ci-lite profile. Browser-free. Per-cell caps sized by
+  # billed-minute multiplier (Linux x1, Windows x2, macOS x10).
+  test-main-matrix:
+    needs: [config]
+    if: needs.config.outputs.has_matrix == 'true' && (github.event_name == 'push' || needs.config.outputs.fullbuild == 'true')
+    name: Verify Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ (matrix.os == 'macos-latest' && 5) || (matrix.os == 'windows-latest' && 8) || 10 }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:   ${{ fromJSON(needs.config.outputs.matrix_os) }}
+        node: ${{ fromJSON(needs.config.outputs.matrix_node) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lite build (no artifact production)
+        run: npm run build -- --profile=ci-lite
+
+
+
+  # Opt-in (ci.stryker): mutation testing. Browser-free.
+  stryker:
+    needs: [config]
+    if: needs.config.outputs.stryker == 'true' && (github.event_name == 'push' || needs.config.outputs.fullbuild == 'true')
+    name: Stryker tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full build
+        run: npm run ci
+
+      - name: Run Stryker
+        run: npm run stryker
+
+
+
+  # Fixed-name aggregation point for branch protection. The main ruleset
+  # requires only the check named "gate", so the real jobs' display names can
+  # change freely without silently wedging PRs (required checks match by name).
+  # Passes when nothing failed and at least one real build job succeeded;
+  # skipped optional jobs are fine.
+  gate:
+    name: gate
+    needs: [config, test-pr, test-main-full, e2e, test-main-matrix, stryker]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Verify required jobs succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e '
+            const needs = JSON.parse(process.env.RESULTS);
+            const bad = Object.entries(needs)
+              .filter(([, v]) => v.result === "failure" || v.result === "cancelled");
+            if (bad.length) {
+              console.error("gate: failed jobs: " + bad.map(([k]) => k).join(", "));
+              process.exit(1);
+            }
+            const built = ["test-pr", "test-main-full"].some(k => needs[k].result === "success");
+            if (!built) {
+              console.error("gate: neither test-pr nor test-main-full succeeded");
+              process.exit(1);
+            }
+            console.log("gate: ok");
+          '
+
+
+
+  verify-version-bump:
+    # Skipped on the template repo itself (is_template); clones run it.
+    if: github.event.repository.is_template != true
+    name: Verify version bump
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Use Node.js 22.x
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22.x
+
+    - name: Verify the version was bumped
+      run: |
+        npm ci
+        git config --global user.email "stonecypher@users.noreply.github.com"
+        git config --global user.name "John Haugeland through Github Actions"
+        node ./src/build_js/verify_version_bump.cjs
+
+
+
+  release:
+    name: Release
+    needs: [test-main-full, test-main-matrix, stryker, verify-version-bump]
+    # Owner push to main when the required jobs succeeded and the opt-in jobs
+    # didn't fail (skipped is fine). always() lets this evaluate even when
+    # matrix/stryker were skipped, so a skipped optional job can't cascade-skip
+    # the release.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && github.event.pusher.name == github.event.repository.owner.name
+      && needs.test-main-full.result == 'success'
+      && needs.verify-version-bump.result == 'success'
+      && needs.test-main-matrix.result != 'failure'
+      && needs.stryker.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Export tag to envvars
+      run: |
+        export TAG=$(awk -F'"' '/"version": ".+"/{ print $4; exit; }' package.json)
+        echo "TAG=$TAG" >> $GITHUB_ENV
+        echo $TAG
+
+    - name: Use Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22.x
+        registry-url: https://registry.npmjs.org/
+
+    - name: Push tags
+      run: git push origin --tags
+
+    # gh replaces the archived actions/create-release@v1; same behavior
+    # (tag, title, CHANGELOG.md body) via the built-in token.
+    - name: Create the release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release create "$TAG" --title "$TAG" --notes-file CHANGELOG.md
+
+    - name: Results page
+      run: |
+        export TAG=$(awk -F'"' '/"version": ".+"/{ print $4; exit; }' package.json)
+        echo '### Results!' >> $GITHUB_STEP_SUMMARY
+        echo "* Published $TAG to NPM" >> $GITHUB_STEP_SUMMARY

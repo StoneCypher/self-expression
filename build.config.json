@@ -1,0 +1,67 @@
+{
+  "$schema": "./build.config.schema.json",
+  "features": {
+    "docs":      true,
+    "eslint":    true,
+    "cloc":      true,
+    "changelog": true,
+    "terser":    true,
+    "attw":      true,
+    "site":      true,
+    "e2e":       false
+  },
+  "ci": {
+    "matrix": {
+      "os":   ["ubuntu-latest"],
+      "node": [22]
+    },
+    "stryker": false
+  },
+  "profiles": {
+    "fast": {
+      "features": {
+        "docs":      false,
+        "eslint":    false,
+        "cloc":      false,
+        "changelog": false,
+        "attw":      false,
+        "site":      false,
+        "e2e":       false
+      }
+    },
+    "ci": {
+      "features": {
+        "docs":      true,
+        "eslint":    true,
+        "cloc":      true,
+        "changelog": true,
+        "terser":    true,
+        "attw":      true,
+        "site":      true,
+        "e2e":       false
+      }
+    },
+    "release": {
+      "features": {
+        "docs":      true,
+        "eslint":    true,
+        "cloc":      true,
+        "changelog": true,
+        "terser":    true,
+        "attw":      true,
+        "site":      true,
+        "e2e":       false
+      }
+    },
+    "ci-lite": {
+      "features": {
+        "docs":      false,
+        "eslint":    false,
+        "cloc":      false,
+        "changelog": false,
+        "site":      false,
+        "e2e":       false
+      }
+    }
+  }
+}

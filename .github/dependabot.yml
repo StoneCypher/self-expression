@@ -1,0 +1,24 @@
+# Dependabot version updates. Security alerts and security-fix PRs are repo
+# settings (Settings → Advanced Security), not controlled by this file.
+version: 2
+updates:
+
+  # npm dependencies: weekly, with minor+patch bumps rolled into one grouped
+  # PR so the repo doesn't drown in single-package updates. Majors still
+  # arrive as individual PRs.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # Actions used in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
