@@ -71,7 +71,7 @@
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stryker-mutator/core": "^10.0.0",
-    "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
     "better_git_changelog": "^1.6.21",
