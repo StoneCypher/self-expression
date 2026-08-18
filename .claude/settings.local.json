@@ -89,7 +89,9 @@
       "Bash(sort -k1 -n)",
       "Bash(python3 -)",
       "Bash(git merge *)",
-      "Bash(node ./src/build_js/verify_version_bump.cjs)"
+      "Bash(node ./src/build_js/verify_version_bump.cjs)",
+      "Bash(gh issue comment 25 --repo StoneCypher/self-expression --body '**`model` must carry the most specific identifier available, not a brand or family name.** *)",
+      "Bash(npx vitest *)"
     ],
     "additionalDirectories": [
       "/Users/john/.claude"
