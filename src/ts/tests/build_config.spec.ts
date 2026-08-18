@@ -362,12 +362,7 @@ describe('JSON Schema / FEATURES catalog drift guard', () => {
   });
 });
 
-describe('build_config_schema — e2e feature and ci block', () => {
-  it('accepts the e2e feature flag', () => {
-    const parsed = BuildConfigSchema.parse({ features: { e2e: true } });
-    expect(parsed.features?.e2e).toBe(true);
-  });
-
+describe('build_config_schema — ci block', () => {
   it('accepts a ci block with matrix and stryker', () => {
     const parsed = BuildConfigSchema.parse({
       ci: { matrix: { os: ['ubuntu-latest'], node: [24] }, stryker: false },

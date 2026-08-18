@@ -36,7 +36,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
-      e2e:         ${{ steps.cfg.outputs.e2e }}
       stryker:     ${{ steps.cfg.outputs.stryker }}
       matrix_os:   ${{ steps.cfg.outputs.matrix_os }}
       matrix_node: ${{ steps.cfg.outputs.matrix_node }}
@@ -58,7 +57,6 @@ jobs:
             var os = (ci.matrix && ci.matrix.os)   || ["ubuntu-latest"];
             var nd = (ci.matrix && ci.matrix.node) || [22];
             var out = process.env.GITHUB_OUTPUT;
-            fs.appendFileSync(out, "e2e="         + !!(c.features && c.features.e2e) + "\n");
             fs.appendFileSync(out, "stryker="     + !!ci.stryker + "\n");
             fs.appendFileSync(out, "matrix_os="   + JSON.stringify(os) + "\n");
             fs.appendFileSync(out, "matrix_node=" + JSON.stringify(nd) + "\n");
@@ -101,7 +99,7 @@ jobs:
 
 
   # Push to main (or #fullbuild PR): full artifact build on the canonical
-  # platform. Browser-free — the ci profile pins e2e off.
+  # platform.
   test-main-full:
     needs: [config]
     if: github.event_name == 'push' || needs.config.outputs.fullbuild == 'true'
@@ -167,45 +165,6 @@ jobs:
           # Single-commit branch: generated output has no useful history and
           # an ever-growing gh-pages would bloat clones.
           force_orphan: true
-
-
-
-  # Opt-in (features.e2e): Playwright e2e suite — the ONLY job that installs a
-  # browser. All jobs run Node 22: Node 24 stalls the Playwright browser
-  # download; ensure_chromium provisions Chromium on demand.
-  e2e:
-    needs: [config]
-    if: needs.config.outputs.e2e == 'true' && (github.event_name == 'push' || needs.config.outputs.fullbuild == 'true')
-    name: E2E (Ubuntu, Node 22)
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
-        with:
-          path: .playwright-browsers
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build the site (browser-free)
-        run: npm run build -- --profile=ci
-
-      - name: Run e2e
-        run: npm run hosted_test
 
 
 
@@ -279,7 +238,7 @@ jobs:
   # skipped optional jobs are fine.
   gate:
     name: gate
-    needs: [config, test-pr, test-main-full, e2e, test-main-matrix, stryker]
+    needs: [config, test-pr, test-main-full, test-main-matrix, stryker]
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 2

@@ -29,8 +29,7 @@
         "changelog": { "type": "boolean" },
         "terser":    { "type": "boolean" },
         "attw":      { "type": "boolean" },
-        "site":      { "type": "boolean" },
-        "e2e":       { "type": "boolean" }
+        "site":      { "type": "boolean" }
       }
     },
     "CiBlock": {

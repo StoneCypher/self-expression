@@ -35,9 +35,6 @@ export const FEATURES = {
   terser:    { stages: [3],    optional: true, defaultEnabled: true,  script: 'terser',       requires: ['rollup'] },
   attw:      { stages: [4],    optional: true, defaultEnabled: true,  script: 'attw' },
   site:      { stages: [5],    optional: true, defaultEnabled: true,  script: 'site',         requires: ['docs'] },
-
-  // optional — default off; must be explicitly enabled
-  e2e:       { stages: [6],    optional: true, defaultEnabled: false, script: 'hosted_test' },
 };
 
 export const MANDATORY_FEATURE_NAMES = Object.entries(FEATURES)
