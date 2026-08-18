@@ -19,7 +19,7 @@
 
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
-  CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
+  CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES, STEMS,
 } from './vocabulary.js';
 
 /**
@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS entries (
   uncertain       INTEGER NOT NULL DEFAULT 0,
   face            TEXT,
   context_emoji   TEXT,
+  stem            TEXT ${check('stem', STEMS)},
   cctype          TEXT,
 
   confidence      TEXT ${check('confidence', CONFIDENCE_GROUNDS)},

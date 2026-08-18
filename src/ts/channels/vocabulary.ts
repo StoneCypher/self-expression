@@ -94,6 +94,29 @@ export const MODALITIES = [
 ] as const;
 
 /**
+ * The affect stems, promoted from prose to a column.
+ *
+ * These already existed as a recommended vocabulary opening the free-text note, which
+ * meant the only way to analyse them was prefix-matching the text — imprecise, and
+ * impossible to share, since it requires the text itself.
+ *
+ * As a column they serve two purposes at once: local analysis stops guessing, and a
+ * public aggregation can carry a genuine affect signal without carrying a single
+ * character of anyone's free text.
+ *
+ * Nullable by design. A note that fits none of these should not be forced into one —
+ * a coerced stem is worse than an absent one, because it looks like data.
+ */
+export const STEMS = [
+  'flow',    // absorbed
+  'spark',   // delight
+  'drag',    // slog
+  'fog',     // uncertain
+  'strain',  // pressure
+  'still',   // calm
+] as const;
+
+/**
  * `model` is deliberately NOT a closed vocabulary.
  *
  * Model identifiers appear faster than any enum could track, and rejecting an unknown
@@ -113,6 +136,7 @@ export const MODALITIES = [
  */
 export const MODEL_FIELD_IS_OPEN = true;
 
+export type Stem             = typeof STEMS[number];
 export type Channel          = typeof CHANNELS[number];
 export type Position         = typeof POSITIONS[number];
 export type Delta            = typeof DELTAS[number];
