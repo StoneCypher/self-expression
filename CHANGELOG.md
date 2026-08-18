@@ -24,7 +24,7 @@ Published tags:
 
 ## [Untagged] - Jul 15, 2026 9:10:16 PM
 
-Commit [e163bbd6dc7a6a165d56bd2bed06a73d9e51a59d](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/e163bbd6dc7a6a165d56bd2bed06a73d9e51a59d)
+Commit [e163bbd6dc7a6a165d56bd2bed06a73d9e51a59d](https://github.com/StoneCypher/self-expression/commit/e163bbd6dc7a6a165d56bd2bed06a73d9e51a59d)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -56,7 +56,7 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 ## [Untagged] - Jun 8, 2026 5:03:50 PM
 
-Commit [bc7521ebfa626af9e468f4c461cf16387b0f9316](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/bc7521ebfa626af9e468f4c461cf16387b0f9316)
+Commit [bc7521ebfa626af9e468f4c461cf16387b0f9316](https://github.com/StoneCypher/self-expression/commit/bc7521ebfa626af9e468f4c461cf16387b0f9316)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -90,7 +90,7 @@ e2e is enabled.
 
 ## [Untagged] - Jun 8, 2026 4:59:59 PM
 
-Commit [7d54ef738aa87691e7fe44280fef7020128d672e](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/7d54ef738aa87691e7fe44280fef7020128d672e)
+Commit [7d54ef738aa87691e7fe44280fef7020128d672e](https://github.com/StoneCypher/self-expression/commit/7d54ef738aa87691e7fe44280fef7020128d672e)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -105,7 +105,7 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 ## [Untagged] - Jun 8, 2026 4:59:14 PM
 
-Commit [07ccfae93860b19441046c2797c537c57fffb1c8](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/07ccfae93860b19441046c2797c537c57fffb1c8)
+Commit [07ccfae93860b19441046c2797c537c57fffb1c8](https://github.com/StoneCypher/self-expression/commit/07ccfae93860b19441046c2797c537c57fffb1c8)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -120,7 +120,7 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 ## [Untagged] - Jun 8, 2026 4:51:23 PM
 
-Commit [1b69611a59376ec41f126c20e7004f45c90fdf9a](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/1b69611a59376ec41f126c20e7004f45c90fdf9a)
+Commit [1b69611a59376ec41f126c20e7004f45c90fdf9a](https://github.com/StoneCypher/self-expression/commit/1b69611a59376ec41f126c20e7004f45c90fdf9a)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -139,7 +139,7 @@ when features.e2e === true, so the default build never launches a browser.
 
 ## [Untagged] - Jun 8, 2026 4:49:51 PM
 
-Commit [6216f4508093ebc117465ec9504a28bea7c70b8f](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/6216f4508093ebc117465ec9504a28bea7c70b8f)
+Commit [6216f4508093ebc117465ec9504a28bea7c70b8f](https://github.com/StoneCypher/self-expression/commit/6216f4508093ebc117465ec9504a28bea7c70b8f)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -159,7 +159,7 @@ filter to exclude off-by-default features that simply remain off.
 
 ## [Untagged] - Jun 8, 2026 4:44:53 PM
 
-Commit [66515788585f56d52764c05e9a9def7245869c35](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/66515788585f56d52764c05e9a9def7245869c35)
+Commit [66515788585f56d52764c05e9a9def7245869c35](https://github.com/StoneCypher/self-expression/commit/66515788585f56d52764c05e9a9def7245869c35)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -179,7 +179,7 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 ## [Untagged] - Jun 8, 2026 4:35:20 PM
 
-Commit [a3e5e12fe7f5f1573923ff01e9c17f215b0e6dc7](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/a3e5e12fe7f5f1573923ff01e9c17f215b0e6dc7)
+Commit [a3e5e12fe7f5f1573923ff01e9c17f215b0e6dc7](https://github.com/StoneCypher/self-expression/commit/a3e5e12fe7f5f1573923ff01e9c17f215b0e6dc7)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -202,7 +202,7 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 ## [Untagged] - Jun 8, 2026 12:31:11 PM
 
-Commit [643e97e668ee0226f227c07acf2e3ec8e647356f](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/643e97e668ee0226f227c07acf2e3ec8e647356f)
+Commit [643e97e668ee0226f227c07acf2e3ec8e647356f](https://github.com/StoneCypher/self-expression/commit/643e97e668ee0226f227c07acf2e3ec8e647356f)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
@@ -225,7 +225,7 @@ Regenerated artifacts (README.md, CHANGELOG, docs, coverage-stoch) committed.
 
 ## [Untagged] - Jun 8, 2026 12:26:34 PM
 
-Commit [e2eaf9c0400998445ddf64821c45be98bc7e5637](https://github.com/StoneCypher/react_ts_with_claude_gh_template/commit/e2eaf9c0400998445ddf64821c45be98bc7e5637)
+Commit [e2eaf9c0400998445ddf64821c45be98bc7e5637](https://github.com/StoneCypher/self-expression/commit/e2eaf9c0400998445ddf64821c45be98bc7e5637)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 

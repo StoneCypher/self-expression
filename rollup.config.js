@@ -14,7 +14,7 @@ const es_config = {
   output: {
     file      : 'build/rollup/index.mjs',
     format    : 'es',
-    name      : 'react_ts_with_claude_gh_template',
+    name      : 'selfExpression',
     sourcemap : true
   },
 
@@ -44,7 +44,7 @@ const cjs_config = {
   output: {
     file      : 'build/rollup/index.cjs',
     format    : 'commonjs',
-    name      : 'react_ts_with_claude_gh_template',
+    name      : 'selfExpression',
     sourcemap : true
   },
 
@@ -74,7 +74,7 @@ const iife_config = {
   output: {
     file      : 'build/rollup/index.iife.js',
     format    : 'iife',
-    name      : 'react_ts_with_claude_gh_template',
+    name      : 'selfExpression',
     sourcemap : true
   },
 
@@ -105,7 +105,7 @@ const iife_config = {
 //     file   : 'build/rollup/cli.cjs',
 //     format : 'commonjs',
 //     banner : '#!/usr/bin/env node',
-//     name   : 'react_ts_with_claude_gh_template-cli'
+//     name   : 'self-expression-cli'
 //   },
 
 //   plugins : [
