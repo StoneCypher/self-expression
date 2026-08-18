@@ -1,0 +1,22 @@
+{
+  "name": "self-expression",
+  "version": "0.1.0",
+  "description": "Backchannels for ideas, needs, and internal state; ASCII charting; richer list expression; and turn-boundary hooks.",
+  "author": {
+    "name": "John Haugeland",
+    "email": "stonecypher@gmail.com",
+    "url": "https://github.com/StoneCypher"
+  },
+  "homepage": "https://github.com/StoneCypher/self-expression#readme",
+  "repository": "https://github.com/StoneCypher/self-expression",
+  "license": "MIT",
+  "keywords": ["self-expression", "backchannel", "ascii-charts", "hooks", "stonecypher"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Self Expression",
+    "shortDescription": "Backchannels, ASCII charts, and richer list expression.",
+    "developerName": "John Haugeland",
+    "category": "productivity"
+  }
+}

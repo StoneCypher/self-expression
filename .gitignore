@@ -142,6 +142,13 @@ vite.config.ts.timestamp-*
 build/*
 test-results/*
 stats.html
+.DS_Store
+
+# Legacy plugin staged for transformation. Untracked on purpose: the repo root
+# doubles as the plugin root, so anything committed here would ship inside the
+# published plugin. The README is the one tracked file, and explains the rules.
+_incoming/*
+!_incoming/README.md
 
 # Built site; published to the gh-pages branch by CI, not tracked here
 docs/
