@@ -1,0 +1,333 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    # Skip CI for PRs that only touch non-build documentation. Conservative
+    # list: only entries the build system genuinely doesn't consume.
+    # NOT in this list (intentionally): base_README.md (template input to
+    # update_madlibs), src/doc_md/**/*.md (typedoc inputs), package.json,
+    # build.config.json, build.config.schema.json, anything under src/ts/
+    # or src/build_js/.
+    paths-ignore:
+      - 'src/superpowers/**/*.md'
+      - 'CONTRIBUTING.md'
+      - 'CODE_OF_CONDUCT.md'
+      - 'LICENSE'
+      - 'CHANGELOG.md'
+      - 'CHANGELOG.long.md'
+
+# Cancel in-progress PR runs when new commits land on the same branch.
+# Main pushes are never cancelled — releases must run to completion.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Cache Playwright browsers in a stable workspace-relative path. The
+# postinstall step (`npx playwright install --with-deps`) sees this
+# location, skips browser download when the cache hits, and only
+# re-checks OS-level deps (which apt handles incrementally).
+env:
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
+
+
+
+
+
+jobs:
+
+
+  # Escape hatch: detect a `#fullbuild` token in the PR head commit
+  # message. Contributors who want the full matrix on a PR (e.g., to
+  # verify a cross-platform change before merge) can opt in by pushing
+  # a commit whose message contains `#fullbuild`.
+  detect-fullbuild:
+    # Runs on push as well as PRs. The main-build jobs declare
+    # `needs: [detect-fullbuild]`, and a skipped dependency cascades to skip
+    # them — so if this job were PR-only, every push-to-main job would skip.
+    # On push it simply reports fullbuild=false; the main jobs gate on
+    # `github.event_name == 'push'` and run regardless.
+    if: >-
+      github.event_name == 'pull_request'
+      || github.event_name == 'push'
+    name: Detect #fullbuild opt-in
+    runs-on: ubuntu-latest
+    outputs:
+      fullbuild: ${{ steps.detect.outputs.fullbuild }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - id: detect
+        shell: bash
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          if echo "$MSG" | grep -q '#fullbuild'; then
+            echo "fullbuild=true" >> $GITHUB_OUTPUT
+            echo "Detected #fullbuild in head commit message — full matrix will run"
+          else
+            echo "fullbuild=false" >> $GITHUB_OUTPUT
+          fi
+
+
+
+  # PR check: a single Ubuntu run with the ci-lite profile.
+  # Contributors only pay one cheap job per push to a PR branch. Lint,
+  # docs/site rendering, viz, changelog, cloc are caught on merge to
+  # main instead — that work is platform-invariant and already runs in
+  # test-main-full, so duplicating on PR is wasted tokens.
+  # Skipped when #fullbuild opts into the full matrix (test-main-full
+  # covers everything test-pr would have).
+  test-pr:
+    needs: [detect-fullbuild]
+    if: github.event_name == 'pull_request' && needs.detect-fullbuild.outputs.fullbuild != 'true'
+    name: PR check (Ubuntu, Node 24, ci-lite)
+    runs-on: ubuntu-latest
+    # Guard against a hung install/build (e.g. a stalled Playwright browser
+    # download). Normal runtime is ~1.5 min; 6 min is a generous ceiling that
+    # fails fast instead of burning toward GitHub's 360-minute default.
+    timeout-minutes: 6
+    # ci-lite needs no browser (viz_png off, no e2e), so the postinstall hook
+    # skips the Playwright browser download entirely.
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: .playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run lite build
+        run: npm run build -- --profile=ci-lite
+
+
+
+  # Push to main: full build on the canonical platform.
+  # Produces docs, site, visualizations, changelog — the artifacts that
+  # only need to be built once because they're identical across platforms.
+  test-main-full:
+    needs: [detect-fullbuild]
+    if: github.event_name == 'push' || needs.detect-fullbuild.outputs.fullbuild == 'true'
+    name: Main full build (Ubuntu, Node 24)
+    runs-on: ubuntu-latest
+    # Full canonical build (npm run ci). Cap well above its normal runtime so a
+    # hung step fails fast instead of running toward the 360-minute default.
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: .playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run full build
+        run: npm run ci
+
+
+
+  # Push to main: cross-platform verification matrix.
+  # Uses the ci-lite profile to skip artifact production (docs, site,
+  # visualizations, changelog, cloc) because those are platform-invariant
+  # and already produced by test-main-full. Tests, typecheck, lint, bundle,
+  # and attw DO benefit from multi-platform verification.
+  test-main-matrix:
+    needs: [detect-fullbuild]
+    if: github.event_name == 'push' || needs.detect-fullbuild.outputs.fullbuild == 'true'
+    name: Verify Node ${{ matrix.node_version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    # Cross-platform cells; Windows/macOS installs are slower than Ubuntu, so use
+    # one generous job ceiling (applies to every cell) to fail fast on hangs.
+    timeout-minutes: 25
+    # ci-lite profile — no browser needed, so skip the Playwright download.
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Node 23 only on Ubuntu (cheapest runner); macOS (~10× ubuntu cost)
+        # and Windows (~2× ubuntu cost) just verify Node 24. Dual-Node
+        # coverage is preserved on the cheap platform; expensive platforms
+        # don't pay double for marginal value.
+        include:
+          - os: ubuntu-latest
+            node_version: 23
+          - os: macos-latest
+            node_version: 24
+          - os: windows-latest
+            node_version: 24
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: 'npm'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: .playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run lite build (no artifact production)
+        run: npm run build -- --profile=ci-lite
+
+
+
+  stryker:
+    # Mutation testing is expensive; only run on push to main, not on every PR.
+    # Exception: PRs with #fullbuild in the head commit message opt in.
+    needs: [detect-fullbuild]
+    if: github.event_name == 'push' || needs.detect-fullbuild.outputs.fullbuild == 'true'
+    name: Stryker tests
+    runs-on: ${{ matrix.os }}
+    # Mutation testing is slow (install + full build + stryker run); give it a
+    # large ceiling that still kills a true hang rather than the 360-min default.
+    timeout-minutes: 45
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        node_version: [24]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: 'npm'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: .playwright-browsers
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm install && npm run ci && npm run stryker
+
+
+
+  verify-version-bump:
+
+    # Skip this job on the template repository itself — the template package
+    # isn't published, so `npm view <name> version` returns nothing and the
+    # verification script exits non-zero. "Use this template" creates a new
+    # repo with is_template: false, so clones still run this job normally.
+    if: github.event.repository.is_template != true
+
+    runs-on: ubuntu-latest
+    # Only installs deps and runs verify_version_bump — no browser needed.
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24.x
+
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: .playwright-browsers
+        key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Verify the version was bumped
+      run: |
+        npm install
+        git config --global user.email "stonecypher@users.noreply.github.com"
+        git config --global user.name "John Haugeland through Github Actions"
+        node ./src/build_js/verify_version_bump.cjs
+
+
+
+  release:
+
+    if: (github.event.pusher.name == github.event.repository.owner.name) && (github.ref == 'refs/heads/main')
+
+    needs: [test-main-full, test-main-matrix, stryker, verify-version-bump]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Export tag to envvars
+      run: |
+        export TAG=$(awk -F'"' '/"version": ".+"/{ print $4; exit; }' package.json)
+        echo "TAG=$TAG" >> $GITHUB_ENV
+        echo $TAG
+
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v5
+      with:
+        node-version: 24.x
+        registry-url: https://registry.npmjs.org/
+
+    - name: Push tags
+      run: git push origin --tags
+
+    - name: Create the release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.TAG }}
+        release_name: ${{ env.TAG }}
+        body_path: CHANGELOG.md
+
+    # - name: Publish to npm
+    #   run: |
+    #     npm publish
+    #   env:
+    #     NODE_AUTH_TOKEN: ${{ secrets.TODO_TOKEN_FOR_GH_CI_CD }}
+
+    - name: Results page
+      run: |
+        export TAG=$(awk -F'"' '/"version": ".+"/{ print $4; exit; }' package.json)
+        echo '### Results!' >> $GITHUB_STEP_SUMMARY
+        echo "* Published $TAG to NPM" >> $GITHUB_STEP_SUMMARY
