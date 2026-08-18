@@ -97,31 +97,32 @@ const iife_config = {
 
 
 
-// const cli_config = {
+const cli_config = {
 
-//   input: 'build/ts/cli.js',
+  input: 'build/ts/cli.js',
 
-//   output: {
-//     file   : 'build/rollup/cli.cjs',
-//     format : 'commonjs',
-//     banner : '#!/usr/bin/env node',
-//     name   : 'self-expression-cli'
-//   },
+  output: {
+    file      : 'build/rollup/cli.cjs',
+    format    : 'commonjs',
+    banner    : '#!/usr/bin/env node',
+    name      : 'selfExpressionCli',
+    sourcemap : true
+  },
 
-//   plugins : [
+  plugins : [
 
-//     nodeResolve({
-//       mainFields     : ['module', 'main'],
-//       browser        : false,
-//       extensions     : [ '.ts', '.js' ],
-//       preferBuiltins : true
-//     }),
+    nodeResolve({
+      mainFields     : ['module', 'main'],
+      browser        : false,
+      extensions     : [ '.ts', '.js' ],
+      preferBuiltins : true
+    }),
 
-//     commonjs()
+    commonjs()
 
-//   ]
+  ]
 
-// };
+};
 
 
 
@@ -146,4 +147,4 @@ const cjs_cts = {
 
 
 
-export default [ es_config, cjs_config, iife_config, cjs_cts ];  // , cli_config ];
+export default [ es_config, cjs_config, iife_config, cjs_cts, cli_config ];

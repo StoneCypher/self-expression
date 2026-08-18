@@ -22,6 +22,9 @@
   },
   "module": "dist/index.mjs",
   "main": "dist/index.cjs",
+  "bin": {
+    "self-expression": "dist/cli.cjs"
+  },
   "exports": {
     ".": {
       "import": {

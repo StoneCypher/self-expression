@@ -77,7 +77,14 @@
       "Bash(git check-ignore *)",
       "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze.mjs)",
       "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze2.mjs)",
-      "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze3.mjs)"
+      "Bash(node /private/tmp/claude-501/-Users-john-projects-self-expression/89253e35-444c-4db5-a135-17becaea79f5/scratchpad/analyze3.mjs)",
+      "Bash(cat)",
+      "Bash(node pad.mjs sm.txt)",
+      "Bash(node frame.mjs sm.txt)",
+      "Bash(gh label *)",
+      "Bash(gh pr create --repo StoneCypher/issue_labels --base main --head docs_26-08-18_label-install-guide --title 'docs: document how to install the taxonomy into a repo' --body 'The README covers generating and colouring the taxonomy but never covers applying it to a repo — which is the step every consumer actually needs, and the one that kept getting rediscovered the slow way. *)",
+      "Bash(node /Users/john/projects/self-expression/dist/cli.cjs help)",
+      "Bash(node dist/cli.cjs mcp)"
     ],
     "additionalDirectories": [
       "/Users/john/.claude"
