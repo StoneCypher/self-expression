@@ -1,10 +1,10 @@
-# self-expression v0.2.0
+# self-expression v0.2.1
 
-> Version 0.2.0 was built on Tuesday, August 18, 2026 at GMT-07:00 `1787107039174` from hash `6de23db`.
+> Version 0.2.1 was built on Wednesday, August 19, 2026 at GMT-07:00 `1787182276522` from hash `5335a98`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787107039174 Tuesday, August 18, 2026 at GMT-07:00 62.05 N/A N/A 6de23db 4.1 6.71 6.34 7.47 7 150 76.49 57.14 62.14 143 0.2.0 -->
+<!-- Supported embeds: 1787182276522 Wednesday, August 19, 2026 at GMT-07:00 62.05 N/A N/A 5335a98 4.1 6.71 6.34 7.47 7 150 76.49 57.14 62.14 143 0.2.1 -->
 
 
 
