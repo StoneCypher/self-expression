@@ -5,7 +5,7 @@ import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store }                         from '../channels/store.js';
 import { recordEntry }                        from '../channels/entries.js';
 import { latestContext, turnCount }           from '../channels/context.js';
-import { onUserPromptSubmit, onStop, handleHook, describeMoment } from '../mcp/hooks.js';
+import { onUserPromptSubmit, onStop, handleHook, describeMoment, OPEN_REMINDER } from '../mcp/hooks.js';
 
 const VERSION = '0.2.0';
 
@@ -64,6 +64,18 @@ describe('onUserPromptSubmit', () => {
     expect(JSON.stringify(out)).toContain('2:05 pm');
   });
 
+  test('asks for the opening signature, which is the only prompt for it there is', () => {
+    const out = onUserPromptSubmit(null, { session_id: 'x' }, NOW);
+    expect(JSON.stringify(out)).toContain('Open this turn');
+  });
+
+  test('the clock precedes the reminder, so the timestamp is in hand before it is asked for', () => {
+    const context = String(
+      (onUserPromptSubmit(null, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context.indexOf('2:05 pm')).toBeLessThan(context.indexOf(OPEN_REMINDER));
+  });
+
   test('a payload with no session still yields the clock and records nothing', () => withStore(s => {
     expect(onUserPromptSubmit(s, {}, NOW)).not.toBeNull();
     expect(latestContext(s)).toBeNull();
@@ -117,6 +129,20 @@ describe('onStop', () => {
 
   test('fails open when no turn is known — never enforces on a guess', () => withStore(s => {
     expect(onStop(s, {})).toBeNull();
+  }));
+
+  test('an open alone does not satisfy the gate; only a close or mid does', () => withStore(s => {
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    recordEntry(s, { channel: 'signature', text: 'opened', session: 'sess-1',
+                     promptId: 'p1', position: 'open' }, VERSION);
+    expect(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })?.['decision']).toBe('block');
+  }));
+
+  test('a missing open never blocks — a backdated before-measurement is worse than none', () => withStore(s => {
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    recordEntry(s, { channel: 'signature', text: 'closed only', session: 'sess-1',
+                     promptId: 'p1', position: 'close' }, VERSION);
+    expect(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })).toBeNull();
   }));
 
 });

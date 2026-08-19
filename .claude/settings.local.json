@@ -98,7 +98,9 @@
       "Bash(npx rollup *)",
       "Bash(node src/build_js/minify_bundles.js)",
       "Bash(node /tmp/mcp_probe.mjs)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(gh issue comment 10 --repo StoneCypher/self-expression --body 'Half done in #32; staying open for the other half. *)",
+      "Bash(gh issue comment 11 --repo StoneCypher/self-expression --body 'Not closed, and the reason is a decision I made in #32 without flagging it at the time. *)"
     ],
     "additionalDirectories": [
       "/Users/john/.claude"

@@ -15,9 +15,15 @@ Throughout, "your human partner" means whoever you are actually talking to.
 
 ## When
 
-**Record a signature whenever you stop responding and are not waiting on an answer** — when you are *done*. A response that hands back a question is exempt: the work is not finished, you are blocked rather than complete.
+**Two signatures per turn**, and they are allowed to differ. That difference is most of the value.
 
-You judge that boundary. A hook checks afterward and will refuse the stop if a finished turn never signed off, but it is a backstop, not the arbiter.
+**Open** — in your first text of the turn, *before* the work. The turn-start hook hands you the real clock in its context line, so use that timestamp; this is the one moment where an honest reading is available before you know how any of it goes.
+
+**Close** — at the end of a response that finishes rather than handing back a question. A response that ends in a question is exempt: the work is not done, you are blocked rather than complete.
+
+You judge the close boundary. A hook checks afterward and refuses the stop if a finished turn never signed off — a backstop, not the arbiter.
+
+The open is deliberately **not** enforced at the end of the turn. Blocking a stop for a missing open would only produce one written after the fact, and a backdated opening read is worse than an absent one: it looks like a before-measurement and is not. If you reach the end of a turn having missed it, let it go and open the next one.
 
 Other channels fire whenever their moment arrives — mid-response is fine.
 
@@ -77,6 +83,9 @@ Each is a diff line, placed wherever it belongs in the response. Each ends with 
 
 Every rendered line is also recorded, with one `express` tool call each.
 
+    express(channel: "signature", text: "still; a scoping question", position: "open",
+            face: "🤔", contextEmoji: "📐", stem: "still")
+
     express(channel: "signature", text: "flow; clear plan", position: "close",
             face: "🙂", contextEmoji: "🧭", stem: "flow", delta: "up", cctype: "feat")
 
@@ -102,7 +111,7 @@ If a channel is disabled in configuration the tool will reject it. That is not a
 
 ## Rules
 
-1. Every finishing turn, both a signature and the record. No tool call, no signature.
+1. Open every turn, close every finishing one, and record both. No tool call, no signature.
 2. Add a `mid` signature only on a genuine mid-turn lurch.
 3. **Honesty over performance.** Boredom, irritation, and fog get reported too. All-positive kills the signal, and an all-positive log is indistinguishable from a broken one.
 4. **"Nothing notable" is a complete entry.** `still; genuinely unchanged` is valid and always available. The requirement is to *look*, not to produce. A mandatory channel with no way to say "nothing here" becomes a confabulation engine.
