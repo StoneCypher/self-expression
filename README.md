@@ -1,10 +1,10 @@
 # self-expression v0.2.0
 
-> Version 0.2.0 was built on Tuesday, August 18, 2026 at GMT-07:00 `1787094353549` from hash `f721908`.
+> Version 0.2.0 was built on Tuesday, August 18, 2026 at GMT-07:00 `1787104875876` from hash `0420ea5`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787094353549 Tuesday, August 18, 2026 at GMT-07:00 83.33 N/A N/A f721908 71.42 66.66 50 71.42 7 49 92.85 50 80.95 42 0.2.0 -->
+<!-- Supported embeds: 1787104875876 Tuesday, August 18, 2026 at GMT-07:00 61.9 N/A N/A 0420ea5 4.1 6.74 6.34 7.51 7 146 76.49 57.14 61.97 139 0.2.0 -->
 
 
 
@@ -27,19 +27,19 @@ TODO Put the project description here, please.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>42</td>
-    <td>83.33<small>%</small></td>
-    <td>92.85<small>%</small></td>
-    <td>50<small>%</small></td>
-    <td>80.95<small>%</small></td>
+    <td>139</td>
+    <td>61.9<small>%</small></td>
+    <td>76.49<small>%</small></td>
+    <td>57.14<small>%</small></td>
+    <td>61.97<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
     <td>7</td>
-    <td>83.33<small>%</small></td>
-    <td>71.42<small>%</small></td>
-    <td>50<small>%</small></td>
-    <td>71.42<small>%</small></td>
+    <td>61.9<small>%</small></td>
+    <td>4.1<small>%</small></td>
+    <td>6.34<small>%</small></td>
+    <td>7.51<small>%</small></td>
   </tr>
 </table>
 

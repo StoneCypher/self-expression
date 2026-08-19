@@ -89,7 +89,16 @@
       "Bash(sort -k1 -n)",
       "Bash(python3 -)",
       "Bash(git merge *)",
-      "Bash(node ./src/build_js/verify_version_bump.cjs)"
+      "Bash(node ./src/build_js/verify_version_bump.cjs)",
+      "Bash(gh issue comment 25 --repo StoneCypher/self-expression --body '**`model` must carry the most specific identifier available, not a brand or family name.** *)",
+      "Bash(npx vitest *)",
+      "Bash(node -e \"const p=require\\('./node_modules/@modelcontextprotocol/sdk/package.json'\\); console.log\\('version', p.version\\); console.log\\(Object.keys\\(p.exports\\).slice\\(0,20\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@modelcontextprotocol/sdk/package.json'\\).dependencies\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(npx rollup *)",
+      "Bash(node src/build_js/minify_bundles.js)",
+      "Bash(node /tmp/mcp_probe.mjs)",
+      "Bash(node -e ' *)"
     ],
     "additionalDirectories": [
       "/Users/john/.claude"

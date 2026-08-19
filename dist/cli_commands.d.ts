@@ -15,6 +15,9 @@
 export type CliCommand = {
     readonly kind: 'mcp';
 } | {
+    readonly kind: 'hook';
+    readonly name: string;
+} | {
     readonly kind: 'help';
 } | {
     readonly kind: 'unknown';
@@ -52,6 +55,24 @@ export declare function parseCommand(argv: readonly string[]): CliCommand;
  *   helpText().startsWith('self-expression') // true
  */
 export declare function helpText(): string;
+/** Starts the MCP server and resolves when its transport closes. */
+export type ServerStarter = () => Promise<void>;
+/** Runs one named hook, reading its payload from stdin and writing its own output. */
+export type HookRunner = (name: string) => Promise<void>;
+/**
+ * Dispatch a command line, including the one command that is asynchronous.
+ *
+ * `mcp` runs a server until its transport closes, which `run` cannot express because it
+ * returns a number. Everything else delegates to `run` unchanged, so the pure dispatch
+ * stays pure and only the genuinely asynchronous path lives here.
+ *
+ * `startServer` is injected so this can be tested without opening a pipe or a database.
+ *
+ * @example
+ *   await runAsync(['help'], streams, start)  // => 0, never calls start
+ *   await runAsync(['mcp'],  streams, start)  // => 0 once the server's transport closes
+ */
+export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner): Promise<number>;
 /**
  * Execute a parsed command and report the process exit code.
  *
