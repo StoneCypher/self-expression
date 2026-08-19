@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
-import { ALL_DDL, SCHEMA_VERSION, check } from '../channels/schema.js';
+import { ALL_DDL, INDEX_DDL, SCHEMA_VERSION, check } from '../channels/schema.js';
 import { CHANNELS, DELTAS }               from '../channels/vocabulary.js';
 
 /** A throwaway on-disk database; node:sqlite has no shared in-memory mode across handles. */
@@ -35,11 +35,20 @@ describe('schema', () => {
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
-  test('creates every index', () => {
+  test('creates every index the DDL declares', () => {
     const { db, dir } = freshDb();
     const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                   .all().map(r => r.name as string);
-    expect(idx).toHaveLength(4);
+    // Counted from the DDL rather than hardcoded, so adding an index cannot break this.
+    expect(idx).toHaveLength(INDEX_DDL.length);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates the turn_context table that bridges hooks and server', () => {
+    const { db, dir } = freshDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
+                     .all().map(r => r.name as string);
+    expect(tables).toContain('turn_context');
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 

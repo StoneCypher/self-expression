@@ -15,6 +15,9 @@
 export type CliCommand = {
     readonly kind: 'mcp';
 } | {
+    readonly kind: 'hook';
+    readonly name: string;
+} | {
     readonly kind: 'help';
 } | {
     readonly kind: 'unknown';
@@ -52,21 +55,10 @@ export declare function parseCommand(argv: readonly string[]): CliCommand;
  *   helpText().startsWith('self-expression') // true
  */
 export declare function helpText(): string;
-/**
- * Execute a parsed command and report the process exit code.
- *
- * Returns the code rather than calling `process.exit`, so the whole dispatch path is
- * testable and so a caller embedding this can decide what to do. 0 means success;
- * any nonzero value is a failure suitable for passing straight to `process.exit`.
- *
- * @example
- *   run(['help'], streams)        // => 0, writes help to out
- *   run(['frobnicate'], streams)  // => 1, writes an error to err
- *
- * @throws Nothing. Failures are reported through the return code and `streams.err`.
- */
 /** Starts the MCP server and resolves when its transport closes. */
 export type ServerStarter = () => Promise<void>;
+/** Runs one named hook, reading its payload from stdin and writing its own output. */
+export type HookRunner = (name: string) => Promise<void>;
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -80,6 +72,19 @@ export type ServerStarter = () => Promise<void>;
  *   await runAsync(['help'], streams, start)  // => 0, never calls start
  *   await runAsync(['mcp'],  streams, start)  // => 0 once the server's transport closes
  */
-export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter): Promise<number>;
+export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner): Promise<number>;
+/**
+ * Execute a parsed command and report the process exit code.
+ *
+ * Returns the code rather than calling `process.exit`, so the whole dispatch path is
+ * testable and so a caller embedding this can decide what to do. 0 means success;
+ * any nonzero value is a failure suitable for passing straight to `process.exit`.
+ *
+ * @example
+ *   run(['help'], streams)        // => 0, writes help to out
+ *   run(['frobnicate'], streams)  // => 1, writes an error to err
+ *
+ * @throws Nothing. Failures are reported through the return code and `streams.err`.
+ */
 export declare function run(argv: readonly string[], streams: CliStreams): number;
 //# sourceMappingURL=cli_commands.d.ts.map

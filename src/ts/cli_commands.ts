@@ -15,6 +15,7 @@
 /** A resolved command line, after parsing but before execution. */
 export type CliCommand =
   | { readonly kind: 'mcp' }
+  | { readonly kind: 'hook'; readonly name: string }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly token: string };
 
@@ -46,6 +47,7 @@ export function parseCommand(argv: readonly string[]): CliCommand {
 
   if (first === undefined)                                    { return { kind: 'help' }; }
   if (first === 'mcp')                                        { return { kind: 'mcp'  }; }
+  if (first === 'hook')                                       { return { kind: 'hook', name: argv[1] ?? '' }; }
   if (first === 'help' || first === '--help' || first === '-h') { return { kind: 'help' }; }
 
   return { kind: 'unknown', token: first };
@@ -66,29 +68,20 @@ export function helpText(): string {
     'self-expression — backchannels, charting, and turn-boundary discipline',
     '',
     'Usage:',
-    '  self-expression mcp     start the MCP server on stdio',
-    '  self-expression help    show this message',
+    '  self-expression mcp          start the MCP server on stdio',
+    '  self-expression hook <name>  run a lifecycle hook, payload on stdin',
+    '  self-expression help         show this message',
     '',
     'The MCP server is normally started by a host plugin rather than by hand;',
     'see .mcp.json in the plugin root.',
   ].join('\n');
 }
 
-/**
- * Execute a parsed command and report the process exit code.
- *
- * Returns the code rather than calling `process.exit`, so the whole dispatch path is
- * testable and so a caller embedding this can decide what to do. 0 means success;
- * any nonzero value is a failure suitable for passing straight to `process.exit`.
- *
- * @example
- *   run(['help'], streams)        // => 0, writes help to out
- *   run(['frobnicate'], streams)  // => 1, writes an error to err
- *
- * @throws Nothing. Failures are reported through the return code and `streams.err`.
- */
 /** Starts the MCP server and resolves when its transport closes. */
 export type ServerStarter = () => Promise<void>;
+
+/** Runs one named hook, reading its payload from stdin and writing its own output. */
+export type HookRunner = (name: string) => Promise<void>;
 
 /**
  * Dispatch a command line, including the one command that is asynchronous.
@@ -107,17 +100,31 @@ export async function runAsync(
   argv        : readonly string[],
   streams     : CliStreams,
   startServer : ServerStarter,
+  runHook     : HookRunner,
 ): Promise<number> {
 
-  if (parseCommand(argv).kind === 'mcp') {
-    await startServer();
-    return 0;
-  }
+  const command = parseCommand(argv);
+
+  if (command.kind === 'mcp')  { await startServer();          return 0; }
+  if (command.kind === 'hook') { await runHook(command.name);  return 0; }
 
   return run(argv, streams);
 
 }
 
+/**
+ * Execute a parsed command and report the process exit code.
+ *
+ * Returns the code rather than calling `process.exit`, so the whole dispatch path is
+ * testable and so a caller embedding this can decide what to do. 0 means success;
+ * any nonzero value is a failure suitable for passing straight to `process.exit`.
+ *
+ * @example
+ *   run(['help'], streams)        // => 0, writes help to out
+ *   run(['frobnicate'], streams)  // => 1, writes an error to err
+ *
+ * @throws Nothing. Failures are reported through the return code and `streams.err`.
+ */
 export function run(argv: readonly string[], streams: CliStreams): number {
 
   const command = parseCommand(argv);
@@ -129,7 +136,8 @@ export function run(argv: readonly string[], streams: CliStreams): number {
       return 0;
 
     case 'mcp':
-      streams.err('self-expression: the MCP server must be started through runAsync.');
+    case 'hook':
+      streams.err(`self-expression: '${command.kind}' must be dispatched through runAsync.`);
       return 70;   // EX_SOFTWARE — reachable only by calling run() directly, which is a bug
 
     case 'unknown':

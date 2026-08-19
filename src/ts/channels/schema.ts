@@ -121,6 +121,37 @@ CREATE TABLE IF NOT EXISTS entries (
   format_version  TEXT
 )`;
 
+/**
+ * What the harness knows about the current turn, written by the hooks.
+ *
+ * This table is the join between two processes that otherwise cannot see each other.
+ * A hook knows the session, the turn, the working directory and the effort level but
+ * cannot write an expression; the MCP server can write expressions but knows none of
+ * those things. Neither can be fixed alone — so the hook deposits what it knows here,
+ * and the server reads it when recording.
+ *
+ * Rows accumulate rather than being replaced, so a turn's context survives for later
+ * inspection and so concurrent sessions do not overwrite each other.
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const TURN_CONTEXT_DDL: string = `
+CREATE TABLE IF NOT EXISTS turn_context (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts_utc          TEXT    NOT NULL,
+  session         TEXT    NOT NULL,
+  prompt_id       TEXT,
+  turn_index      INTEGER,
+  turn            TEXT,
+  cwd             TEXT,
+  git_branch      TEXT,
+  permission_mode TEXT,
+  agent_id        TEXT,
+  agent_type      TEXT,
+  effort          TEXT,
+  compactions     INTEGER,
+  prompt_len      INTEGER
+)`;
+
 /** System state. Not user-editable; changes at install and upgrade only. */
 export const META_DDL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -147,6 +178,7 @@ export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_session ON entries(session, id)',
   'CREATE INDEX IF NOT EXISTS idx_entries_channel ON entries(channel, ts_utc)',
   'CREATE INDEX IF NOT EXISTS idx_entries_series  ON entries(series_key, id)',
+  'CREATE INDEX IF NOT EXISTS idx_context_session ON turn_context(session, id)',
 ];
 
 /**
@@ -160,6 +192,7 @@ export const INDEX_DDL: readonly string[] = [
  */
 export const ALL_DDL: readonly string[] = [
   ENTRIES_DDL,
+  TURN_CONTEXT_DDL,
   META_DDL,
   CONFIG_DDL,
   ...INDEX_DDL,

@@ -25,6 +25,7 @@ import {
 import type { Channel }        from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
 import { readConfig, writeConfig, allConfig }                                 from '../channels/store.js';
+import { latestContext }                                                     from '../channels/context.js';
 import type { Store } from '../channels/store.js';
 
 /** Config key holding the comma-separated list of active channels. */
@@ -103,7 +104,8 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
       text           : z.string().min(1).max(280).describe('the content; terse, honest over flattering'),
-      session        : z.string().min(1).describe('session identifier'),
+      session        : z.string().optional().describe(
+        'usually omit — the hook supplies it, and an observed session beats a claimed one'),
       promptId       : z.string().optional().describe('turn identifier; groups a turn'),
       position       : z.enum(tuple(POSITIONS)).optional().describe('signatures only'),
       delta          : z.enum(tuple(DELTAS)).optional().describe('versus the previous signature'),
@@ -124,12 +126,37 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     },
   }, (args) => {
 
-    const client = server.server.getClientVersion();
+    const client  = server.server.getClientVersion(),
+          context = latestContext(store, args.session),
+          str     = (k: string): string | undefined => {
+            const v = context?.[k];
+            return typeof v === 'string' && v !== '' ? v : undefined;
+          },
+          num     = (k: string): number | undefined => {
+            const v = context?.[k];
+            return typeof v === 'number' ? v : undefined;
+          };
 
+    // Anything the caller supplied wins; everything else is adopted from what the hook
+    // observed. A row that reaches here with no context at all is marked 'no-hook'
+    // rather than given a plausible-looking session, so the gap is visible in the data
+    // instead of being disguised as an ordinary row.
     const written = recordEntry(store, {
       ...args,
-      host        : client?.name,
-      hostVersion : client?.version,
+      session        : args.session ?? str('session') ?? 'no-hook',
+      promptId       : args.promptId ?? str('prompt_id'),
+      turn           : args.turn     ?? (str('turn') as never),
+      effort         : args.effort   ?? (str('effort') as never),
+      turnIndex      : num('turn_index'),
+      cwd            : str('cwd'),
+      gitBranch      : str('git_branch'),
+      permissionMode : str('permission_mode'),
+      agentId        : str('agent_id'),
+      agentType      : str('agent_type'),
+      compactions    : num('compactions'),
+      promptLen      : num('prompt_len'),
+      host           : client?.name,
+      hostVersion    : client?.version,
     }, pluginVersion);
 
     return reply(`recorded #${String(written.id)} ${written.uuid}`);
@@ -142,23 +169,30 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'Read back what has been recorded. Use before writing a signature so delta comes ' +
       'from the record rather than from memory, which degrades quietly.',
     inputSchema : {
-      session : z.string().min(1),
+      session : z.string().optional().describe('omit to use the session the hook observed'),
       limit   : z.number().int().min(1).max(100).optional(),
     },
   }, (args) => {
 
-    const previous = previousSignature(store, args.session),
+    const context  = latestContext(store, args.session),
+          session  = args.session ?? (typeof context?.['session'] === 'string' ? context['session'] : ''),
+          previous = session === '' ? null : previousSignature(store, session),
           recent   = recentEntries(store, args.limit ?? 10);
 
-    return reply(JSON.stringify({ previous, recent }, null, 2));
+    return reply(JSON.stringify({ context, previous, recent }, null, 2));
 
   });
 
   server.registerTool('turn_signed', {
     title       : 'Turn signed',
     description : 'Whether this turn already carries a closing signature. Exact, by turn identity.',
-    inputSchema : { promptId: z.string().min(1) },
-  }, (args) => reply(String(hasClosingSignature(store, args.promptId))));
+    inputSchema : { promptId: z.string().optional() },
+  }, (args) => {
+    const context  = latestContext(store),
+          promptId = args.promptId
+            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : '');
+    return reply(promptId === '' ? 'unknown' : String(hasClosingSignature(store, promptId)));
+  });
 
   server.registerTool('configure', {
     title       : 'Configure',
