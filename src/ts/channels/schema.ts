@@ -47,8 +47,16 @@ export function check(column: string, vocabulary: readonly string[]): string {
   return `CHECK (${column} IS NULL OR ${column} IN (${vocabulary.map(v => `'${v}'`).join(',')}))`;
 }
 
-/** Every expression, of every kind, in one table. */
-export const ENTRIES_DDL = `
+/**
+ * Every expression, of every kind, in one table.
+ *
+ * The explicit annotation is required by `isolatedDeclarations` and is simultaneously
+ * flagged by eslint's `no-inferrable-types`, which does not know about that constraint.
+ * The compiler wins: without the annotation the build fails outright, whereas the lint
+ * rule is a style preference.
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const ENTRIES_DDL: string = `
 CREATE TABLE IF NOT EXISTS entries (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   uuid            TEXT    NOT NULL UNIQUE,

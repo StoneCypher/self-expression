@@ -97,9 +97,18 @@ const iife_config = {
 
 
 
+// The bin bundles only this project's own code. Every bare specifier — node:
+// builtins, the MCP SDK, zod — stays external and resolves from node_modules at
+// runtime, which is how an npm-installed executable is normally shaped.
+//
+// Bundling them is not merely wasteful but broken: the SDK's dependency tree pulls in
+// express, hono, ajv and jose, and ajv imports JSON, which Rollup cannot parse without
+// an extra plugin. node:sqlite must be external regardless, being a builtin.
 const cli_config = {
 
   input: 'build/ts/cli.js',
+
+  external: (id) => !id.startsWith('.') && !id.startsWith('/'),
 
   output: {
     file      : 'build/rollup/cli.cjs',
@@ -107,20 +116,7 @@ const cli_config = {
     banner    : '#!/usr/bin/env node',
     name      : 'selfExpressionCli',
     sourcemap : true
-  },
-
-  plugins : [
-
-    nodeResolve({
-      mainFields     : ['module', 'main'],
-      browser        : false,
-      extensions     : [ '.ts', '.js' ],
-      preferBuiltins : true
-    }),
-
-    commonjs()
-
-  ]
+  }
 
 };
 

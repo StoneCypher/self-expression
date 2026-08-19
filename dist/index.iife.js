@@ -1,0 +1,2 @@
+var selfExpression=function(e){"use strict";return e.double=function(e){if("number"!=typeof e)throw new TypeError("input to `double/1` must be a `number`");return 2*e},e.unhandled_external=function(){},e}({});
+//# sourceMappingURL=index.iife.js.map

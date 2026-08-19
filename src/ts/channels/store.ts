@@ -43,7 +43,7 @@ export type ConfigValue = string | number | boolean;
  */
 export function readMeta(store: Store, key: string): string | null {
   const row = store.db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
-  return row ? String(row.value) : null;
+  return row ? String(row['value']) : null;
 }
 
 /**
@@ -71,7 +71,7 @@ export function writeMeta(store: Store, key: string, value: string): void {
  */
 export function readConfig(store: Store, key: string): string | null {
   const row = store.db.prepare('SELECT value FROM config WHERE key = ?').get(key);
-  return row ? String(row.value) : null;
+  return row ? String(row['value']) : null;
 }
 
 /**
@@ -104,7 +104,7 @@ export function writeConfig(store: Store, key: string, value: ConfigValue): void
 export function allConfig(store: Store): Record<string, string> {
   const out: Record<string, string> = {};
   for (const row of store.db.prepare('SELECT key, value FROM config').all()) {
-    out[String(row.key)] = String(row.value);
+    out[String(row['key'])] = String(row['value']);
   }
   return out;
 }

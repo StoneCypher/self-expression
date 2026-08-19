@@ -33,54 +33,54 @@ export interface EntryInput {
   readonly text             : string;
   readonly session          : string;
 
-  readonly promptId?        : string;
-  readonly turnIndex?       : number;
-  readonly turn?            : Turn;
-  readonly host?            : string;
-  readonly hostVersion?     : string;
-  readonly agentId?         : string;
-  readonly agentType?       : string;
-  readonly effort?          : Effort;
-  readonly permissionMode?  : string;
-  readonly cwd?             : string;
-  readonly project?         : string;
-  readonly gitBranch?       : string;
-  readonly model?           : string;
+  readonly promptId?        : string | undefined;
+  readonly turnIndex?       : number | undefined;
+  readonly turn?            : Turn | undefined;
+  readonly host?            : string | undefined;
+  readonly hostVersion?     : string | undefined;
+  readonly agentId?         : string | undefined;
+  readonly agentType?       : string | undefined;
+  readonly effort?          : Effort | undefined;
+  readonly permissionMode?  : string | undefined;
+  readonly cwd?             : string | undefined;
+  readonly project?         : string | undefined;
+  readonly gitBranch?       : string | undefined;
+  readonly model?           : string | undefined;
 
-  readonly modality?        : Modality;
-  readonly visible?         : boolean;
-  readonly nudged?          : boolean;
-  readonly interrupted?     : boolean;
-  readonly toolCalls?       : number;
-  readonly errorCount?      : number;
-  readonly compactions?     : number;
-  readonly promptLen?       : number;
-  readonly responseLen?     : number;
-  readonly contextTokens?   : number;
-  readonly outputTokens?    : number;
-  readonly thinkingTokens?  : number;
-  readonly correctsId?      : number;
-  readonly elapsedMs?       : number;
+  readonly modality?        : Modality | undefined;
+  readonly visible?         : boolean | undefined;
+  readonly nudged?          : boolean | undefined;
+  readonly interrupted?     : boolean | undefined;
+  readonly toolCalls?       : number | undefined;
+  readonly errorCount?      : number | undefined;
+  readonly compactions?     : number | undefined;
+  readonly promptLen?       : number | undefined;
+  readonly responseLen?     : number | undefined;
+  readonly contextTokens?   : number | undefined;
+  readonly outputTokens?    : number | undefined;
+  readonly thinkingTokens?  : number | undefined;
+  readonly correctsId?      : number | undefined;
+  readonly elapsedMs?       : number | undefined;
 
-  readonly position?        : Position;
-  readonly delta?           : Delta;
-  readonly uncertain?       : boolean;
-  readonly face?            : string;
-  readonly contextEmoji?    : string;
-  readonly stem?            : Stem;
-  readonly cctype?          : string;
+  readonly position?        : Position | undefined;
+  readonly delta?           : Delta | undefined;
+  readonly uncertain?       : boolean | undefined;
+  readonly face?            : string | undefined;
+  readonly contextEmoji?    : string | undefined;
+  readonly stem?            : Stem | undefined;
+  readonly cctype?          : string | undefined;
 
-  readonly confidence?      : ConfidenceGround;
-  readonly divergenceKind?  : DivergenceKind;
+  readonly confidence?      : ConfidenceGround | undefined;
+  readonly divergenceKind?  : DivergenceKind | undefined;
 
-  readonly seriesKey?       : string;
-  readonly title?           : string;
-  readonly succ?            : number;
-  readonly active?          : number;
-  readonly fail?            : number;
-  readonly percent?         : number;
+  readonly seriesKey?       : string | undefined;
+  readonly title?           : string | undefined;
+  readonly succ?            : number | undefined;
+  readonly active?          : number | undefined;
+  readonly fail?            : number | undefined;
+  readonly percent?         : number | undefined;
 
-  readonly formatVersion?   : string;
+  readonly formatVersion?   : string | undefined;
 }
 
 /** Identity of a row that was written. */
@@ -212,7 +212,8 @@ export function recordEntry(
     pluginVersion, input.formatVersion ?? null,
   );
 
-  const id = store.db.prepare('SELECT last_insert_rowid() AS id').get().id as number;
+  const row = store.db.prepare('SELECT last_insert_rowid() AS id').get(),
+        id  = Number(row?.['id'] ?? 0);
 
   return { id, uuid };
 

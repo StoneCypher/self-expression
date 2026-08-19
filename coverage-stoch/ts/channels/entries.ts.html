@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/26</span>
+                <span class='fraction'>0/27</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/96</span>
+                <span class='fraction'>0/98</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/24</span>
+                <span class='fraction'>0/25</span>
             </div>
         
             
@@ -332,7 +332,8 @@
 <a name='L267'></a><a href='#L267'>267</a>
 <a name='L268'></a><a href='#L268'>268</a>
 <a name='L269'></a><a href='#L269'>269</a>
-<a name='L270'></a><a href='#L270'>270</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -546,6 +547,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -636,54 +638,54 @@ export interface EntryInput {
   readonly text             : string;
   readonly session          : string;
 &nbsp;
-  readonly promptId?        : string;
-  readonly turnIndex?       : number;
-  readonly turn?            : Turn;
-  readonly host?            : string;
-  readonly hostVersion?     : string;
-  readonly agentId?         : string;
-  readonly agentType?       : string;
-  readonly effort?          : Effort;
-  readonly permissionMode?  : string;
-  readonly cwd?             : string;
-  readonly project?         : string;
-  readonly gitBranch?       : string;
-  readonly model?           : string;
+  readonly promptId?        : string | undefined;
+  readonly turnIndex?       : number | undefined;
+  readonly turn?            : Turn | undefined;
+  readonly host?            : string | undefined;
+  readonly hostVersion?     : string | undefined;
+  readonly agentId?         : string | undefined;
+  readonly agentType?       : string | undefined;
+  readonly effort?          : Effort | undefined;
+  readonly permissionMode?  : string | undefined;
+  readonly cwd?             : string | undefined;
+  readonly project?         : string | undefined;
+  readonly gitBranch?       : string | undefined;
+  readonly model?           : string | undefined;
 &nbsp;
-  readonly modality?        : Modality;
-  readonly visible?         : boolean;
-  readonly nudged?          : boolean;
-  readonly interrupted?     : boolean;
-  readonly toolCalls?       : number;
-  readonly errorCount?      : number;
-  readonly compactions?     : number;
-  readonly promptLen?       : number;
-  readonly responseLen?     : number;
-  readonly contextTokens?   : number;
-  readonly outputTokens?    : number;
-  readonly thinkingTokens?  : number;
-  readonly correctsId?      : number;
-  readonly elapsedMs?       : number;
+  readonly modality?        : Modality | undefined;
+  readonly visible?         : boolean | undefined;
+  readonly nudged?          : boolean | undefined;
+  readonly interrupted?     : boolean | undefined;
+  readonly toolCalls?       : number | undefined;
+  readonly errorCount?      : number | undefined;
+  readonly compactions?     : number | undefined;
+  readonly promptLen?       : number | undefined;
+  readonly responseLen?     : number | undefined;
+  readonly contextTokens?   : number | undefined;
+  readonly outputTokens?    : number | undefined;
+  readonly thinkingTokens?  : number | undefined;
+  readonly correctsId?      : number | undefined;
+  readonly elapsedMs?       : number | undefined;
 &nbsp;
-  readonly position?        : Position;
-  readonly delta?           : Delta;
-  readonly uncertain?       : boolean;
-  readonly face?            : string;
-  readonly contextEmoji?    : string;
-  readonly stem?            : Stem;
-  readonly cctype?          : string;
+  readonly position?        : Position | undefined;
+  readonly delta?           : Delta | undefined;
+  readonly uncertain?       : boolean | undefined;
+  readonly face?            : string | undefined;
+  readonly contextEmoji?    : string | undefined;
+  readonly stem?            : Stem | undefined;
+  readonly cctype?          : string | undefined;
 &nbsp;
-  readonly confidence?      : ConfidenceGround;
-  readonly divergenceKind?  : DivergenceKind;
+  readonly confidence?      : ConfidenceGround | undefined;
+  readonly divergenceKind?  : DivergenceKind | undefined;
 &nbsp;
-  readonly seriesKey?       : string;
-  readonly title?           : string;
-  readonly succ?            : number;
-  readonly active?          : number;
-  readonly fail?            : number;
-  readonly percent?         : number;
+  readonly seriesKey?       : string | undefined;
+  readonly title?           : string | undefined;
+  readonly succ?            : number | undefined;
+  readonly active?          : number | undefined;
+  readonly fail?            : number | undefined;
+  readonly percent?         : number | undefined;
 &nbsp;
-  readonly formatVersion?   : string;
+  readonly formatVersion?   : string | undefined;
 }
 &nbsp;
 /** Identity of a row that was written. */
@@ -815,7 +817,8 @@ export function <span class="fstat-no" title="function not covered" >recordEntry
     pluginVersion, input.formatVersion ?? null,
   );
 &nbsp;
-  const id = <span class="cstat-no" title="statement not covered" >store.db.prepare('SELECT last_insert_rowid() AS id').get().id as number;</span>
+  const row = <span class="cstat-no" title="statement not covered" >store.db.prepare('SELECT last_insert_rowid() AS id').get(),</span>
+        id  = <span class="cstat-no" title="statement not covered" >Number(row?.['id'] ?? 0);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return { id, uuid };</span>
 &nbsp;
@@ -877,7 +880,7 @@ export function <span class="fstat-no" title="function not covered" >recentEntri
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-18T23:27:02.541Z
+                at 2026-08-19T00:07:11.953Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

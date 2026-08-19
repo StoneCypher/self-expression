@@ -11,19 +11,20 @@
  *
  * @see ../doc_md/plugin-layout.md
  */
-
 /** A resolved command line, after parsing but before execution. */
-export type CliCommand =
-  | { readonly kind: 'mcp' }
-  | { readonly kind: 'help' }
-  | { readonly kind: 'unknown'; readonly token: string };
-
+export type CliCommand = {
+    readonly kind: 'mcp';
+} | {
+    readonly kind: 'help';
+} | {
+    readonly kind: 'unknown';
+    readonly token: string;
+};
 /** Streams the CLI writes to, injectable so tests can capture output. */
 export interface CliStreams {
-  readonly out: (line: string) => void;
-  readonly err: (line: string) => void;
+    readonly out: (line: string) => void;
+    readonly err: (line: string) => void;
 }
-
 /**
  * Resolve raw command-line arguments into a single command.
  *
@@ -40,18 +41,7 @@ export interface CliStreams {
  *   parseCommand(['--help'])    // { kind: 'help' }
  *   parseCommand(['frobnicate'])// { kind: 'unknown', token: 'frobnicate' }
  */
-export function parseCommand(argv: readonly string[]): CliCommand {
-
-  const [first] = argv;
-
-  if (first === undefined)                                    { return { kind: 'help' }; }
-  if (first === 'mcp')                                        { return { kind: 'mcp'  }; }
-  if (first === 'help' || first === '--help' || first === '-h') { return { kind: 'help' }; }
-
-  return { kind: 'unknown', token: first };
-
-}
-
+export declare function parseCommand(argv: readonly string[]): CliCommand;
 /**
  * The text shown for `--help` and for a bare invocation.
  *
@@ -61,19 +51,7 @@ export function parseCommand(argv: readonly string[]): CliCommand {
  * @example
  *   helpText().startsWith('self-expression') // true
  */
-export function helpText(): string {
-  return [
-    'self-expression — backchannels, charting, and turn-boundary discipline',
-    '',
-    'Usage:',
-    '  self-expression mcp     start the MCP server on stdio',
-    '  self-expression help    show this message',
-    '',
-    'The MCP server is normally started by a host plugin rather than by hand;',
-    'see .mcp.json in the plugin root.',
-  ].join('\n');
-}
-
+export declare function helpText(): string;
 /**
  * Execute a parsed command and report the process exit code.
  *
@@ -89,7 +67,6 @@ export function helpText(): string {
  */
 /** Starts the MCP server and resolves when its transport closes. */
 export type ServerStarter = () => Promise<void>;
-
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -103,40 +80,6 @@ export type ServerStarter = () => Promise<void>;
  *   await runAsync(['help'], streams, start)  // => 0, never calls start
  *   await runAsync(['mcp'],  streams, start)  // => 0 once the server's transport closes
  */
-export async function runAsync(
-  argv        : readonly string[],
-  streams     : CliStreams,
-  startServer : ServerStarter,
-): Promise<number> {
-
-  if (parseCommand(argv).kind === 'mcp') {
-    await startServer();
-    return 0;
-  }
-
-  return run(argv, streams);
-
-}
-
-export function run(argv: readonly string[], streams: CliStreams): number {
-
-  const command = parseCommand(argv);
-
-  switch (command.kind) {
-
-    case 'help':
-      streams.out(helpText());
-      return 0;
-
-    case 'mcp':
-      streams.err('self-expression: the MCP server must be started through runAsync.');
-      return 70;   // EX_SOFTWARE — reachable only by calling run() directly, which is a bug
-
-    case 'unknown':
-      streams.err(`self-expression: unknown command '${command.token}'`);
-      streams.err(helpText());
-      return 64;   // EX_USAGE
-
-  }
-
-}
+export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter): Promise<number>;
+export declare function run(argv: readonly string[], streams: CliStreams): number;
+//# sourceMappingURL=cli_commands.d.ts.map

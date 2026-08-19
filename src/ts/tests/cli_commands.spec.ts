@@ -1,5 +1,5 @@
-import { parseCommand, helpText, run } from '../cli_commands.js';
-import type { CliStreams }             from '../cli_commands.js';
+import { parseCommand, helpText, run, runAsync } from '../cli_commands.js';
+import type { CliStreams }                       from '../cli_commands.js';
 
 /** Collect everything the dispatcher writes, so exit codes and output can both be asserted. */
 function capture(): { streams: CliStreams; out: string[]; err: string[] } {
@@ -52,10 +52,10 @@ describe('run', () => {
     expect(err).toHaveLength(0);
   });
 
-  test('mcp reports unavailable with EX_SOFTWARE rather than pretending to start', () => {
+  test('the synchronous path refuses mcp rather than pretending to start a server', () => {
     const { streams, out, err } = capture();
     expect(run(['mcp'], streams)).toBe(70);
-    expect(err.join('\n')).toContain('not implemented');
+    expect(err.join('\n')).toContain('runAsync');
     expect(out).toHaveLength(0);
   });
 
@@ -68,6 +68,48 @@ describe('run', () => {
   });
 
   test('a bare invocation behaves exactly like help', () => {
+    const bare = capture(),
+          help = capture();
+    expect(run([], bare.streams)).toBe(run(['help'], help.streams));
+    expect(bare.out).toEqual(help.out);
+  });
+
+});
+
+describe('runAsync', () => {
+
+  test('mcp starts the server and succeeds once its transport closes', async () => {
+    const { streams } = capture();
+    let started = false;
+    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); });
+    expect(started).toBe(true);
+    expect(code).toBe(0);
+  });
+
+  test('never starts a server for any other command', async () => {
+    const { streams } = capture();
+    let started = false;
+    const start = (): Promise<void> => { started = true; return Promise.resolve(); };
+    for (const argv of [['help'], [], ['--help'], ['frobnicate']]) {
+      await runAsync(argv, streams, start);
+    }
+    expect(started).toBe(false);
+  });
+
+  test('delegates non-mcp exit codes unchanged', async () => {
+    const a = capture(), b = capture();
+    const start = (): Promise<void> => Promise.resolve();
+    expect(await runAsync(['help'], a.streams, start)).toBe(0);
+    expect(await runAsync(['frobnicate'], b.streams, start)).toBe(64);
+  });
+
+  test('propagates a startup failure rather than reporting success', async () => {
+    const { streams } = capture();
+    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk'))))
+      .rejects.toThrow('no disk');
+  });
+
+  test('the old help-equivalence still holds', () => {
     const bare = capture(),
           help = capture();
     expect(run([], bare.streams)).toBe(run(['help'], help.streams));
