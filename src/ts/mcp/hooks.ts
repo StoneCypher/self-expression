@@ -64,6 +64,21 @@ export function describeMoment(now: Date): string {
 }
 
 /**
+ * Asks for the opening signature at the only moment it can honestly be written.
+ *
+ * The opening read is deliberately not enforced at the end of the turn: blocking a stop
+ * for a missing open would only produce one written after the fact, and a backdated
+ * before-measurement is worse than an absent one, because it looks like data.
+ *
+ * So this is the entire enforcement, and it is prompting rather than blocking. That is
+ * a change of kind from the previous design, where nothing asked at all — which is the
+ * most likely explanation for opens running at roughly 54% of closes across five weeks
+ * of logged use. Whether asking is sufficient is now a measurable question.
+ */
+export const OPEN_REMINDER =
+  'Open this turn with a signature before working, using the timestamp above.';
+
+/**
  * `UserPromptSubmit`: record what the harness knows, and hand back the clock.
  *
  * The context write is the important half. It is the only way session identity,
@@ -97,7 +112,7 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
   return {
     hookSpecificOutput: {
       hookEventName    : 'UserPromptSubmit',
-      additionalContext: describeMoment(now),
+      additionalContext: `${describeMoment(now)} ${OPEN_REMINDER}`,
     },
   };
 
