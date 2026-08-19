@@ -144,6 +144,14 @@ test-results/*
 stats.html
 .DS_Store
 
+# Personal, machine-specific Claude Code settings. Per Claude Code's own scoping,
+# .claude/settings.json is the team-shared file and settings.local.json is the
+# personal one, which the harness rewrites continuously — so while it is tracked
+# the working tree is permanently dirty and every branch switch and merge is
+# blocked. It also accumulates absolute paths from other machines, which are
+# meaningless anywhere else. Shared project settings belong in settings.json.
+.claude/settings.local.json
+
 # Legacy plugin staged for transformation. Untracked on purpose: the repo root
 # doubles as the plugin root, so anything committed here would ship inside the
 # published plugin. The README is the one tracked file, and explains the rules.
