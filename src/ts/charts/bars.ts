@@ -386,10 +386,13 @@ const BOX_WALL_RIGHT        = '\u{2520}'; // ┠ right wall of the interquartile
  * fill between them, and `median` the `┃` tick — all five positions scaled linearly onto
  * `width` cells, with `min` always at the left edge and `max` always at the right.
  *
- * When two or more stats land on the same cell (including the degenerate case
- * `min === max`, where every stat collapses to the left edge), the more specific glyph
- * wins: the median tick beats the box walls, and the whisker ends beat everything,
- * since the overall span is the fact most worth keeping visible.
+ * When two or more stats land on the same cell, the more specific glyph wins: the
+ * median tick beats the box walls, and the whisker ends beat everything else. Between
+ * the two ends themselves, the left end `├` wins — deliberately, not as an accident of
+ * assignment order — so the fully degenerate case (`min === max`, which forces every
+ * stat to the same value and every position to `0`, since `fraction` is defined as `0`
+ * when the span is `0`) renders as a single `├` at the left edge followed by plain
+ * whisker fill, matching "collapses to the left edge" rather than showing `┤` there.
  *
  * @param stats the five-number summary; must satisfy
  *   `min <= q1 <= median <= q3 <= max`
@@ -401,6 +404,12 @@ const BOX_WALL_RIGHT        = '\u{2520}'; // ┠ right wall of the interquartile
  *   // posMin=0 posQ1=4 posMedian=8 posQ3=11 posMax=15
  *   renderBoxWhisker({ min: 0, q1: 25, median: 50, q3: 75, max: 100 })
  *   // => '├───┨▓▓▓┃▓▓┠───┤'
+ *
+ *   // degenerate case: min === max forces span = 0, so every position is 0 — the
+ *   // left whisker end '├' wins the five-way tie, and everything past it is plain
+ *   // whisker fill
+ *   renderBoxWhisker({ min: 5, q1: 5, median: 5, q3: 5, max: 5 })
+ *   // => '├───────────────'
  *
  * @throws {RangeError} when a stat is non-finite, the stats are not non-decreasing, or
  *   `width` is not an integer of at least 2.
@@ -439,11 +448,15 @@ export function renderBoxWhisker(stats: BoxWhiskerStats, width: number = 16): st
   for (let i = posQ1 + 1; i < posMedian; i++) { cells[i] = at(SHADES, 2); }
   for (let i = posMedian + 1; i < posQ3; i++) { cells[i] = at(SHADES, 2); }
 
+  // Assignment order doubles as precedence: each later write wins a coincident cell.
+  // Box walls first, then the median (beats the walls), then the right whisker end,
+  // then the left whisker end last — so `min` deliberately wins over `max` in the
+  // fully degenerate `min === max` case, per the DocBlock above.
   cells[posQ1] = BOX_WALL_LEFT;
   cells[posQ3] = BOX_WALL_RIGHT;
   cells[posMedian] = DIVERGING_CENTER;
-  cells[posMin] = BOX_WHISKER_END_LEFT;
   cells[posMax] = BOX_WHISKER_END_RIGHT;
+  cells[posMin] = BOX_WHISKER_END_LEFT;
 
   return cells.join('');
 }

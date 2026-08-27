@@ -278,8 +278,21 @@ describe('renderBoxWhisker', () => {
     expect(() => renderBoxWhisker({ min: 0, q1: 5, median: 10, q3: 25, max: 20 })).toThrow(RangeError);
   });
 
-  test('accepts equal adjacent stats (non-strict ordering)', () => {
-    expect(() => renderBoxWhisker({ min: 0, q1: 0, median: 5, q3: 5, max: 10 })).not.toThrow();
+  test('accepts equal adjacent stats (non-strict ordering) and renders the coincident cells deterministically', () => {
+    // span = 10; position(v) = round(v/10 * 15)
+    // posMin=posQ1=round(0)=0 (coincide); posMedian=posQ3=round(7.5)=8 (coincide); posMax=round(15)=15
+    // indices 1-7: box fill '▓' (between q1 and median)
+    // index 8: median '┃' wins over the coincident q3 wall '┠'
+    // indices 9-14: whisker fill '─' (between q3 and max)
+    // index 0: the left whisker end '├' wins over the coincident q1 wall '┨'
+    expect(renderBoxWhisker({ min: 0, q1: 0, median: 5, q3: 5, max: 10 })).toBe('├▓▓▓▓▓▓▓┃──────┤');
+  });
+
+  test('the degenerate min === max case collapses every position to 0; the left whisker end wins the five-way tie', () => {
+    // span = 0, so fraction(v) = 0 for every stat -> every position is 0.
+    // Assignment order (walls, median, right end, left end last) means '├' wins over
+    // '┠', '┃', and '┤' at index 0; everything past it is untouched whisker fill.
+    expect(renderBoxWhisker({ min: 5, q1: 5, median: 5, q3: 5, max: 5 })).toBe('├───────────────');
   });
 
   test('throws RangeError when a stat is non-finite', () => {
