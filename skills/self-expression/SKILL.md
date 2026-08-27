@@ -81,6 +81,10 @@ Each is a diff line, placed wherever it belongs in the response. Each ends with 
 
 - `sPoNgEbOb` case — mocking case for mocking content: `oH sUrE, tHe TeStS pAsSeD lOcAlLy`
 - strikethrough-then-sanitized-replacement: `this ~~dumpster fire~~ opportunity space`
+- the deadpan footnote — an innocent sentence carrying a superscript marker (`¹ ² ³`, or daggers `† ‡` as a variant), the dagger line arriving a beat later: `The deploy went smoothly.¹` … `¹ it did not go smoothly.` The delay is the joke; comedic timing rendered spatially.
+- the mock conventional-commit — parody in the house idiom: `fix: the thing that was already fixed, twice, by the same hand`
+- weaponized precision — deadpan statistics as commentary: `the build passed on attempt 7 of 7 (a career-best 14.3% success rate)`. Wears the measured register's clothes, which is why the code-block uniform is non-negotiable here.
+- the ellipsis of dawning horror — pacing as affect: `it reads the config... at import time... from the network`
 
 &nbsp;
 
