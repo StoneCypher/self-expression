@@ -53,6 +53,18 @@ describe('handleRenderSeries', () => {
     expect(text(handleRenderSeries(s, { form: 'sparkline', seriesKey: 'coverage' }))).toBe('▁▄▆█');
   }));
 
+  test('a conflicting scale is ignored when seriesKey is supplied — always renders absolute', () => withStore(s => {
+    for (const percent of [10, 40, 70, 100]) {
+      recordEntry(s, { channel: 'need', text: 'checkpoint', session: 's1', seriesKey: 'scale-conflict', percent }, VERSION);
+    }
+    // Same [10,40,70,100] data, requested on the 'relative' scale this series' own
+    // min(10)/max(100) would produce relativeIndex mapping '▁▃▆█' (40 -> step 2, '▃')
+    // rather than the absolute mapping '▁▄▆█' (40 -> step 3, '▄') — asserting the
+    // absolute string proves 'scale' was actually overridden, not merely unread.
+    const out = text(handleRenderSeries(s, { form: 'sparkline', seriesKey: 'scale-conflict', scale: 'relative' }));
+    expect(out).toBe('▁▄▆█');
+  }));
+
   test('braille form resolves seriesKey the same way', () => withStore(s => {
     for (const percent of [0, 20, 50, 100]) {
       recordEntry(s, { channel: 'need', text: 'checkpoint', session: 's1', seriesKey: 'braille-series', percent }, VERSION);

@@ -59,6 +59,41 @@ function tuple<T extends string>(values: readonly T[]): [T, ...T[]] {
 }
 
 /**
+ * Compile-time exact type equality — deliberately stricter than mutual `extends`.
+ *
+ * A hand-written `*Args` interface (see {@link SeriesArgs} and its five siblings) is
+ * kept honest against its `*_SHAPE` zod object by a per-pair assertion built from this
+ * type, immediately below each `*Args` declaration. Plain bidirectional `extends` is
+ * NOT sufficient for that job: TypeScript's structural assignability treats "the target
+ * declares an optional field, the source lacks the key entirely" as a match in both
+ * directions, so a naive `A extends B ? (B extends A ? true : never) : never` would
+ * silently accept an `*Args` interface that is missing (or has renamed) an optional
+ * field the real schema carries — exactly the drift `registerChartTools`'s call-site
+ * check cannot catch either, since the SDK hands each callback a contextually-typed
+ * parameter, and structural assignability into a function parameter permits both
+ * excess properties on the source and absent-but-optional properties on the target.
+ * This type instead wraps each side in a generic function-return position before
+ * comparing — the standard trick (used by test-type libraries like `tsd`/`expect-type`)
+ * for forcing TypeScript to compare two types invariantly, which does distinguish
+ * `{ f?: T }` from `{}` and catches a renamed, added, or removed optional key.
+ *
+ * `A` and `B` each appear exactly once in the body by necessity — that is the whole
+ * shape of this comparison, not a sign either could be inlined away — so
+ * `no-unnecessary-type-parameters` is disabled for this one declaration.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- A and B each referenced exactly once is the point of this comparison
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+
+/**
+ * Fails to compile unless `T` is exactly `true`; otherwise returns what it was given.
+ * Called once per `*Args`/`*_SHAPE` pair, e.g. `expectType<Equal<SeriesArgs,
+ * z.infer<z.ZodObject<typeof SERIES_SHAPE>>>>(true)` — a real call rather than a bare
+ * `type` alias, specifically so the assertion counts as "used" under this project's
+ * `noUnusedLocals` without needing to export purely-internal type-testing plumbing.
+ */
+function expectType<T extends true>(value: T): T { return value; }
+
+/**
  * The shape of an MCP tool result's text content — every chart tool's return type.
  *
  * Carries `[x: string]: unknown` alongside `content` because the SDK's own
@@ -196,6 +231,9 @@ export interface SeriesArgs {
   seriesKey?: string | undefined;
 }
 
+// Fails to compile if SeriesArgs drifts from SERIES_SHAPE — see expectType's docblock.
+expectType<Equal<SeriesArgs, z.infer<z.ZodObject<typeof SERIES_SHAPE>>>>(true);
+
 /**
  * Handles `render_series`: a trend sparkline, a braille microplot, or a win/loss strip.
  *
@@ -328,6 +366,9 @@ export interface BarArgs {
   median?: number | undefined;
   q3?: number | undefined;
 }
+
+// Fails to compile if BarArgs drifts from BAR_SHAPE — see expectType's docblock.
+expectType<Equal<BarArgs, z.infer<z.ZodObject<typeof BAR_SHAPE>>>>(true);
 
 /**
  * Handles `render_bar`: a single value, or a small stat set, as a fixed-width bar.
@@ -487,6 +528,9 @@ export interface RowsArgs {
   fill?: TileFill | undefined;
 }
 
+// Fails to compile if RowsArgs drifts from ROWS_SHAPE — see expectType's docblock.
+expectType<Equal<RowsArgs, z.infer<z.ZodObject<typeof ROWS_SHAPE>>>>(true);
+
 /**
  * Handles `render_rows`: several values compared side by side, as bars/dots or a
  * tile-grid map.
@@ -594,6 +638,9 @@ export interface TimelineArgs {
   transitions?: { from: string; to: string; action?: string | undefined }[] | undefined;
   activeState?: string | undefined;
 }
+
+// Fails to compile if TimelineArgs drifts from TIMELINE_SHAPE — see expectType's docblock.
+expectType<Equal<TimelineArgs, z.infer<z.ZodObject<typeof TIMELINE_SHAPE>>>>(true);
 
 /**
  * Handles `render_timeline`: an ordered-stage milestone rail, dependency chain, or FSL
@@ -717,6 +764,9 @@ export interface GlyphArgs {
   state?: WeatherState | undefined;
 }
 
+// Fails to compile if GlyphArgs drifts from GLYPH_SHAPE — see expectType's docblock.
+expectType<Equal<GlyphArgs, z.infer<z.ZodObject<typeof GLYPH_SHAPE>>>>(true);
+
 /**
  * Handles `render_glyph`: the lightest-weight inline visual cue — a trend tag, star
  * rating, retry health bar, or weather glyph.
@@ -753,7 +803,7 @@ export function handleRenderGlyph(_store: Store, args: GlyphArgs): ToolReply {
             "(number, 0 to max); 'max' optional, defaults to 5"
           );
         }
-        return reply(max === undefined ? renderStars(score) : renderStars(score, max));
+        return reply(renderStars(score, max));
       }
 
       case 'retry': {
@@ -822,6 +872,10 @@ export interface ChecklistSummaryArgs {
   series?: number[] | undefined;
   seriesKey?: string | undefined;
 }
+
+// Fails to compile if ChecklistSummaryArgs drifts from CHECKLIST_SUMMARY_SHAPE — see
+// expectType's docblock.
+expectType<Equal<ChecklistSummaryArgs, z.infer<z.ZodObject<typeof CHECKLIST_SUMMARY_SHAPE>>>>(true);
 
 /**
  * Handles `render_checklist_summary`: the full status-checklist summary line — count
