@@ -110,6 +110,10 @@ export function renderBraille(series: readonly number[], scale: SeriesScale): st
 /**
  * The run-outcome vocabulary a win/loss strip renders, per `visuals.md` § Inline
  * micro-visualizations, "Win/loss strip".
+ *
+ * @example
+ *   OUTCOMES[0]  // => 'pass'
+ *   OUTCOMES[5]  // => 'skipped'
  */
 export const OUTCOMES: readonly string[] = [
   'pass', 'flaky', 'fail', 'underway', 'queued', 'skipped',
