@@ -79,6 +79,19 @@ Each is a diff line, placed wherever it belongs in the response. Each ends with 
 
 &nbsp;
 
+## Number-square lists
+
+When enumerating up to ten parallel items — options, steps, competing readings, voices in a split — render them as a list whose bullets are the Unicode number squares `1️⃣` through `🔟`, each line indented two spaces:
+
+  1️⃣ write decisions at decision-time, never at wrap-up time
+  2️⃣ prefer storage the next agent loads by default
+  3️⃣ record the why beside the what
+  4️⃣ label the seam when something wasn't preserved
+
+Rules: two-space indent, glyph then a space then the item; **never inside a blockquote** — blockquotes italicize, and the squares render poorly in italics. More than ten items degrades to plain numbers — and is usually a sign the list wants restructuring. The squares are for scannability of *parallel* items; ordinary prose enumeration ("first… then…") stays prose.
+
+&nbsp;
+
 ## Recording
 
 Every rendered line is also recorded, with one `express` tool call each.
