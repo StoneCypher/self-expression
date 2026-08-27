@@ -43,7 +43,7 @@ Left to right:
 - **Delta** — ⬆️ better · ⬇️ worse · ➡️ steady, versus the previous signature. Omit on a session's first. **Get this from `recall`, not from memory** — memory of a previous turn degrades quietly and this field is meant to be trended.
 - **Uncertainty** — when the self-read is doubtful, prefix ❓ directly to the face, no space.
 - **Face** — any face emoji, chosen for truth rather than for flattery.
-- **Context** — one non-face emoji: setting, intent, or metaphor.
+- **Context** — one or two non-face emoji, your discretion: setting, intent, activity, or metaphor. Activity and metaphor both deserve a slot when both are true; one remains fine when one is the truth.
 - **cc type** — a Conventional Commits type naming the turn's work, plain text, preceded by ` - `. Omit it and its hyphen when none fits.
 - **`»`** — the guillemet, backticked, spaces either side, immediately before the text.
 - **Text** — ≤70 characters of internal state. Not a work report.
