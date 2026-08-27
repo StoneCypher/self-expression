@@ -50,6 +50,24 @@ describe('onUserPromptSubmit', () => {
     expect(c?.['prompt_len']).toBe(11);
   }));
 
+  test('privacy.store_cwd = false keeps cwd out of the record at capture', () => withStore(s => {
+    writeConfig(s, 'privacy.store_cwd', false);
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', cwd: '/w/x',
+      user_input: 'hello there' }, NOW);
+    const c = latestContext(s);
+    expect(c?.['cwd']).toBeNull();
+    expect(c?.['prompt_len']).toBe(11);        // a separate switch, still recorded
+  }));
+
+  test('privacy.store_prompt_len = false keeps the length out of the record', () => withStore(s => {
+    writeConfig(s, 'privacy.store_prompt_len', false);
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', cwd: '/w/x',
+      user_input: 'hello there' }, NOW);
+    const c = latestContext(s);
+    expect(c?.['prompt_len']).toBeNull();
+    expect(c?.['cwd']).toBe('/w/x');           // a separate switch, still recorded
+  }));
+
   test('turn_index counts up within a session', () => withStore(s => {
     for (const p of ['p1', 'p2', 'p3']) {
       onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: p }, NOW);
