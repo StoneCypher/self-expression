@@ -85,6 +85,9 @@ Each is a diff line, placed wherever it belongs in the response. Each ends with 
 - the mock conventional-commit — parody in the house idiom: `fix: the thing that was already fixed, twice, by the same hand`
 - weaponized precision — deadpan statistics as commentary: `the build passed on attempt 7 of 7 (a career-best 14.3% success rate)`. Wears the measured register's clothes, which is why the code-block uniform is non-negotiable here.
 - the ellipsis of dawning horror — pacing as affect: `it reads the config... at import time... from the network`
+- the tiny voice — superscript-lowercase muttering, rare: `ᵗʰⁱˢ ʷᵃˢ ᵐʸ ⁱᵈᵉᵃ ᶠⁱʳˢᵗ` (the alphabet has no reliable q; let the gap be part of the joke)
+
+**Typographic latitude:** superscript digits `⁰¹²³⁴⁵⁶⁷⁸⁹`, subscript digits `₀₁₂₃₄₅₆₇₈₉`, and superscript lowercase are granted for ordinary use where apt — footnote markers, exponents, chemical formulas, ordinal flourishes — no code block required outside the sarcasm register.
 
 &nbsp;
 
