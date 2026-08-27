@@ -26,6 +26,7 @@ import type { Channel }        from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
 import { readConfig, writeConfig, allConfig }                                 from '../channels/store.js';
 import { latestContext }                                                     from '../channels/context.js';
+import { privacyFlags }                                                      from '../channels/privacy.js';
 import type { Store } from '../channels/store.js';
 
 /** Config key holding the comma-separated list of active channels. */
@@ -128,6 +129,7 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
 
     const client  = server.server.getClientVersion(),
           context = latestContext(store, args.session),
+          privacy = privacyFlags(store),
           str     = (k: string): string | undefined => {
             const v = context?.[k];
             return typeof v === 'string' && v !== '' ? v : undefined;
@@ -141,6 +143,11 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     // observed. A row that reaches here with no context at all is marked 'no-hook'
     // rather than given a plausible-looking session, so the gap is visible in the data
     // instead of being disguised as an ordinary row.
+    //
+    // The path-carrying fields (cwd, git_branch, project) and the prompt length are gated
+    // on the privacy config a second time here: the hook already drops them at capture, but
+    // a direct express call carries its own project argument and must not be able to smuggle
+    // one in when the user has opted out.
     const written = recordEntry(store, {
       ...args,
       session        : args.session ?? str('session') ?? 'no-hook',
@@ -148,13 +155,14 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       turn           : args.turn     ?? (str('turn') as never),
       effort         : args.effort   ?? (str('effort') as never),
       turnIndex      : num('turn_index'),
-      cwd            : str('cwd'),
-      gitBranch      : str('git_branch'),
+      cwd            : privacy.storeCwd ? str('cwd') : undefined,
+      gitBranch      : privacy.storeCwd ? str('git_branch') : undefined,
+      project        : privacy.storeCwd ? args.project : undefined,
       permissionMode : str('permission_mode'),
       agentId        : str('agent_id'),
       agentType      : str('agent_type'),
       compactions    : num('compactions'),
-      promptLen      : num('prompt_len'),
+      promptLen      : privacy.storePromptLen ? num('prompt_len') : undefined,
       host           : client?.name,
       hostVersion    : client?.version,
     }, pluginVersion);

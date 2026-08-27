@@ -19,6 +19,7 @@ import { hasClosingSignature }                     from '../channels/entries.js'
 import { readConfig }                              from '../channels/store.js';
 import type { Store }                              from '../channels/store.js';
 import { clockTime }                               from '../channels/time.js';
+import { privacyFlags }                            from '../channels/privacy.js';
 
 /** The subset of a hook payload these handlers read. */
 export interface HookPayload {
@@ -86,6 +87,11 @@ export const OPEN_REMINDER =
  * cannot observe any of them, and the model reporting them about itself is exactly the
  * self-report this design removes.
  *
+ * The path-carrying fields — `cwd` and the prompt length — are gated here on the privacy
+ * config, at the point of capture, so a suppressed field is never written to the database
+ * rather than being hidden after the fact. The config read is inside the fail-open `try`,
+ * so a config error skips the context write entirely and still delivers the clock.
+ *
  * @example
  *   onUserPromptSubmit(store, { session_id: 'abc', prompt_id: 'p1' }, new Date())
  *   // => { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: '…' } }
@@ -94,17 +100,18 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
 
   if (store !== null && typeof payload.session_id === 'string' && payload.session_id !== '') {
     try {
+      const privacy = privacyFlags(store);
       recordContext(store, {
         session        : payload.session_id,
         promptId       : payload.prompt_id,
         turnIndex      : turnCount(store, payload.session_id) + 1,
         turn           : 'reply',
-        cwd            : payload.cwd,
+        cwd            : privacy.storeCwd ? payload.cwd : undefined,
         permissionMode : payload.permission_mode,
         agentId        : payload.agent_id,
         agentType      : payload.agent_type,
         effort         : payload.effort?.level,
-        promptLen      : payload.user_input?.length,
+        promptLen      : privacy.storePromptLen ? payload.user_input?.length : undefined,
       }, now);
     } catch { /* fail open: the clock still gets delivered */ }
   }
