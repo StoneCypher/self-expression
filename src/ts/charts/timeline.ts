@@ -50,12 +50,27 @@ const COLORED_GLYPHS: Readonly<Record<MilestoneState, string>> = {
 };
 
 /**
- * Guards the one precondition {@link renderTimelineRail} and
- * {@link renderTimelineColored} share: a timeline needs at least one stage to draw.
+ * Guards the two preconditions {@link renderTimelineRail} and
+ * {@link renderTimelineColored} share: a timeline needs at least one stage to draw,
+ * and every stage needs a non-empty label.
+ *
+ * The empty-label case matters specifically for the rail: an empty label collapses
+ * `floor((labelLength - 1) / 2)` to `floor(-1 / 2) = -1`, which — as the first
+ * milestone — writes the marker to the non-existent index `rail[-1]` (silently
+ * dropped by `Array.prototype.join`, so the marker simply vanishes) or — as a later
+ * milestone — writes one column short of `cursor`, silently overwriting the previous
+ * milestone's trailing rail character. Rejecting the empty label outright, for both
+ * renderers, is simpler and safer than teaching the rail's column arithmetic to cope
+ * with a zero-width label.
  */
 function requireMilestones(milestones: readonly Milestone[], fn: string): void {
   if (milestones.length === 0) {
     throw new RangeError(`${fn} needs at least one milestone`);
+  }
+  for (const milestone of milestones) {
+    if (milestone.label === '') {
+      throw new RangeError(`${fn} needs a non-empty label for every milestone`);
+    }
   }
 }
 
@@ -81,8 +96,9 @@ function requireMilestones(milestones: readonly Milestone[], fn: string): void {
  *   ])
  *   // => '━●━━━━━━━━●━━━━━━━◆━━━━━━━○━━\nspec    build    test    ship'
  *
- * @throws {RangeError} If `milestones` is empty, or any milestone is in the `'failed'`
- *                        state — use {@link renderTimelineColored} instead.
+ * @throws {RangeError} If `milestones` is empty, any milestone has an empty `label`,
+ *                        or any milestone is in the `'failed'` state — use
+ *                        {@link renderTimelineColored} instead.
  * @see ../../doc_md/reference/visuals.md#process-timeline
  */
 export function renderTimelineRail(milestones: readonly Milestone[]): string {
@@ -128,7 +144,8 @@ export function renderTimelineRail(milestones: readonly Milestone[]): string {
  *   ])
  *   // => '🟢 spec ━━ 🔶 build ━━ 🟦 test ━━ ◎ ship'
  *
- * @throws {RangeError} If `milestones` is empty.
+ * @throws {RangeError} If `milestones` is empty, or any milestone has an empty
+ *                        `label`.
  * @see ../../doc_md/reference/visuals.md#process-timeline
  */
 export function renderTimelineColored(milestones: readonly Milestone[]): string {
@@ -159,13 +176,19 @@ function underline(text: string): string {
  *   renderDependencyChain(['lint', 'test', 'build', 'deploy'], 2)
  *   // => 'lint ━ test ━ b̲u̲i̲l̲d̲ ━ deploy'
  *
- * @throws {RangeError} If `steps` is empty, or `currentIndex` is not an integer within
+ * @throws {RangeError} If `steps` is empty, any step is an empty string, or
+ *                        `currentIndex` is not an integer within
  *                        `[0, steps.length - 1]`.
  * @see ../../doc_md/reference/visuals.md#inline-micro-visualizations
  */
 export function renderDependencyChain(steps: readonly string[], currentIndex: number): string {
   if (steps.length === 0) {
     throw new RangeError('renderDependencyChain needs at least one step');
+  }
+  for (const step of steps) {
+    if (step === '') {
+      throw new RangeError('renderDependencyChain needs a non-empty label for every step');
+    }
   }
   if (!Number.isInteger(currentIndex) || currentIndex < 0 || currentIndex >= steps.length) {
     throw new RangeError(

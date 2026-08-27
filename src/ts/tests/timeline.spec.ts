@@ -84,6 +84,40 @@ describe('renderTimelineRail', () => {
     expect(() => renderTimelineRail([])).toThrow(RangeError);
   });
 
+  // Regression coverage for a review finding: floor((labelLength - 1) / 2) on an
+  // empty label collapses to floor(-1 / 2) = -1. As the first milestone that writes
+  // rail[-1], a non-index property `.join('')` silently ignores - the marker simply
+  // vanishes rather than throwing or corrupting visible output.
+  test('an empty label on the first milestone throws RangeError instead of silently dropping its marker', () => {
+    const withEmptyFirst: readonly Milestone[] = [
+      { label: '', state: 'reached' },
+      { label: 'ship', state: 'future' },
+    ];
+    expect(() => renderTimelineRail(withEmptyFirst)).toThrow(RangeError);
+    expect(() => renderTimelineRail(withEmptyFirst)).toThrow(/non-empty label/);
+  });
+
+  // As a later milestone, the same arithmetic lands one column before `cursor`,
+  // silently overwriting the previous milestone's trailing rail character instead of
+  // vanishing outright - a second, distinct corruption from the first-milestone case.
+  test('an empty label on a later milestone throws RangeError instead of corrupting the previous marker', () => {
+    const withEmptyLater: readonly Milestone[] = [
+      { label: 'spec', state: 'reached' },
+      { label: '', state: 'future' },
+    ];
+    expect(() => renderTimelineRail(withEmptyLater)).toThrow(RangeError);
+    expect(() => renderTimelineRail(withEmptyLater)).toThrow(/non-empty label/);
+  });
+
+  test('a one-character label still centers correctly (floor((1 - 1) / 2) = 0)', () => {
+    const oneChar: readonly Milestone[] = [
+      { label: 'a', state: 'reached' },
+      { label: 'b', state: 'future' },
+    ];
+    expect(renderTimelineRail(oneChar)).toBe(deriveRail(oneChar));
+    expect(renderTimelineRail(oneChar)).toBe('\u{25CF}\u{2501}\u{2501}\u{2501}\u{2501}\u{25CB}\na    b');
+  });
+
 });
 
 describe('renderTimelineColored', () => {
@@ -120,6 +154,11 @@ describe('renderTimelineColored', () => {
 
   test('an empty milestone list throws RangeError', () => {
     expect(() => renderTimelineColored([])).toThrow(RangeError);
+  });
+
+  test('an empty label throws RangeError, for consistency with the rail form', () => {
+    expect(() => renderTimelineColored([{ label: '', state: 'reached' }])).toThrow(RangeError);
+    expect(() => renderTimelineColored([{ label: '', state: 'reached' }])).toThrow(/non-empty label/);
   });
 
 });
@@ -168,6 +207,26 @@ describe('renderDependencyChain', () => {
 
   test('a non-integer currentIndex throws RangeError', () => {
     expect(() => renderDependencyChain(['a', 'b'], 0.5)).toThrow(RangeError);
+  });
+
+  test('an empty step string throws RangeError, for consistency with the milestone label guard', () => {
+    expect(() => renderDependencyChain(['a', '', 'c'], 0)).toThrow(RangeError);
+    expect(() => renderDependencyChain(['a', '', 'c'], 0)).toThrow(/non-empty label/);
+  });
+
+  test('an empty current step also throws RangeError', () => {
+    expect(() => renderDependencyChain(['a', ''], 1)).toThrow(RangeError);
+  });
+
+  test('underlines by Unicode code point, not UTF-16 code unit, so a surrogate-pair step name gets one underline mark per glyph', () => {
+    const rendered = renderDependencyChain(['\u{1F680}build', 'test'], 0);
+    const expectedFirstStep = Array.from('\u{1F680}build', ch => `${ch}\u{0332}`).join('');
+    expect(rendered).toBe(`${expectedFirstStep} \u{2501} test`);
+    // exactly one underline mark immediately after the (single, two-code-unit) rocket
+    // emoji, not two - proof the implementation iterates by code point via
+    // Array.from(text, ...), not by UTF-16 code unit via a naive index loop
+    expect(rendered.startsWith('\u{1F680}\u{0332}')).toBe(true);
+    expect(rendered.split('\u{0332}').length - 1).toBe(Array.from('\u{1F680}build').length);
   });
 
 });
