@@ -196,4 +196,60 @@ describe('renderChecklistSummary', () => {
     expect([...bar]).toHaveLength(10);
   });
 
+  test('a 🛳️ marker split across two buckets by override renders on both bucket lines, in block form', () => {
+    // 9 distinct (bucket, marker) groups -> block form. 🛳️ appears twice: once
+    // overridden into 'success', and (via the remaining items, no override) three
+    // times classifying as 'active' -- the same glyph must appear on both the
+    // success and the active bucket lines, each with its own reconciled count.
+    const items: ChecklistItem[] = [
+      ...repeat('✅', 2),
+      { marker: '🛳️', bucket: 'success' },
+      ...repeat('🛳️', 3),
+      ...repeat('🤖', 1),
+      ...repeat('⏳', 1),
+      ...repeat('🌐', 1),
+      ...repeat('🛠️', 1),
+      ...repeat('❌', 1),
+      ...repeat('🚫', 1),
+    ];
+    // success = 2 (✅) + 1 (🛳️ override) = 3; active = 3 (🛳️, no override) + 4 singles = 7;
+    // failure = 2 (❌, 🚫); total = 12; percent = round(100*3/12) = 25%.
+    const expected =
+      '3/7/2 items (25%) ██▓░░░░░░░\n' +
+      '\n' +
+      '✅ 2  🛳️ 1\n' +
+      '🛳️ 3  🤖 1  ⏳ 1  🌐 1  🛠️ 1\n' +
+      '❌ 1  🚫 1';
+    expect(renderChecklistSummary(items)).toBe(expected);
+  });
+
+  test('exactly 12 entries on one bucket line does not wrap (the wrap-boundary edge)', () => {
+    const activeMarkers = [
+      '🤖', '⏳', '🌐', '🛠️', '🛰️', '🔜', '🦥', '🦡', '⏭️', '⏸️', '❗', '⏰',
+    ];
+    const items: ChecklistItem[] = [
+      ...repeat('✅', 1),
+      ...activeMarkers.map(marker => ({ marker })),
+      ...repeat('❌', 1),
+    ];
+    // 14 distinct groups -> block form; active bucket has exactly 12 entries, the
+    // cap itself, so it must stay on one line with no wrap and no blank separators.
+    const expected =
+      '1/12/1 items (7%) ▓░░░░░░░░░\n' +
+      '\n' +
+      '✅ 1\n' +
+      '🤖 1  ⏳ 1  🌐 1  🛠️ 1  🛰️ 1  🔜 1  🦥 1  🦡 1  ⏭️ 1  ⏸️ 1  ❗ 1  ⏰ 1\n' +
+      '❌ 1';
+    expect(renderChecklistSummary(items)).toBe(expected);
+  });
+
+  test('an all-failure item set renders 0% with an all-░ bar and no success/active lines', () => {
+    const items: ChecklistItem[] = [...repeat('❌', 3), ...repeat('🚫', 2)];
+    expect(renderChecklistSummary(items)).toBe('0/0/5 items (0%) ░░░░░░░░░░  ❌ 3  🚫 2');
+  });
+
+  test('a single item renders a complete, valid summary line', () => {
+    expect(renderChecklistSummary([{ marker: '✅' }])).toBe('1/0/0 items (100%) ██████████  ✅ 1');
+  });
+
 });
