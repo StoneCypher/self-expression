@@ -102,3 +102,38 @@ describe('CANONICAL_ORDER', () => {
   });
 
 });
+
+describe('multi-code-point marker fidelity (regression guard)', () => {
+  // Regression guard for a silently dropped U+FE0F variation selector. The
+  // markers below are written here as literals independent of
+  // SUCCESS_MARKERS/FAILURE_MARKERS/CANONICAL_ORDER, and exercised through
+  // classifyMarker's *real* matching path (no override) and canonicalRank's
+  // real lookup — not read back out of the arrays under test — so a future
+  // edit that strips a variation selector from the source arrays breaks
+  // these assertions instead of passing vacuously.
+
+  test("this file's own '⚠️' literal is still the two-code-point VS-16 form", () => {
+    expect([...'⚠️'].length).toBe(2);
+  });
+
+  test("this file's own '🛠️' literal is still the two-code-point VS-16 form", () => {
+    expect([...'🛠️'].length).toBe(2);
+  });
+
+  test('⚠️ (caution / worked-with-a-caveat) classifies success via the real match path, not an override', () => {
+    expect(classifyMarker('⚠️')).toBe('success');
+  });
+
+  test('🛠️ (deferred to a skill) classifies active via the real fall-through path, not an override', () => {
+    expect(classifyMarker('🛠️')).toBe('active');
+  });
+
+  test('⚠️ has a fixed, independently-known canonical rank', () => {
+    expect(canonicalRank('⚠️')).toBe(18);
+  });
+
+  test('🛠️ has a fixed, independently-known canonical rank', () => {
+    expect(canonicalRank('🛠️')).toBe(5);
+  });
+
+});
