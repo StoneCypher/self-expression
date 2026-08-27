@@ -218,6 +218,15 @@ describe('renderTileGrid', () => {
     expect(renderTileGrid(grid, 'pixel')).toBe('🟥 🟥 🟥');
   });
 
+  test('a ragged grid (rows of different lengths) renders without error, each row its own width', () => {
+    const grid: readonly (TileCell | null)[][] = [
+      [{ glyph: 'a' }, { glyph: 'b' }, { glyph: 'c' }],
+      [{ glyph: 'd' }],
+      [],
+    ];
+    expect(renderTileGrid(grid, 'custom')).toBe('a b c\nd\n');
+  });
+
   test('rejects an empty grid, naming the accepted domain', () => {
     expect(() => renderTileGrid([], 'abbr-shade')).toThrow(RangeError);
     try {

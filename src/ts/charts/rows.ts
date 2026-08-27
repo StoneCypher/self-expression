@@ -39,10 +39,19 @@ export interface ComparisonRow {
 /** The two geometries {@link renderComparison} can draw a row's value as. */
 const COMPARISON_FORMS: readonly string[] = ['bar', 'dot'];
 
-/** `█` — {@link renderComparison}'s bar-fill glyph; the darkest of `SHADES`. */
+/**
+ * `█` — {@link renderComparison}'s bar-fill glyph; the darkest of `SHADES`. Kept as its
+ * own literal rather than `SHADES[3]`: `renderComparison`'s fill count is a plain
+ * round-to-nearest-cell (`Math.round(value / sharedMax * width)`), not a `SHADES`-ramp
+ * index computed via `absoluteIndex`/`relativeIndex`, so there is no shared arithmetic
+ * here to reuse — only the character happens to coincide with `SHADES`'s last entry.
+ */
 const FILL_GLYPH = '\u{2588}';
 
-/** `░` — the empty/pad glyph both `renderComparison` track forms share; the lightest of `SHADES`. */
+/**
+ * `░` — the empty/pad glyph both `renderComparison` track forms share; the lightest of
+ * `SHADES`, kept independent for the same reason as {@link FILL_GLYPH}.
+ */
 const PAD_GLYPH = '\u{2591}';
 
 /** `●` — the marker {@link renderComparison}'s `'dot'` form places on its `░` track. */
@@ -169,22 +178,6 @@ const SHADE_LEGEND = `low ${SHADES.join(' ')} high`;
 /** `⬛` — {@link renderTileGrid}'s null-cell glyph for the `'pixel'` fill only. */
 const PIXEL_GAP = '\u{2B1B}';
 
-/**
- * The `SHADES` glyph for `absoluteIndex(value, SHADES.length)` — a literal-index
- * switch, not a computed array index, so the result is a definite `string` rather than
- * the possibly-`undefined` type a computed index into `SHADES`'s widened
- * `readonly string[]` type would carry under `noUncheckedIndexedAccess`. Mirrors
- * `scale.ts`'s own `boundaryGlyph`, which resolves the identical tension the same way.
- */
-function shadeGlyph(value: number): string {
-  switch (absoluteIndex(value, SHADES.length)) {
-    case 0:  return '\u{2591}'; // ░
-    case 1:  return '\u{2592}'; // ▒
-    case 2:  return '\u{2593}'; // ▓
-    default: return '\u{2588}'; // █
-  }
-}
-
 /** How many buckets {@link renderTileGrid}'s `'color-keyed'`/`'pixel'` fills quintile a value into. */
 const QUINTILE_STEPS = 5;
 
@@ -235,7 +228,14 @@ function renderTileCell(
           + `row ${String(row)} col ${String(col)} is missing ${missing}`
         );
       }
-      return `${cell.label}${shadeGlyph(cell.value)}`;
+      // Stay inside a join (never a template literal) over the computed SHADES index,
+      // per the same reasoning as series.ts's `ramp[absoluteIndex(value, steps)]`
+      // inside a `.map(...).join('')`: the indexed element is possibly-`undefined`
+      // under `noUncheckedIndexedAccess` (SHADES is exported as the widened
+      // `readonly string[]`, not a tuple), but `.join('')` accepts that without
+      // requiring a non-undefined `string`, so SHADES stays the single source of the
+      // glyphs rather than being restated here.
+      return [cell.label, SHADES[absoluteIndex(cell.value, SHADES.length)]].join('');
     }
     case 'custom': {
       if (cell.glyph === undefined) {
