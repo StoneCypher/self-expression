@@ -4,7 +4,7 @@ import { join }                from 'node:path';
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
-  recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
+  recordEntry, validate, hasClosingSignature, previousSignature, recentEntries, seriesPercents,
 } from '../channels/entries.js';
 
 const VERSION = '0.2.0';
@@ -158,6 +158,23 @@ describe('recentEntries', () => {
       recordEntry(s, { channel: 'idea', text: t, session: 's1' }, VERSION);
     }
     expect(recentEntries(s, 2)).toHaveLength(2);
+  }));
+
+});
+
+describe('seriesPercents', () => {
+
+  test('returns a series\' percents ascending by id, ignoring other series', () => withStore(s => {
+    recordEntry(s, { channel: 'checklist', text: 'a', session: 's1', seriesKey: 'x', percent: 10 }, VERSION);
+    recordEntry(s, { channel: 'checklist', text: 'b', session: 's1', seriesKey: 'x', percent: 50 }, VERSION);
+    recordEntry(s, { channel: 'checklist', text: 'c', session: 's1', seriesKey: 'x', percent: 90 }, VERSION);
+    recordEntry(s, { channel: 'checklist', text: 'unrelated', session: 's1', seriesKey: 'y', percent: 30 }, VERSION);
+    expect(seriesPercents(s, 'x')).toEqual([10, 50, 90]);
+  }));
+
+  test('an unknown series key yields an empty array', () => withStore(s => {
+    recordEntry(s, { channel: 'checklist', text: 'a', session: 's1', seriesKey: 'x', percent: 10 }, VERSION);
+    expect(seriesPercents(s, 'nonesuch')).toEqual([]);
   }));
 
 });

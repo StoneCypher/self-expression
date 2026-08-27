@@ -268,3 +268,26 @@ export function recentEntries(store: Store, limit = 10): Record<string, unknown>
        FROM entries ORDER BY id DESC LIMIT ?`).all(limit);
   return rows.reverse();
 }
+
+/**
+ * The stored percent history for one checklist series, oldest first.
+ *
+ * Backs the chart tools' `seriesKey` resolution: a caller names a series it previously
+ * logged instead of repeating its numbers by hand, and this replays exactly what
+ * `recordEntry` persisted for it. An unknown or never-used key returns an empty array
+ * rather than throwing — a series with no history yet is not an error.
+ *
+ * @param seriesKey the series identifier entries were recorded under
+ * @returns each matching entry's `percent`, ascending by id (recording order)
+ *
+ * @example
+ *   seriesPercents(store, 'coverage')  // => [62, 71, 71, 84]
+ *   seriesPercents(store, 'nonesuch')  // => []
+ */
+export function seriesPercents(store: Store, seriesKey: string): number[] {
+  const rows = store.db.prepare(
+    `SELECT percent FROM entries
+      WHERE series_key = ? AND percent IS NOT NULL
+      ORDER BY id ASC`).all(seriesKey);
+  return rows.map(row => Number(row['percent']));
+}
