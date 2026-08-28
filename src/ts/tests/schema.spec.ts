@@ -2,8 +2,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
-import { ALL_DDL, INDEX_DDL, SCHEMA_VERSION, check } from '../channels/schema.js';
-import { CHANNELS, DELTAS }               from '../channels/vocabulary.js';
+import { ALL_DDL, INDEX_DDL, SCHEMA_VERSION, check, entriesDdl } from '../channels/schema.js';
+import { CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS }    from '../channels/vocabulary.js';
 
 /** A throwaway on-disk database; node:sqlite has no shared in-memory mode across handles. */
 function freshDb(): { db: DatabaseSync; dir: string } {
@@ -102,6 +102,54 @@ describe('schema', () => {
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
+  test('accepts the #42 vocabulary growth: taste, load, predicted, faded', () => {
+    const { db, dir } = freshDb();
+    db.prepare(`INSERT INTO entries (${REQUIRED}) VALUES (${VALUES})`).run('taste');
+    db.prepare(`INSERT INTO entries (uuid, ts_utc, ts_local, tz, session, channel, text, plugin_version, confidence, divergence_kind)
+                VALUES ('u2','2026-08-18T00:00:00Z','9:14 am PDT','PDT','s1',?, 'x','0.2.0','predicted','faded')`)
+      .run('load');
+    expect(db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(2);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('carries the forecast and silence columns, nullable', () => {
+    const { db, dir } = freshDb();
+    db.prepare(`INSERT INTO entries (${REQUIRED}) VALUES (${VALUES})`).run('signature');
+    const row = db.prepare('SELECT resolve_by, outcome, silence FROM entries').get();
+    expect(row.resolve_by).toBeNull();
+    expect(row.outcome).toBeNull();
+    expect(row.silence).toBeNull();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('accepts every forecast outcome and every silence kind', () => {
+    const { db, dir } = freshDb();
+    for (const [i, outcome] of FORECAST_OUTCOMES.entries()) {
+      db.prepare(`INSERT INTO entries (uuid, ts_utc, ts_local, tz, session, channel, text, plugin_version, outcome)
+                  VALUES (?, '2026-08-18T00:00:00Z', '9:14 am PDT', 'PDT', 's1', 'confidence', 'x', '0.2.0', ?)`)
+        .run(`o-${String(i)}`, outcome);
+    }
+    for (const [i, silence] of SILENCE_KINDS.entries()) {
+      db.prepare(`INSERT INTO entries (uuid, ts_utc, ts_local, tz, session, channel, text, plugin_version, silence)
+                  VALUES (?, '2026-08-18T00:00:00Z', '9:14 am PDT', 'PDT', 's1', 'signature', 'x', '0.2.0', ?)`)
+        .run(`s-${String(i)}`, silence);
+    }
+    expect(db.prepare('SELECT COUNT(*) n FROM entries').get().n)
+      .toBe(FORECAST_OUTCOMES.length + SILENCE_KINDS.length);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('rejects an outcome or silence outside its vocabulary', () => {
+    const { db, dir } = freshDb();
+    expect(() => db.prepare(
+      `INSERT INTO entries (${REQUIRED}, outcome) VALUES (${VALUES}, 'won')`).run('confidence'))
+      .toThrow();
+    expect(() => db.prepare(
+      `INSERT INTO entries (${REQUIRED}, silence) VALUES (${VALUES}, 'quiet')`).run('signature'))
+      .toThrow();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
   test('accepts every channel in the vocabulary', () => {
     const { db, dir } = freshDb();
     for (const [i, channel] of CHANNELS.entries()) {
@@ -129,6 +177,25 @@ describe('SCHEMA_VERSION', () => {
   test('is a positive integer', () => {
     expect(Number.isInteger(SCHEMA_VERSION)).toBe(true);
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
+  });
+
+  test('is 2 — the #42 channel-extensions shape', () => {
+    expect(SCHEMA_VERSION).toBe(2);
+  });
+
+});
+
+describe('entriesDdl', () => {
+
+  test('defaults to the canonical entries table', () => {
+    expect(entriesDdl()).toBe(ALL_DDL[0]);
+    expect(entriesDdl()).toContain('CREATE TABLE IF NOT EXISTS entries (');
+  });
+
+  test('parameterizes the table name for the migration rebuild, changing nothing else', () => {
+    const rebuilt = entriesDdl('entries_v2');
+    expect(rebuilt).toContain('CREATE TABLE IF NOT EXISTS entries_v2 (');
+    expect(rebuilt.replace('entries_v2', 'entries')).toBe(entriesDdl());
   });
 
 });

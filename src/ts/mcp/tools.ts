@@ -21,10 +21,12 @@ import { z }         from 'zod';
 import {
   CHANNELS, POSITIONS, DELTAS, STEMS, EFFORTS, TURNS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
+  FORECAST_OUTCOMES, SILENCE_KINDS,
 } from '../channels/vocabulary.js';
 import type {
   Channel, Position, Delta, Stem, Turn, Effort,
   ConfidenceGround, DivergenceKind, Modality,
+  ForecastOutcome, SilenceKind,
 } from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
 import { readConfig, writeConfig, deleteConfig }                              from '../channels/store.js';
@@ -38,6 +40,9 @@ import type { ToolReply } from './chart_tools.js';
 
 /** Config key holding the comma-separated list of active channels. */
 export const ENABLED_KEY = 'channels.enabled';
+
+/** Config key for the forecast feature; only an effective 'false' disables it (#42). */
+export const FORECAST_KEY = 'forecast.enabled';
 
 /**
  * Which channels are currently active.
@@ -60,6 +65,29 @@ export function enabledChannels(store: Store): readonly Channel[] {
 
   return valid.length > 0 ? valid : CHANNELS;
 
+}
+
+/**
+ * Which confidence grounds are currently offered.
+ *
+ * The forecast toggle cannot ride `channels.enabled` because a ground is not a
+ * channel, so it gets the same schema-baking treatment: when `forecast.enabled`
+ * resolves to `'false'` (through the tolerant effective-value accessor, so an invalid
+ * override behaves as unset), the enum handed to the model omits `'predicted'` — a
+ * disabled forecast cannot even be named, so no attention is spent producing one.
+ * Default is on, per the issue-thread verdict.
+ *
+ * @example
+ *   enabledConfidenceGrounds(store)   // => all CONFIDENCE_GROUNDS, when unconfigured
+ *   // after configure set forecast.enabled false:
+ *   enabledConfidenceGrounds(store)   // => the grounds minus 'predicted'
+ *
+ * @see enabledChannels
+ */
+export function enabledConfidenceGrounds(store: Store): readonly ConfidenceGround[] {
+  return effectiveValue(store, FORECAST_KEY) === 'false'
+    ? CONFIDENCE_GROUNDS.filter(g => g !== 'predicted')
+    : CONFIDENCE_GROUNDS;
 }
 
 /**
@@ -112,6 +140,9 @@ export interface ExpressArgs {
   readonly modality?       : Modality | undefined;
   readonly confidence?     : ConfidenceGround | undefined;
   readonly divergenceKind? : DivergenceKind | undefined;
+  readonly resolveBy?      : string | undefined;
+  readonly outcome?        : ForecastOutcome | undefined;
+  readonly silence?        : SilenceKind | undefined;
   readonly visible?        : boolean | undefined;
   readonly correctsId?     : number | undefined;
   readonly effort?         : Effort | undefined;
@@ -142,12 +173,19 @@ export interface ExpressArgs {
  * @param args          the validated tool arguments
  * @param client        what the MCP handshake reported about the host, if anything
  *
+ * An `outcome` is additionally checked against the store (the half of forecast
+ * validation `entries.validate` cannot do alone, #42): its `correctsId` must name an
+ * existing row whose confidence is `'predicted'`, or the rejection names the target's
+ * actual ground.
+ *
  * @example
  *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
  *   // => { content: [{ type: 'text', text: 'recorded #1 …' }] }
  *
- * @throws {Error} If entry validation fails — a closed field outside its vocabulary —
- *                 naming every problem and the values that would have been accepted.
+ * @throws {Error} If entry validation fails — a closed field outside its vocabulary,
+ *                 a cross-field forecast violation, or an outcome whose target is not
+ *                 a `predicted` row — naming every problem and the values that would
+ *                 have been accepted.
  *
  * @see ../channels/entries.js recordEntry
  */
@@ -157,6 +195,21 @@ export function handleExpress(
   args          : ExpressArgs,
   client?       : ClientIdentity,
 ): ToolReply {
+
+  if (args.outcome !== undefined && args.correctsId !== undefined) {
+    const target = store.db.prepare('SELECT confidence FROM entries WHERE id = ?').get(args.correctsId);
+    if (target === undefined) {
+      throw new Error(
+        `cannot record entry:\n  - outcome's correctsId #${String(args.correctsId)} does not exist`);
+    }
+    const ground = target['confidence'];
+    if (ground !== 'predicted') {
+      throw new Error(
+        `cannot record entry:\n  - entry #${String(args.correctsId)} is not a forecast — its ` +
+        `confidence is ${ground === null ? 'unset' : `'${String(ground)}'`}, not 'predicted', ` +
+        'so there is nothing for an outcome to resolve');
+    }
+  }
 
   const context = latestContext(store, args.session),
         privacy = privacyFlags(store),
@@ -341,7 +394,8 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
  */
 export function registerTools(server: McpServer, store: Store, pluginVersion: string): void {
 
-  const channels = enabledChannels(store);
+  const channels = enabledChannels(store),
+        grounds  = enabledConfidenceGrounds(store);
 
   server.registerTool('express', {
     title       : 'Express',
@@ -354,7 +408,10 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'know what you just claimed; unanswerable records that something cannot be resolved ' +
       'with what is available; pattern is an observation about how the collaboration is ' +
       'going; checklist logs one render of a status checklist — its identity is seriesKey, ' +
-      'a stable id chosen once, never the display title. "Nothing notable" is always a ' +
+      'a stable id chosen once, never the display title; load is proprioception — context ' +
+      'pressure, concurrency, latency: the machinery\'s state, not the mood, fired when ' +
+      'notable rather than on a schedule; taste is a scarce aesthetic observation about ' +
+      'the work itself, observing with nothing proposed. "Nothing notable" is always a ' +
       'valid signature — the requirement is to look, not to produce.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
@@ -369,8 +426,23 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       stem           : z.enum(tuple(STEMS)).optional().describe('flow, spark, drag, fog, strain, still'),
       uncertain      : z.boolean().optional().describe('true when the self-read is doubtful'),
       modality       : z.enum(tuple(MODALITIES)).optional().describe('what kind of utterance'),
-      confidence     : z.enum(tuple(CONFIDENCE_GROUNDS)).optional().describe('grounds, not strength'),
-      divergenceKind : z.enum(tuple(DIVERGENCE_KINDS)).optional(),
+      confidence     : z.enum(tuple(grounds)).optional().describe(
+        "grounds, not strength; 'predicted' marks a forecast — a claim about the future, " +
+        'resolvable later via a correcting entry'),
+      divergenceKind : z.enum(tuple(DIVERGENCE_KINDS)).optional().describe(
+        "how the divergence happened; 'faded' is prospective — recall degraded to gist, " +
+        'disclosed before use, and never counted as an error'),
+      resolveBy      : z.string().optional().describe(
+        'forecasts only: ISO-8601 local date (YYYY-MM-DD) the forecast expects resolution ' +
+        "by; valid only with confidence 'predicted'"),
+      outcome        : z.enum(tuple(FORECAST_OUTCOMES)).optional().describe(
+        'resolutions only: how the forecast this entry corrects turned out — hit (it ' +
+        'happened), miss (it did not), void (the premise dissolved); requires correctsId ' +
+        "pointing at a 'predicted' entry"),
+      silence        : z.enum(tuple(SILENCE_KINDS)).optional().describe(
+        'which honest shape of nothing this entry reports: empty (looked, found nothing), ' +
+        'unlooked (did not look), held (withholding pending evidence), depth (beyond ' +
+        'ability to evaluate)'),
       visible        : z.boolean().optional().describe('false when logged but not surfaced'),
       correctsId     : z.number().int().optional().describe('id of an entry this retracts'),
       effort         : z.enum(tuple(EFFORTS)).optional(),

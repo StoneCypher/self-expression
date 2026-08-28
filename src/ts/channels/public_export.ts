@@ -94,6 +94,7 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   context_emoji   : { kind: 'excluded', note: 'multi-emoji with a weaker convention than face; revisit only with an equally strict validator' },
   permission_mode : { kind: 'excluded', note: 'host-defined open string; promotable to verbatim if it ever gains a closed vocabulary' },
   turn_index      : { kind: 'excluded', note: 'fine-grained session-structure fingerprint; hashed prompt_id already groups turns' },
+  resolve_by      : { kind: 'excluded', note: 'forecast deadline (#42): write-validated to a local date but carrying no CHECK; conservative until reviewed — promotable to an export-validated date' },
 
   // ── verbatim: closed vocabularies and safe scalars ─────────────────────────────
   channel         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary' },
@@ -105,6 +106,8 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   confidence      : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary' },
   divergence_kind : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary' },
   stem            : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary; the public affect signal' },
+  outcome         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#42 forecast resolution)' },
+  silence         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#42 typed silence)' },
   uncertain       : { kind: 'verbatim', note: 'boolean' },
   visible         : { kind: 'verbatim', note: 'boolean' },
   nudged          : { kind: 'verbatim', note: 'boolean' },

@@ -47,7 +47,8 @@ self-expression/
 │                            `node dist/cli.cjs hook <name>` — Node, never shell (Windows)
 │
 ├── src/ts/
-│   ├── channels/            backchannel capture and storage
+│   ├── channels/            backchannel capture and storage, incl. versioned schema
+│   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
 │   ├── charts/              pure ASCII renderers
 │   ├── dwelling/            the keepsake dwelling: paths, schema, store/adoption, ops
 │   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)

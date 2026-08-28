@@ -59,17 +59,17 @@ describe('totality — the allowlist covers the whole schema, forever', () => {
     }
   });
 
-  test('the classification counts match the spec: 22 verbatim, 11 coarsen, 7 hash, 3 derive, 11 excluded', () => {
+  test('the classification counts match the spec plus the classified v2 columns: 24 verbatim, 11 coarsen, 7 hash, 3 derive, 12 excluded', () => {
     const counts: Record<string, number> = {};
     for (const treatment of Object.values(PUBLIC_TREATMENTS)) {
       counts[treatment.kind] = (counts[treatment.kind] ?? 0) + 1;
     }
-    expect(counts).toEqual({ verbatim: 22, coarsen: 11, hash: 7, derive: 3, excluded: 11 });
+    expect(counts).toEqual({ verbatim: 24, coarsen: 11, hash: 7, derive: 3, excluded: 12 });
   });
 
   test('the free-text and identifier columns are excluded or blinded, by name', () => {
     for (const column of ['text', 'title', 'cwd', 'project', 'git_branch', 'tz', 'agent_type',
-                          'context_emoji', 'permission_mode', 'turn_index', 'id']) {
+                          'context_emoji', 'permission_mode', 'turn_index', 'id', 'resolve_by']) {
       expect(PUBLIC_TREATMENTS[column]?.kind).toBe('excluded');
     }
     for (const column of ['uuid', 'session', 'prompt_id', 'machine_id', 'agent_id', 'series_key', 'corrects_id']) {
@@ -333,7 +333,7 @@ describe('the shaped rows', () => {
           keys = Object.keys(doc.rows[0] ?? {});
     for (const banned of ['id', 'text', 'title', 'cwd', 'project', 'git_branch', 'tz',
                           'ts_local', 'agent_type', 'context_emoji', 'permission_mode',
-                          'turn_index', 'corrects_id']) {
+                          'turn_index', 'corrects_id', 'resolve_by']) {
       expect(keys).not.toContain(banned);
     }
     for (const derived of ['local_period', 'local_dow', 'is_subagent', 'corrects_uuid', 'cctype', 'face']) {

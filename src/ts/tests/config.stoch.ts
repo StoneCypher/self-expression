@@ -53,7 +53,9 @@ describe('canonicalization is a fixed point', () => {
 
         }));
     });
-  }, 60000);   // real SQLite on a loaded Windows CI; the property, not the clock, is the test
+    // 100 property runs each write to disk through a real store; under a concurrent
+    // build the default 5s vitest timeout is a flake margin, not a correctness bound.
+  }, 60_000);
 
   it('lists: any non-empty subsequence of the channels, however spaced, canonicalizes stably', () => {
     fc.assert(fc.property(

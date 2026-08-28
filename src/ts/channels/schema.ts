@@ -20,6 +20,7 @@
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES, STEMS,
+  FORECAST_OUTCOMES, SILENCE_KINDS,
 } from './vocabulary.js';
 
 /**
@@ -27,8 +28,15 @@ import {
  *
  * Stored once in `meta`, not on every row: it changes only at upgrade, so per-row
  * storage would be pure duplication of a value that is identical everywhere.
+ *
+ * v2 (issue #42): `CHANNELS` gained `load` and `taste`, `CONFIDENCE_GROUNDS` gained
+ * `predicted`, `DIVERGENCE_KINDS` gained `faded`, and `entries` gained the nullable
+ * `resolve_by`, `outcome`, and `silence` columns. Because the vocabularies are baked
+ * into `CHECK` constraints, v1 databases require the table rebuild in `migrate.ts`.
+ *
+ * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -48,16 +56,26 @@ export function check(column: string, vocabulary: readonly string[]): string {
 }
 
 /**
- * Every expression, of every kind, in one table.
+ * The `entries` DDL, parameterized on the table name.
  *
- * The explicit annotation is required by `isolatedDeclarations` and is simultaneously
- * flagged by eslint's `no-inferrable-types`, which does not know about that constraint.
- * The compiler wins: without the annotation the build fails outright, whereas the lint
- * rule is a style preference.
+ * Exists (beyond {@link ENTRIES_DDL}) for the migration's table rebuild: SQLite cannot
+ * alter a `CHECK` constraint in place, so a version step creates `entries_v2` from
+ * this same definition, copies the rows across, and renames. Generating both from one
+ * function means the rebuilt table cannot drift from the fresh-install one.
+ *
+ * @param table the table name to create; defaults to `entries`
+ * @returns a `CREATE TABLE IF NOT EXISTS` statement for the current schema
+ *
+ * @example
+ *   entriesDdl()             // the canonical entries table
+ *   entriesDdl('entries_v2') // the migration's rebuild target
+ *
+ * @see ./migrate.js
  */
-// eslint-disable-next-line @typescript-eslint/no-inferrable-types
-export const ENTRIES_DDL: string = `
-CREATE TABLE IF NOT EXISTS entries (
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types -- isolatedDeclarations requires the annotation
+export function entriesDdl(table: string = 'entries'): string {
+  return `
+CREATE TABLE IF NOT EXISTS ${table} (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   uuid            TEXT    NOT NULL UNIQUE,
 
@@ -109,6 +127,9 @@ CREATE TABLE IF NOT EXISTS entries (
 
   confidence      TEXT ${check('confidence', CONFIDENCE_GROUNDS)},
   divergence_kind TEXT ${check('divergence_kind', DIVERGENCE_KINDS)},
+  resolve_by      TEXT,
+  outcome         TEXT ${check('outcome', FORECAST_OUTCOMES)},
+  silence         TEXT ${check('silence', SILENCE_KINDS)},
 
   series_key      TEXT,
   title           TEXT,
@@ -120,6 +141,17 @@ CREATE TABLE IF NOT EXISTS entries (
   plugin_version  TEXT    NOT NULL,
   format_version  TEXT
 )`;
+}
+
+/**
+ * Every expression, of every kind, in one table.
+ *
+ * The explicit annotation is required by `isolatedDeclarations` and is simultaneously
+ * flagged by eslint's `no-inferrable-types`, which does not know about that constraint.
+ * The compiler wins: without the annotation the build fails outright, whereas the lint
+ * rule is a style preference.
+ */
+export const ENTRIES_DDL: string = entriesDdl();
 
 /**
  * What the harness knows about the current turn, written by the hooks.
