@@ -18,7 +18,7 @@ import { recordContext, latestContext, turnCount } from '../channels/context.js'
 import { hasClosingSignature }                     from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
 import type { Store }                              from '../channels/store.js';
-import { clockTime }                               from '../channels/time.js';
+import { clockTime, zoneAbbreviation }             from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
 
 /** The subset of a hook payload these handlers read. */
@@ -41,13 +41,16 @@ export type HookOutput = Record<string, unknown> | null;
  * A short human sentence naming the moment a turn begins.
  *
  * Wall-clock time is not otherwise available at turn start, so without it the opening
- * signature has no clock to report and falls back to a placeholder. Part-of-day is
- * included because the interesting question is rarely the exact minute — it is whether
- * this is a Tuesday morning or a Saturday at two in the morning.
+ * signature has no clock to report and falls back to a placeholder. The zone travels with
+ * the clock because the signature timestamp is specified `12-hour, with zone` and must
+ * never be fabricated — the model can only carry a zone it was handed, so the hook has to
+ * hand it one, exactly as the original standalone hook did. Part-of-day is included
+ * because the interesting question is rarely the exact minute — it is whether this is a
+ * Tuesday morning or a Saturday at two in the morning.
  *
  * @example
  *   describeMoment(new Date(2026, 7, 18, 14, 5))
- *   // => 'Turn starting Tuesday, August 18, 2026 at 2:05 pm (afternoon).'
+ *   // => 'Turn starting Tuesday, August 18, 2026 at 2:05 pm PDT (afternoon).'
  */
 export function describeMoment(now: Date): string {
 
@@ -60,7 +63,7 @@ export function describeMoment(now: Date): string {
         date = now.toLocaleDateString('en-US',
                  { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  return `Turn starting ${date} at ${clockTime(now)} (${part}).`;
+  return `Turn starting ${date} at ${clockTime(now)} ${zoneAbbreviation(now)} (${part}).`;
 
 }
 

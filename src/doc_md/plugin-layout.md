@@ -43,14 +43,13 @@ self-expression/
 ├── claude-commands/         Claude slash commands (.md) — Claude's path is configurable
 │
 ├── hooks/
-│   └── hooks.claude.json    per-host, because event vocabularies differ
-├── scripts/                 hook implementations — Node, never shell (Windows machine)
-│   └── time-of-day.mjs
+│   └── hooks.claude.json    per-host, because event vocabularies differ; each entry runs
+│                            `node dist/cli.cjs hook <name>` — Node, never shell (Windows)
 │
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage
 │   ├── charts/              pure ASCII renderers
-│   ├── mcp/                 MCP server exposing channels + charts as tools
+│   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
 └── dist/                    committed build output (dist is intentionally not gitignored)

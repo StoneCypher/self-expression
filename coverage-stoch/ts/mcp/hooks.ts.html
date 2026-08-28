@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/27</span>
+                <span class='fraction'>0/28</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/32</span>
+                <span class='fraction'>0/36</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/21</span>
+                <span class='fraction'>0/22</span>
             </div>
         
             
@@ -253,7 +253,21 @@
 <a name='L188'></a><a href='#L188'>188</a>
 <a name='L189'></a><a href='#L189'>189</a>
 <a name='L190'></a><a href='#L190'>190</a>
-<a name='L191'></a><a href='#L191'>191</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -347,6 +361,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -463,7 +483,8 @@ import { recordContext, latestContext, turnCount } from '../channels/context.js'
 import { hasClosingSignature }                     from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
 import type { Store }                              from '../channels/store.js';
-import { clockTime }                               from '../channels/time.js';
+import { clockTime, zoneAbbreviation }             from '../channels/time.js';
+import { privacyFlags }                            from '../channels/privacy.js';
 &nbsp;
 /** The subset of a hook payload these handlers read. */
 export interface HookPayload {
@@ -485,13 +506,16 @@ export type HookOutput = Record&lt;string, unknown&gt; | null;
  * A short human sentence naming the moment a turn begins.
  *
  * Wall-clock time is not otherwise available at turn start, so without it the opening
- * signature has no clock to report and falls back to a placeholder. Part-of-day is
- * included because the interesting question is rarely the exact minute — it is whether
- * this is a Tuesday morning or a Saturday at two in the morning.
+ * signature has no clock to report and falls back to a placeholder. The zone travels with
+ * the clock because the signature timestamp is specified `12-hour, with zone` and must
+ * never be fabricated — the model can only carry a zone it was handed, so the hook has to
+ * hand it one, exactly as the original standalone hook did. Part-of-day is included
+ * because the interesting question is rarely the exact minute — it is whether this is a
+ * Tuesday morning or a Saturday at two in the morning.
  *
  * @example
  *   describeMoment(new Date(2026, 7, 18, 14, 5))
- *   // =&gt; 'Turn starting Tuesday, August 18, 2026 at 2:05 pm (afternoon).'
+ *   // =&gt; 'Turn starting Tuesday, August 18, 2026 at 2:05 pm PDT (afternoon).'
  */
 export function <span class="fstat-no" title="function not covered" >describeMoment(n</span>ow: Date): string {
 &nbsp;
@@ -504,7 +528,7 @@ export function <span class="fstat-no" title="function not covered" >describeMom
         date = <span class="cstat-no" title="statement not covered" >now.toLocaleDateString('en-US',</span>
                  { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return `Turn starting ${date} at ${clockTime(now)} (${part}).`;</span>
+<span class="cstat-no" title="statement not covered" >  return `Turn starting ${date} at ${clockTime(now)} ${zoneAbbreviation(now)} (${part}).`;</span>
 &nbsp;
 }
 &nbsp;
@@ -531,6 +555,11 @@ export const OPEN_REMINDER =
  * cannot observe any of them, and the model reporting them about itself is exactly the
  * self-report this design removes.
  *
+ * The path-carrying fields — `cwd` and the prompt length — are gated here on the privacy
+ * config, at the point of capture, so a suppressed field is never written to the database
+ * rather than being hidden after the fact. The config read is inside the fail-open `try`,
+ * so a config error skips the context write entirely and still delivers the clock.
+ *
  * @example
  *   onUserPromptSubmit(store, { session_id: 'abc', prompt_id: 'p1' }, new Date())
  *   // =&gt; { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: '…' } }
@@ -539,17 +568,18 @@ export function <span class="fstat-no" title="function not covered" >onUserPromp
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (store !== null &amp;&amp; typeof payload.session_id === 'string' &amp;&amp; payload.session_id !== '') {</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
+      const privacy = <span class="cstat-no" title="statement not covered" >privacyFlags(store);</span>
 <span class="cstat-no" title="statement not covered" >      recordContext(store, {</span>
         session        : payload.session_id,
         promptId       : payload.prompt_id,
         turnIndex      : turnCount(store, payload.session_id) + 1,
         turn           : 'reply',
-        cwd            : payload.cwd,
+        cwd            : privacy.storeCwd ? payload.cwd : undefined,
         permissionMode : payload.permission_mode,
         agentId        : payload.agent_id,
         agentType      : payload.agent_type,
         effort         : payload.effort?.level,
-        promptLen      : payload.user_input?.length,
+        promptLen      : privacy.storePromptLen ? payload.user_input?.length : undefined,
       }, now);
     } catch { /* fail open: the clock still gets delivered */ }
   }
@@ -640,7 +670,7 @@ export function <span class="fstat-no" title="function not covered" >handleHook(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T03:22:44.459Z
+                at 2026-08-28T05:50:39.247Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
