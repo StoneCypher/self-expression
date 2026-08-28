@@ -6,6 +6,8 @@ import { openStore, closeStore, writeConfig, deleteConfig, readConfig } from '..
 import type { Store } from '../channels/store.js';
 import {
   FORMAT_VERSION, CONFIG_KEYS, configKey,
+  DEFAULT_CHANNEL_MAX_CHARS, MAX_TEXT_CEILING, MIN_CHANNEL_MAX_CHARS,
+  channelMaxChars, channelMaxCharsKey,
   validateBool, intValidator, validateChannelList, stringValidator,
   effectiveValue, effectiveConfig,
 } from '../channels/config.js';
@@ -19,13 +21,20 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the three #31 share keys, and the eleven #44 audio keys', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the three #31 share keys, the eleven #44 audio keys, and the twelve #76 length keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
       'audio.wav.attention', 'audio.wav.need-blocked', 'audio.wav.quiet-completion',
       'audio.wav.session-open', 'audio.wav.spark',
-      'channels.enabled', 'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
+      'channels.checklist.max_chars', 'channels.confidence.max_chars',
+      'channels.conflict.max_chars', 'channels.dissent.max_chars',
+      'channels.divergence.max_chars',
+      'channels.enabled',
+      'channels.idea.max_chars', 'channels.load.max_chars', 'channels.need.max_chars',
+      'channels.pattern.max_chars', 'channels.signature.max_chars',
+      'channels.taste.max_chars', 'channels.unanswerable.max_chars',
+      'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
       'gifts.enabled', 'messages.enabled', 'messages.notify',
       'privacy.store_cwd', 'privacy.store_prompt_len',
@@ -84,6 +93,77 @@ describe('CONFIG_KEYS registry', () => {
   test('an unknown key has no definition — that is what makes the D3 warning possible', () => {
     expect(configKey('gate.signture')).toBeUndefined();
   });
+
+});
+
+describe('channels.<name>.max_chars — the #76 length family', () => {
+
+  test('every channel has a registered int key defaulting to 200', () => {
+    for (const channel of CHANNELS) {
+      expect(configKey(channelMaxCharsKey(channel)))
+        .toMatchObject({ kind: 'int', fallback: String(DEFAULT_CHANNEL_MAX_CHARS) });
+    }
+    expect(DEFAULT_CHANNEL_MAX_CHARS).toBe(200);
+  });
+
+  test('the key name is the documented shape users type', () => {
+    expect(channelMaxCharsKey('signature')).toBe('channels.signature.max_chars');
+    expect(channelMaxCharsKey('taste')).toBe('channels.taste.max_chars');
+  });
+
+  test('the accepted range is 1 to the hard ceiling the tool schema carries', () => {
+    const def = configKey(channelMaxCharsKey('signature'));
+    expect(def?.validate(String(MIN_CHANNEL_MAX_CHARS)).ok).toBe(true);
+    expect(def?.validate(String(MAX_TEXT_CEILING)).ok).toBe(true);
+    expect(def?.validate('0').ok).toBe(false);
+    expect(def?.validate(String(MAX_TEXT_CEILING + 1)).ok).toBe(false);
+  });
+
+  test('zero is refused, naming the range — disabling a channel is channels.enabled’s job', () => {
+    const outcome = configKey(channelMaxCharsKey('need'))?.validate('0');
+    expect(outcome?.ok).toBe(false);
+    if (outcome !== undefined && !outcome.ok) { expect(outcome.expected).toContain('1 to 2000'); }
+  });
+
+  test('channelMaxChars returns the default on a fresh store', () => withStore(s => {
+    for (const channel of CHANNELS) {
+      expect(channelMaxChars(s, channel)).toBe(DEFAULT_CHANNEL_MAX_CHARS);
+    }
+  }));
+
+  test('a configured limit reaches exactly the channel it names', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('taste'), '320');
+    expect(channelMaxChars(s, 'taste')).toBe(320);
+    for (const other of CHANNELS.filter(c => c !== 'taste')) {
+      expect(channelMaxChars(s, other)).toBe(DEFAULT_CHANNEL_MAX_CHARS);
+    }
+  }));
+
+  test('a hand-edited garbage or out-of-range row behaves as unset, never as a limit nobody chose', () => withStore(s => {
+    for (const bad of ['soon', '-5', '0', '99999', '', '12.5']) {
+      writeConfig(s, channelMaxCharsKey('need'), bad);
+      expect(channelMaxChars(s, 'need')).toBe(DEFAULT_CHANNEL_MAX_CHARS);
+    }
+  }));
+
+  test('an unregistered channel name resolves to the default rather than throwing', () => withStore(s => {
+    expect(channelMaxChars(s, 'vibes')).toBe(DEFAULT_CHANNEL_MAX_CHARS);
+  }));
+
+  test('unset returns the channel to the code default', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('load'), '90');
+    expect(channelMaxChars(s, 'load')).toBe(90);
+    deleteConfig(s, channelMaxCharsKey('load'));
+    expect(channelMaxChars(s, 'load')).toBe(DEFAULT_CHANNEL_MAX_CHARS);
+  }));
+
+  test('the family appears in the effective listing, one inspectable line per channel', () => withStore(s => {
+    const listed = effectiveConfig(s).filter(e => e.key.endsWith('.max_chars'));
+    expect(listed).toHaveLength(CHANNELS.length);
+    for (const entry of listed) {
+      expect(entry).toMatchObject({ value: '200', source: 'default', known: true });
+    }
+  }));
 
 });
 

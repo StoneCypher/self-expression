@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787943035360` from hash `f1f573e`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787945276175` from hash `0ca5184`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787943035360 Friday, August 28, 2026 at GMT-07:00 94.08 291 91 f1f573e 49.87 63.57 61.32 62.72 122 1414 87.83 91.23 94.44 1292 0.2.1 -->
+<!-- Supported embeds: 1787945276175 Friday, August 28, 2026 at GMT-07:00 94.13 291 91 0ca5184 51.13 64.07 62.25 63.37 127 1447 87.91 91.33 94.48 1320 0.2.1 -->
 
 
 
@@ -71,6 +71,7 @@ The registered keys:
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
+| `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
 | `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
@@ -91,6 +92,16 @@ The registered keys:
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
+
+Two of those families reach the *skills*, which are static Markdown and cannot read
+configuration at all. The turn-start hook carries them on the context line it already
+injects: a `conventions:` segment for the prose toggles, and a `lengths:` segment for
+the per-channel text ceilings — rendered against whichever limit the most channels
+share, so `lengths: 200 all` is the usual cost and `lengths: 200 except signature:70`
+names only genuine deviations. The skill states its *recommended* length (≤70, because
+a signature that has to be read has stopped being a glance) as a constant, and takes
+its *ceiling* from that segment; a raised ceiling is headroom for the occasional line
+that earns it, never an invitation to fill it.
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
@@ -415,19 +426,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1292</td>
-    <td>94.08<small>%</small></td>
-    <td>87.83<small>%</small></td>
-    <td>91.23<small>%</small></td>
-    <td>94.44<small>%</small></td>
+    <td>1320</td>
+    <td>94.13<small>%</small></td>
+    <td>87.91<small>%</small></td>
+    <td>91.33<small>%</small></td>
+    <td>94.48<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>122</td>
-    <td>94.08<small>%</small></td>
-    <td>49.87<small>%</small></td>
-    <td>61.32<small>%</small></td>
-    <td>62.72<small>%</small></td>
+    <td>127</td>
+    <td>94.13<small>%</small></td>
+    <td>51.13<small>%</small></td>
+    <td>62.25<small>%</small></td>
+    <td>63.37<small>%</small></td>
   </tr>
 </table>
 

@@ -8,9 +8,10 @@ import { latestContext, turnCount }           from '../channels/context.js';
 import {
   onUserPromptSubmit, onStop, handleHook, describeMoment,
   OPEN_REMINDER, OPEN_REMINDER_CLOCKLESS,
-  conventionFlags, CONVENTION_FLAGS,
+  conventionFlags, CONVENTION_FLAGS, channelLengths,
 } from '../mcp/hooks.js';
-import { configKey }                          from '../channels/config.js';
+import { configKey, channelMaxCharsKey, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
+import { CHANNELS }                           from '../channels/vocabulary.js';
 import { zoneAbbreviation }                   from '../channels/time.js';
 
 const VERSION = '0.2.0';
@@ -165,6 +166,74 @@ describe('conventionFlags', () => {
 
 });
 
+describe('channelLengths — the #76 ceiling transport', () => {
+
+  test('an unconfigured install costs one short segment, not twelve pairs', () => withStore(s => {
+    expect(channelLengths(s)).toBe('lengths: 200 all');
+  }));
+
+  test('a configured channel is named as an exception against the shared base', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('signature'), '70');
+    expect(channelLengths(s)).toBe('lengths: 200 except signature:70');
+  }));
+
+  test('several exceptions are listed in vocabulary order', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('signature'), '70');
+    writeConfig(s, channelMaxCharsKey('taste'), '400');
+    expect(channelLengths(s)).toBe('lengths: 200 except signature:70 taste:400');
+  }));
+
+  test('moving every channel to one new number renders as compactly as the default', () => withStore(s => {
+    for (const channel of CHANNELS) { writeConfig(s, channelMaxCharsKey(channel), '120'); }
+    expect(channelLengths(s)).toBe('lengths: 120 all');
+  }));
+
+  test('the base follows the majority, so a lone holdout is the exception', () => withStore(s => {
+    for (const channel of CHANNELS.filter(c => c !== 'taste')) {
+      writeConfig(s, channelMaxCharsKey(channel), '120');
+    }
+    expect(channelLengths(s)).toBe('lengths: 120 except taste:200');
+  }));
+
+  test('an invalid stored row never reaches the segment — it renders as the default', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('need'), 'lots');
+    expect(channelLengths(s)).toBe('lengths: 200 all');
+  }));
+
+  test('the ceiling on the line is the configured one, never the hardcoded default', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('need'), '450');
+    const context = String(
+      (onUserPromptSubmit(s, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context).toContain('lengths: 200 except need:450');
+  }));
+
+  test('the segment sits after the conventions flags and before the reminder', () => withStore(s => {
+    const context = String(
+      (onUserPromptSubmit(s, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context.indexOf('conventions:')).toBeLessThan(context.indexOf('lengths:'));
+    expect(context.indexOf('lengths:')).toBeLessThan(context.indexOf(OPEN_REMINDER));
+  }));
+
+  test('with no store there is no lengths segment, and the clock still arrives', () => {
+    const context = String(
+      (onUserPromptSubmit(null, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context).not.toContain('lengths:');
+    expect(context).toContain('2:05 pm');
+  });
+
+  test('every channel is representable in the segment, whether as base or exception', () => withStore(s => {
+    for (const channel of CHANNELS) {
+      writeConfig(s, channelMaxCharsKey(channel), String(DEFAULT_CHANNEL_MAX_CHARS + 1));
+      expect(channelLengths(s)).toContain(channel);
+      writeConfig(s, channelMaxCharsKey(channel), String(DEFAULT_CHANNEL_MAX_CHARS));
+    }
+  }));
+
+});
+
 describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
 
   function additionalContext(out: unknown): string {
@@ -177,7 +246,7 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW));
     // The conventions flags are config transport, not time presentation (#42), so they
     // still lead the clockless line; only the clock sentence is suppressed.
-    expect(context).toBe(`${conventionFlags(s)}. ${OPEN_REMINDER_CLOCKLESS}`);
+    expect(context).toBe(`${conventionFlags(s)}. ${channelLengths(s)}. ${OPEN_REMINDER_CLOCKLESS}`);
     expect(context).not.toContain('2:05 pm');
     expect(context).not.toContain('Turn starting');
     expect(context).not.toContain('timestamp above');   // the shipped wording must not dangle
@@ -206,9 +275,10 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     expect(context).toContain(OPEN_REMINDER);
   }));
 
-  test('unset keeps the clock, with the conventions flags between clock and reminder', () => withStore(s => {
+  test('unset keeps the clock, with the conventions flags and lengths between clock and reminder', () => withStore(s => {
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
-    expect(context).toBe(`${describeMoment(NOW)} ${conventionFlags(s)}. ${OPEN_REMINDER}`);
+    expect(context).toBe(
+      `${describeMoment(NOW)} ${conventionFlags(s)}. ${channelLengths(s)}. ${OPEN_REMINDER}`);
   }));
 
 });
