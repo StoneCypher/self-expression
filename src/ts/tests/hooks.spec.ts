@@ -5,7 +5,10 @@ import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store }                         from '../channels/store.js';
 import { recordEntry }                        from '../channels/entries.js';
 import { latestContext, turnCount }           from '../channels/context.js';
-import { onUserPromptSubmit, onStop, handleHook, describeMoment, OPEN_REMINDER } from '../mcp/hooks.js';
+import {
+  onUserPromptSubmit, onStop, handleHook, describeMoment,
+  OPEN_REMINDER, OPEN_REMINDER_CLOCKLESS,
+} from '../mcp/hooks.js';
 import { zoneAbbreviation }                   from '../channels/time.js';
 
 const VERSION = '0.2.0';
@@ -106,6 +109,45 @@ describe('onUserPromptSubmit', () => {
   test('a payload with no session still yields the clock and records nothing', () => withStore(s => {
     expect(onUserPromptSubmit(s, {}, NOW)).not.toBeNull();
     expect(latestContext(s)).toBeNull();
+  }));
+
+});
+
+describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
+
+  function additionalContext(out: unknown): string {
+    return String((out as { hookSpecificOutput: { additionalContext: string } })
+      .hookSpecificOutput.additionalContext);
+  }
+
+  test("'false' drops the clock sentence and keeps the reminder, reworded for the clockless case", () => withStore(s => {
+    writeConfig(s, 'time.hook', false);
+    const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW));
+    expect(context).toBe(OPEN_REMINDER_CLOCKLESS);
+    expect(context).not.toContain('2:05 pm');
+    expect(context).not.toContain('Turn starting');
+    expect(context).not.toContain('timestamp above');   // the shipped wording must not dangle
+  }));
+
+  test("context recording is unaffected — the write is observational, not presentational", () => withStore(s => {
+    writeConfig(s, 'time.hook', false);
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', effort: { level: 'high' } }, NOW);
+    const c = latestContext(s);
+    expect(c?.['session']).toBe('sess-1');
+    expect(c?.['prompt_id']).toBe('p1');
+    expect(c?.['effort']).toBe('high');
+  }));
+
+  test('only the exact string false suppresses; any other value keeps current behavior', () => withStore(s => {
+    writeConfig(s, 'time.hook', 'off');
+    const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
+    expect(context).toContain('2:05 pm');
+    expect(context).toContain(OPEN_REMINDER);
+  }));
+
+  test('unset keeps the clock, exactly as before the key existed', () => withStore(s => {
+    const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
+    expect(context).toBe(`${describeMoment(NOW)} ${OPEN_REMINDER}`);
   }));
 
 });

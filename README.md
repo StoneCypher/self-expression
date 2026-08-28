@@ -1,12 +1,58 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787900436173` from hash `960abf0`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787928318800` from hash `4b4cf6f`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787900436173 Friday, August 28, 2026 at GMT-07:00 87.13 85 84 960abf0 44.92 51.64 45.91 50.45 46 530 86.13 81.63 87.41 484 0.2.1 -->
+<!-- Supported embeds: 1787928318800 Friday, August 28, 2026 at GMT-07:00 90.39 85 84 4b4cf6f 44.34 51.87 49.53 50.72 53 608 89.6 86.44 90.22 555 0.2.1 -->
 
 
+
+&nbsp;
+
+## Configuration
+
+Configuration lives in the log database's `config` table, reached through the `configure`
+MCP tool — never in host-specific plugin config, so a choice made under one host holds
+under all of them. Precedence is exactly two layers:
+
+1. **`SELF_EXPRESSION_HOME`** (environment variable) locates the data directory —
+   default `~/.self-expression` — and does nothing else.
+2. Every other choice is a **`config` row, else the code default**. Defaults are never
+   seeded as rows, so a later release changing a default actually reaches existing
+   installs; a zero-row table is a valid, fully-working state.
+
+The `configure` tool takes an `op`:
+
+| Op | Effect |
+|---|---|
+| `get` | One key's stored override, or which code default applies. |
+| `set` | Validate and store one value in canonical form. Known keys are typed — an invalid value is rejected naming what would have been accepted, and nothing is written. An unknown key is stored as given, with a stated warning (a newer version may legitimately have written it). |
+| `unset` | Delete the override so the code default applies again — including a future changed default. |
+| `list` | The **effective** configuration: every known key with its value and source (`override` or `default`), plus any unknown override rows, labeled. |
+
+The registered keys:
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
+| `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
+| `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
+| `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
+| `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
+| `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
+| `format.version` | string | `1` | Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral. |
+| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording and the open-signature reminder remain. |
+| `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
+| `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
+| `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+
+Readers are tolerant: a stored value that fails validation behaves as unset, so a
+hand-edited database or a downgrade can never wedge the server or the gates. The
+privacy and `time.hook` switches additionally act only on the exact string `false` —
+an ambiguous value records rather than silently suppressing.
+
+&nbsp;
 
 &nbsp;
 
@@ -63,19 +109,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>484</td>
-    <td>87.13<small>%</small></td>
-    <td>86.13<small>%</small></td>
-    <td>81.63<small>%</small></td>
-    <td>87.41<small>%</small></td>
+    <td>555</td>
+    <td>90.39<small>%</small></td>
+    <td>89.6<small>%</small></td>
+    <td>86.44<small>%</small></td>
+    <td>90.22<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>46</td>
-    <td>87.13<small>%</small></td>
-    <td>44.92<small>%</small></td>
-    <td>45.91<small>%</small></td>
-    <td>50.45<small>%</small></td>
+    <td>53</td>
+    <td>90.39<small>%</small></td>
+    <td>44.34<small>%</small></td>
+    <td>49.53<small>%</small></td>
+    <td>50.72<small>%</small></td>
   </tr>
 </table>
 
