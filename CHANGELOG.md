@@ -22,52 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 12:21:17 PM
-
-Commit [0ca51840822be11ac662093cd795133dcd6fd124](https://github.com/StoneCypher/self-expression/commit/0ca51840822be11ac662093cd795133dcd6fd124)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: per-channel text length keys, handler check, hook transport, skill wording
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:19:28 PM
-
-Commit [5622fef56c1aac7d1852ccfceed0199606d50eee](https://github.com/StoneCypher/self-expression/commit/5622fef56c1aac7d1852ccfceed0199606d50eee)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: anchoring core — vocabulary, anchors module, schema v4, entries, renderer, tools
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:16:39 PM
-
-Commit [56ef1919339382232049109bce14452fef649dc0](https://github.com/StoneCypher/self-expression/commit/56ef1919339382232049109bce14452fef649dc0)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: regenerate artifacts after the claudio merge
-  * README.md, CHANGELOG*, and coverage-stoch/ rebuilt from the merged tree.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 28, 2026 12:13:47 PM
 
 Commit [a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d](https://github.com/StoneCypher/self-expression/commit/a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d)
@@ -189,3 +143,59 @@ Merges [d8562eb, d3fec48]
 
   * Merge pull request #71 from StoneCypher/feat_26-08-28_voluntary-audio_44
   * feat: claudio — voluntary audio expression as its own facility (strike/audition/say)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:51:49 AM
+
+Commit [95b4285ccf10177a02d0e3fb6b167d2987c1fc77](https://github.com/StoneCypher/self-expression/commit/95b4285ccf10177a02d0e3fb6b167d2987c1fc77)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: onboarding question registry, ledger, and onboard MCP tool (wip, refs #40)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:51:45 AM
+
+Commit [d3fec489e7e1df2ca1385a6470de67afa851b398](https://github.com/StoneCypher/self-expression/commit/d3fec489e7e1df2ca1385a6470de67afa851b398)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * build: regenerate artifacts after the share/messagebox merge
+  * dist, coverage, README, and changelogs regenerated on the merged tree;
+full build green (exit 0).
+  * Refs #44
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:48:48 AM
+
+Commit [f1f573e8faf30c8a93d2800929515fc33fb1175e](https://github.com/StoneCypher/self-expression/commit/f1f573e8faf30c8a93d2800929515fc33fb1175e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [90a1269, d8562eb]
+
+  * chore: merge origin/main (#31 share keys, #41 messagebox); union the registry and its pin test
+  * Source integration: audio.* keys sit alongside the new share.* and
+messages.* keys in CONFIG_KEYS; the registry pin test now lists all
+32 keys. surface.stoch timeouts were widened identically on both sides
+(main's 30_000 spelling kept). Generated artifacts taken from main;
+rebuild follows.
+  * Refs #44

@@ -22,52 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 12:21:17 PM
-
-Commit [0ca51840822be11ac662093cd795133dcd6fd124](https://github.com/StoneCypher/self-expression/commit/0ca51840822be11ac662093cd795133dcd6fd124)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: per-channel text length keys, handler check, hook transport, skill wording
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:19:28 PM
-
-Commit [5622fef56c1aac7d1852ccfceed0199606d50eee](https://github.com/StoneCypher/self-expression/commit/5622fef56c1aac7d1852ccfceed0199606d50eee)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: anchoring core — vocabulary, anchors module, schema v4, entries, renderer, tools
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:16:39 PM
-
-Commit [56ef1919339382232049109bce14452fef649dc0](https://github.com/StoneCypher/self-expression/commit/56ef1919339382232049109bce14452fef649dc0)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: regenerate artifacts after the claudio merge
-  * README.md, CHANGELOG*, and coverage-stoch/ rebuilt from the merged tree.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 28, 2026 12:13:47 PM
 
 Commit [a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d](https://github.com/StoneCypher/self-expression/commit/a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d)

@@ -245,6 +245,27 @@ export function validateIsoUtc(raw: string): Validation {
 }
 
 /**
+ * Validate a free token list: comma-separated non-empty tokens, at least one,
+ * canonicalized to trimmed tokens joined with `,`.
+ *
+ * Deliberately permissive about what a token *is* — it exists for
+ * `onboarding.answered`, whose unknown-ids-are-preserved rule (#40, following #30's
+ * unknown-keys rule) means a strict membership check would be a bug: a newer plugin
+ * version's question ids must survive validation by an older version, and a reader
+ * that treated them as invalid would silently un-answer the whole questionnaire.
+ *
+ * @example
+ *   validateTokenList(' roster , forecast ')  // => { ok: true, canonical: 'roster,forecast' }
+ *   validateTokenList(' , ')                  // => { ok: false, expected: 'a non-empty comma-separated list …' }
+ */
+export function validateTokenList(raw: string): Validation {
+  const tokens = raw.split(',').map(s => s.trim()).filter(s => s !== '');
+  return tokens.length > 0
+    ? { ok: true, canonical: tokens.join(',') }
+    : { ok: false, expected: 'a non-empty comma-separated list of ids' };
+}
+
+/**
  * The registry key naming one channel's maximum text length.
  *
  * Twelve flat keys rather than one map-valued key, deliberately (issue #76): a map
@@ -374,6 +395,9 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'share.time_granularity', kind: 'string', fallback: 'hour',
     description: 'how far exported timestamps are coarsened: hour keeps time-of-day questions answerable, day destroys them for a smaller residual',
     validate: choiceValidator(['hour', 'day']) },
+  { key: 'onboarding.answered', kind: 'list', fallback: null,
+    description: 'ids of onboarding questions resolved — answered or skipped (#40); unknown ids are preserved, and unsetting this re-runs onboarding',
+    validate: validateTokenList },
 ];
 
 /**

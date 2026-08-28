@@ -21,7 +21,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the three #31 share keys, the eleven #44 audio keys, and the twelve #76 length keys', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the three #31 share keys, the eleven #44 audio keys, the #40 onboarding ledger, and the twelve #76 length keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -36,7 +36,7 @@ describe('CONFIG_KEYS registry', () => {
       'channels.taste.max_chars', 'channels.unanswerable.max_chars',
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
-      'gifts.enabled', 'messages.enabled', 'messages.notify',
+      'gifts.enabled', 'messages.enabled', 'messages.notify', 'onboarding.answered',
       'privacy.store_cwd', 'privacy.store_prompt_len',
       'retention.days', 'revision.enabled', 'roster.enabled', 'salience.enabled',
       'share.enabled', 'share.opted_in_utc', 'share.time_granularity',

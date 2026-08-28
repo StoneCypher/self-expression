@@ -92,6 +92,7 @@ The registered keys:
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
+| `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
 
 Two of those families reach the *skills*, which are static Markdown and cannot read
 configuration at all. The turn-start hook carries them on the context line it already
@@ -108,6 +109,29 @@ hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
 an ambiguous value records rather than silently suppressing. `share.enabled` inverts
 that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Onboarding
+
+Several features are durably toggleable and default off precisely because they are
+matters of taste, size, or consent. On a fresh database the server's MCP handshake
+says onboarding is pending, and the assistant offers a short questionnaire — at a
+natural pause, never interrupting the work: the party roster, forecasts, visible
+revision, the ⭑ salience glyph, the taste line, the gift register, the dwelling (which
+requires a directory of your choosing — there is deliberately no default path), and
+trimming the channel set.
+
+Saying **"defaults"** ends it in one word and writes nothing, so later releases'
+changed defaults still reach you; every explicitly answered question writes a real
+config row, so a later default flip cannot silently un-choose it. Answers persist in
+the shared database — answer once under one host and no other host re-asks. A key you
+have already set by hand counts as answered. Say **"re-run onboarding"**
+(`onboard {op:'reset'}`) to be asked again; config values are untouched. Progress
+lives in the single `onboarding.answered` ledger key — there is deliberately no
+completion boolean, so a new question in a later release re-asks only itself.
 
 &nbsp;
 
