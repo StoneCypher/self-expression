@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787942564319` from hash `c503ac6`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787942498605` from hash `cb24f76`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787942564319 Friday, August 28, 2026 at GMT-07:00 93.99 291 91 c503ac6 49.22 64.39 60.91 63.01 111 1236 87.16 91 94.31 1125 0.2.1 -->
+<!-- Supported embeds: 1787942498605 Friday, August 28, 2026 at GMT-07:00 94.6 291 91 cb24f76 51.68 66.13 65.57 65.44 111 1291 88.52 92.71 95.07 1180 0.2.1 -->
 
 
 
@@ -36,7 +36,7 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 2) and
+Schema versioning is stored in the database (`schema_version`, currently 3) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
@@ -83,14 +83,65 @@ The registered keys:
 | `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
 | `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
+| `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
+| `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+| `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
+| `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
+| `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
-an ambiguous value records rather than silently suppressing.
+an ambiguous value records rather than silently suppressing. `share.enabled` inverts
+that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Sharing — structured fields only, never free text
+
+Public aggregation is opt-in, off by default, and carries **no free text, ever** —
+not the note text, not titles, not paths, branches, or user-chosen names. The `share`
+MCP tool exposes three verbs:
+
+| Verb | Effect |
+|---|---|
+| `preview` | Renders exactly what an export would produce — the same code path, the same rows — plus the full column-by-column treatment table. |
+| `export` | Produces the submission as one JSON document (to a file when `path` is given). Refuses until a preview for the same options has been rendered this session: seeing what goes is mechanical, not optional. |
+| `status` | Reports the opt-in state, the opt-in moment, and how many rows are eligible. |
+
+Every column of the local schema is classified in a single allowlist
+(`src/ts/channels/public_export.ts`), and the exporter builds its query from that
+allowlist — an unlisted column is unreachable by construction, and a test fails the
+build if a future schema column is ever left unclassified. The treatments:
+
+- **Verbatim** — closed vocabularies (`channel`, `stem`, `delta`, …), booleans, and
+  bounded counts; plus `model` and `host`, which name software, not people.
+- **Coarsened** — timestamps truncated to the hour (or day); lengths and token counts
+  as log2 buckets; small counters capped at `33+`; host version to its major.
+- **Hashed** — `session`, `prompt_id`, `machine_id`, `agent_id`, `uuid`, `series_key`,
+  and correction edges, under a fresh per-submission salt that is never persisted:
+  grouping works within one submission, nothing joins across submissions.
+- **Derived** — `local_period` (six-hour band) and `local_dow` (weekday/weekend)
+  replace any timezone export; `cctype` and `face` export only when they validate
+  against a closed list or as exactly one emoji grapheme, else `NULL`.
+- **Excluded** — `text`, `title`, `cwd`, `project`, `git_branch`, `tz`, `agent_type`,
+  `context_emoji`, `permission_mode`, `turn_index`, `resolve_by`, and every raw
+  identifier.
+
+Opting in is an **event, never retroactive**: setting `share.enabled` to `true`
+records the moment, and only rows recorded at or after the most recent opt-in are
+eligible — rows from before it are permanently outside the export, and opting out
+clears the window entirely. v1 ships no network transport: the export is a local file
+the user inspects and sends however they choose, or not at all.
+
+The honest claim, in full: *no free text, reduced linkage, coarsened time.* This is
+not differential privacy and not a formal anonymity guarantee, and nothing in this
+tool should be read as claiming either.
 
 &nbsp;
 
@@ -204,6 +255,48 @@ from a rendered body's markers).
 
 &nbsp;
 
+## Messagebox
+
+Audience-tagged messages with real delivery and readback semantics, stored beside the
+expression log — its own facility, not a rendered channel. One transcript can carry
+several conversations without any of them appearing in it: notes to future-self that
+survive compaction, coordination between sibling agents, asides for the human to read
+later, remarks for the record. Read-state is append-only receipt rows, never a mutable
+flag; **unread** means "no receipt from this reader, and not expired". `expires_utc`
+only excludes a message from delivery — deletion belongs to `retention.days` alone.
+
+The audiences:
+
+| audience | scope | who collects | unread notification |
+|---|---|---|---|
+| `self` | sender's session | the same session, later — after compaction or resume | `SessionStart` injects the notes; the per-turn line shows a count |
+| `agents` | `box` (required) | any agent working that box | none — workers poll by instruction |
+| `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count |
+| `record` | global | nobody; consultable history | never |
+
+Two MCP tools:
+
+| Tool | Purpose |
+|---|---|
+| `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
+| `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
+
+The user's own door, with no model in the loop:
+
+```text
+self-expression messages [--audience A] [--box B] [--ack] [--limit N]
+```
+
+Default audience is `user`; `--ack` collects (writing the human's own receipts), its
+absence peeks. Delivery is pull on every host; on Claude, hooks add two pull triggers —
+a per-turn unread-count line (config-gated by `messages.notify`) and a `SessionStart`
+injection of unread self notes on `compact`/`resume`, which is what makes a note to
+future-self genuinely survive compaction.
+
+&nbsp;
+
+&nbsp;
+
 ## The dwelling
 
 A per-assistant keepsake database: a tended space whose **current arrangement** is the
@@ -250,65 +343,6 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
 
 &nbsp;
 
-## Voluntary audio (claudio)
-
-A small palette of **leitmotifs the assistant chooses to strike** — the choice is the
-expression, exactly as choosing to write a `need` line is. The successor to the
-hook-triggered prototype, inverting all three of its defining properties: voluntary
-rather than involuntary, meaning-mapped rather than event-mapped, and built on platform
-facilities rather than native audio modules (issue #44; design in
-`src/superpowers/spec/2026-08-27-voluntary-audio-design.md`).
-
-**Its own facility, not new tools on this server.** The audio surface is a second MCP
-server, `claudio`, in its own bundle (`self-expression-audio mcp` — registered alongside
-the main server in `.mcp.json`), so a broken audio stack can never take the backchannel
-down. The playback mechanism is a spawned `powershell -NoProfile -NonInteractive` child
-playing a vendored WAV via `System.Media.SoundPlayer.PlaySync()` — zero native
-dependencies, nothing compiled at install time. Volume is applied by scaling the PCM
-samples in Node before the child ever sees the file. Platforms without a player (all
-non-Windows, for now) register no tools at all: absence degrades to silence.
-
-**Default off, exact affirmative on.** Installing produces no sound. The `audio.*` keys
-ride the ordinary `configure` tool:
-
-| Key | Type | Default | Meaning |
-|---|---|---|---|
-| `audio.enabled` | bool | `false` | Only exactly `true` enables. Read at claudio startup for the tool schema, and re-checked on every strike. |
-| `audio.volume_ceiling` | int | `50` | Loudest volume (0–100) the assistant may choose. The `CLAUDIO_VOLUME_CEILING` environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. |
-| `audio.tts_local` | bool | `false` | The local offline TTS tier's own consent gate. Cloud TTS tiers deliberately do not exist in this build. |
-| `audio.min_gap_seconds` | int | `30` | Minimum spacing between audible strikes. |
-| `audio.hourly_budget` | int | `6` | Audible strikes per rolling hour. |
-| `audio.hourly_budget_attention` | int | `8` | The slightly larger budget `attention` draws from. |
-| `audio.wav.<leitmotif>` | string | *(none)* | Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. |
-
-The palette is a closed vocabulary of five meanings, capped at six —
-`session-open` (at most once per session), `quiet-completion`, `attention`,
-`need-blocked`, and `spark` — shipped as small synthesized WAVs in `assets/leitmotifs/`
-(regenerable via `src/scripts/generate_leitmotifs.mjs`). A leitmotif is a meaning, not a
-sound file; re-skin the waveform per meaning without the vocabulary drifting.
-
-| Tool | Purpose |
-|---|---|
-| `strike` | Strike one leitmotif at a chosen volume within `[0, ceiling]` — softer is a choice, louder is impossible. Refusals name the limit that blocked them. |
-| `audition` | Play one leitmotif at a fixed low volume, outside the strike budget, for reviewing the palette during configuration. |
-| `say` | One short line through the local offline voice (SAPI). Registered only at the `audio.tts_local` tier; the spoken text stays in the local ledger and never enters any aggregation. |
-
-**Everything is enforced server-side and everything is ledgered.** Rate limits, the
-ceiling, the once-per-session rule, and a hard duration cap (nothing loops, ever; a
-child that overstays is killed) are the facility's own code, never model politeness.
-Every strike attempt — played, refused, or errored — lands in the facility's own
-`audio.sqlite3` ledger beside the log, so what made noise and when is always
-reconstructible. Choosing *not* to strike records nothing: audio is a privilege, not an
-obligation, and silence is free.
-
-Quiet-hours and the shared unprompted-output policy surface are deferred to issue #43;
-unprompted strikes outside a live session are out of scope until it lands. The scarcity
-ethos ships in `skills/audio-expression/SKILL.md`.
-
-&nbsp;
-
-&nbsp;
-
 ## Test status
 
 <table>
@@ -322,19 +356,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1125</td>
-    <td>93.99<small>%</small></td>
-    <td>87.16<small>%</small></td>
-    <td>91<small>%</small></td>
-    <td>94.31<small>%</small></td>
+    <td>1180</td>
+    <td>94.6<small>%</small></td>
+    <td>88.52<small>%</small></td>
+    <td>92.71<small>%</small></td>
+    <td>95.07<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
     <td>111</td>
-    <td>93.99<small>%</small></td>
-    <td>49.22<small>%</small></td>
-    <td>60.91<small>%</small></td>
-    <td>63.01<small>%</small></td>
+    <td>94.6<small>%</small></td>
+    <td>51.68<small>%</small></td>
+    <td>65.57<small>%</small></td>
+    <td>65.44<small>%</small></td>
   </tr>
 </table>
 

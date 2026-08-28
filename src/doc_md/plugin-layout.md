@@ -52,6 +52,7 @@ self-expression/
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
 │   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
+│   │                        and the messagebox facility (messages.ts, issue #41)
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
 │   ├── claudio/             the voluntary audio facility: its own MCP server, gate, ledger,
 │   │                        WAV pipeline, and PowerShell player seam (issue #44)
@@ -150,6 +151,32 @@ as unset, so a hand-edited database can never wedge the gates). `unset` returns 
 tracking the code default, and `list` reports the effective configuration rather than just
 the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
 server startup — it never archives, and never touches `meta` or `config`.
+
+**The messagebox is a facility, not a channel (issue #41).** Audience-tagged messages
+(`self` / `agents` / `user` / `record`) live in two tables beside the expression log —
+`messages` plus an append-only `message_reads` receipt table — and never appear in the
+transcript: the store carries them, not the visible text. Delivery is pull
+(`read_messages` is the mechanism of record on every host), with two Claude hook
+triggers layered on top: the per-turn unread-count line (gated by `messages.notify`)
+and a `SessionStart` injection of unread self notes on `compact`/`resume`, receipting
+as it delivers. `self` is fenced by hook-observed session, `agents` by a required
+`box`, and the model can never write the human's receipt nor vice versa. Expiry
+(`expires_utc`) only excludes from delivery; deletion belongs to `retention.days`,
+which prunes messages by age and receipts only by orphanhood. The
+`self-expression messages` CLI subcommand is the human's own door.
+
+**Public aggregation is one module, allowlist-only (issue #31).**
+`src/ts/channels/public_export.ts` is the single point where rows are shaped for any
+public aggregation, and the only code allowed to do so. Its `PUBLIC_TREATMENTS` table
+classifies every `entries` column — verbatim, coarsen, hash, derive, or excluded — and
+the exporter builds its `SELECT` from that table, so an unlisted column is unreachable
+rather than filtered; a totality test against `ENTRIES_DDL` makes an unclassified future
+column fail the build. The `share` MCP tool (`src/ts/mcp/share_tools.ts`) wraps it:
+`preview` renders the exporter's actual output, `export` refuses until that preview has
+been seen this session, and the whole surface is off by default behind an event-based,
+never-retroactive opt-in (`share.enabled` / `share.opted_in_utc`). Free text never
+exports; the honest claim is *no free text, reduced linkage, coarsened time* — nothing
+stronger.
 
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ

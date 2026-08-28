@@ -166,6 +166,28 @@ export const STEMS = [
 ] as const;
 
 /**
+ * Who a messagebox message is addressed to (issue #41).
+ *
+ * Everything the assistant writes is formally addressed to the user, but real
+ * utterances have distinct audiences; this closes that set so an invalid audience is
+ * unnameable rather than quietly stored. `self` is fenced by the sender's session —
+ * "my future self" means the same session after compaction or resume, which is
+ * hook-observed and therefore unforgeable. `agents` requires a named box, because an
+ * unscoped agent message would be delivered to every concurrent multi-agent job
+ * sharing the database. `user` is an aside deferred rather than rendered — the point
+ * is that it deliberately does not appear now. `record` has no expected reader and
+ * never counts as unread.
+ *
+ * @see ./messages.js
+ */
+export const AUDIENCES = [
+  'self',    // future-self in this session: survives compaction, dies with the session's relevance
+  'agents',  // sibling agents coordinating on a named box; box is REQUIRED
+  'user',    // an aside for the human to read later rather than now
+  'record',  // posterity; no expected reader, never counts as unread
+] as const;
+
+/**
  * `model` is deliberately NOT a closed vocabulary.
  *
  * Model identifiers appear faster than any enum could track, and rejecting an unknown
@@ -196,6 +218,7 @@ export type DivergenceKind   = typeof DIVERGENCE_KINDS[number];
 export type Modality         = typeof MODALITIES[number];
 export type ForecastOutcome  = typeof FORECAST_OUTCOMES[number];
 export type SilenceKind      = typeof SILENCE_KINDS[number];
+export type Audience         = typeof AUDIENCES[number];
 
 /**
  * Whether `value` belongs to the closed vocabulary `vocabulary`, narrowing its type

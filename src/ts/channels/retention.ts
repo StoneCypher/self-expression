@@ -10,7 +10,12 @@
  * Both `entries` and `turn_context` are pruned on the same horizon: `turn_context`
  * carries the same path-shaped context the privacy keys guard, so trimming entries
  * while keeping context rows forever would be a privacy hole shaped exactly like the
- * one write-time redaction closes. `meta` and `config` are never touched.
+ * one write-time redaction closes. The messagebox tables (#41) ride the same horizon:
+ * `messages` prunes by age, and `message_reads` prunes **only by orphanhood** — a
+ * receipt whose message survived must survive too, because deleting it would
+ * resurrect the message as unread. Message expiry (`expires_utc`) is not retention:
+ * it only stops delivery, and only this horizon ever deletes. `meta` and `config`
+ * are never touched.
  *
  * @see ./config.js
  * @see ./store.js
@@ -21,8 +26,11 @@ import type { Store }     from './store.js';
 
 /** How many rows one pruning pass removed from each table. */
 export interface Pruned {
-  readonly entries     : number;
-  readonly turnContext : number;
+  readonly entries      : number;
+  readonly turnContext  : number;
+  readonly messages     : number;
+  /** Receipts removed because their message was pruned — never by their own age. */
+  readonly messageReads : number;
 }
 
 /** Milliseconds in one day, for the horizon arithmetic. */
@@ -51,13 +59,26 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
 
   const days = Number(effectiveValue(store, 'retention.days') ?? '0');
 
-  if (days === 0) { return { entries: 0, turnContext: 0 }; }
+  if (days === 0) { return { entries: 0, turnContext: 0, messages: 0, messageReads: 0 }; }
 
   const horizon = new Date(now.getTime() - days * DAY_MS).toISOString();
 
   const entries     = store.db.prepare('DELETE FROM entries      WHERE ts_utc < ?').run(horizon),
-        turnContext = store.db.prepare('DELETE FROM turn_context WHERE ts_utc < ?').run(horizon);
+        turnContext = store.db.prepare('DELETE FROM turn_context WHERE ts_utc < ?').run(horizon),
+        // Receipts of doomed messages go first — the foreign key would otherwise
+        // refuse the message delete. Orphanhood, not age, is the receipts' only
+        // criterion: a receipt of a surviving message must survive, or the message
+        // would be resurrected as unread.
+        reads       = store.db.prepare(
+          'DELETE FROM message_reads WHERE message_id IN (SELECT id FROM messages WHERE ts_utc < ?)')
+          .run(horizon),
+        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon);
 
-  return { entries: Number(entries.changes), turnContext: Number(turnContext.changes) };
+  return {
+    entries      : Number(entries.changes),
+    turnContext  : Number(turnContext.changes),
+    messages     : Number(messages.changes),
+    messageReads : Number(reads.changes),
+  };
 
 }

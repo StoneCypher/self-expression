@@ -2,8 +2,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
-import { ALL_DDL, INDEX_DDL, SCHEMA_VERSION, check, entriesDdl } from '../channels/schema.js';
-import { CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS }    from '../channels/vocabulary.js';
+import {
+  ALL_DDL, INDEX_DDL, MESSAGE_INDEX_DDL, SCHEMA_VERSION, check, entriesDdl,
+} from '../channels/schema.js';
+import {
+  CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
+} from '../channels/vocabulary.js';
 
 /** A throwaway on-disk database; node:sqlite has no shared in-memory mode across handles. */
 function freshDb(): { db: DatabaseSync; dir: string } {
@@ -40,7 +44,7 @@ describe('schema', () => {
     const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                   .all().map(r => r.name as string);
     // Counted from the DDL rather than hardcoded, so adding an index cannot break this.
-    expect(idx).toHaveLength(INDEX_DDL.length);
+    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length);
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
@@ -150,6 +154,41 @@ describe('schema', () => {
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
+  test('creates the messagebox tables (#41)', () => {
+    const { db, dir } = freshDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
+                     .all().map(r => r.name as string);
+    expect(tables).toContain('messages');
+    expect(tables).toContain('message_reads');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('accepts every audience and rejects one outside the vocabulary', () => {
+    const { db, dir } = freshDb();
+    const insert = db.prepare(
+      `INSERT INTO messages (uuid, ts_utc, ts_local, tz, session, machine_id, audience, text, plugin_version)
+       VALUES (?, '2026-08-28T00:00:00Z', '9:14 am PDT', 'PDT', 's1', 'm1', ?, 'x', '0.2.1')`);
+    for (const [i, audience] of AUDIENCES.entries()) {
+      insert.run(`a-${String(i)}`, audience);
+    }
+    expect(() => insert.run('a-bad', 'everyone')).toThrow();
+    expect(db.prepare('SELECT COUNT(*) n FROM messages').get().n).toBe(AUDIENCES.length);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("message_reads accepts only 'model' and 'user' readers", () => {
+    const { db, dir } = freshDb();
+    db.prepare(
+      `INSERT INTO messages (uuid, ts_utc, ts_local, tz, session, machine_id, audience, text, plugin_version)
+       VALUES ('m-1', '2026-08-28T00:00:00Z', '9:14 am PDT', 'PDT', 's1', 'm1', 'self', 'x', '0.2.1')`).run();
+    const insert = db.prepare(
+      "INSERT INTO message_reads (message_id, ts_utc, reader) VALUES (1, '2026-08-28T00:00:00Z', ?)");
+    insert.run('model');
+    insert.run('user');
+    expect(() => insert.run('bystander')).toThrow();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
   test('accepts every channel in the vocabulary', () => {
     const { db, dir } = freshDb();
     for (const [i, channel] of CHANNELS.entries()) {
@@ -179,8 +218,8 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 2 — the #42 channel-extensions shape', () => {
-    expect(SCHEMA_VERSION).toBe(2);
+  test('is 3 — the #41 messagebox shape', () => {
+    expect(SCHEMA_VERSION).toBe(3);
   });
 
 });

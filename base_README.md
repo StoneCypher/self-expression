@@ -36,7 +36,7 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 2) and
+Schema versioning is stored in the database (`schema_version`, currently 3) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
@@ -83,14 +83,65 @@ The registered keys:
 | `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
 | `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
+| `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
+| `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+| `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
+| `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
+| `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
-an ambiguous value records rather than silently suppressing.
+an ambiguous value records rather than silently suppressing. `share.enabled` inverts
+that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Sharing — structured fields only, never free text
+
+Public aggregation is opt-in, off by default, and carries **no free text, ever** —
+not the note text, not titles, not paths, branches, or user-chosen names. The `share`
+MCP tool exposes three verbs:
+
+| Verb | Effect |
+|---|---|
+| `preview` | Renders exactly what an export would produce — the same code path, the same rows — plus the full column-by-column treatment table. |
+| `export` | Produces the submission as one JSON document (to a file when `path` is given). Refuses until a preview for the same options has been rendered this session: seeing what goes is mechanical, not optional. |
+| `status` | Reports the opt-in state, the opt-in moment, and how many rows are eligible. |
+
+Every column of the local schema is classified in a single allowlist
+(`src/ts/channels/public_export.ts`), and the exporter builds its query from that
+allowlist — an unlisted column is unreachable by construction, and a test fails the
+build if a future schema column is ever left unclassified. The treatments:
+
+- **Verbatim** — closed vocabularies (`channel`, `stem`, `delta`, …), booleans, and
+  bounded counts; plus `model` and `host`, which name software, not people.
+- **Coarsened** — timestamps truncated to the hour (or day); lengths and token counts
+  as log2 buckets; small counters capped at `33+`; host version to its major.
+- **Hashed** — `session`, `prompt_id`, `machine_id`, `agent_id`, `uuid`, `series_key`,
+  and correction edges, under a fresh per-submission salt that is never persisted:
+  grouping works within one submission, nothing joins across submissions.
+- **Derived** — `local_period` (six-hour band) and `local_dow` (weekday/weekend)
+  replace any timezone export; `cctype` and `face` export only when they validate
+  against a closed list or as exactly one emoji grapheme, else `NULL`.
+- **Excluded** — `text`, `title`, `cwd`, `project`, `git_branch`, `tz`, `agent_type`,
+  `context_emoji`, `permission_mode`, `turn_index`, `resolve_by`, and every raw
+  identifier.
+
+Opting in is an **event, never retroactive**: setting `share.enabled` to `true`
+records the moment, and only rows recorded at or after the most recent opt-in are
+eligible — rows from before it are permanently outside the export, and opting out
+clears the window entirely. v1 ships no network transport: the export is a local file
+the user inspects and sends however they choose, or not at all.
+
+The honest claim, in full: *no free text, reduced linkage, coarsened time.* This is
+not differential privacy and not a formal anonymity guarantee, and nothing in this
+tool should be read as claiming either.
 
 &nbsp;
 
@@ -199,6 +250,48 @@ inferred from the digest line's noun (`items` → checklist, `findings`, `option
 percent on a profile with no scalar axis is flagged as fabricated, and the diff
 profile's kind-classified partition is checked by sum (change kinds are not derivable
 from a rendered body's markers).
+
+&nbsp;
+
+&nbsp;
+
+## Messagebox
+
+Audience-tagged messages with real delivery and readback semantics, stored beside the
+expression log — its own facility, not a rendered channel. One transcript can carry
+several conversations without any of them appearing in it: notes to future-self that
+survive compaction, coordination between sibling agents, asides for the human to read
+later, remarks for the record. Read-state is append-only receipt rows, never a mutable
+flag; **unread** means "no receipt from this reader, and not expired". `expires_utc`
+only excludes a message from delivery — deletion belongs to `retention.days` alone.
+
+The audiences:
+
+| audience | scope | who collects | unread notification |
+|---|---|---|---|
+| `self` | sender's session | the same session, later — after compaction or resume | `SessionStart` injects the notes; the per-turn line shows a count |
+| `agents` | `box` (required) | any agent working that box | none — workers poll by instruction |
+| `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count |
+| `record` | global | nobody; consultable history | never |
+
+Two MCP tools:
+
+| Tool | Purpose |
+|---|---|
+| `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
+| `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
+
+The user's own door, with no model in the loop:
+
+```text
+self-expression messages [--audience A] [--box B] [--ack] [--limit N]
+```
+
+Default audience is `user`; `--ack` collects (writing the human's own receipts), its
+absence peeks. Delivery is pull on every host; on Claude, hooks add two pull triggers —
+a per-turn unread-count line (config-gated by `messages.notify`) and a `SessionStart`
+injection of unread self notes on `compact`/`resume`, which is what makes a note to
+future-self genuinely survive compaction.
 
 &nbsp;
 

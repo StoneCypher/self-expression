@@ -12,6 +12,7 @@
  * @see ../doc_md/plugin-layout.md
  */
 import type { HistoryChart } from './raster/compose.js';
+import type { Audience } from './channels/vocabulary.js';
 /** A resolved `render` subcommand: the window, the chart, and where to write. */
 export interface RenderCommand {
     readonly kind: 'render';
@@ -22,6 +23,21 @@ export interface RenderCommand {
     /** Explicit output path, or `null` for the default beside the database. */
     readonly out: string | null;
 }
+/**
+ * A resolved `messages` subcommand — the user's direct door into the messagebox
+ * (issue #41), with no model in the loop.
+ */
+export interface MessagesCommand {
+    readonly kind: 'messages';
+    /** Which mailbox to read; defaults to `user`, the human's own mail. */
+    readonly audience: Audience;
+    /** Coordination-box filter, or `null` for no filter. */
+    readonly box: string | null;
+    /** Whether to write `reader: 'user'` receipts; collecting rather than peeking. */
+    readonly ack: boolean;
+    /** Most messages printed; a positive integer, capped at 100. */
+    readonly limit: number;
+}
 /** A resolved command line, after parsing but before execution. */
 export type CliCommand = {
     readonly kind: 'mcp';
@@ -30,7 +46,7 @@ export type CliCommand = {
     readonly name: string;
 } | {
     readonly kind: 'help';
-} | RenderCommand | {
+} | RenderCommand | MessagesCommand | {
     readonly kind: 'invalid';
     readonly message: string;
 } | {
@@ -75,6 +91,8 @@ export type ServerStarter = () => Promise<void>;
 export type HookRunner = (name: string) => Promise<void>;
 /** Renders the history PNG and resolves to the absolute path it was written at. */
 export type RenderRunner = (command: RenderCommand) => Promise<string>;
+/** Reads messagebox mail and resolves to the human-first report to print. */
+export type MessagesRunner = (command: MessagesCommand) => Promise<string>;
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -82,16 +100,16 @@ export type RenderRunner = (command: RenderCommand) => Promise<string>;
  * returns a number. Everything else delegates to `run` unchanged, so the pure dispatch
  * stays pure and only the genuinely asynchronous path lives here.
  *
- * `startServer`, `runHook`, and `runRender` are injected so this can be tested
- * without opening a pipe, a database, or writing an image to disk.
+ * `startServer`, `runHook`, `runRender`, and `runMessages` are injected so this can
+ * be tested without opening a pipe, a database, or writing an image to disk.
  *
  * @example
- *   await runAsync(['help'], streams, start, hook, render)  // => 0, never calls start
- *   await runAsync(['mcp'],  streams, start, hook, render)  // => 0 once the transport closes
- *   await runAsync(['render', '--days', '30'], streams, start, hook, render)
- *   // => 0, having written the rendered path to streams.out
+ *   await runAsync(['help'], streams, start, hook, render, messages)  // => 0, never calls start
+ *   await runAsync(['mcp'],  streams, start, hook, render, messages)  // => 0 once the transport closes
+ *   await runAsync(['messages', '--ack'], streams, start, hook, render, messages)
+ *   // => 0, having written the mail report to streams.out
  */
-export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner, runRender: RenderRunner): Promise<number>;
+export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner, runRender: RenderRunner, runMessages: MessagesRunner): Promise<number>;
 /**
  * Execute a parsed command and report the process exit code.
  *

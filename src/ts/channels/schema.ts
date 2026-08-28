@@ -20,7 +20,7 @@
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES, STEMS,
-  FORECAST_OUTCOMES, SILENCE_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
 } from './vocabulary.js';
 
 /**
@@ -34,9 +34,14 @@ import {
  * `resolve_by`, `outcome`, and `silence` columns. Because the vocabularies are baked
  * into `CHECK` constraints, v1 databases require the table rebuild in `migrate.ts`.
  *
+ * v3 (issue #41): the messagebox facility added the `messages` and `message_reads`
+ * tables and their indices. Purely additive — no existing table changes shape and no
+ * data moves — so the v2→v3 step only creates what is missing; the bump exists so the
+ * recorded history says when the shape changed.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -204,6 +209,68 @@ CREATE TABLE IF NOT EXISTS config (
   updated_utc TEXT NOT NULL
 )`;
 
+/**
+ * One messagebox message (issue #41): audience-tagged, sender-identified, optionally
+ * boxed and expiring.
+ *
+ * Sender identity is observed the way `entries` observes it — adopted from
+ * `turn_context` at write time, with absent context recorded as `no-hook` rather than
+ * disguised. `expires_utc` excludes a message from delivery; it never deletes —
+ * deletion belongs to `retention.days` and nothing else. Deliberately no `cwd`/path
+ * columns at all: the strongest form of `privacy.store_cwd` compliance is having
+ * nothing to redact.
+ *
+ * @see ./messages.js
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const MESSAGES_DDL: string = `
+CREATE TABLE IF NOT EXISTS messages (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid           TEXT    NOT NULL UNIQUE,
+
+  ts_utc         TEXT    NOT NULL,
+  ts_local       TEXT    NOT NULL,
+  tz             TEXT    NOT NULL,
+
+  session        TEXT    NOT NULL,
+  prompt_id      TEXT,
+  agent_id       TEXT,
+  agent_type     TEXT,
+  machine_id     TEXT    NOT NULL,
+
+  audience       TEXT    NOT NULL ${check('audience', AUDIENCES)},
+  box            TEXT,
+  reply_to       INTEGER REFERENCES messages(id),
+  text           TEXT    NOT NULL,
+  expires_utc    TEXT,
+
+  plugin_version TEXT    NOT NULL
+)`;
+
+/**
+ * One delivery receipt: a particular reader collected a particular message at a
+ * particular moment.
+ *
+ * Read-state is never a mutable flag on the message — receipts are append-only rows,
+ * so "who read this, and when" stays a fact the record can answer, multiple readers
+ * (sibling agents) each get their own receipt, and the storage keeps the house's
+ * no-UPDATE ethos. **Unread** is a computed predicate: no receipt from this reader,
+ * and not expired.
+ *
+ * @see ./messages.js
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const MESSAGE_READS_DDL: string = `
+CREATE TABLE IF NOT EXISTS message_reads (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id  INTEGER NOT NULL REFERENCES messages(id),
+  ts_utc      TEXT    NOT NULL,
+  reader      TEXT    NOT NULL ${check('reader', ['model', 'user'])},
+  session     TEXT,
+  agent_id    TEXT,
+  prompt_id   TEXT
+)`;
+
 /** Indices covering the queries the gates and the analyses actually run. */
 export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_prompt  ON entries(prompt_id)',
@@ -211,6 +278,20 @@ export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_channel ON entries(channel, ts_utc)',
   'CREATE INDEX IF NOT EXISTS idx_entries_series  ON entries(series_key, id)',
   'CREATE INDEX IF NOT EXISTS idx_context_session ON turn_context(session, id)',
+];
+
+/**
+ * Indices for the messagebox tables, kept apart from {@link INDEX_DDL} so the v1→v2
+ * migration step — which recreates the entries indices on a database where the
+ * messagebox tables may not exist yet — never references a table outside its own
+ * version's shape.
+ *
+ * @see ./migrate.js
+ */
+export const MESSAGE_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX IF NOT EXISTS idx_messages_audience ON messages(audience, session, id)',
+  'CREATE INDEX IF NOT EXISTS idx_messages_box      ON messages(box, id)',
+  'CREATE INDEX IF NOT EXISTS idx_reads_message     ON message_reads(message_id)',
 ];
 
 /**
@@ -227,5 +308,8 @@ export const ALL_DDL: readonly string[] = [
   TURN_CONTEXT_DDL,
   META_DDL,
   CONFIG_DDL,
+  MESSAGES_DDL,
+  MESSAGE_READS_DDL,
   ...INDEX_DDL,
+  ...MESSAGE_INDEX_DDL,
 ];
