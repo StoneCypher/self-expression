@@ -23,6 +23,7 @@ import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { openStore, closeStore } from '../channels/store.js';
+import { onboardingInstructions } from '../channels/onboarding.js';
 import { pruneExpired }  from '../channels/retention.js';
 import type { Store }    from '../channels/store.js';
 import { registerTools } from './tools.js';
@@ -49,6 +50,11 @@ export const SERVER_NAME = 'self-expression';
  * `dwelling` explicitly to control that in tests, or omit it to let configuration
  * decide via `maybeOpenDwelling`.
  *
+ * When onboarding questions are pending (issue #40), the server's `instructions`
+ * string says so — the MCP initialize handshake delivers it on every host, which is
+ * why hooks are deliberately not part of that detection path. The `onboard` tool
+ * itself is always registered, so permission caches never see a tool flicker.
+ *
  * @param dwelling - an open dwelling to register, `null` for none, or omit to resolve
  *                   from configuration; a caller who passes one also owns closing it
  *
@@ -57,7 +63,11 @@ export const SERVER_NAME = 'self-expression';
  */
 export function buildServer(store: Store, version: string, dwelling?: DwellingStore | null): McpServer {
 
-  const server = new McpServer({ name: SERVER_NAME, version });
+  const pending = onboardingInstructions(store);
+
+  const server = pending === null
+    ? new McpServer({ name: SERVER_NAME, version })
+    : new McpServer({ name: SERVER_NAME, version }, { instructions: pending });
 
   registerTools(server, store, version);
   registerChartTools(server, store);

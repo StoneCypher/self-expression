@@ -178,6 +178,27 @@ never-retroactive opt-in (`share.enabled` / `share.opted_in_utc`). Free text nev
 exports; the honest claim is *no free text, reduced linkage, coarsened time* — nothing
 stronger.
 
+**Onboarding is a per-question ledger, not a completion flag (issue #40).** The
+questionnaire lives in code (`src/ts/channels/onboarding.ts`), for the same reason the
+config registry does: static markdown cannot track registry growth or answered state.
+What it records is a single `onboarding.answered` key holding the question ids resolved
+so far — answered or explicitly skipped — in the same list-in-a-string idiom as
+`channels.enabled`, unknown ids preserved so a newer version's entries survive a write by
+an older one. There is deliberately no "onboarding is done" boolean: the questionnaire
+demonstrably grows, and under a boolean every added question either re-runs the whole
+interview or reaches nobody who already onboarded, while under the ledger an upgrade
+shipping a new question produces exactly one pending item. An explicit `config` row on any
+key a question writes counts as answered too, so a user who already set `roster.enabled`
+by hand is never asked about it; first run is a property of the shared database rather
+than the host, machine, or session, so answering under one host is not re-asked under
+another. Pending questions surface through the MCP server's `instructions` string,
+delivered by the initialize handshake — hooks are deliberately excluded from that
+detection path, because they are the least portable layer and onboarding must reach
+exactly the hosts that host-native prompting misses. The `onboard` tool is registered
+unconditionally so permission caches never see it flicker, and the etiquette is
+offer-not-gate: one offer at a natural pause, never blocking work, an ignored offer simply
+recurring next session.
+
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
 there is no sharing to be had, so Claude is pointed at `claude-commands/` and Gemini keeps

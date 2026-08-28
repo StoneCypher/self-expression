@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787943035360` from hash `f1f573e`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787944549182` from hash `a1a6dda`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787943035360 Friday, August 28, 2026 at GMT-07:00 94.08 291 91 f1f573e 49.87 63.57 61.32 62.72 122 1414 87.83 91.23 94.44 1292 0.2.1 -->
+<!-- Supported embeds: 1787944549182 Friday, August 28, 2026 at GMT-07:00 94.14 291 91 a1a6dda 49.96 63.59 62.48 62.79 126 1459 87.74 91.41 94.55 1333 0.2.1 -->
 
 
 
@@ -91,12 +91,36 @@ The registered keys:
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
+| `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
 an ambiguous value records rather than silently suppressing. `share.enabled` inverts
 that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Onboarding
+
+Several features are durably toggleable and default off precisely because they are
+matters of taste, size, or consent. On a fresh database the server's MCP handshake
+says onboarding is pending, and the assistant offers a short questionnaire — at a
+natural pause, never interrupting the work: the party roster, forecasts, visible
+revision, the ⭑ salience glyph, the taste line, the gift register, the dwelling (which
+requires a directory of your choosing — there is deliberately no default path), and
+trimming the channel set.
+
+Saying **"defaults"** ends it in one word and writes nothing, so later releases'
+changed defaults still reach you; every explicitly answered question writes a real
+config row, so a later default flip cannot silently un-choose it. Answers persist in
+the shared database — answer once under one host and no other host re-asks. A key you
+have already set by hand counts as answered. Say **"re-run onboarding"**
+(`onboard {op:'reset'}`) to be asked again; config values are untouched. Progress
+lives in the single `onboarding.answered` ledger key — there is deliberately no
+completion boolean, so a new question in a later release re-asks only itself.
 
 &nbsp;
 
@@ -415,19 +439,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1292</td>
-    <td>94.08<small>%</small></td>
-    <td>87.83<small>%</small></td>
-    <td>91.23<small>%</small></td>
-    <td>94.44<small>%</small></td>
+    <td>1333</td>
+    <td>94.14<small>%</small></td>
+    <td>87.74<small>%</small></td>
+    <td>91.41<small>%</small></td>
+    <td>94.55<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>122</td>
-    <td>94.08<small>%</small></td>
-    <td>49.87<small>%</small></td>
-    <td>61.32<small>%</small></td>
-    <td>62.72<small>%</small></td>
+    <td>126</td>
+    <td>94.14<small>%</small></td>
+    <td>49.96<small>%</small></td>
+    <td>62.48<small>%</small></td>
+    <td>62.79<small>%</small></td>
   </tr>
 </table>
 
