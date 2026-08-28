@@ -29,6 +29,7 @@ import type {
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
 import { readConfig, writeConfig, deleteConfig }                              from '../channels/store.js';
 import { FORMAT_VERSION, configKey, effectiveValue, effectiveConfig }         from '../channels/config.js';
+import { rejectDwellingWrite, dwellingChangeNotice }                          from '../dwelling/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
 import type { Store }     from '../channels/store.js';
@@ -283,13 +284,22 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
       `expected ${outcome.expected}. nothing was written`);
   }
 
+  // The dwelling's cross-key semantics (issue #45) sit atop the registry's type
+  // validation: enabling requires dwelling.path to already be set and valid, and the
+  // path itself must name an existing absolute directory — the plugin creates the
+  // database file, never the directory, so a typo is refused rather than hidden.
+  const rejected = rejectDwellingWrite(store, args.key, outcome.canonical);
+  if (rejected !== null) { return reply(`${rejected}. nothing was written`); }
+
   writeConfig(store, args.key, outcome.canonical);
 
   const restart = args.key === ENABLED_KEY
     ? ' — takes effect at the next server start; the channel enum is baked into the tool schema at startup'
     : '';
 
-  return reply(`${args.key} = ${outcome.canonical}${restart}`);
+  const dwelling = dwellingChangeNotice(args.key);
+
+  return reply(`${args.key} = ${outcome.canonical}${restart}${dwelling === null ? '' : ` — ${dwelling}`}`);
 
 }
 
