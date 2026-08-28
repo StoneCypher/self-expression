@@ -9,6 +9,8 @@ import {
   onUserPromptSubmit, onStop, handleHook, describeMoment,
   OPEN_REMINDER, OPEN_REMINDER_CLOCKLESS,
   conventionFlags, CONVENTION_FLAGS, channelLengths,
+  renderReplayItem, retractionReplayLine,
+  REPLAY_WINDOW_DAYS, REPLAY_MAX_ITEMS, REPLAY_QUOTE_MAX,
 } from '../mcp/hooks.js';
 import { configKey, channelMaxCharsKey, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
 import { CHANNELS }                           from '../channels/vocabulary.js';
@@ -280,6 +282,140 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     expect(context).toBe(
       `${describeMoment(NOW)} ${conventionFlags(s)}. ${channelLengths(s)}. ${OPEN_REMINDER}`);
   }));
+
+});
+
+describe('the retraction replay (#16)', () => {
+
+  /** Record a claim and take it back, at `when`. Returns the strike's replacement text. */
+  function takeBack(s: Store, when: Date, claim: string, fix: string): string {
+    const original = recordEntry(s, { channel: 'checklist', text: 'a render', session: 's1' },
+                                 VERSION, when).id;
+    recordEntry(s, { channel: 'divergence', text: fix, session: 's1', divergenceKind: 'stale',
+                     correctsId: original, correctsKind: 'retracts', verbatim: claim },
+                VERSION, when);
+    return fix;
+  }
+
+  /** The whole `additionalContext` string one turn produces. */
+  function contextLine(s: Store | null, session: string, at: Date = NOW): string {
+    return String((onUserPromptSubmit(s, { session_id: session, prompt_id: 'p1' }, at) as
+      { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+  }
+
+  test('renders one item as ⊘ quote → replacement (day)', () => {
+    expect(renderReplayItem({
+      kind: 'retracts', at: '2026-08-25T18:02:00.000Z', original: null,
+      verbatim: 'the build skips lint on spec-only PRs',
+      replacement: { id: 9, channel: 'divergence', text: 'it runs markdownlint' },
+    })).toBe('⊘ "the build skips lint on spec-only PRs" → it runs markdownlint (2026-08-25)');
+  });
+
+  test('falls back to the original\'s own text when the strike quoted nothing', () => {
+    expect(renderReplayItem({
+      kind: 'retracts', at: '2026-08-25T18:02:00.000Z',
+      original: { id: 3, channel: 'checklist', tsUtc: '2026-08-24T00:00:00.000Z', text: 'Atlas 31%' },
+      verbatim: null,
+      replacement: { id: 9, channel: 'divergence', text: 'Atlas 62%' },
+    })).toContain('"Atlas 31%"');
+  });
+
+  test('elides a claim longer than the line budget rather than flooding the turn', () => {
+    const long = 'x'.repeat(REPLAY_QUOTE_MAX + 40);
+    const line = renderReplayItem({
+      kind: 'retracts', at: '2026-08-25T00:00:00.000Z', original: null, verbatim: long,
+      replacement: { id: 1, channel: 'divergence', text: 'no' },
+    });
+    expect(line).toContain('…');
+    expect(line.length).toBeLessThan(long.length);
+  });
+
+  test('the first turn of a session carries the recently retracted claims', () => withStore(s => {
+    takeBack(s, new Date(NOW.getTime() - 86_400_000), 'icons sort by status first', 'rank then bucket');
+    const context = contextLine(s, 'sess-new');
+    expect(context).toContain('Recently retracted (do not rely on these):');
+    expect(context).toContain('⊘ "icons sort by status first" → rank then bucket');
+  }));
+
+  test('and no later turn does — once per session, or it becomes wallpaper', () => withStore(s => {
+    takeBack(s, new Date(NOW.getTime() - 86_400_000), 'wrong thing', 'right thing');
+    expect(contextLine(s, 'sess-new')).toContain('Recently retracted');
+    expect(contextLine(s, 'sess-new')).not.toContain('Recently retracted');
+    expect(turnCount(s, 'sess-new')).toBe(2);
+  }));
+
+  test('an empty register costs no ritual text at all', () => withStore(s => {
+    expect(contextLine(s, 'sess-new')).not.toContain('Recently retracted');
+  }));
+
+  test('retraction.replay = false suppresses it, and nothing else', () => withStore(s => {
+    takeBack(s, new Date(NOW.getTime() - 86_400_000), 'wrong thing', 'right thing');
+    writeConfig(s, 'retraction.replay', 'false');
+    const context = contextLine(s, 'sess-new');
+    expect(context).not.toContain('Recently retracted');
+    expect(context).toContain(OPEN_REMINDER);
+    expect(context).toContain('2:05 pm');
+  }));
+
+  test('the reminder still precedes it — the replay never displaces the ask', () => withStore(s => {
+    takeBack(s, new Date(NOW.getTime() - 86_400_000), 'wrong thing', 'right thing');
+    const context = contextLine(s, 'sess-new');
+    expect(context.indexOf(OPEN_REMINDER)).toBeLessThan(context.indexOf('Recently retracted'));
+  }));
+
+  test('anything older than the window is not replayed', () => withStore(s => {
+    takeBack(s, new Date(NOW.getTime() - (REPLAY_WINDOW_DAYS + 2) * 86_400_000),
+             'ancient history', 'long since fixed');
+    expect(contextLine(s, 'sess-new')).not.toContain('Recently retracted');
+  }));
+
+  test('the register is capped, so a bad week cannot swamp the turn', () => withStore(s => {
+    for (let i = 0; i < REPLAY_MAX_ITEMS + 4; i++) {
+      takeBack(s, new Date(NOW.getTime() - 3_600_000), `claim ${String(i)}`, `fix ${String(i)}`);
+    }
+    const context = contextLine(s, 'sess-new');
+    expect([...context.matchAll(/⊘/gu)]).toHaveLength(REPLAY_MAX_ITEMS);
+  }));
+
+  test('an amendment is never replayed as a falsehood', () => withStore(s => {
+    const original = recordEntry(s, { channel: 'checklist', text: '171 rows', session: 's1' },
+                                 VERSION, new Date(NOW.getTime() - 3_600_000)).id;
+    recordEntry(s, { channel: 'divergence', text: '172; off by the header', session: 's1',
+                     correctsId: original, correctsKind: 'amends', verbatim: '171 rows' },
+                VERSION, new Date(NOW.getTime() - 3_600_000));
+    expect(contextLine(s, 'sess-new')).not.toContain('Recently retracted');
+  }));
+
+  test('a withdrawn retraction stops replaying its original, and replays itself instead', () => withStore(s => {
+    const when     = new Date(NOW.getTime() - 3_600_000),
+          original = recordEntry(s, { channel: 'checklist', text: 'a render', session: 's1' },
+                                 VERSION, when).id;
+    const strike = recordEntry(s, { channel: 'divergence', text: 'rank then bucket', session: 's1',
+                                    correctsId: original, correctsKind: 'retracts',
+                                    verbatim: 'icons sort by status' }, VERSION, when).id;
+    recordEntry(s, { channel: 'divergence', text: 'I was wrong to take that back', session: 's1',
+                     correctsId: strike, correctsKind: 'retracts' }, VERSION, when);
+    const context = contextLine(s, 'sess-new');
+    // The original claim stands again, so it is no longer named as a falsehood…
+    expect(context).not.toContain('icons sort by status');
+    // …and the withdrawn retraction is now the thing not to rely on.
+    expect(context).toContain('⊘ "rank then bucket" → I was wrong to take that back');
+  }));
+
+  test('retractionReplayLine is null when disabled and null when empty', () => withStore(s => {
+    expect(retractionReplayLine(s, NOW)).toBeNull();
+    recordEntry(s, { channel: 'divergence', text: 'it runs markdownlint', session: 's1',
+                     verbatim: 'the build skips lint' }, VERSION, NOW);
+    expect(retractionReplayLine(s, NOW)).toContain('⊘ "the build skips lint"');
+    writeConfig(s, 'retraction.replay', 'false');
+    expect(retractionReplayLine(s, NOW)).toBeNull();
+  }));
+
+  test('with no store there is no replay, and the clock still arrives', () => {
+    const context = contextLine(null, 'sess-new');
+    expect(context).not.toContain('Recently retracted');
+    expect(context).toContain('2:05 pm');
+  });
 
 });
 

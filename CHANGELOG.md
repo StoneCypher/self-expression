@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-70 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+71 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -14,6 +14,132 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 2:17:50 PM
+
+Commit [5843e94ecfcf768307f5c8b6f254ecef858cb598](https://github.com/StoneCypher/self-expression/commit/5843e94ecfcf768307f5c8b6f254ecef858cb598)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: retraction tests, stochastic properties, README/layout/skill docs
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 2:02:48 PM
+
+Commit [2484a1ef477186ee685f4ba3764ef8c483ca6f2e](https://github.com/StoneCypher/self-expression/commit/2484a1ef477186ee685f4ba3764ef8c483ca6f2e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: retraction marks the original (#16) — vocabulary, schema v6, standing, register, tools, hook
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:41:08 PM
+
+Commit [931f44e23cc3e4455a5473e1b01003d9af25bfc2](https://github.com/StoneCypher/self-expression/commit/931f44e23cc3e4455a5473e1b01003d9af25bfc2)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: ca657f213272a88d1d43d3a6bc6781f9ad9fec6a
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:39:33 PM
+
+Commit [ca657f213272a88d1d43d3a6bc6781f9ad9fec6a](https://github.com/StoneCypher/self-expression/commit/ca657f213272a88d1d43d3a6bc6781f9ad9fec6a)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [2da163d, e0509ea]
+
+  * Merge pull request #81 from StoneCypher/feat_26-08-28_self-initiated-speech_43
+  * feat: held notes — self-initiated speech with provable delivery (#43)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:36:11 PM
+
+Commit [e0509ea559c6cae508c5e8b76dc036b542e0f0ea](https://github.com/StoneCypher/self-expression/commit/e0509ea559c6cae508c5e8b76dc036b542e0f0ea)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: held notes — self-initiated speech with provable delivery (#43)
+  * Agency over WHEN to speak, built so the assistant can never believe more
+about a message's fate than the system can prove.
+  * The discipline, enforced rather than promised: compose on any turn; deliver
+only on a human's turn. A wakeup may write a note; it may not deliver one.
+The sole delivery vehicle is the UserPromptSubmit hook riding the next
+human-initiated turn, checked against the hook-supplied TURNS ground truth.
+  * Schema v5, purely additive: `notes` is a sidecar on #41's `messages` rather
+than a rival store — a note is an audience-`user` message plus `not_before`,
+`reason`, and `series_key` — and `note_events` is an append-only ledger whose
+`turn` column carries the hook-supplied turn type. State is derived from that
+ledger by a pure `deriveNoteState`, never stored, so it cannot drift from the
+record that justifies it.
+  * The ladder is queued -> offered -> surfaced, with expired and withdrawn
+terminal. There is deliberately no `read` state: nothing in this stack
+observes a human reading anything, so `surfaced` — "rendered into a reply the
+human explicitly prompted" — is the ceiling, and a false belief about
+delivery is structurally inexpressible rather than merely discouraged.
+`offerRipeNotes` refuses any turn but `reply`; `surfaceNote` refuses unless a
+matching hook-written offer exists for the same prompt_id.
+  * Failure modes foreclosed mechanically: nagging (per-turn budget, rolling-24h
+cap, offer cap then expiry, mandatory TTL, series dedupe), performing
+(mandatory stated reason plus an audit surface that shows the notes that
+died; nothing ever prompts "consider writing a note"), manipulating
+(mandatory provenance on every surfaced note), false delivery (the vocabulary
+itself), groundhog-day resends (series supersede plus the permanent ledger),
+and cross-host drift (no hook means held longer, never claimed delivered).
+  * Off by default behind `mailbox.enabled`, asked at onboarding, with five
+numeric budgets, a kill switch covering every moment, and the hook check
+inside the existing fail-open boundary. Adds post_note, withdraw_note,
+surface_note, and list_notes, a read-only `self-expression notes` CLI door,
+surfacing guidance in the skill, and retention pruning the note tables by
+orphanhood with their messages.
+  * Closes #43
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:32:13 PM
+
+Commit [79e589dfe2cdbc766db73bbd6bd6975bb0c9475c](https://github.com/StoneCypher/self-expression/commit/79e589dfe2cdbc766db73bbd6bd6975bb0c9475c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: docs, skill guidance, and lint fixes for held notes
 
 
 
@@ -77,132 +203,3 @@ Commit [9f7a387f8d2d47877cebc2e07070fb8618a010d3](https://github.com/StoneCypher
 Author: `John Haugeland <stonecypher@gmail.com>`
 
   * build: regenerate artifacts after merging origin/main
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:56:04 PM
-
-Commit [66da9d12a8c7b155fa3c06491e459e3a8b44dd20](https://github.com/StoneCypher/self-expression/commit/66da9d12a8c7b155fa3c06491e459e3a8b44dd20)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [cbd6324, 8fc723d]
-
-  * merge: origin/main into anchoring — annotate honours the #76 per-channel length budget
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:51:05 PM
-
-Commit [cbd63246ad55f3cd6fdc60a54d1b974e548c2b9d](https://github.com/StoneCypher/self-expression/commit/cbd63246ad55f3cd6fdc60a54d1b974e548c2b9d)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: anchoring — commentary bound to a location instead of floating in prose
-  * Implements the anchoring design: an expression entry can carry a machine-readable
-pointer to the thing it is about, plus the rendering that makes it read as
-attached and the resolution rules for when the target moves or vanishes.
-  * Five addressable kinds (file, prompt, reply, checklist, entry) as a new closed
-vocabulary, and five nullable qualifier columns on entries — anchor_kind (CHECK-
-constrained), anchor_target, anchor_span, anchor_quote, anchor_hash — in the
-typed-silence pattern rather than a separate table or a new channel, because an
-anchored dissent is still a dissent. One new index, idx_entries_anchor.
-  * Schema version 4. The v3 to v4 step is a table rebuild, since anchor_kind's CHECK
-cannot be added in place; the recipe v1 to v2 already used is extracted as one
-shared rebuildEntries that both steps call.
-  * channels/anchors.ts adds normalization, the SHA-256 fingerprint, span grammar, and
-the pure read-time resolvers behind the fresh to moved to orphaned ladder.
-Resolution is computed and never stored, and matching is exact-normalized only:
-two identical candidates degrade to orphaned rather than guess, because a note
-pinned to the wrong line is worse than an orphan, and an orphan degrades to
-today's floating-prose behavior rather than below it.
-  * charts/annotations.ts adds renderAnnotations for the grouped block and
-renderAnchorSegment for a single anchored line, following the house renderer
-contract, with verdicts passed in so the renderers stay pure.
-  * express grows four optional anchor arguments with the hash derived server-side and
-a prompt anchor adopting the observed turn; the new annotate tool takes 1 to 25
-notes, all-or-nothing in one transaction, and returns the canonical block.
-recall widens to carry the anchor columns.
-  * privacy.store_quotes joins the config registry: a prompt quote is dropped at write
-while anchor_hash still records, so drift detection and public aggregation carry
-no words. anchor_kind exports verbatim, anchor_hash re-blinded under the
-per-submission salt, and target, span, and quote never export.
-  * Two incidental fixes the change forced: openStore now applies indices after
-migrating rather than before, since an index over a newly-migrated column cannot
-be created against the old table shape; and the v1/v2 fixtures freeze their own
-index list rather than importing the live one, which would drift forward with the
-schema.
-  * Closes #18
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:36:59 PM
-
-Commit [6c6110910ba623636a2cd62ed29bd8c9b23cea09](https://github.com/StoneCypher/self-expression/commit/6c6110910ba623636a2cd62ed29bd8c9b23cea09)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 8fc723d70cc1372df3cb2f894f592dd261ed126e
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:36:16 PM
-
-Commit [d7424964c5cacd9802105c89f3fe50ee893d366b](https://github.com/StoneCypher/self-expression/commit/d7424964c5cacd9802105c89f3fe50ee893d366b)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: anchoring tests — resolver, renderer, migration, tools, stochastic
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:35:42 PM
-
-Commit [8fc723d70cc1372df3cb2f894f592dd261ed126e](https://github.com/StoneCypher/self-expression/commit/8fc723d70cc1372df3cb2f894f592dd261ed126e)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [28b41be, feef2ea]
-
-  * Merge pull request #77 from StoneCypher/feat_26-08-28_channel-text-lengths_76
-  * feat: per-channel text length, user-configurable, defaults raised to 200
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:34:38 PM
-
-Commit [feef2ea14fed5ec07a5b8102a88461779f2c3826](https://github.com/StoneCypher/self-expression/commit/feef2ea14fed5ec07a5b8102a88461779f2c3826)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: rebuild generated artifacts after merging origin/main (#40 onboarding)

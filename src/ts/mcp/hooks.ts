@@ -15,7 +15,8 @@
  */
 
 import { recordContext, latestContext, turnCount } from '../channels/context.js';
-import { hasClosingSignature }                     from '../channels/entries.js';
+import { hasClosingSignature, register }           from '../channels/entries.js';
+import type { RegisterRow }                        from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
 import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
 import { CHANNELS }                                from '../channels/vocabulary.js';
@@ -265,6 +266,106 @@ export function heldNotesLine(
 
 }
 
+/** Config key gating the session-resume retraction replay (#16). */
+export const REPLAY_KEY = 'retraction.replay';
+
+/**
+ * How far back the resume replay looks, in days.
+ *
+ * A code constant, not a config key: defaults live in code, and a key nobody has asked
+ * to tune is seeding by another name. A fortnight is long enough to cover a weekend plus
+ * a working week — the realistic gap between writing something wrong and resuming the
+ * work — and short enough that a retraction from last quarter does not keep announcing
+ * itself.
+ */
+export const REPLAY_WINDOW_DAYS = 14;
+
+/** How many retracted claims the resume replay will name. Code constant, same reasoning. */
+export const REPLAY_MAX_ITEMS = 5;
+
+/** Longest a quoted claim may run inside the replay line before it is elided. */
+export const REPLAY_QUOTE_MAX = 90;
+
+/**
+ * One register row rendered for the replay line: `⊘ "<the wrong words>" → <what replaced
+ * them> (2026-08-25)`.
+ *
+ * `⊘` is the mark for a replayed original — chosen over `✗` (already the quote bracket in
+ * the retraction line's own grammar), over `🚫` (which reads as prohibition rather than
+ * withdrawal), and over `❌` (already the failure marker in the checklist vocabulary).
+ * The glyph is presentation and is never stored; it is derived from the record every time
+ * it is drawn.
+ *
+ * The quoted claim is the `verbatim` column when the strike carried one and the
+ * original's own text otherwise, because one of the two always exists: a prose-only
+ * retraction must quote, and a row-backed one already preserves the words it struck.
+ *
+ * @param row  one standing strike from the register
+ * @returns a single line, with the claim elided at {@link REPLAY_QUOTE_MAX} characters
+ *
+ * @example
+ *   renderReplayItem({ kind: 'retracts', at: '2026-08-25T18:02:00.000Z', original: null,
+ *                      verbatim: 'the build skips lint on spec-only PRs',
+ *                      replacement: { id: 9, channel: 'divergence', text: 'it runs markdownlint' } })
+ *   // => '⊘ "the build skips lint on spec-only PRs" → it runs markdownlint (2026-08-25)'
+ *
+ * @see retractionReplayLine
+ * @see ../channels/entries.js register
+ */
+export function renderReplayItem(row: RegisterRow): string {
+
+  const claimed = row.verbatim ?? row.original?.text ?? '(claim not recorded)',
+        claim   = claimed.length > REPLAY_QUOTE_MAX
+                    ? `${claimed.slice(0, REPLAY_QUOTE_MAX - 1)}…`
+                    : claimed,
+        day     = row.at.slice(0, 10);
+
+  return `⊘ "${claim}" → ${row.replacement.text} (${day})`;
+
+}
+
+/**
+ * The context line's retraction-replay segment (issue #16) — or `null` when there is
+ * nothing to replay.
+ *
+ * The issue's third option: a resumed session must not carry silent falsehoods forward.
+ * `recall` is pull, and the whole problem is that nobody knows to pull; this is the push
+ * half, and it fires **once per session** because the context line is prime attention
+ * real estate and a register repeated every turn becomes wallpaper.
+ *
+ * Scope is deliberately narrow: standing `retracts` strikes from the last
+ * {@link REPLAY_WINDOW_DAYS} days, newest first, capped at {@link REPLAY_MAX_ITEMS}. The
+ * whole segment is omitted when the register is empty, so the happy path costs no ritual
+ * text at all. Amendments are left out on purpose — an amended claim stood, so listing it
+ * under "do not rely on these" would overclaim exactly the way the `amends` kind exists
+ * to prevent.
+ *
+ * Gated on `retraction.replay` (default on) through the tolerant effective-value
+ * accessor, so a stored override that fails validation behaves as unset.
+ *
+ * @param now the moment the turn began, which anchors the window
+ * @returns the segment text, or `null` when disabled or empty
+ *
+ * @example
+ *   retractionReplayLine(store, new Date('2026-08-28T09:14:00Z'))
+ *   // => 'Recently retracted (do not rely on these): ⊘ "icons sort by status first" → rank then bucket (2026-08-25)'
+ *
+ * @see onUserPromptSubmit
+ * @see ../channels/entries.js register
+ */
+export function retractionReplayLine(store: Store, now: Date = new Date()): string | null {
+
+  if (effectiveValue(store, REPLAY_KEY) === 'false') { return null; }
+
+  const since = new Date(now.getTime() - REPLAY_WINDOW_DAYS * 86_400_000).toISOString(),
+        rows  = register(store, { kind: 'retracts', sinceUtc: since, limit: REPLAY_MAX_ITEMS });
+
+  if (rows.length === 0) { return null; }
+
+  return `Recently retracted (do not rely on these): ${rows.map(renderReplayItem).join(' · ')}`;
+
+}
+
 /**
  * Asks for the opening signature at the only moment it can honestly be written.
  *
@@ -318,6 +419,13 @@ export const OPEN_REMINDER_CLOCKLESS =
  * present only when something is actually unread and both `messages.*` keys allow it.
  * It fails open separately too: a mailbox error costs the count line and nothing else.
  *
+ * On a session's **first** turn only, the retraction replay ({@link retractionReplayLine},
+ * issue #16) follows the reminder: the recently taken-back claims, so a resumed session
+ * does not carry known falsehoods forward. Turn index 1 — a session this store has never
+ * seen — is the portable definition of the resume/fresh boundary, observed rather than
+ * claimed, and it fires on every host that runs the plugin at all rather than only the
+ * ones with a `SessionStart` event. It fails open on its own terms too.
+ *
  * Last comes the held-note segment ({@link heldNotesLine}, issue #43) — the **only**
  * delivery vehicle self-initiated speech has. Notes may be composed on any turn, but
  * they can be offered only from here, on a turn this hook stamped `reply`, which is what
@@ -335,13 +443,20 @@ export const OPEN_REMINDER_CLOCKLESS =
  */
 export function onUserPromptSubmit(store: Store | null, payload: HookPayload, now: Date): HookOutput {
 
+  // Captured from the context write, because it is also the resume/fresh boundary the
+  // retraction replay keys off: turn 1 is "a turn this store has never seen for this
+  // session", which is exactly what a fresh start or a resume under a new session id
+  // looks like, observed rather than claimed.
+  let turnIndex: number | null = null;
+
   if (store !== null && typeof payload.session_id === 'string' && payload.session_id !== '') {
     try {
-      const privacy = privacyFlags(store);
+      const privacy = privacyFlags(store),
+            index   = turnCount(store, payload.session_id) + 1;
       recordContext(store, {
         session        : payload.session_id,
         promptId       : payload.prompt_id,
-        turnIndex      : turnCount(store, payload.session_id) + 1,
+        turnIndex      : index,
         turn           : 'reply',
         cwd            : privacy.storeCwd ? payload.cwd : undefined,
         permissionMode : payload.permission_mode,
@@ -350,6 +465,7 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
         effort         : payload.effort?.level,
         promptLen      : privacy.storePromptLen ? payload.user_input?.length : undefined,
       }, now);
+      turnIndex = index;
     } catch { /* fail open: the clock still gets delivered */ }
   }
 
@@ -371,6 +487,18 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
       const line = mailboxLine(store, payload.session_id, now);
       if (line !== null) { mail = ` ${line}`; }
     } catch { /* fail open: the clock, flags, lengths, and reminder still get delivered */ }
+  }
+
+  // The retraction replay (#16), on the first turn this store has seen of this session
+  // and no other. Fails open on its own terms: an error here costs the replay segment and
+  // nothing else, which is the right trade — a hook that could wedge a turn over a
+  // register lookup would be worse than a register nobody sees.
+  let replay = '';
+  if (store !== null && turnIndex === 1) {
+    try {
+      const line = retractionReplayLine(store, now);
+      if (line !== null) { replay = `\n${line}`; }
+    } catch { /* fail open: every other segment still gets delivered */ }
   }
 
   // Held notes (#43) ride the same fail-open boundary, and are last because they are the
@@ -404,7 +532,9 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
   return {
     hookSpecificOutput: {
       hookEventName    : 'UserPromptSubmit',
-      additionalContext: head === '' ? `${reminder}${held}` : `${head} ${reminder}${held}`,
+      additionalContext: head === ''
+        ? `${reminder}${replay}${held}`
+        : `${head} ${reminder}${replay}${held}`,
     },
   };
 

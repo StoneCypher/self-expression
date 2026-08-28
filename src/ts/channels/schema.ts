@@ -14,9 +14,15 @@
  * occasional, so the dominant case gets real columns and the minority carries NULLs,
  * which SQLite stores in about a bit each.
  *
- * The same shape carries **qualifiers**: typed silence (#42) and the five anchor
- * columns (#18) are nullable columns any channel may fill, not tables or channels of
- * their own. An anchored dissent is still a dissent, so it is still one row.
+ * The same shape carries **qualifiers**: typed silence (#42), the five anchor columns
+ * (#18), and the two correction columns (#16) are nullable columns any channel may fill,
+ * not tables or channels of their own. An anchored dissent is still a dissent, so it is
+ * still one row.
+ *
+ * There is deliberately **no `retracted` column** (#16). Retraction is derived at read
+ * time from the `corrects_id` chain, because a stored flag has two silent failure modes
+ * — set wrongly, or never set — and because one legitimate `UPDATE` path would dissolve
+ * "the only verb is INSERT" from a structural property into a code-review promise.
  *
  * @see ../../doc_md/plugin-layout.md
  */
@@ -25,7 +31,7 @@ import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES, STEMS,
   FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
-  NOTE_EVENTS,
+  NOTE_EVENTS, CORRECTION_KINDS,
 } from './vocabulary.js';
 
 /**
@@ -54,9 +60,17 @@ import {
  * `messages` row rather than a rival store, so no existing table changes shape and no
  * data moves.
  *
+ * v6 (issue #16): `entries` gained the nullable `corrects_kind` and `verbatim` columns
+ * and `idx_entries_corrects`. `corrects_kind` carries a `CHECK` over
+ * {@link ../channels/vocabulary.js CORRECTION_KINDS}, and SQLite cannot add a constraint
+ * in place, so the v5→v6 step is another table rebuild — the same recipe v1→v2 and
+ * v3→v4 used. **Nothing is written onto an existing row by this feature**: retraction is
+ * derived at read time from the `corrects_id` chain, and the rebuild copies rows
+ * verbatim, which is the one standing exception to the INSERT-only rule.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -136,6 +150,8 @@ CREATE TABLE IF NOT EXISTS ${table} (
   output_tokens   INTEGER,
   thinking_tokens INTEGER,
   corrects_id     INTEGER REFERENCES entries(id),
+  corrects_kind   TEXT ${check('corrects_kind', CORRECTION_KINDS)},
+  verbatim        TEXT,
 
   position        TEXT ${check('position', POSITIONS)},
   delta           TEXT ${check('delta', DELTAS)},
@@ -372,6 +388,10 @@ export const INDEX_DDL: readonly string[] = [
   // "every note ever attached to this file / this message / this series" is the one
   // question anchoring exists to answer, so it gets the one index anchoring adds (#18).
   'CREATE INDEX IF NOT EXISTS idx_entries_anchor  ON entries(anchor_kind, anchor_target)',
+  // "what strikes this row, and what strikes that" — the edge walk every marked read
+  // surface performs, so retraction (#16) gets exactly one index. Over `corrects_id`,
+  // which has existed since v1, so an older version's rebuild can recreate it safely.
+  'CREATE INDEX IF NOT EXISTS idx_entries_corrects ON entries(corrects_id, id)',
   'CREATE INDEX IF NOT EXISTS idx_context_session ON turn_context(session, id)',
 ];
 

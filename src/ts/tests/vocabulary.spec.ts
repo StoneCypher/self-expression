@@ -1,14 +1,14 @@
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS, CORRECTION_KINDS,
   isMember, describeVocabulary,
 } from '../channels/vocabulary.js';
 
 const ALL: readonly (readonly string[])[] = [
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS, CORRECTION_KINDS,
 ];
 
 describe('vocabularies', () => {
@@ -93,6 +93,29 @@ describe('vocabularies', () => {
   test('outcomes are outcomes, not silences, and vice versa', () => {
     expect(isMember(FORECAST_OUTCOMES, 'empty')).toBe(false);
     expect(isMember(SILENCE_KINDS, 'void')).toBe(false);
+  });
+
+  test('the #16 correction kinds pin their exact contents — three meanings, three names', () => {
+    expect(CORRECTION_KINDS).toEqual(['retracts', 'amends', 'resolves']);
+  });
+
+  test('resolution is nameable apart from wrongness — the whole reason the column exists', () => {
+    expect(isMember(CORRECTION_KINDS, 'resolves')).toBe(true);
+    expect(isMember(CORRECTION_KINDS, 'retracts')).toBe(true);
+    // No synonym for "sort of wrong": amends is the only softening, and it is a stated word.
+    expect(isMember(CORRECTION_KINDS, 'supersedes')).toBe(false);
+    expect(isMember(CORRECTION_KINDS, 'corrects')).toBe(false);
+    expect(isMember(CORRECTION_KINDS, 'partially')).toBe(false);
+  });
+
+  test('a correction kind is not a channel, a divergence kind, or an outcome', () => {
+    for (const kind of CORRECTION_KINDS) {
+      expect(isMember(CHANNELS, kind)).toBe(false);
+      expect(isMember(DIVERGENCE_KINDS, kind)).toBe(false);
+      expect(isMember(FORECAST_OUTCOMES, kind)).toBe(false);
+    }
+    expect(isMember(CORRECTION_KINDS, 'divergence')).toBe(false);
+    expect(isMember(CORRECTION_KINDS, 'hit')).toBe(false);
   });
 
 });

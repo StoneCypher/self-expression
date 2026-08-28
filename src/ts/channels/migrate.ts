@@ -11,9 +11,9 @@
  *
  * The machinery is deliberately reusable rather than a one-off: each version step is a
  * `MigrationStep`, {@link migrate} walks whatever chain exists, and the rebuild recipe
- * itself is one shared function two steps already call. #41 and #18 both added their
- * steps to {@link MIGRATIONS} rather than new mechanisms; later schema work does the
- * same.
+ * itself is one shared function three steps already call. #41, #18, #43, and #16 all
+ * added their steps to {@link MIGRATIONS} rather than new mechanisms; later schema work
+ * does the same.
  *
  * @see ./schema.js
  * @see ./store.js
@@ -61,6 +61,21 @@ export const V3_ENTRY_COLUMNS: readonly string[] = [
   ...V1_ENTRY_COLUMNS.slice(0, V1_ENTRY_COLUMNS.indexOf('series_key')),
   'resolve_by', 'outcome', 'silence',
   ...V1_ENTRY_COLUMNS.slice(V1_ENTRY_COLUMNS.indexOf('series_key')),
+];
+
+/**
+ * The `entries` columns exactly as schema v5 declared them, in v5 order.
+ *
+ * v3's list plus the five #18 anchor columns — v4→v5 was purely additive and touched no
+ * `entries` column, so the v4 and v5 shapes are identical. Named explicitly on both
+ * sides of the v5→v6 rebuild's `INSERT … SELECT`, for the same anti-shear reason as
+ * {@link V1_ENTRY_COLUMNS}, and frozen for the same reason: it describes databases that
+ * already exist.
+ */
+export const V5_ENTRY_COLUMNS: readonly string[] = [
+  ...V3_ENTRY_COLUMNS.slice(0, V3_ENTRY_COLUMNS.indexOf('series_key')),
+  'anchor_kind', 'anchor_target', 'anchor_span', 'anchor_quote', 'anchor_hash',
+  ...V3_ENTRY_COLUMNS.slice(V3_ENTRY_COLUMNS.indexOf('series_key')),
 ];
 
 /** One version step: how to carry a database from `from` to `to`. */
@@ -219,6 +234,31 @@ function migrateV4toV5(db: DatabaseSync): void {
 }
 
 /**
+ * The v5→v6 step: rebuild `entries` so the nullable `corrects_kind` and `verbatim`
+ * columns and the `corrects_kind` `CHECK` exist (#16).
+ *
+ * Additive in data terms — every v5 row keeps every v5 value, and the two new columns
+ * arrive NULL, which reads as "an unstated link kind" and "no quote". That NULL is not a
+ * hole: the legacy read rule gives a pre-existing `corrects_id` link the meaning its
+ * column description promised since v1 (`retracts`, or `resolves` when the row carries an
+ * `outcome`), so an old database's retraction register is correct the moment it opens
+ * rather than after a backfill. **Nothing is ever written onto an old row to make that
+ * true** — see {@link ../channels/entries.js effectiveCorrectionKind}.
+ *
+ * A rebuild rather than two `ALTER TABLE`s because the new `CHECK` cannot be added in
+ * place. `idx_entries_corrects` comes back with the rest of {@link INDEX_DDL} inside the
+ * rebuild.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v5 database exactly as it was.
+ *
+ * @see rebuildEntries
+ */
+function migrateV5toV6(db: DatabaseSync): void {
+  rebuildEntries(db, 'entries_v6', V5_ENTRY_COLUMNS);
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
@@ -227,6 +267,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 2, to: 3, apply: migrateV2toV3 },
   { from: 3, to: 4, apply: migrateV3toV4 },
   { from: 4, to: 5, apply: migrateV4toV5 },
+  { from: 5, to: 6, apply: migrateV5toV6 },
 ];
 
 /**

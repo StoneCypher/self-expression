@@ -4,7 +4,11 @@ import { join }   from 'node:path';
 
 import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js';
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
-import { migrate, MIGRATIONS, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS } from '../channels/migrate.js';
+import {
+  migrate, MIGRATIONS, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS, V5_ENTRY_COLUMNS,
+} from '../channels/migrate.js';
+import { standingOf, register, recentEntries } from '../channels/entries.js';
+import { buildV5, insertV5 }                   from './helpers/v5_fixture.js';
 import { SCHEMA_VERSION, ALL_INDEX_DDL, entriesDdl } from '../channels/schema.js';
 import { postMessage, readMessages, unreadCounts }    from '../channels/messages.js';
 import { composeNote, listNotes }                     from '../channels/notes.js';
@@ -13,7 +17,7 @@ import { anchoredEntries }                            from '../channels/entries.
 import { buildV1, insertV1 }                          from './helpers/v1_fixture.js';
 import { buildV2, insertV2 }                          from './helpers/v2_fixture.js';
 import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
-import { buildV4, insertV4Message, V4_ENTRIES_DDL }   from './helpers/v4_fixture.js';
+import { buildV4, insertV4, insertV4Message, V4_ENTRIES_DDL } from './helpers/v4_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -66,7 +70,7 @@ describe('openStore on a v1 database', () => {
     const forecast = recordEntry(s, { channel: 'confidence', text: 'passes untouched', session: 's1',
                                       confidence: 'predicted', resolveBy: '2026-08-30' }, VERSION);
     recordEntry(s, { channel: 'confidence', text: 'merged clean', session: 's1',
-                     correctsId: forecast.id, outcome: 'hit' }, VERSION);
+                     correctsId: forecast.id, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
     recordEntry(s, { channel: 'divergence', text: 'which way is gone', session: 's1',
                      divergenceKind: 'faded' }, VERSION);
     recordEntry(s, { channel: 'signature', text: 'still; nothing notable', session: 's1',
@@ -314,7 +318,7 @@ describe('openStore on a v3 database (#18)', () => {
 
 describe('openStore on a v4 database (#43)', () => {
 
-  test('the fixture really is v4: no note tables at all', () => {
+  test('the fixture really is v4: no note tables, and no correction columns either', () => {
     const dir = tmp(), db = buildV4(join(dir, 'log.sqlite3'));
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
                      .all().map(r => String(r.name));
@@ -322,14 +326,29 @@ describe('openStore on a v4 database (#43)', () => {
     expect(tables).not.toContain('notes');
     expect(tables).not.toContain('note_events');
     expect(() => db.exec('SELECT 1 FROM notes')).toThrow();
+    // A v4 row can carry a link but never a kind — the column simply is not there.
+    expect(() => insertV4(db, 'u-ok', 'checklist')).not.toThrow();
+    expect(() => insertV4(db, 'u-legacy', 'divergence', { corrects_id: 1 })).not.toThrow();
+    expect(() => insertV4(db, 'u-bad', 'divergence', { corrects_kind: 'retracts' })).toThrow();
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
-  test('V4_ENTRIES_DDL still describes v4 — v4→v5 must stay additive', () => {
-    // The v4 fixture generates its entries DDL from the schema module, which is only
-    // sound while v4→v5 adds no entries column. If a later version widens the table,
-    // this fails and the fixture must be frozen the way v1's and v2's are.
-    expect(V4_ENTRIES_DDL).toBe(entriesDdl());
+  test('V4_ENTRIES_DDL is frozen and no longer tracks the schema module', () => {
+    // It used to be `entriesDdl()`, which was sound only while every later step stayed
+    // additive. #16 widened `entries` at v6, so the fixture is now written out — and a
+    // fixture that still equalled the live DDL would be proving nothing.
+    expect(V4_ENTRIES_DDL).not.toBe(entriesDdl());
+    expect(V4_ENTRIES_DDL).not.toContain('corrects_kind');
+    expect(V4_ENTRIES_DDL).not.toContain('verbatim');
+    expect(V4_ENTRIES_DDL).toContain('anchor_kind');
+  });
+
+  test('the frozen v4 DDL really produces the v4 column set', () => {
+    const dir = tmp(), db = buildV4(join(dir, 'log.sqlite3'));
+    const actual = db.prepare("SELECT name FROM pragma_table_info('entries')")
+                     .all().map(r => String(r.name));
+    expect([...V5_ENTRY_COLUMNS].sort()).toEqual([...actual].sort());
+    db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
   test('migrates: the messagebox survives untouched, and notes become usable', () => {
@@ -388,16 +407,139 @@ describe('openStore on a v4 database (#43)', () => {
 
 });
 
+describe('openStore on a v5 database (#16)', () => {
+
+  test('the fixture really is v5: no correction columns at all', () => {
+    const dir = tmp(), db = buildV5(join(dir, 'log.sqlite3'));
+    const columns = db.prepare("SELECT name FROM pragma_table_info('entries')")
+                      .all().map(r => String(r.name));
+    expect(columns).toContain('anchor_kind');
+    expect(columns).not.toContain('corrects_kind');
+    expect(columns).not.toContain('verbatim');
+    expect(() => insertV5(db, 'u-bad', 'divergence', { corrects_kind: 'retracts' })).toThrow();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('migrates: rows survive byte-for-byte, correction columns arrive NULL, version stamped', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v5  = buildV5(path);
+    insertV5(v5, 'u1', 'signature', { position: 'close', stem: 'still', silence: 'empty' });
+    insertV5(v5, 'u2', 'checklist', { series_key: 'atlas', percent: 40 });
+    insertV5(v5, 'u3', 'dissent', { anchor_kind: 'file', anchor_target: 'a.ts' });
+    const columns = V5_ENTRY_COLUMNS.join(', '),
+          before  = JSON.parse(JSON.stringify(
+            v5.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
+    v5.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    const after = JSON.parse(JSON.stringify(
+      s.db.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
+    expect(after).toEqual(before);
+
+    for (const row of s.db.prepare('SELECT * FROM entries').all()) {
+      expect(row).toHaveProperty('corrects_kind', null);
+      expect(row).toHaveProperty('verbatim', null);
+    }
+
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('preserves ids across the rebuild, so the corrects_id chain stays valid', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v5  = buildV5(path);
+    insertV5(v5, 'u1', 'checklist', { series_key: 'atlas', percent: 40 });
+    insertV5(v5, 'u2', 'divergence', { corrects_id: 1 });
+    v5.close();
+
+    const s    = openStore(path),
+          rows = s.db.prepare('SELECT id, uuid, corrects_id FROM entries ORDER BY id').all();
+    expect(rows[0]?.uuid).toBe('u1');
+    expect(rows[1]?.corrects_id).toBe(1);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('a legacy kind-less link reads as a retraction — read rule, never a backfill', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v5  = buildV5(path);
+    insertV5(v5, 'u1', 'checklist', { series_key: 'atlas', percent: 40 });
+    insertV5(v5, 'u2', 'divergence', { corrects_id: 1 });
+    v5.close();
+
+    const s = openStore(path);
+
+    // The mark is correct the moment the database opens…
+    expect(standingOf(s, [1])).toEqual([{ id: 1, status: 'retracted', by: 2 }]);
+    expect(register(s)).toHaveLength(1);
+    expect(seriesPercents(s, 'atlas')).toEqual([]);
+
+    // …and nothing was written onto the old row to make that true.
+    expect(s.db.prepare('SELECT corrects_kind FROM entries WHERE id = 2').get()?.corrects_kind)
+      .toBeNull();
+
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('a legacy resolution link reads as resolves, not as a retraction', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v5  = buildV5(path);
+    insertV5(v5, 'u1', 'confidence', { confidence: 'predicted' });
+    insertV5(v5, 'u2', 'confidence', { corrects_id: 1, outcome: 'hit' });
+    v5.close();
+
+    const s = openStore(path);
+    expect(standingOf(s, [1])).toEqual([{ id: 1, status: 'stands', by: null }]);
+    expect(register(s)).toEqual([]);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates idx_entries_corrects, which a v5 database could not have held', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV5(path).close();
+    const s   = openStore(path),
+          idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+                    .all().map(r => r.name as string);
+    expect(idx).toContain('idx_entries_corrects');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('reopening after migration is idempotent — a no-op, not a second rebuild', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV5(path).close();
+    const a = openStore(path);
+    const original = recordEntry(a, { channel: 'checklist', text: 'x', session: 's1' }, VERSION);
+    recordEntry(a, { channel: 'divergence', text: 'wrong', session: 's1',
+                     correctsId: original.id, correctsKind: 'retracts',
+                     verbatim: 'the wrong words' }, VERSION);
+    closeStore(a);
+    const b = openStore(path);
+    expect(readMeta(b, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    expect(b.db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(2);
+    expect(recentEntries(b, 2)[0]?.['status']).toBe('retracted');
+    closeStore(b); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('meta identity survives migration: created_utc and machine_id are untouched', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV5(path).close();
+    const s = openStore(path);
+    expect(readMeta(s, 'created_utc')).toBe('2026-08-28T00:00:00Z');
+    expect(s.machineId).toBe('55555555-6666-7777-8888-999999999999');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
 describe('a v1 database walks the whole chain', () => {
 
-  test('1 → 5 in one open: old rows intact, anchors, messagebox, and notes all usable', () => {
+  test('1 → current in one open: old rows intact, anchors, messagebox, and notes all usable', () => {
     const dir = tmp(), path = join(dir, 'log.sqlite3'),
           v1  = buildV1(path);
     insertV1(v1, 'u1', 'signature', { position: 'close', stem: 'still' });
     v1.close();
 
     const s = openStore(path);
-    expect(readMeta(s, 'schema_version')).toBe('5');
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
     expect(s.db.prepare('SELECT uuid FROM entries').get().uuid).toBe('u1');
 
     const written = recordEntry(s, { channel: 'taste', text: 'reads like it was always true', session: 's1' }, VERSION);
@@ -480,6 +622,29 @@ describe('migrate', () => {
   test('V3_ENTRY_COLUMNS is V1 plus exactly the three #42 columns', () => {
     expect(V3_ENTRY_COLUMNS.filter(c => !V1_ENTRY_COLUMNS.includes(c)))
       .toEqual(['resolve_by', 'outcome', 'silence']);
+  });
+
+  test('V5_ENTRY_COLUMNS names exactly the v5 columns, in a set sense', () => {
+    const dir = tmp(), db = buildV5(join(dir, 'log.sqlite3'));
+    const actual = db.prepare("SELECT name FROM pragma_table_info('entries')")
+                     .all().map(r => String(r.name));
+    expect([...V5_ENTRY_COLUMNS].sort()).toEqual([...actual].sort());
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('V5_ENTRY_COLUMNS is V3 plus exactly the five #18 anchor columns', () => {
+    expect(V5_ENTRY_COLUMNS.filter(c => !V3_ENTRY_COLUMNS.includes(c)))
+      .toEqual(['anchor_kind', 'anchor_target', 'anchor_span', 'anchor_quote', 'anchor_hash']);
+  });
+
+  test('the current shape is V5 plus exactly the two #16 correction columns', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          s   = openStore(path);
+    const actual = s.db.prepare("SELECT name FROM pragma_table_info('entries')")
+                       .all().map(r => String(r.name));
+    expect(actual.filter(c => !V5_ENTRY_COLUMNS.includes(c)))
+      .toEqual(['corrects_kind', 'verbatim']);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
 });

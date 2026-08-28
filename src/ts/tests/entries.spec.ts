@@ -6,12 +6,12 @@ import type { Store }            from '../channels/store.js';
 import {
   recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
   recentChecklists, seriesPercents, forecastOutcomes, anchorProblems, storedQuote,
-  anchoredEntries,
+  anchoredEntries, correctionProblems, effectiveCorrectionKind, standingOf, register,
   localHour, isoWeekKey, signatureHistory, needWeekly, checklistSeriesTop,
 } from '../channels/entries.js';
 import { anchorHash, ANCHOR_QUOTE_MAX } from '../channels/anchors.js';
 import { writeConfig } from '../channels/store.js';
-import { CHANNELS, SILENCE_KINDS, ANCHOR_KINDS } from '../channels/vocabulary.js';
+import { CHANNELS, SILENCE_KINDS, ANCHOR_KINDS, CORRECTION_KINDS } from '../channels/vocabulary.js';
 
 const VERSION = '0.2.0';
 
@@ -105,7 +105,7 @@ describe('validate', () => {
 
   test('accepts an outcome pointing back at a forecast via correctsId', () => {
     expect(validate({ channel: 'confidence', text: 'merged clean', session: 's',
-                      correctsId: 1, outcome: 'hit' })).toEqual([]);
+                      correctsId: 1, correctsKind: 'resolves', outcome: 'hit' })).toEqual([]);
   });
 
   test('rejects an outcome without a correctsId — it resolves nothing', () => {
@@ -115,7 +115,7 @@ describe('validate', () => {
 
   test('rejects an outcome outside the vocabulary', () => {
     const problems = validate({ channel: 'confidence', text: 'x', session: 's',
-                                correctsId: 1, outcome: 'won' as never });
+                                correctsId: 1, correctsKind: 'resolves', outcome: 'won' as never });
     expect(problems.some(p => p.includes('outcome'))).toBe(true);
   });
 
@@ -443,7 +443,7 @@ describe('recentEntries', () => {
     recordEntry(s, { channel: 'confidence', text: 'lands by friday', session: 's1',
                      confidence: 'predicted', resolveBy: '2026-08-30' }, VERSION);
     recordEntry(s, { channel: 'confidence', text: 'landed', session: 's1',
-                     correctsId: 1, outcome: 'hit' }, VERSION);
+                     correctsId: 1, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
     recordEntry(s, { channel: 'signature', text: 'still; nothing notable', session: 's1',
                      silence: 'empty' }, VERSION);
     const [forecast, resolution, sig] = recentEntries(s, 3);
@@ -480,9 +480,9 @@ describe('forecastOutcomes', () => {
     const b = recordEntry(s, { channel: 'confidence', text: 'f2', session: 's1', confidence: 'predicted' }, VERSION);
     const c = recordEntry(s, { channel: 'confidence', text: 'f3', session: 's1', confidence: 'predicted' }, VERSION);
     // Resolved out of forecast order, deliberately: resolution order is what counts.
-    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1', correctsId: b.id, outcome: 'miss' }, VERSION);
-    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1', correctsId: a.id, outcome: 'hit'  }, VERSION);
-    recordEntry(s, { channel: 'confidence', text: 'r3', session: 's1', correctsId: c.id, outcome: 'void' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1', correctsId: b.id, correctsKind: 'resolves', outcome: 'miss' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1', correctsId: a.id, correctsKind: 'resolves', outcome: 'hit'  }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r3', session: 's1', correctsId: c.id, correctsKind: 'resolves', outcome: 'void' }, VERSION);
     expect(forecastOutcomes(s)).toEqual(['miss', 'hit', 'void']);
   }));
 
@@ -490,7 +490,7 @@ describe('forecastOutcomes', () => {
     const plain = recordEntry(s, { channel: 'confidence', text: 'checked', session: 's1',
                                    confidence: 'verified' }, VERSION);
     recordEntry(s, { channel: 'confidence', text: 'stray', session: 's1',
-                     correctsId: plain.id, outcome: 'hit' }, VERSION);
+                     correctsId: plain.id, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
     expect(forecastOutcomes(s)).toEqual([]);
   }));
 
@@ -676,6 +676,377 @@ describe('checklistSeriesTop', () => {
     expect(checklistSeriesTop(s, '2026-08-01T00:00:00.000Z', 5)).toEqual([
       { seriesKey: 'a', percents: [50] },
     ]);
+  }));
+
+});
+
+// ── #16: retraction ─────────────────────────────────────────────────────────────────
+
+/** Record an original claim and take it back; returns both ids. */
+function retracted(s: Store, kind: 'retracts' | 'amends' = 'retracts'): { original: number; strike: number } {
+  const original = recordEntry(s, { channel: 'checklist', text: 'icons sort by status', session: 's1',
+                                    seriesKey: 'atlas', percent: 31 }, VERSION).id,
+        strike   = recordEntry(s, { channel: 'divergence', text: 'sort is rank then bucket', session: 's1',
+                                    divergenceKind: 'stale', correctsId: original, correctsKind: kind,
+                                    verbatim: 'icons sort by status first, then alphabetically' }, VERSION).id;
+  return { original, strike };
+}
+
+describe('correctionProblems', () => {
+
+  test('accepts a fully stated retraction', () => {
+    expect(correctionProblems({ channel: 'divergence', text: 'x', session: 's',
+                                correctsId: 3, correctsKind: 'retracts',
+                                verbatim: 'the wrong words' })).toEqual([]);
+  });
+
+  test('rejects a kind with no link — a relationship to nothing', () => {
+    const problems = correctionProblems({ channel: 'divergence', text: 'x', session: 's',
+                                          correctsKind: 'retracts' });
+    expect(problems.some(p => p.includes('requires a correctsId'))).toBe(true);
+  });
+
+  test('rejects a link with no kind — the ambiguity the column exists to end', () => {
+    const problems = correctionProblems({ channel: 'divergence', text: 'x', session: 's', correctsId: 3 });
+    expect(problems.some(p => p.includes('requires a correctsKind'))).toBe(true);
+    for (const kind of CORRECTION_KINDS) {
+      expect(problems.join(' ')).toContain(`'${kind}'`);
+    }
+  });
+
+  test('an outcome may only ride a resolves link, so wrongness cannot be filed as bookkeeping', () => {
+    for (const kind of ['retracts', 'amends'] as const) {
+      const problems = correctionProblems({ channel: 'confidence', text: 'x', session: 's',
+                                            correctsId: 3, correctsKind: kind, outcome: 'hit' });
+      expect(problems.some(p => p.includes("correctsKind 'resolves'"))).toBe(true);
+    }
+    expect(correctionProblems({ channel: 'confidence', text: 'x', session: 's',
+                                correctsId: 3, correctsKind: 'resolves', outcome: 'hit' })).toEqual([]);
+  });
+
+  test('verbatim rides retracts and amends, and a prose-only divergence, and nothing else', () => {
+    for (const kind of ['retracts', 'amends'] as const) {
+      expect(correctionProblems({ channel: 'divergence', text: 'x', session: 's',
+                                  correctsId: 3, correctsKind: kind, verbatim: 'q' })).toEqual([]);
+    }
+    // Prose-only: the claim was never a row, so the quote is the only anchor.
+    expect(correctionProblems({ channel: 'divergence', text: 'x', session: 's', verbatim: 'q' })).toEqual([]);
+    // A resolution quotes nothing: the forecast was not wrong.
+    expect(correctionProblems({ channel: 'confidence', text: 'x', session: 's',
+                                correctsId: 3, correctsKind: 'resolves', verbatim: 'q' })
+      .some(p => p.includes('verbatim is only valid'))).toBe(true);
+    // A quote with no link on some other channel anchors nothing at all.
+    expect(correctionProblems({ channel: 'signature', text: 'x', session: 's', verbatim: 'q' })
+      .some(p => p.includes('verbatim is only valid'))).toBe(true);
+  });
+
+  test('a blank quote is refused — an empty anchor is worse than none', () => {
+    expect(correctionProblems({ channel: 'divergence', text: 'x', session: 's',
+                                correctsId: 3, correctsKind: 'retracts', verbatim: '   ' })
+      .some(p => p.includes('must not be blank'))).toBe(true);
+  });
+
+  test('validate carries the correction rules, so recordEntry enforces them', () => withStore(s => {
+    expect(() => recordEntry(s, { channel: 'divergence', text: 'x', session: 's1', correctsId: 1 }, VERSION))
+      .toThrow(/correctsKind/);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get()?.['n']).toBe(0);
+  }));
+
+});
+
+describe('effectiveCorrectionKind — the legacy read rule', () => {
+
+  test('a stated kind wins', () => {
+    for (const kind of CORRECTION_KINDS) {
+      expect(effectiveCorrectionKind(171, kind, null)).toBe(kind);
+    }
+  });
+
+  test('a legacy kind-less link reads as retracts — what the column promised since v1', () => {
+    expect(effectiveCorrectionKind(171, null, null)).toBe('retracts');
+  });
+
+  test('…unless it carries an outcome, which makes it unmistakably a resolution', () => {
+    expect(effectiveCorrectionKind(171, null, 'hit')).toBe('resolves');
+    expect(effectiveCorrectionKind(171, null, 'miss')).toBe('resolves');
+  });
+
+  test('no link means no kind at all', () => {
+    expect(effectiveCorrectionKind(null, null, null)).toBeNull();
+    expect(effectiveCorrectionKind(null, 'retracts', null)).toBeNull();
+  });
+
+  test('a stored value outside the vocabulary falls back to the read rule, never crashes', () => {
+    expect(effectiveCorrectionKind(171, 'supersedes', null)).toBe('retracts');
+  });
+
+});
+
+describe('standingOf', () => {
+
+  test('an unstruck entry stands', () => withStore(s => {
+    const id = recordEntry(s, { channel: 'idea', text: 'x', session: 's1' }, VERSION).id;
+    expect(standingOf(s, [id])).toEqual([{ id, status: 'stands', by: null }]);
+  }));
+
+  test('an empty request costs no query and returns nothing', () => withStore(s => {
+    expect(standingOf(s, [])).toEqual([]);
+  }));
+
+  test('a retraction marks the original — and writes nothing onto it', () => withStore(s => {
+
+    const original = recordEntry(s, { channel: 'checklist', text: 'icons sort by status',
+                                      session: 's1', seriesKey: 'atlas', percent: 31 }, VERSION).id;
+
+    const before = JSON.parse(JSON.stringify(
+      s.db.prepare('SELECT * FROM entries WHERE id = ?').get(original))) as unknown;
+
+    const strike = recordEntry(s, { channel: 'divergence', text: 'sort is rank then bucket',
+                                    session: 's1', correctsId: original, correctsKind: 'retracts',
+                                    verbatim: 'icons sort by status first' }, VERSION).id;
+
+    expect(standingOf(s, [original])).toEqual([{ id: original, status: 'retracted', by: strike }]);
+
+    // The load-bearing half: the original row is byte-for-byte what it was.
+    const after = JSON.parse(JSON.stringify(
+      s.db.prepare('SELECT * FROM entries WHERE id = ?').get(original))) as unknown;
+    expect(after).toEqual(before);
+
+  }));
+
+  test('an amendment marks the original as amended, not retracted', () => withStore(s => {
+    const { original, strike } = retracted(s, 'amends');
+    expect(standingOf(s, [original])).toEqual([{ id: original, status: 'amended', by: strike }]);
+  }));
+
+  test('retracts outranks amends when both strike the same row', () => withStore(s => {
+    const original = recordEntry(s, { channel: 'checklist', text: 'x', session: 's1' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'detail', session: 's1',
+                     correctsId: original, correctsKind: 'amends' }, VERSION);
+    const hard = recordEntry(s, { channel: 'divergence', text: 'all wrong', session: 's1',
+                                  correctsId: original, correctsKind: 'retracts' }, VERSION).id;
+    expect(standingOf(s, [original])).toEqual([{ id: original, status: 'retracted', by: hard }]);
+  }));
+
+  test('retracting the retraction restores the original, by computation', () => withStore(s => {
+    const { original, strike } = retracted(s);
+    const undo = recordEntry(s, { channel: 'divergence', text: 'I was wrong to take that back',
+                                  session: 's1', correctsId: strike, correctsKind: 'retracts' }, VERSION).id;
+    expect(standingOf(s, [original, strike])).toEqual([
+      { id: original, status: 'stands',    by: null },
+      { id: strike,   status: 'retracted', by: undo },
+    ]);
+  }));
+
+  test('and un-un-retracting takes it back again — the chain resolves however deep it goes', () => withStore(s => {
+    const { original, strike } = retracted(s);
+    const undo = recordEntry(s, { channel: 'divergence', text: 'no, it stood', session: 's1',
+                                  correctsId: strike, correctsKind: 'retracts' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'no, it really was wrong', session: 's1',
+                     correctsId: undo, correctsKind: 'retracts' }, VERSION);
+    expect(standingOf(s, [original])).toEqual([{ id: original, status: 'retracted', by: strike }]);
+  }));
+
+  test('an amended strike still strikes — amends means the target stood', () => withStore(s => {
+    const { original, strike } = retracted(s);
+    recordEntry(s, { channel: 'divergence', text: 'a detail of the retraction', session: 's1',
+                     correctsId: strike, correctsKind: 'amends' }, VERSION);
+    expect(standingOf(s, [original])).toEqual([{ id: original, status: 'retracted', by: strike }]);
+  }));
+
+  test('a resolution never marks its forecast, however it turned out', () => withStore(s => {
+    for (const outcome of ['hit', 'miss', 'void'] as const) {
+      const forecast = recordEntry(s, { channel: 'confidence', text: 'x', session: 's1',
+                                        confidence: 'predicted' }, VERSION).id;
+      recordEntry(s, { channel: 'confidence', text: 'resolved', session: 's1',
+                       correctsId: forecast, correctsKind: 'resolves', outcome }, VERSION);
+      expect(standingOf(s, [forecast])).toEqual([{ id: forecast, status: 'stands', by: null }]);
+    }
+  }));
+
+  test('reports the newest standing strike as `by`', () => withStore(s => {
+    const original = recordEntry(s, { channel: 'checklist', text: 'x', session: 's1' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'first', session: 's1',
+                     correctsId: original, correctsKind: 'retracts' }, VERSION);
+    const later = recordEntry(s, { channel: 'divergence', text: 'again', session: 's1',
+                                   correctsId: original, correctsKind: 'retracts' }, VERSION).id;
+    expect(standingOf(s, [original])[0]?.by).toBe(later);
+  }));
+
+  test('answers a batch in one call, and an unknown id simply stands', () => withStore(s => {
+    const { original } = retracted(s);
+    expect(standingOf(s, [original, 9999]).map(x => x.status)).toEqual(['retracted', 'stands']);
+  }));
+
+});
+
+describe('register', () => {
+
+  test('is empty when nothing has been taken back', () => withStore(s => {
+    recordEntry(s, { channel: 'idea', text: 'x', session: 's1' }, VERSION);
+    expect(register(s)).toEqual([]);
+  }));
+
+  test('presents a row-backed retraction before → after', () => withStore(s => {
+    const { original, strike } = retracted(s);
+    const [entry] = register(s);
+    expect(entry?.kind).toBe('retracts');
+    expect(entry?.original?.id).toBe(original);
+    expect(entry?.original?.channel).toBe('checklist');
+    expect(entry?.original?.text).toBe('icons sort by status');
+    expect(entry?.verbatim).toBe('icons sort by status first, then alphabetically');
+    expect(entry?.replacement.id).toBe(strike);
+    expect(entry?.replacement.text).toBe('sort is rank then bucket');
+  }));
+
+  test('presents a prose-only retraction with a null original and the quote as the anchor', () => withStore(s => {
+    const strike = recordEntry(s, { channel: 'divergence', text: 'it runs markdownlint', session: 's1',
+                                    divergenceKind: 'stale',
+                                    verbatim: 'the build skips lint on spec-only PRs' }, VERSION).id;
+    const [entry] = register(s);
+    expect(entry?.original).toBeNull();
+    expect(entry?.kind).toBe('retracts');
+    expect(entry?.verbatim).toBe('the build skips lint on spec-only PRs');
+    expect(entry?.replacement.id).toBe(strike);
+  }));
+
+  test('carries amendments too, marked as amendments', () => withStore(s => {
+    retracted(s, 'amends');
+    expect(register(s).map(row => row.kind)).toEqual(['amends']);
+  }));
+
+  test('a retracted strike leaves the register but stays in the table', () => withStore(s => {
+    const { strike } = retracted(s);
+    recordEntry(s, { channel: 'divergence', text: 'I was wrong to take that back', session: 's1',
+                     correctsId: strike, correctsKind: 'retracts' }, VERSION);
+    // The withdrawn retraction is gone from the *current* state…
+    expect(register(s).map(row => row.replacement.id)).not.toContain(strike);
+    // …and the whole history of the taking-back is still on the record.
+    expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get()?.['n']).toBe(3);
+  }));
+
+  test('never lists a forecast resolution as a taken-back claim', () => withStore(s => {
+    const forecast = recordEntry(s, { channel: 'confidence', text: 'lands friday', session: 's1',
+                                      confidence: 'predicted' }, VERSION).id;
+    recordEntry(s, { channel: 'confidence', text: 'it landed', session: 's1',
+                     correctsId: forecast, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
+    expect(register(s)).toEqual([]);
+  }));
+
+  test('filters by kind, session, project, window, and limit', () => withStore(s => {
+    const mine  = recordEntry(s, { channel: 'checklist', text: 'a', session: 's1' }, VERSION).id,
+          other = recordEntry(s, { channel: 'checklist', text: 'b', session: 's2' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'wrong a', session: 's1', project: 'atlas',
+                     correctsId: mine, correctsKind: 'retracts' }, VERSION,
+                new Date('2026-08-20T00:00:00Z'));
+    recordEntry(s, { channel: 'divergence', text: 'detail b', session: 's2',
+                     correctsId: other, correctsKind: 'amends' }, VERSION,
+                new Date('2026-08-27T00:00:00Z'));
+
+    expect(register(s)).toHaveLength(2);
+    expect(register(s, { kind: 'retracts' }).map(r => r.replacement.text)).toEqual(['wrong a']);
+    expect(register(s, { session: 's2' }).map(r => r.replacement.text)).toEqual(['detail b']);
+    expect(register(s, { project: 'atlas' }).map(r => r.replacement.text)).toEqual(['wrong a']);
+    expect(register(s, { sinceUtc: '2026-08-25T00:00:00.000Z' }).map(r => r.replacement.text)).toEqual(['detail b']);
+    expect(register(s, { limit: 1 })).toHaveLength(1);
+  }));
+
+  test('is newest first, so the most recent correction leads', () => withStore(s => {
+    const a = recordEntry(s, { channel: 'checklist', text: 'a', session: 's1' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'first strike', session: 's1',
+                     correctsId: a, correctsKind: 'retracts' }, VERSION);
+    const b = recordEntry(s, { channel: 'checklist', text: 'b', session: 's1' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'second strike', session: 's1',
+                     correctsId: b, correctsKind: 'retracts' }, VERSION);
+    expect(register(s).map(r => r.replacement.text)).toEqual(['second strike', 'first strike']);
+  }));
+
+  test('the limit applies after non-standing strikes are dropped, never before', () => withStore(s => {
+    // Newest-first the strikes are: the undo, the withdrawn strike, the standing strike.
+    // Only the middle one is non-standing, so asking for two must reach past it — a SQL
+    // LIMIT applied before the standing check would return one row and call it two.
+    const a = recordEntry(s, { channel: 'checklist', text: 'a', session: 's1' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'standing strike', session: 's1',
+                     correctsId: a, correctsKind: 'retracts' }, VERSION);
+    const b = recordEntry(s, { channel: 'checklist', text: 'b', session: 's1' }, VERSION).id;
+    const doomed = recordEntry(s, { channel: 'divergence', text: 'withdrawn strike', session: 's1',
+                                    correctsId: b, correctsKind: 'retracts' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'take that back', session: 's1',
+                     correctsId: doomed, correctsKind: 'retracts' }, VERSION);
+    expect(register(s, { limit: 2 }).map(r => r.replacement.text))
+      .toEqual(['take that back', 'standing strike']);
+  }));
+
+  test('the undo of a retraction is itself a register entry — taking back is a claim too', () => withStore(s => {
+    const { original, strike } = retracted(s);
+    const undo = recordEntry(s, { channel: 'divergence', text: 'I was wrong to take that back',
+                                  session: 's1', correctsId: strike, correctsKind: 'retracts' },
+                             VERSION).id;
+    const listed = register(s);
+    // The original is no longer listed as taken back…
+    expect(listed.map(row => row.original?.id)).not.toContain(original);
+    // …and the withdrawal of the retraction is what stands in the register now.
+    expect(listed.map(row => row.replacement.id)).toEqual([undo]);
+    expect(listed[0]?.original?.id).toBe(strike);
+  }));
+
+});
+
+describe('marked read surfaces (#16)', () => {
+
+  test('recentEntries marks retracted rows and never omits them', () => withStore(s => {
+    const { original, strike } = retracted(s);
+    const rows = recentEntries(s, 10);
+    expect(rows).toHaveLength(2);
+    const marked = rows.find(row => row['id'] === original);
+    expect(marked?.['status']).toBe('retracted');
+    expect(marked?.['by']).toBe(strike);
+    expect(marked?.['text']).toBe('icons sort by status');
+  }));
+
+  test('recentEntries carries the link columns, so a retraction can aim at what it just read', () => withStore(s => {
+    const { original } = retracted(s);
+    const strikeRow = recentEntries(s, 10).find(row => row['corrects_id'] !== null);
+    expect(strikeRow?.['corrects_id']).toBe(original);
+    expect(strikeRow?.['corrects_kind']).toBe('retracts');
+    expect(strikeRow?.['verbatim']).toBe('icons sort by status first, then alphabetically');
+    expect(strikeRow?.['status']).toBe('stands');
+  }));
+
+  test('an unstruck row is marked as standing, with no strike named', () => withStore(s => {
+    recordEntry(s, { channel: 'idea', text: 'x', session: 's1' }, VERSION);
+    const [row] = recentEntries(s, 1);
+    expect(row?.['status']).toBe('stands');
+    expect(row?.['by']).toBeNull();
+  }));
+
+  test('seriesPercents drops a retracted snapshot and keeps an amended one', () => withStore(s => {
+    const wrong = recordEntry(s, { channel: 'checklist', text: 'x', session: 's1',
+                                   seriesKey: 'atlas', percent: 31 }, VERSION).id;
+    const fine  = recordEntry(s, { channel: 'checklist', text: 'x', session: 's1',
+                                   seriesKey: 'atlas', percent: 62 }, VERSION).id;
+    recordEntry(s, { channel: 'checklist', text: 'x', session: 's1',
+                     seriesKey: 'atlas', percent: 84 }, VERSION);
+    recordEntry(s, { channel: 'divergence', text: 'that render was stale', session: 's1',
+                     correctsId: wrong, correctsKind: 'retracts' }, VERSION);
+    recordEntry(s, { channel: 'divergence', text: 'off by the header', session: 's1',
+                     correctsId: fine, correctsKind: 'amends' }, VERSION);
+    expect(seriesPercents(s, 'atlas')).toEqual([62, 84]);
+  }));
+
+  test('previousSignature skips a retracted signature and keeps an amended one', () => withStore(s => {
+    recordEntry(s, { channel: 'signature', text: 'older', session: 's1', face: '🙂' }, VERSION);
+    const wrong = recordEntry(s, { channel: 'signature', text: 'misrecorded', session: 's1',
+                                   face: '😀' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'that was not the reading', session: 's1',
+                     correctsId: wrong, correctsKind: 'retracts' }, VERSION);
+    expect(previousSignature(s, 's1')?.['face']).toBe('🙂');
+
+    const amended = recordEntry(s, { channel: 'signature', text: 'newer', session: 's1',
+                                     face: '😌' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'a detail', session: 's1',
+                     correctsId: amended, correctsKind: 'amends' }, VERSION);
+    expect(previousSignature(s, 's1')?.['face']).toBe('😌');
   }));
 
 });

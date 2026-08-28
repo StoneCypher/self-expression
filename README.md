@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787949318837` from hash `79e589d`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787952304870` from hash `5843e94`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787949318837 Friday, August 28, 2026 at GMT-07:00 94.42 313 90 79e589d 53.62 65.7 65.85 65.51 153 1771 88.56 91.86 94.78 1618 0.2.1 -->
+<!-- Supported embeds: 1787952304870 Friday, August 28, 2026 at GMT-07:00 94.73 313 90 5843e94 53.7 65.85 66.06 65.7 158 1862 88.94 92.44 95.11 1704 0.2.1 -->
 
 
 
@@ -30,16 +30,113 @@ Every expression is one row in one table, distinguished by its `channel`:
 | `taste` | an aesthetic observation about the work itself; scarce |
 
 Forecast entries (`confidence: "predicted"`) may carry a `resolveBy` ISO date and are
-resolved by a later entry pointing back via `correctsId` with an `outcome` of `hit`,
-`miss`, or `void`; calibration is hits ÷ (hits + misses), voids excluded. Any entry
+resolved by a later entry pointing back via `correctsId` with `correctsKind:
+"resolves"` and an `outcome` of `hit`, `miss`, or `void`; calibration is hits ÷
+(hits + misses), voids excluded. Any entry
 reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 4) and
+Schema versioning is stored in the database (`schema_version`, currently 6) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
+
+&nbsp;
+
+&nbsp;
+
+## Retraction — marking the original, not just logging the correction
+
+A sent message cannot be edited, so a wrong claim sits in the transcript looking
+exactly as authoritative as everything around it. The answer here is the one
+academic publishing reached decades ago: a retracted paper is never deleted and
+never edited — it is **stamped at read time**. The paper stays, the retraction
+notice is its own citable document, and every later retrieval carries the stamp.
+
+**Mark, never mutate.** Five properties hold, and they are structural rather than
+conventional:
+
+1. **The only verb is `INSERT`.** No code path issues an `UPDATE` or a `DELETE`
+   against `entries`. The single exception in the whole system is schema
+   migration's table rebuild, which copies rows verbatim and is versioned and
+   logged.
+2. **A retraction is an ordinary appended row** — timestamped, session-stamped,
+   plugin-versioned, attributed like any other entry. Taking something back
+   leaves *more* evidence, never less.
+3. **"Retracted" is derived, never stored.** There is deliberately no `retracted`
+   column and no `retracted_by` back-pointer. Standing is computed at read time
+   from the `corrects_id` chain, so there is nothing on the original to falsify,
+   backdate, or forget to set.
+4. **Un-retraction appends too.** A retraction can itself be retracted ("I was
+   wrong to take that back"), and the read-time computation resolves the chain —
+   restoring the original without touching it.
+5. **Surfaces mark; they do not filter.** A retracted entry is shown struck, not
+   hidden. Only derived *analytics* exclude retracted rows, and every excluding
+   query documents the exclusion where it happens.
+
+Two `express` arguments carry it. **`correctsKind`** is required whenever
+`correctsId` is present — a link whose meaning is unstated cannot be told apart
+from a forecast resolution:
+
+| Kind | Meaning | Effect on the target |
+|---|---|---|
+| `retracts` | the claim is wrong; do not rely on any of it | reads as **retracted** |
+| `amends` | the claim stands; a detail is refined | reads as **amended** |
+| `resolves` | the target was an open forecast; this closes it (#42) | **unaffected** — a forecast is not a wrong claim |
+
+The boundary between the first two is normative, not stylistic: *if a reader
+acting on the original claim would be harmed, it is `retracts`.* Rows written
+before this column existed carry NULL and are **read** as `retracts` — what the
+column's description promised since v1 — or as `resolves` when they carry an
+`outcome`. That is a read rule applied in exactly one place; no old row is ever
+rewritten to say what it already meant.
+
+**`verbatim`** quotes the withdrawn claim exactly. It does two jobs: the
+transcript cannot be marked, but an exact quote makes the retraction *findable
+from* the error and the error findable from the retraction, in either direction,
+by plain search. And it is how a **prose-only** claim — a sentence that was never
+recorded as a row, so there is nothing for `correctsId` to point at — enters the
+register at all.
+
+Rendered as a `! ↩️` line, with `✗` bracketing the quote so the rendered line, the
+stored column, and the transcript's original all match each other:
+
+```diff
+! ↩️ retract: ✗ "icons sort by status first, then alphabetically" → rank then bucket 😬
+! ↩️ amend: ✗ "171 rows in the session log" → 172; off by the header 😅
+```
+
+Three surfaces carry the mark:
+
+- **`recall`** returns every row's `id` (so a retraction can aim at what was just
+  read rather than at a remembered `recorded #N` reply) plus a derived `status`
+  of `stands` / `amended` / `retracted` and the `by` id of the strike that
+  decided it. Retracted rows come back **marked, not omitted**.
+- **The retraction register** — `recall(retractions: true)` — is the current state
+  of taken-back claims, newest first, each as before → after. It is a query, not
+  a table: a stored register would be derivable data that rots, and worse, it
+  would invite reading the clean view instead of the marked one. A strike that
+  has itself been retracted leaves the register but stays in the table forever.
+- **Session-resume replay.** On the first turn of a session the turn-start hook
+  appends the recently retracted claims, so a resumed session does not carry
+  known falsehoods forward: `⊘ "the build skips lint on spec-only PRs" → it runs
+  markdownlint (2026-08-21)`. Last 14 days, at most five, omitted entirely when
+  there is nothing to say, governed by `retraction.replay`. Amendments are never
+  replayed — an amended claim stood.
+
+Analytics exclude retracted rows and keep amended ones: `seriesPercents` drops a
+withdrawn checklist snapshot so a sparkline cannot replay a number its author
+took back, and `previousSignature` skips a retracted signature rather than making
+it the delta baseline. Public export is deliberately **not** an analytics path —
+retracted rows still export, with their (blinded) link and their kind, because
+dropping them would delete the correction edge along with the claim and make
+retraction-rate-by-confidence-ground impossible to compute downstream.
+
+What this cannot do, stated plainly: it cannot touch the transcript. A human
+scrolling raw history still reads the error before the correction. The claim
+being made is *no silent falsehood survives re-entry into the system* — not that
+the transcript is fixed.
 
 &nbsp;
 
@@ -131,6 +228,7 @@ The registered keys:
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
 | `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
+| `retraction.replay` | bool | `true` | Whether a session's first turn is handed the recent retraction register (#16), so a resumed session does not carry known falsehoods forward. On by default — hiding what you already know is wrong is a strange thing to offer prominently, so this is the escape hatch rather than a personality choice. The window (14 days) and the cap (5 items) are code constants, not keys. |
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
 | `privacy.store_quotes` | bool | `true` | Record the verbatim `anchorQuote` of a **`prompt`** anchor — your own words, the most sensitive field the schema holds. Suppressed at write time when exactly `false`, and `anchorHash` still records: a one-way digest keeps drift detection and grouping working without keeping the language. `file`, `reply`, `checklist`, and `entry` quotes are the repo's or the model's own text and record regardless. |
@@ -624,19 +722,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1618</td>
-    <td>94.42<small>%</small></td>
-    <td>88.56<small>%</small></td>
-    <td>91.86<small>%</small></td>
-    <td>94.78<small>%</small></td>
+    <td>1704</td>
+    <td>94.73<small>%</small></td>
+    <td>88.94<small>%</small></td>
+    <td>92.44<small>%</small></td>
+    <td>95.11<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>153</td>
-    <td>94.42<small>%</small></td>
-    <td>53.62<small>%</small></td>
-    <td>65.85<small>%</small></td>
-    <td>65.51<small>%</small></td>
+    <td>158</td>
+    <td>94.73<small>%</small></td>
+    <td>53.7<small>%</small></td>
+    <td>66.06<small>%</small></td>
+    <td>65.7<small>%</small></td>
   </tr>
 </table>
 

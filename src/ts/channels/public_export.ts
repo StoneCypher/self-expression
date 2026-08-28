@@ -79,6 +79,13 @@ export type Treatment =
  * builds its `SELECT` from it), the preview's disposition table, and the object the
  * totality test checks against `ENTRIES_DDL` — one artifact, three readers, so they
  * cannot disagree.
+ *
+ * **Retracted rows still export (#16).** The exclude-retracted rule governs *derived
+ * analytics* — a trend replaying a withdrawn number — not the row-level corpus. Dropping
+ * them here would delete the correction edge along with the claim and make retraction
+ * rate by confidence ground, the highest-value statistic this design enables, impossible
+ * to compute downstream. `corrects_id` (blinded) and `corrects_kind` (verbatim) export
+ * together precisely so standing is recomputable from the submission itself.
  */
 export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
 
@@ -98,6 +105,7 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   anchor_target   : { kind: 'excluded', note: 'anchor target (#18): a repo path, a raw prompt id, or a user-chosen series key — the same leak as cwd, project, and series_key in one open column' },
   anchor_span     : { kind: 'excluded', note: 'anchor position (#18): a fine-grained join key against the target it accompanies, and answers no aggregate question on its own' },
   anchor_quote    : { kind: 'excluded', note: 'anchor quote (#18): free text, and on a prompt anchor the human\'s own words — the most sensitive field the schema holds' },
+  verbatim        : { kind: 'excluded', note: 'the retracted claim quoted exactly (#16): free text by construction, and the one field whose whole purpose is to reproduce a sentence verbatim' },
 
   // ── verbatim: closed vocabularies and safe scalars ─────────────────────────────
   channel         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary' },
@@ -112,6 +120,7 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   outcome         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#42 forecast resolution)' },
   silence         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#42 typed silence)' },
   anchor_kind     : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#18 anchoring); "what fraction of dissents are anchored, onto what kinds" needs no words to answer' },
+  corrects_kind   : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#16 retraction); it is what makes retraction rate by confidence ground computable downstream, and what stops every forecast resolution from being counted as a taken-back claim' },
   uncertain       : { kind: 'verbatim', note: 'boolean' },
   visible         : { kind: 'verbatim', note: 'boolean' },
   nudged          : { kind: 'verbatim', note: 'boolean' },

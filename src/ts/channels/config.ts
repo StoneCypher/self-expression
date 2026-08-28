@@ -303,7 +303,9 @@ export function channelMaxCharsKey(channel: string): string {
  * with its length key already registered rather than silently unbounded. The
  * `mailbox.*` family belongs to issue #43's held notes: one kill switch plus four
  * numeric budgets and a TTL, all riding this registry so the consent surface and the
- * facility cannot disagree about a default.
+ * facility cannot disagree about a default. `retraction.replay` belongs to issue #16 and
+ * is the single key that feature adds — the register itself is always computed; the key
+ * governs only whether a session's first turn is handed it.
  */
 export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
@@ -354,6 +356,13 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
     validate: validateBool },
   { key: 'roster.enabled', kind: 'bool', fallback: 'false',
     description: 'the party-roster prose convention (#40); carried via the conventions flags',
+    validate: validateBool },
+  { key: 'retraction.replay', kind: 'bool', fallback: 'true',
+    description:
+      'whether the first turn of a session is handed the recent retraction register (#16), ' +
+      'so a resumed session does not carry known falsehoods forward; on by default — ' +
+      'hiding what you already know is wrong is a strange thing to offer prominently, so ' +
+      'this is the escape hatch rather than a personality choice',
     validate: validateBool },
   { key: 'messages.enabled', kind: 'bool', fallback: 'true',
     description: 'the messagebox facility (#41): kill switch for the message tools and every hook delivery moment',
