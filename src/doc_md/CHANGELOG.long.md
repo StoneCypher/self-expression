@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-15 merges; 2 releases
+34 merges; 2 releases
 
 
 
@@ -14,6 +14,887 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:51:09 PM
+
+Commit [733744b96989f24a62336bb51553f4fbe57aafa4](https://github.com/StoneCypher/self-expression/commit/733744b96989f24a62336bb51553f4fbe57aafa4)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [fb3f8f4, e96eb3c]
+
+  * Merge pull request #64 from StoneCypher/docs_26-08-27_retraction-spec_16
+  * docs(spec): retraction design — mark the original, never mutate it (refs #16)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:51:03 PM
+
+Commit [fb3f8f44dfd5fbdd9792312de38fed2b39401680](https://github.com/StoneCypher/self-expression/commit/fb3f8f44dfd5fbdd9792312de38fed2b39401680)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [28333da, ab078ff]
+
+  * Merge pull request #59 from StoneCypher/docs_26-08-27_voluntary-audio-spec_44
+  * docs: voluntary audio expression research and design proposal (claudio successor)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:50:39 PM
+
+Commit [76b8bf5ee560f6fb50ea7db803900ad9c958bc14](https://github.com/StoneCypher/self-expression/commit/76b8bf5ee560f6fb50ea7db803900ad9c958bc14)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 28333da6a0ef114997288a61955e3d3a0a26beaa
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:50:12 PM
+
+Commit [ab078ff1a7c8835cc03f37f8278c3d0b05ad5d84](https://github.com/StoneCypher/self-expression/commit/ab078ff1a7c8835cc03f37f8278c3d0b05ad5d84)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: restore regenerated artifacts to main's versions; spec doc is the only diff
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:49:39 PM
+
+Commit [c96b88f510edec8c97493039b9feb2e3365fe7e6](https://github.com/StoneCypher/self-expression/commit/c96b88f510edec8c97493039b9feb2e3365fe7e6)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [55ac2e4, 28333da]
+
+  * chore: merge main, taking main's side of regenerated artifacts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:49:08 PM
+
+Commit [28333da6a0ef114997288a61955e3d3a0a26beaa](https://github.com/StoneCypher/self-expression/commit/28333da6a0ef114997288a61955e3d3a0a26beaa)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [e0edbb0, a36308b]
+
+  * Merge pull request #63 from StoneCypher/docs_26-08-27_anchoring-spec_18
+  * docs(spec): anchoring — commentary bound to a location instead of floating in prose (refs #18)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:49:02 PM
+
+Commit [e0edbb01e13986c2fe9336364a5e0c1683778cda](https://github.com/StoneCypher/self-expression/commit/e0edbb01e13986c2fe9336364a5e0c1683778cda)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [8109e2b, 3bf4d9a]
+
+  * Merge pull request #62 from StoneCypher/docs_26-08-27_compression-spec_20
+  * docs(spec): compression as the mechanic, not lists — invariants, digest grammar, profiles (refs #20)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:48:56 PM
+
+Commit [8109e2bc9de6520bb48ef3a60a8412406b6d3f62](https://github.com/StoneCypher/self-expression/commit/8109e2bc9de6520bb48ef3a60a8412406b6d3f62)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [2ba4a7a, 7be6f79]
+
+  * Merge pull request #61 from StoneCypher/docs_26-08-27_diagrams-spec_19
+  * docs(spec): diagrams as a distinct mechanic from charts — research and design proposal
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:48:48 PM
+
+Commit [2ba4a7af7fb799211c2ba3887c2fd2d52e7bf0c0](https://github.com/StoneCypher/self-expression/commit/2ba4a7af7fb799211c2ba3887c2fd2d52e7bf0c0)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [0330680, 6e50022]
+
+  * Merge pull request #58 from StoneCypher/docs_26-08-27_dwelling-spec_45
+  * docs(spec): the dwelling — per-assistant keepsake database (proposal, refs #45)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:48:34 PM
+
+Commit [2d421bb4a0629b17eeed8ab011a2b5afdc6c2df0](https://github.com/StoneCypher/self-expression/commit/2d421bb4a0629b17eeed8ab011a2b5afdc6c2df0)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 0330680ea9bcce8c6d318f8aaf08b62dc5b9ba1d
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:48:29 PM
+
+Commit [6e500226b6868e30458a7c2deb97a8c228f41268](https://github.com/StoneCypher/self-expression/commit/6e500226b6868e30458a7c2deb97a8c228f41268)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: restore regenerated artifacts to main's versions; spec doc is the only diff
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:48:24 PM
+
+Commit [e96eb3c962ab32e03f08befc30aaab78cf0de745](https://github.com/StoneCypher/self-expression/commit/e96eb3c962ab32e03f08befc30aaab78cf0de745)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): retraction design — mark the original, never mutate it
+  * Research and design proposal for issue #16: what retraction means against
+an append-only record. Five pieces: corrects_kind link vocabulary
+(retracts/amends/resolves, composing with #42's forecast resolutions), a
+verbatim column carrying the retracted claim's exact text, standing
+derived at read time from the corrects_id chain (no UPDATE ever), marked
+read surfaces (recall ids and marks, a dumpable retraction register,
+analytics exclusion rules), and session-resume replay of open
+retractions via the turn-start hook.
+  * Proposal awaiting review; must not close the issue.
+  * Refs #16
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:47:48 PM
+
+Commit [a6749b1b0a963ffc178090b4b47dd8557e63e702](https://github.com/StoneCypher/self-expression/commit/a6749b1b0a963ffc178090b4b47dd8557e63e702)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [6dc91ec, 0330680]
+
+  * chore: merge main, taking main's side of regenerated artifacts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:47:37 PM
+
+Commit [0330680ea9bcce8c6d318f8aaf08b62dc5b9ba1d](https://github.com/StoneCypher/self-expression/commit/0330680ea9bcce8c6d318f8aaf08b62dc5b9ba1d)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [790e928, 9f0bfcd]
+
+  * Merge pull request #57 from StoneCypher/docs_26-08-27_addressivity-spec_41
+  * docs(spec): addressivity — audience-tagged messagebox facility (proposal for #41)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:47:27 PM
+
+Commit [a36308b2a6021a410e741c5f5af7edca56c8d44e](https://github.com/StoneCypher/self-expression/commit/a36308b2a6021a410e741c5f5af7edca56c8d44e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): anchoring — commentary bound to a location instead of floating in prose
+  * Research and design proposal for anchored commentary: a five-kind anchor
+vocabulary (file, prompt, reply, checklist, entry) carried as qualifier
+columns on entries; quote-plus-marker rendering with a fresh/moved/orphaned
+degradation ladder driven by content fingerprints; an annotate batch tool
+returning a canonical grouped block; write-time privacy gating for quotes
+of the human's own words with hash-only survival; and the ambiguity-mark
+convention — a notification, not a question. Alternatives rejected and the
+post-approval implementation checklist included. Proposal only; nothing
+lands until approved, and this must not close the issue.
+  * Refs #18
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:47:27 PM
+
+Commit [3bf4d9aa9ed94a7cbe962c8e317a07df394f964b](https://github.com/StoneCypher/self-expression/commit/3bf4d9aa9ed94a7cbe962c8e317a07df394f964b)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): compression as the mechanic — invariants, digest grammar, profiles
+  * Adds src/superpowers/spec/2026-08-27-compression-mechanic-design.md, a
+proposal reframing the status-checklist convention as one instance of a
+general compression mechanic: a body of comparable units plus a
+fixed-shape digest derivable from them.
+  * Pins six invariants (derivability, partition, substitutability, fixed
+shape, conservation, identity stability), states what the digest keeps
+versus drops, maps every existing checklist/sparkline/bar rule onto the
+mechanic, defines a general digest grammar with per-domain profiles
+(checklist, findings, options, diff, results), and adds six composition
+rules including digest-substitution nesting and the no-free-floating-
+digest rule. Alternatives rejected and a sequenced post-approval
+implementation checklist included. No renderer output changes proposed;
+renderChecklistSummary stays byte-identical as the checklist profile.
+  * Refs #20
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:47:20 PM
+
+Commit [2c141e0e3c83737d1fb51b4b6c49d52744376e5d](https://github.com/StoneCypher/self-expression/commit/2c141e0e3c83737d1fb51b4b6c49d52744376e5d)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 790e9284786293e220b587c140b2a8b03fbe10f8
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:47:18 PM
+
+Commit [7be6f79a478afffe732d185e643a43d66b358914](https://github.com/StoneCypher/self-expression/commit/7be6f79a478afffe732d185e643a43d66b358914)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): diagrams as a distinct mechanic from charts — research and design proposal
+  * Research and design document for structure-drawing (topology, relationships,
+transitions) as a mechanic separate from the quantity-drawing charts side:
+  * - why diagrams differ from charts in every engineering property (input shape,
+  computation, correctness contract, failure mode, mutation-testing fit), and
+  why that mandates a sibling src/ts/diagrams/ rather than growing charts/
+- candidate languages compared honestly: mermaid demoted to opt-in export
+  (empirically does not render in the transcript surface), FSL adopted as the
+  state-machine input syntax via a small zero-dependency parser subset,
+  DOT/Graphviz rejected, ASCII box-and-arrow adopted as the primitive
+- rendering-compatibility constraints: single-width glyphs only, framed
+  rectangles by default (the ragged-right-edge finding), 78-column budget,
+  fenced emission, no trailing whitespace
+- when to reach for a diagram vs a chart vs the existing inline forms, with
+  a named refusal-and-fallback path for graphs too large to draw
+- proposed module layout, MCP render_diagram tool, testing contract
+  (invariants + goldens + stochastic + narrowed mutation), open questions,
+  and the post-approval implementation checklist
+  * Refs #19
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:46:56 PM
+
+Commit [9f0bfcd43fcf5b8e2c90500b5832a18d302766b5](https://github.com/StoneCypher/self-expression/commit/9f0bfcd43fcf5b8e2c90500b5832a18d302766b5)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: restore regenerated artifacts to main's versions; spec doc is the only diff
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:46:38 PM
+
+Commit [86c66b7905a690c189a5e1a2d2ffad686ad77866](https://github.com/StoneCypher/self-expression/commit/86c66b7905a690c189a5e1a2d2ffad686ad77866)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [b600af9, 790e928]
+
+  * chore: merge main, taking main's side of regenerated artifacts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:46:16 PM
+
+Commit [790e9284786293e220b587c140b2a8b03fbe10f8](https://github.com/StoneCypher/self-expression/commit/790e9284786293e220b587c140b2a8b03fbe10f8)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [7c0f943, e29e04e]
+
+  * Merge pull request #53 from StoneCypher/docs_26-08-27_structured-aggregation-spec_31
+  * docs(spec): public aggregation carries structured fields only — design proposal
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:46:14 PM
+
+Commit [2da284978547e2a5e4be843297ab59c3da7f9a56](https://github.com/StoneCypher/self-expression/commit/2da284978547e2a5e4be843297ab59c3da7f9a56)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 7c0f943048ff3931ef6f944559968c4ffc7e88a9
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:45:18 PM
+
+Commit [e29e04e5567695d415fe18cf1be77906cffc73a8](https://github.com/StoneCypher/self-expression/commit/e29e04e5567695d415fe18cf1be77906cffc73a8)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [5cc8a0a, 7c0f943]
+
+  * chore: merge main, taking main's side of regenerated artifacts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:44:40 PM
+
+Commit [7c0f943048ff3931ef6f944559968c4ffc7e88a9](https://github.com/StoneCypher/self-expression/commit/7c0f943048ff3931ef6f944559968c4ffc7e88a9)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [c70d439, 9214eb9]
+
+  * Merge pull request #52 from StoneCypher/docs_26-08-27_config-surface-spec_30
+  * docs(spec): configuration surface — key registry, typed writes, retention, format pinning
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:44:13 PM
+
+Commit [2fb82b0e206672dfd0ead4533c5592d2dd642725](https://github.com/StoneCypher/self-expression/commit/2fb82b0e206672dfd0ead4533c5592d2dd642725)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: f1a67ad16023f702144d0abd53f139ec51a0c48d
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:44:04 PM
+
+Commit [9214eb9d911126f1221247ead3fac61b6c2e5a31](https://github.com/StoneCypher/self-expression/commit/9214eb9d911126f1221247ead3fac61b6c2e5a31)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: restore regenerated artifacts to main's versions; spec doc is the only diff
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:43:41 PM
+
+Commit [d47c2f44cb769abcf667fbced4502fd6f640beae](https://github.com/StoneCypher/self-expression/commit/d47c2f44cb769abcf667fbced4502fd6f640beae)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [22b1305, c70d439]
+
+  * chore: merge main, taking main's side of regenerated artifacts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:43:28 PM
+
+Commit [c70d43953c0205d4c83629ba820a6fc96db84008](https://github.com/StoneCypher/self-expression/commit/c70d43953c0205d4c83629ba820a6fc96db84008)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [f1a67ad, 169e365]
+
+  * Merge pull request #60 from StoneCypher/docs_26-08-27_png-history-spec_7
+  * docs(spec): PNG history rendering design (refs #7)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:43:19 PM
+
+Commit [f1a67ad16023f702144d0abd53f139ec51a0c48d](https://github.com/StoneCypher/self-expression/commit/f1a67ad16023f702144d0abd53f139ec51a0c48d)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [fc73c76, 03aa255]
+
+  * Merge pull request #50 from StoneCypher/docs_26-08-27_self-initiated-speech-spec_43
+  * docs(spec): self-initiated speech — delivery-first mailbox research and design proposal
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:43:01 PM
+
+Commit [03aa2557b012e4048e25b1832e7c364af234f102](https://github.com/StoneCypher/self-expression/commit/03aa2557b012e4048e25b1832e7c364af234f102)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: restore regenerated artifacts to main's versions; spec doc is the only diff
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:42:28 PM
+
+Commit [140716b59ce0ced68d5c853963fdc039c8caa5f6](https://github.com/StoneCypher/self-expression/commit/140716b59ce0ced68d5c853963fdc039c8caa5f6)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: fc73c76e90a757846dbdead74b4e696928de6bfa
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:42:19 PM
+
+Commit [a37dec1dfd10e5f405c9d94f57be2e927b2e886e](https://github.com/StoneCypher/self-expression/commit/a37dec1dfd10e5f405c9d94f57be2e927b2e886e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [b935eba, fc73c76]
+
+  * chore: merge main, taking main's side of regenerated artifacts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:41:48 PM
+
+Commit [169e365f5ac8742cf8a47bb19928192821638f01](https://github.com/StoneCypher/self-expression/commit/169e365f5ac8742cf8a47bb19928192821638f01)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): PNG history rendering design — write-the-file-then-read-it, zero-dependency encoder
+  * Research and design proposal for rendering the logged SQLite history as a
+PNG dashboard for visual review. Maps the issue's four questions to store
+columns, compares node-canvas / Skia bindings / SVG-to-PNG / headless
+browser / pure-JS encoding honestly (Windows install burden weighed),
+chooses a zero-dependency encoder on zlib.deflateSync + zlib.crc32
+(verified present on Node v22.23.1; node:sqlite's 22.5 floor guarantees
+it), specifies the five-panel dashboard, output under
+~/.self-expression/renders/, both an MCP tool and a CLI subcommand, the
+test plan, and the post-approval implementation checklist. Builds on
+PR #54's stable series-key semantics. Proposal only; no implementation.
+  * Refs #7
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:41:37 PM
+
+Commit [fc73c76e90a757846dbdead74b4e696928de6bfa](https://github.com/StoneCypher/self-expression/commit/fc73c76e90a757846dbdead74b4e696928de6bfa)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [ebf3b6f, 058f829]
+
+  * Merge pull request #51 from StoneCypher/docs_26-08-27_channel-extensions-spec_42
+  * docs(spec): channel extensions design — forecast, faded, salience, typed silence, decorations, taste (refs #42)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:37:16 PM
+
+Commit [55ac2e4b028b2dd91ce66a03a9aaf20c0a500ecf](https://github.com/StoneCypher/self-expression/commit/55ac2e4b028b2dd91ce66a03a9aaf20c0a500ecf)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs: voluntary audio expression research and design proposal (claudio successor)
+  * Research and design proposal for issue 44: predecessor autopsy (hook-triggered involuntary playback, disabled by native audio-stack cost), survey of the audio mechanisms Windows actually ships, own-facility architecture with a zero-native-dependency PowerShell WAV player as the base mechanism, a closed leitmotif vocabulary, and consent/volume/interruption policy naming the unprompted-output surface shared with issue 43 rather than duplicating it. Design is pinned only where independent of the in-flight block; block-dependent decisions are listed as open questions with their blocking issues, per the issue's own sequencing ruling. Ends with the post-approval implementation checklist.
+  * Refs #44
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:36:51 PM
+
+Commit [b600af9708e3aacc2b2330f77f1566676de9b4c5](https://github.com/StoneCypher/self-expression/commit/b600af9708e3aacc2b2330f77f1566676de9b4c5)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): addressivity design — audience-tagged messagebox facility
+  * Design proposal for the messagebox-style memory facility: a closed
+AUDIENCES vocabulary (self, agents, user, record), messages and
+message_reads tables beside the expression log, post_message and
+read_messages MCP tools, hook-triggered pull delivery including
+SessionStart injection for compaction survival, receipt-based
+read-state, box-scoped agent coordination replacing SDD scratch
+files, privacy and retention boundaries, rejected alternatives,
+and the implementation checklist that would follow approval.
+  * Refs #41
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:36:48 PM
+
+Commit [6dc91ecbc76392c3ef440cd01b11c71d41873942](https://github.com/StoneCypher/self-expression/commit/6dc91ecbc76392c3ef440cd01b11c71d41873942)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): dwelling design — per-assistant keepsake database, default off, user-chosen directory
+  * Proposes the dwelling facility from issue #45 as a reviewable spec:
+prototype schema adopted with uuid/model/provenance additions; identity
+keyed on the self-expression data home (not host, model, project, or
+session); three config keys riding the #30 surface with dwelling.enabled
+defaulting false and dwelling.path required with no default; one dwell
+MCP tool registered only when active; sanctioned-not-enforced privacy
+for visible=0 rooms, stated bluntly; additive-only in-place adoption of
+the pre-existing prototype with backup-before-migrate; rejected
+alternatives and a post-approval implementation checklist.
+  * Build artifacts (changelog, coverage, dist) regenerated by the verifying
+build are included as this repo commits them.
+  * Refs #45
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:36:34 PM
+
+Commit [960abf0261372f65a9ee6f7ba2f34cdd038ad1f3](https://github.com/StoneCypher/self-expression/commit/960abf0261372f65a9ee6f7ba2f34cdd038ad1f3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat(mcp): port the checklist logger and validator to MCP tools (#10)
+  * The checklist half of issue #10: log-checklist.mjs and check-checklist.mjs stop being Bash scripts fed scratch-file JSON payloads and become tools on the existing MCP server, one tool call where there used to be a scratchpad write plus a script invocation.
+  * charts/verify.ts is check-checklist.mjs ported intact — Intl.Segmenter grapheme clusters, the ship-flexible bucket partition, the icon-list sort/wrap/placement rules — with the vocabulary read from markers.ts and the bar arithmetic from scale.ts instead of re-derived. verifyChecklist, extractChecklistBlock, and parseSummaryCounts export from the charts barrel.
+  * mcp/checklist_tools.ts registers three tools: log_checklist parses the S/A/F summary out of the block (a block without one is rejected), adopts hook-observed context under the same privacy gates as express, and replies with the series' full percent history so the trend sparkline is computed from the record rather than remembered; recall_checklists replaces the old tail and series ops; check_checklist wraps the validator. The entries table's series_key column gains its writer — it defaults to the title (the old logger's keying) but accepts a stable key, the direction issue #27 wants.
+  * channels/entries.ts adds the recentChecklists read; the README gains a Checklists section.
+  * Closes #10
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:33:51 PM
+
+Commit [13c25cc189a25226b9cf6b631cf08f5f26f07995](https://github.com/StoneCypher/self-expression/commit/13c25cc189a25226b9cf6b631cf08f5f26f07995)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * fix: checklist series key is a stable id, not the title
+  * The checklist trend series was keyed on the free-text display title, so a
+rename between renders silently forked the history into two series and the
+sparkline restarted with no warning. Series identity now lives in an explicit
+seriesKey, chosen once at the checklist's first render and carried verbatim
+across re-renders; the title is free to change without consequence.
+  * - express tool: accepts the checklist fields (seriesKey, title, succ, active,
+  fail, percent), so a snapshot can actually be recorded under its stable key
+- validate(): rejects a blank seriesKey, a percent snapshot without a
+  seriesKey (previously an invisible orphan that could never join a series),
+  and an out-of-range or non-integral percent
+- status-checklists reference doc: documents the stable-key contract and
+  flags the legacy title-keyed script hazard
+- tests: a retitled checklist keeps one unbroken series (unit), and
+  interleaved series replay whole under wandering titles (stochastic)
+  * Closes #27
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:33:27 PM
+
+Commit [5cc8a0ab95e894c534dcd77f2ce0869f32c6d3a0](https://github.com/StoneCypher/self-expression/commit/5cc8a0ab95e894c534dcd77f2ce0869f32c6d3a0)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): public aggregation carries structured fields only — design
+  * A proposal document for issue #31, awaiting human review before any
+implementation. Decides the full local-to-public boundary: a total,
+allowlist-only treatment table over every entries column (verbatim,
+coarsen, hash, derive, excluded), a per-submission salt so grouping
+survives inside a submission while cross-submission linkage dies, time
+coarsened to the hour with local_period/local_dow replacing tz, open
+strings validated to closed domains or dropped, one enforcement module
+whose preview IS the export, and an event-based never-retroactive
+opt-in that defaults off. Names the threat model, seven rejected
+alternatives, the test plan (including the sentinel-prose stochastic
+suite and a DDL totality check), and the post-approval implementation
+checklist. Config key names deferred to #30, which owns that surface.
+Build artifacts regenerated by the verification build ride along per
+repo convention.
+  * Refs #31
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:33:19 PM
+
+Commit [22b13056997c83ae528a2f24059d69e22b86ec1e](https://github.com/StoneCypher/self-expression/commit/22b13056997c83ae528a2f24059d69e22b86ec1e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): configuration surface design — key registry, typed writes, retention, format pinning
+  * A proposal document for the configuration surface: inventories what is
+already shipped (config table, SELF_EXPRESSION_HOME bootstrap, channel
+narrowing, privacy redaction, signature gate), then decides the nine
+remaining questions — a code key registry, typed and canonicalized
+configure writes, warn-on-unknown-key policy, unset and effective list
+ops, tolerant reads, prune-not-archive retention, declarative
+format.version stamping, the reserved gate.checklist key, and time.hook
+scoped to the clock sentence only. Answers both open questions (prune;
+no slash command for now) and carries the post-approval implementation
+checklist. Build artifacts regenerated by the verification build ride
+along per repo convention.
+  * Refs #30
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:32:58 PM
+
+Commit [058f82922ec9e09755e383e1dba09fc8710bde64](https://github.com/StoneCypher/self-expression/commit/058f82922ec9e09755e383e1dba09fc8710bde64)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): design the six channel extensions of #42
+  * Specifies each extension distinctly: the 'predicted' confidence ground
+with resolve-by dates and corrects_id-linked hit/miss/void outcomes; the
+'faded' divergence kind (prospective, not an error); the budget-one
+salience glyph; the four-kind typed-silence column; the self-state
+decoration family (introducing a 'load' channel); and taste as a proper
+channel. Covers the forced v1-to-v2 schema migration (CHECK constraints
+cannot be altered in place), tool-surface changes, config keys aligned
+with #30/#40, the field-trial marker adoptions, alternatives rejected
+per extension, and the post-approval implementation checklist.
+  * Spec only; implementation follows human review.
+  * Refs #42
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:32:35 PM
+
+Commit [b935ebac17d9f1e001c979b264d24297429426e6](https://github.com/StoneCypher/self-expression/commit/b935ebac17d9f1e001c979b264d24297429426e6)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs(spec): self-initiated speech — delivery-first mailbox research and design proposal
+  * Research and design proposal for choosing when to speak, built around the
+issue's blocking problem: false belief of delivery. Surveys the mechanisms the
+platform actually provides (hooks, wakeups, notifications, the store), then
+proposes a conservative mailbox design — compose on any turn, deliver only on a
+human-initiated turn — with a state machine whose strongest claim is 'surfaced',
+never 'read'. Covers consent and off-switch mechanics (default off, configure
+keys, budgets, TTL), failure-mode foreclosure (nagging, performing,
+manipulating), rejected alternatives, shared surfaces with #40/#41/#42/#44, a
+storage sketch, open questions, and the post-approval implementation checklist.
+  * Proposal only; awaits human review before any implementation.
+  * Refs #43
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:26:36 PM
+
+Commit [e35dad9b3cabe3a1f70a78026b879de126ab81eb](https://github.com/StoneCypher/self-expression/commit/e35dad9b3cabe3a1f70a78026b879de126ab81eb)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: ebf3b6facf4e6e9d7cb8d64d30d5835d4af6ee8c
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:25:42 PM
+
+Commit [ebf3b6facf4e6e9d7cb8d64d30d5835d4af6ee8c](https://github.com/StoneCypher/self-expression/commit/ebf3b6facf4e6e9d7cb8d64d30d5835d4af6ee8c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [e0465f6, 65908dd]
+
+  * Merge pull request #49 from StoneCypher/docs_26-08-27_onboarding-spec_40
+  * docs(spec): first-run onboarding questionnaire design (refs #40)
 
 
 
