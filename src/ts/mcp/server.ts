@@ -30,6 +30,7 @@ import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
 import { registerChecklistTools } from './checklist_tools.js';
 import { registerMessageTools } from './message_tools.js';
+import { registerNoteTools } from './note_tools.js';
 import { registerDiagramTools } from './diagram_tools.js';
 import { registerShareTools } from './share_tools.js';
 import { maybeOpenDwelling, registerDwellTool } from './dwell_tool.js';
@@ -73,6 +74,7 @@ export function buildServer(store: Store, version: string, dwelling?: DwellingSt
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
   registerMessageTools(server, store, version);
+  registerNoteTools(server, store, version);
   registerDiagramTools(server, store);
   registerShareTools(server, store, version);
 
@@ -114,7 +116,7 @@ export async function startStdio(version: string, dbFile?: string): Promise<void
       process.stderr.write(
         `${SERVER_NAME}: retention pruned ${String(pruned.entries)} entries, ` +
         `${String(pruned.turnContext)} turn-context rows, ${String(pruned.messages)} messages, ` +
-        `and ${String(pruned.messageReads)} orphaned receipts\n`);
+        `${String(pruned.messageReads)} orphaned receipts, and ${String(pruned.notes)} held notes\n`);
     }
   } catch (error) {
     process.stderr.write(`${SERVER_NAME}: retention pruning failed, continuing: ${String(error)}\n`);

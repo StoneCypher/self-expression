@@ -15,12 +15,13 @@
 import { readFileSync }  from 'node:fs';
 import { join }          from 'node:path';
 import { runAsync }      from './cli_commands.js';
-import type { RenderCommand, MessagesCommand } from './cli_commands.js';
+import type { RenderCommand, MessagesCommand, NotesCommand } from './cli_commands.js';
 import { startStdio }    from './mcp/server.js';
 import { handleHook }    from './mcp/hooks.js';
 import type { HookPayload } from './mcp/hooks.js';
 import { renderHistoryToFile } from './mcp/chart_tools.js';
 import { readMessages, formatMessages } from './channels/messages.js';
+import { noteReport }    from './mcp/note_tools.js';
 import { openStore, closeStore } from './channels/store.js';
 import type { Store }    from './channels/store.js';
 
@@ -125,12 +126,28 @@ function runMessages(command: MessagesCommand): Promise<string> {
   }
 }
 
+/**
+ * Run one `notes` command against the real store — the human's audit door onto held
+ * notes (#43), with no model in the loop. Read-only: it reports what is queued and how
+ * each finished note ended, and can mark nothing delivered. The store closes even when
+ * the read throws.
+ */
+function runNotes(command: NotesCommand): Promise<string> {
+  const store = openStore();
+  try {
+    return Promise.resolve(noteReport(store, command.limit, command.state ?? undefined));
+  } finally {
+    closeStore(store);
+  }
+}
+
 const streams = {
   out: (line: string): void => { console.log(line);   },
   err: (line: string): void => { console.error(line); },
 };
 
-runAsync(process.argv.slice(2), streams, () => startStdio(version()), runHook, runRender, runMessages)
+runAsync(process.argv.slice(2), streams, () => startStdio(version()),
+         runHook, runRender, runMessages, runNotes)
   .then(code => { process.exit(code); })
   .catch((error: unknown) => {
     console.error(`self-expression: ${error instanceof Error ? error.message : String(error)}`);

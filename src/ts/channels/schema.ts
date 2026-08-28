@@ -25,6 +25,7 @@ import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES, STEMS,
   FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
+  NOTE_EVENTS,
 } from './vocabulary.js';
 
 /**
@@ -48,9 +49,14 @@ import {
  * over `ANCHOR_KINDS`, and SQLite cannot add a constraint in place — so the v3→v4 step
  * is another table rebuild, the same recipe v1→v2 used.
  *
+ * v5 (issue #43): the held-note mailbox added the `notes` and `note_events` tables and
+ * their indices. Purely additive, like v2→v3: a note is a *sidecar* on an existing
+ * `messages` row rather than a rival store, so no existing table changes shape and no
+ * data moves.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -286,6 +292,77 @@ CREATE TABLE IF NOT EXISTS message_reads (
   prompt_id   TEXT
 )`;
 
+/**
+ * One held note (issue #43): the timing and the stated reason laid over an existing
+ * messagebox message.
+ *
+ * Deliberately a **sidecar**, not a store of its own. The note's words, its audience,
+ * its sender identity, and its expiry all live on the `messages` row this points at —
+ * so a note is literally "an audience-tagged message plus timing and a delivery
+ * lifecycle", which is the division of labour #41 and #43 agreed on, and there is
+ * exactly one table holding assistant-authored text. The columns here are only what a
+ * note *adds*:
+ *
+ * - `not_before` — the moment the note becomes eligible to be offered. This is the
+ *   whole feature: agency over *when*, granted as a floor and never as an alarm. A note
+ *   for Tuesday morning lands with the first prompt sent after Tuesday morning, which is
+ *   the honest bound — landing at 9:00 sharp in an empty room is the failure mode the
+ *   design exists to foreclose.
+ * - `reason` — why this was worth holding, stated at composition time. Mandatory,
+ *   because scarcity plus audit is the antibody against performing: a pattern of empty
+ *   reasons is visible as data rather than deniable as vibes.
+ * - `series_key` — the dedupe handle. At most one live note per series, so a second
+ *   "remember the migration" note supersedes the first rather than joining it.
+ *
+ * There is no `state` column and no `offer_count` column: both are derived from
+ * `note_events`, so a stored state can never disagree with the ledger that justifies it.
+ *
+ * The message's `expires_utc` is nullable in general and **mandatory for notes** — the
+ * TTL is enforced by {@link ../channels/notes.js composeNote}, since SQLite cannot
+ * express a cross-table `CHECK`.
+ *
+ * @see ./notes.js
+ * @see MESSAGES_DDL
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const NOTES_DDL: string = `
+CREATE TABLE IF NOT EXISTS notes (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id  INTEGER NOT NULL UNIQUE REFERENCES messages(id),
+  reason      TEXT    NOT NULL,
+  series_key  TEXT,
+  not_before  TEXT    NOT NULL
+)`;
+
+/**
+ * One thing that happened to a held note: the append-only ledger the whole state
+ * machine is derived from.
+ *
+ * `turn` is **the enforcement column**. It carries the hook-supplied turn type rather
+ * than anything the model asserted, so an `offered` row proves a human had just acted,
+ * and a `surfaced` row can be refused unless such an offer exists for the same
+ * `prompt_id`. That is what makes "compose on any turn; deliver only on a human's turn"
+ * a structural property instead of a promise: there is no code path from a wakeup turn
+ * to a delivery claim.
+ *
+ * Append-only, in the same spirit as `message_reads`: current state is always
+ * re-derivable, and every transition carries the ground truth that authorized it.
+ *
+ * @see ./notes.js
+ * @see ./vocabulary.js NOTE_EVENTS
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const NOTE_EVENTS_DDL: string = `
+CREATE TABLE IF NOT EXISTS note_events (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  note_id    INTEGER NOT NULL REFERENCES notes(id),
+  ts_utc     TEXT    NOT NULL,
+  event      TEXT    NOT NULL ${check('event', NOTE_EVENTS)},
+  turn       TEXT ${check('turn', TURNS)},
+  prompt_id  TEXT,
+  session    TEXT
+)`;
+
 /** Indices covering the queries the gates and the analyses actually run. */
 export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_prompt  ON entries(prompt_id)',
@@ -313,6 +390,24 @@ export const MESSAGE_INDEX_DDL: readonly string[] = [
 ];
 
 /**
+ * Indices for the held-note tables (#43), kept apart from the others for the same
+ * reason {@link MESSAGE_INDEX_DDL} is: an earlier version's migration step must never
+ * reference a table outside its own version's shape.
+ *
+ * Two questions earn the two indices. "What is ripe now?" scans `notes` by
+ * `not_before`, on every prompt of every enabled install — the hot path. "What has
+ * happened to this note?" reads its whole ledger, which is how state is derived at all,
+ * so it is on every read of every note. `message_id` needs no index of its own: its
+ * `UNIQUE` constraint already provides one.
+ *
+ * @see ./migrate.js
+ */
+export const NOTE_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX IF NOT EXISTS idx_notes_ripe    ON notes(not_before, id)',
+  'CREATE INDEX IF NOT EXISTS idx_note_events   ON note_events(note_id, id)',
+];
+
+/**
  * Every `CREATE TABLE` the current schema needs, in order — and nothing else.
  *
  * Kept apart from the indices because the two have different safety on an *old*
@@ -334,10 +429,13 @@ export const TABLE_DDL: readonly string[] = [
   CONFIG_DDL,
   MESSAGES_DDL,
   MESSAGE_READS_DDL,
+  NOTES_DDL,
+  NOTE_EVENTS_DDL,
 ];
 
-/** Every index the current schema declares, entries and messagebox together. */
-export const ALL_INDEX_DDL: readonly string[] = [...INDEX_DDL, ...MESSAGE_INDEX_DDL];
+/** Every index the current schema declares — entries, messagebox, and held notes. */
+export const ALL_INDEX_DDL: readonly string[] =
+  [...INDEX_DDL, ...MESSAGE_INDEX_DDL, ...NOTE_INDEX_DDL];
 
 /**
  * Every statement needed to bring an **empty** database to the current schema, in

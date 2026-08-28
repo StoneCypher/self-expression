@@ -23,6 +23,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   entriesDdl, INDEX_DDL,
   MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
+  NOTES_DDL, NOTE_EVENTS_DDL, NOTE_INDEX_DDL,
 } from './schema.js';
 
 /**
@@ -187,6 +188,37 @@ function migrateV3toV4(db: DatabaseSync): void {
 }
 
 /**
+ * The v4→v5 step: create the held-note tables and their indices (#43).
+ *
+ * Purely additive, exactly like v2→v3, and for a reason worth stating: a note is a
+ * *sidecar* on an existing `messages` row rather than a rival store, so nothing about
+ * `messages`, `message_reads`, or `entries` changes shape and no row moves. A v4
+ * database that never enables the mailbox is byte-identical afterward apart from two
+ * empty tables.
+ *
+ * Each statement is `IF NOT EXISTS`-idempotent, which also makes this safe when
+ * `openStore` has already applied `TABLE_DDL` before walking the chain — its normal
+ * order of operations.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v4 database exactly as it was.
+ */
+function migrateV4toV5(db: DatabaseSync): void {
+
+  db.exec('BEGIN');
+  try {
+    db.exec(NOTES_DDL);
+    db.exec(NOTE_EVENTS_DDL);
+    for (const statement of NOTE_INDEX_DDL) { db.exec(statement); }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
@@ -194,6 +226,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 1, to: 2, apply: migrateV1toV2 },
   { from: 2, to: 3, apply: migrateV2toV3 },
   { from: 3, to: 4, apply: migrateV3toV4 },
+  { from: 4, to: 5, apply: migrateV4toV5 },
 ];
 
 /**

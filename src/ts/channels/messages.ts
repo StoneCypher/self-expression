@@ -197,6 +197,22 @@ export function postMessage(
 /** The not-yet-expired predicate, shared by every delivery query. */
 const NOT_EXPIRED = '(m.expires_utc IS NULL OR m.expires_utc > ?)';
 
+/**
+ * The not-a-held-note predicate, applied to `user` **delivery** only (issue #43).
+ *
+ * A held note is stored as a `user` message with a `notes` sidecar, so that one table
+ * carries every assistant-authored text. Its delivery, though, is governed by the note
+ * ladder — `not_before`, budgets, offers, `surfaced` — and letting it *also* count as
+ * ordinary unread `user` mail would give one text two disagreeing delivery records, plus
+ * a per-turn count line nagging about a note deliberately timed for Tuesday. So notes
+ * are excluded from the unread set and the unread count, and from nowhere else: the
+ * peek view (`ack: false`) still shows them, because they genuinely are part of the
+ * history, and peeking makes no claim about delivery.
+ *
+ * @see ./notes.js
+ */
+const NOT_A_NOTE = 'NOT EXISTS (SELECT 1 FROM notes n WHERE n.message_id = m.id)';
+
 /** The columns every read returns, in recording order. */
 const MESSAGE_COLUMNS =
   'm.id, m.uuid, m.ts_utc, m.ts_local, m.tz, m.session, m.prompt_id, m.agent_id, ' +
@@ -261,7 +277,7 @@ function unreadRows(
   if (audience === 'user') {
     return store.db.prepare(
       `SELECT ${MESSAGE_COLUMNS} FROM messages m
-        WHERE m.audience = 'user' AND ${NOT_EXPIRED}
+        WHERE m.audience = 'user' AND ${NOT_EXPIRED} AND ${NOT_A_NOTE}
           AND NOT EXISTS (SELECT 1 FROM message_reads r
                            WHERE r.message_id = m.id AND r.reader = 'user')
         ORDER BY m.id ASC LIMIT ?`).all(nowUtc, limit);
@@ -318,7 +334,9 @@ function recentRows(
  *   to session, so sibling agents each get their own delivery.
  * - `user` — collected by the human; a model reader is handed the unread mail **without
  *   receipting regardless of `ack`**, because relaying is not reading. Only a
- *   `reader: 'user'` (the CLI) writes `user` receipts.
+ *   `reader: 'user'` (the CLI) writes `user` receipts. Held notes (#43) are excluded
+ *   from the *unread* set — their delivery is the note ladder's — but remain visible in
+ *   the `ack: false` peek, which claims nothing about delivery.
  * - `record` — never unread; delivery-mode reads return the recent history instead,
  *   and nothing ever receipts.
  *
@@ -389,6 +407,8 @@ export interface UnreadCounts {
  * Counts only, never text: full injection every turn would spend context on notes the
  * model usually still remembers. `agents` mail is deliberately excluded — workers poll
  * their box by instruction, not by ambient nag — and `record` never counts as unread.
+ * Held notes (#43) are excluded from `forUser` too: their delivery is the note ladder's,
+ * and counting them here would nag about a note deliberately timed for later.
  *
  * @param session the reader session fencing the `self` count; omit for user-only
  * @param when    injectable clock for expiry evaluation
@@ -411,7 +431,7 @@ export function unreadCounts(store: Store, session?: string, when: Date = new Da
 
   const forUser = Number(store.db.prepare(
     `SELECT COUNT(*) AS n FROM messages m
-      WHERE m.audience = 'user' AND ${NOT_EXPIRED}
+      WHERE m.audience = 'user' AND ${NOT_EXPIRED} AND ${NOT_A_NOTE}
         AND NOT EXISTS (SELECT 1 FROM message_reads r
                          WHERE r.message_id = m.id AND r.reader = 'user')`)
     .get(nowUtc)?.['n'] ?? 0);

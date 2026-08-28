@@ -225,6 +225,73 @@ export const ANCHOR_KINDS = [
 ] as const;
 
 /**
+ * The delivery ladder a held note can stand on (issue #43).
+ *
+ * **There is deliberately no `read` state, and there never will be.** Nothing in this
+ * stack can observe a human reading anything — no read receipts, no unread indicator in
+ * the transcript, no presence detection — so a `read` term would be a word for a fact
+ * the system cannot collect, and the assistant would be able to *believe* more about a
+ * note's fate than the record can prove. The ladder therefore stops at `surfaced`,
+ * whose exact meaning is "this text was rendered into a reply the human explicitly
+ * prompted", which is the strongest claim the evidence supports.
+ *
+ * States are **derived** from {@link NOTE_EVENTS}, never stored as a mutable column, so
+ * there is exactly one source of truth and no way for a stored state to drift from the
+ * ledger that justifies it:
+ *
+ * - `queued` — written and waiting. Composition is unrestricted by turn type; this is
+ *   the safe half of self-initiated speech, and where "something ripened at 2 am" lives.
+ * - `offered` — the `UserPromptSubmit` hook found the note ripe on a turn it stamped
+ *   `reply` and handed it to the model. Transient: it lasts one turn.
+ * - `surfaced` — terminal success. Reachable *only* from an offer whose `turn` column
+ *   the hook wrote, on the same `prompt_id`.
+ * - `expired` — terminal. The mandatory TTL passed, or the offer cap was reached
+ *   without the note ever being surfaced. Never resurrected.
+ * - `withdrawn` — terminal. The author's own exit, including the supersede that
+ *   `series_key` dedupe performs.
+ *
+ * `ripe` is deliberately absent: it is `now >= not_before` applied to a `queued` note,
+ * derived at read time, and a stored ripeness could go stale the moment a clock moved.
+ *
+ * @see ./notes.js
+ * @see NOTE_EVENTS
+ */
+export const NOTE_STATES = [
+  'queued',     // written, waiting for its moment
+  'offered',    // handed to the model on a hook-stamped reply turn; lasts one turn
+  'surfaced',   // rendered into a reply the human prompted — the ceiling, not 'read'
+  'expired',    // TTL passed or offers exhausted; terminal, never resurrected
+  'withdrawn',  // retracted by a later, wiser turn; terminal
+] as const;
+
+/**
+ * What can happen to a held note, recorded append-only (issue #43).
+ *
+ * The events *are* the record; {@link NOTE_STATES} is a function of them. Every row
+ * carries the turn type the hook supplied, which is what makes the central rule
+ * enforceable rather than aspirational: an `offered` row can only exist with
+ * `turn = 'reply'`, and a `surfaced` row is refused unless such an offer exists for the
+ * same `prompt_id`. No sequence of tool calls can manufacture a delivery claim the hook
+ * did not authorize.
+ *
+ * `declined` is the honest name for an offer the assistant did not take up — budget
+ * spent, or the moment judged wrong. It returns the note to `queued` with its offer
+ * count incremented, which is what makes the offer cap a real ceiling instead of an
+ * intention.
+ *
+ * @see NOTE_STATES
+ * @see ./notes.js
+ */
+export const NOTE_EVENTS = [
+  'composed',   // the note was written
+  'offered',    // a reply turn's hook handed it to the model
+  'declined',   // that offer lapsed unused; back to queued, offer_count + 1
+  'surfaced',   // rendered into the reply, against the offering turn's prompt_id
+  'withdrawn',  // retracted by its author, or superseded by a later note in its series
+  'expired',    // TTL passed or offers exhausted
+] as const;
+
+/**
  * `model` is deliberately NOT a closed vocabulary.
  *
  * Model identifiers appear faster than any enum could track, and rejecting an unknown
@@ -257,6 +324,8 @@ export type ForecastOutcome  = typeof FORECAST_OUTCOMES[number];
 export type SilenceKind      = typeof SILENCE_KINDS[number];
 export type Audience         = typeof AUDIENCES[number];
 export type AnchorKind       = typeof ANCHOR_KINDS[number];
+export type NoteState        = typeof NOTE_STATES[number];
+export type NoteEvent        = typeof NOTE_EVENTS[number];
 
 /**
  * Whether `value` belongs to the closed vocabulary `vocabulary`, narrowing its type
