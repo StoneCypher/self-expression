@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787942498605` from hash `cb24f76`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787943035360` from hash `f1f573e`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787942498605 Friday, August 28, 2026 at GMT-07:00 94.6 291 91 cb24f76 51.68 66.13 65.57 65.44 111 1291 88.52 92.71 95.07 1180 0.2.1 -->
+<!-- Supported embeds: 1787943035360 Friday, August 28, 2026 at GMT-07:00 94.08 291 91 f1f573e 49.87 63.57 61.32 62.72 122 1414 87.83 91.23 94.44 1292 0.2.1 -->
 
 
 
@@ -343,6 +343,65 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
 
 &nbsp;
 
+## Voluntary audio (claudio)
+
+A small palette of **leitmotifs the assistant chooses to strike** — the choice is the
+expression, exactly as choosing to write a `need` line is. The successor to the
+hook-triggered prototype, inverting all three of its defining properties: voluntary
+rather than involuntary, meaning-mapped rather than event-mapped, and built on platform
+facilities rather than native audio modules (issue #44; design in
+`src/superpowers/spec/2026-08-27-voluntary-audio-design.md`).
+
+**Its own facility, not new tools on this server.** The audio surface is a second MCP
+server, `claudio`, in its own bundle (`self-expression-audio mcp` — registered alongside
+the main server in `.mcp.json`), so a broken audio stack can never take the backchannel
+down. The playback mechanism is a spawned `powershell -NoProfile -NonInteractive` child
+playing a vendored WAV via `System.Media.SoundPlayer.PlaySync()` — zero native
+dependencies, nothing compiled at install time. Volume is applied by scaling the PCM
+samples in Node before the child ever sees the file. Platforms without a player (all
+non-Windows, for now) register no tools at all: absence degrades to silence.
+
+**Default off, exact affirmative on.** Installing produces no sound. The `audio.*` keys
+ride the ordinary `configure` tool:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `audio.enabled` | bool | `false` | Only exactly `true` enables. Read at claudio startup for the tool schema, and re-checked on every strike. |
+| `audio.volume_ceiling` | int | `50` | Loudest volume (0–100) the assistant may choose. The `CLAUDIO_VOLUME_CEILING` environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. |
+| `audio.tts_local` | bool | `false` | The local offline TTS tier's own consent gate. Cloud TTS tiers deliberately do not exist in this build. |
+| `audio.min_gap_seconds` | int | `30` | Minimum spacing between audible strikes. |
+| `audio.hourly_budget` | int | `6` | Audible strikes per rolling hour. |
+| `audio.hourly_budget_attention` | int | `8` | The slightly larger budget `attention` draws from. |
+| `audio.wav.<leitmotif>` | string | *(none)* | Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. |
+
+The palette is a closed vocabulary of five meanings, capped at six —
+`session-open` (at most once per session), `quiet-completion`, `attention`,
+`need-blocked`, and `spark` — shipped as small synthesized WAVs in `assets/leitmotifs/`
+(regenerable via `src/scripts/generate_leitmotifs.mjs`). A leitmotif is a meaning, not a
+sound file; re-skin the waveform per meaning without the vocabulary drifting.
+
+| Tool | Purpose |
+|---|---|
+| `strike` | Strike one leitmotif at a chosen volume within `[0, ceiling]` — softer is a choice, louder is impossible. Refusals name the limit that blocked them. |
+| `audition` | Play one leitmotif at a fixed low volume, outside the strike budget, for reviewing the palette during configuration. |
+| `say` | One short line through the local offline voice (SAPI). Registered only at the `audio.tts_local` tier; the spoken text stays in the local ledger and never enters any aggregation. |
+
+**Everything is enforced server-side and everything is ledgered.** Rate limits, the
+ceiling, the once-per-session rule, and a hard duration cap (nothing loops, ever; a
+child that overstays is killed) are the facility's own code, never model politeness.
+Every strike attempt — played, refused, or errored — lands in the facility's own
+`audio.sqlite3` ledger beside the log, so what made noise and when is always
+reconstructible. Choosing *not* to strike records nothing: audio is a privilege, not an
+obligation, and silence is free.
+
+Quiet-hours and the shared unprompted-output policy surface are deferred to issue #43;
+unprompted strikes outside a live session are out of scope until it lands. The scarcity
+ethos ships in `skills/audio-expression/SKILL.md`.
+
+&nbsp;
+
+&nbsp;
+
 ## Test status
 
 <table>
@@ -356,19 +415,19 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1180</td>
-    <td>94.6<small>%</small></td>
-    <td>88.52<small>%</small></td>
-    <td>92.71<small>%</small></td>
-    <td>95.07<small>%</small></td>
+    <td>1292</td>
+    <td>94.08<small>%</small></td>
+    <td>87.83<small>%</small></td>
+    <td>91.23<small>%</small></td>
+    <td>94.44<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>111</td>
-    <td>94.6<small>%</small></td>
-    <td>51.68<small>%</small></td>
-    <td>65.57<small>%</small></td>
-    <td>65.44<small>%</small></td>
+    <td>122</td>
+    <td>94.08<small>%</small></td>
+    <td>49.87<small>%</small></td>
+    <td>61.32<small>%</small></td>
+    <td>62.72<small>%</small></td>
   </tr>
 </table>
 

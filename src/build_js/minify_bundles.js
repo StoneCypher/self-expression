@@ -32,6 +32,7 @@ const BUNDLES = [
   { name: 'index.cjs' },
   { name: 'index.iife.js' },
   { name: 'cli.cjs' },
+  { name: 'claudio.cjs' },
 ];
 
 /**
