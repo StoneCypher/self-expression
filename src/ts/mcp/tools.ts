@@ -507,7 +507,7 @@ function answerDwelling(store: Store, enable: boolean, path: string | undefined)
   writeConfig(store, 'dwelling.enabled', 'true');
 
   return `dwelling.path = ${outcome.canonical}; dwelling.enabled = true — ` +
-         `${dwellingChangeNotice('dwelling.enabled') ?? ''}`;
+         (dwellingChangeNotice('dwelling.enabled') ?? '');
 
 }
 
