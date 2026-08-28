@@ -34,7 +34,13 @@ import {
 import type { EntryInput }                                                   from '../channels/entries.js';
 import { ANCHOR_QUOTE_MAX }                                                  from '../channels/anchors.js';
 import { readConfig, writeConfig, deleteConfig }                              from '../channels/store.js';
-import { FORMAT_VERSION, configKey, effectiveValue, effectiveConfig }         from '../channels/config.js';
+import {
+  FORMAT_VERSION, MAX_TEXT_CEILING, configKey, channelMaxChars, channelMaxCharsKey,
+  effectiveValue, effectiveConfig, validateBool, validateChannelList,
+} from '../channels/config.js';
+import { QUESTION_IDS, onboardingQuestion, answeredIds,
+         pendingQuestions, resolveQuestion, resetOnboarding }                 from '../channels/onboarding.js';
+import type { Question }                                                      from '../channels/onboarding.js';
 import { rejectDwellingWrite, dwellingChangeNotice }                          from '../dwelling/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
@@ -274,11 +280,22 @@ export function adoptAnchorTarget(
  * @param args          the validated tool arguments
  * @param client        what the MCP handshake reported about the host, if anything
  *
- * An `outcome` is additionally checked against the store (the half of forecast
- * validation `entries.validate` cannot do alone, #42): its `correctsId` must name an
- * existing row whose confidence is `'predicted'`, or the rejection names the target's
- * actual ground. Anchors get the same treatment (#18): the referent check that needs
- * the store runs here, and a `prompt` anchor with no target adopts the observed turn.
+ * Three checks live here rather than in the schema, because none is expressible in a
+ * shape built once at registration:
+ *
+ * - **Text length** is per-channel and user-configurable (issue #76), so the static
+ *   zod bound can only be {@link MAX_TEXT_CEILING} — the largest value any key may be
+ *   set to. The configured limit is checked here, and the rejection names the channel,
+ *   its limit, the length received, and the key that changes it. The check governs
+ *   writes only: rows already stored longer than a later-lowered limit are untouched
+ *   and stay fully readable (see {@link channelMaxChars}).
+ * - An **`outcome`** is checked against the store (the half of forecast validation
+ *   `entries.validate` cannot do alone, #42): its `correctsId` must name an existing
+ *   row whose confidence is `'predicted'`, or the rejection names the target's actual
+ *   ground.
+ * - An **anchor's referent** gets the same treatment (#18): the existence check that
+ *   needs the store runs here, and a `prompt` anchor with no target adopts the turn the
+ *   hook observed.
  *
  * @example
  *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
@@ -289,6 +306,8 @@ export function adoptAnchorTarget(
  *                                   anchorKind: 'prompt', anchorQuote: 'ship it when ready' })
  *   // => recorded, anchored to the prompt_id the hook observed for this turn
  *
+ * @throws {Error} If the text is longer than the channel's configured limit, naming the
+ *                 channel, the limit, and the length received.
  * @throws {Error} If entry validation fails — a closed field outside its vocabulary,
  *                 a cross-field forecast or anchor violation, an outcome whose target
  *                 is not a `predicted` row, or an anchor whose target does not exist —
@@ -297,6 +316,7 @@ export function adoptAnchorTarget(
  * @see ../channels/entries.js recordEntry
  * @see anchorTargetProblem
  * @see adoptAnchorTarget
+ * @see ../channels/config.js channelMaxChars
  */
 export function handleExpress(
   store         : Store,
@@ -304,6 +324,19 @@ export function handleExpress(
   args          : ExpressArgs,
   client?       : ClientIdentity,
 ): ToolReply {
+
+  // The per-channel length check (issue #76). It lives here rather than in the schema
+  // because the schema is built once at registration and cannot read config; the schema
+  // carries only MAX_TEXT_CEILING, the largest value any key may be set to. Rejection —
+  // not truncation, not a warning — because every other vocabulary in this plugin
+  // rejects, and a silently shortened line is a lie about what was said.
+  const limit = channelMaxChars(store, args.channel);
+  if (args.text.length > limit) {
+    throw new Error(
+      `cannot record entry:\n  - text is ${String(args.text.length)} characters; the ` +
+      `'${args.channel}' channel allows at most ${String(limit)} ` +
+      `(configure set ${channelMaxCharsKey(args.channel)} <n> to change it)`);
+  }
 
   if (args.outcome !== undefined && args.correctsId !== undefined) {
     const target = store.db.prepare('SELECT confidence FROM entries WHERE id = ?').get(args.correctsId);
@@ -399,10 +432,11 @@ export interface AnnotateArgs {
  * hook-context adoption, same referent checks, same write-time privacy gates, one row
  * apiece — with two additions.
  *
- * **All-or-nothing.** Every note is validated before any is written, and the writes run
- * inside one transaction, so an invalid note rejects the whole batch naming its index
- * and its problem. A half-recorded review is worse than a rejected one: the reader
- * cannot tell which half is missing.
+ * **All-or-nothing.** Every note is validated before any is written — including against
+ * its channel's own configured length budget (#76), so the batch is not a hole around a
+ * limit `express` enforces — and the writes run inside one transaction, so an invalid
+ * note rejects the whole batch naming its index and its problem. A half-recorded review
+ * is worse than a rejected one: the reader cannot tell which half is missing.
  *
  * **The reply carries the block.** The recorded ids come back with
  * {@link renderAnnotations}' output, so the model pastes the canonical rendering
@@ -487,7 +521,16 @@ export function handleAnnotate(
   const problems: string[] = [];
   for (const [index, input] of inputs.entries()) {
     const found  = validate(input),
-          target = anchorTargetProblem(store, input.anchorKind, input.anchorTarget);
+          target = anchorTargetProblem(store, input.anchorKind, input.anchorTarget),
+          limit  = channelMaxChars(store, input.channel);
+    if (input.text.length > limit) {
+      // The same per-channel budget `express` enforces (#76). A batch must not be a hole
+      // around it: one tool writing rows another tool's limit would have refused is the
+      // kind of drift both layers exist to prevent.
+      found.push(
+        `text is ${String(input.text.length)} characters; the '${input.channel}' channel ` +
+        `allows at most ${String(limit)} (configure set ${channelMaxCharsKey(input.channel)} <n> to change it)`);
+    }
     if (input.anchorKind === undefined) { found.push('every annotate note requires an anchorKind — use express for a floating note'); }
     if (target !== null) { found.push(target); }
     for (const problem of found) { problems.push(`note ${String(index)}: ${problem}`); }
@@ -649,6 +692,240 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
 }
 
 /**
+ * What a caller supplies to `onboard`, after schema validation.
+ *
+ * Hand-written for the same `isolatedDeclarations` reason as {@link ConfigureArgs};
+ * the registration call site keeps it honest against the zod shape.
+ */
+export interface OnboardArgs {
+  readonly op     : 'status' | 'answer' | 'skip' | 'reset';
+  readonly id?    : string | undefined;
+  readonly value? : string | undefined;
+  readonly path?  : string | undefined;
+}
+
+/** The `status` op's report of one still-pending question. */
+interface PendingReport {
+  readonly id      : string;
+  readonly prompt  : string;
+  readonly kind    : string;
+  readonly default : string;
+  readonly keys    : readonly string[];
+}
+
+/** Shapes one question for the `status` op's JSON report. */
+function pendingReport(question: Question): PendingReport {
+  return { id: question.id, prompt: question.prompt, kind: question.kind,
+           default: question.defaultAnswer, keys: question.keys };
+}
+
+/** The `N question(s) still pending` tail every mutating onboard reply carries. */
+function pendingTail(store: Store): string {
+  const remaining = pendingQuestions(store).length;
+  return remaining === 0
+    ? ' Onboarding is complete.'
+    : ` ${String(remaining)} question${remaining === 1 ? '' : 's'} still pending.`;
+}
+
+/**
+ * Answers the taste question by editing the channel's membership in
+ * `channels.enabled` — taste is a channel, not a flag, so there is no
+ * `taste.enabled` row to write (#42, #30).
+ *
+ * Enabling when no override exists writes nothing: the default already offers the
+ * channel, and pinning the entire channel list to record one membership would
+ * silently freeze every *other* channel against future default changes — the exact
+ * bug #30's defaults-live-in-code rule exists to prevent. Disabling always writes
+ * the trimmed list, and both directions note the startup baking caveat when a row
+ * changes.
+ *
+ * @returns the reply text, or an error line when the trim would empty the set
+ */
+function answerChannelMembership(store: Store, channel: Channel, enable: boolean): string {
+
+  const stored  = readConfig(store, ENABLED_KEY),
+        current = enabledChannels(store),
+        caveat  = ' Takes full effect next server start; the channel enum is baked into the tool schema at startup.';
+
+  if (enable) {
+    if (current.includes(channel)) {
+      return stored === null
+        ? `'${channel}' is already offered by default; no config row written, so a later default change still reaches you.`
+        : `'${channel}' is already in the enabled set; nothing to write.`;
+    }
+    const grown = CHANNELS.filter(c => current.includes(c) || c === channel);
+    writeConfig(store, ENABLED_KEY, grown.join(','));
+    return `${ENABLED_KEY} = ${grown.join(',')} — '${channel}' restored.${caveat}`;
+  }
+
+  if (!current.includes(channel)) {
+    return `'${channel}' is already absent from the enabled set; nothing to write.`;
+  }
+
+  const trimmed = current.filter(c => c !== channel);
+
+  if (trimmed.length === 0) {
+    return `error: disabling '${channel}' would leave no channels enabled; nothing was written`;
+  }
+
+  writeConfig(store, ENABLED_KEY, trimmed.join(','));
+  return `${ENABLED_KEY} = ${trimmed.join(',')} — '${channel}' trimmed.${caveat}`;
+
+}
+
+/**
+ * Answers the dwelling question: a path-gated boolean, where enabling **must**
+ * carry a user-chosen directory — there is deliberately no default path (#45).
+ *
+ * The path rides the same validation the `configure` tool applies
+ * ({@link rejectDwellingWrite}): an absolute path to an existing directory, refused
+ * otherwise, so onboarding cannot record a config state `configure` itself would
+ * have rejected. A refusal writes nothing and leaves the question pending.
+ *
+ * @returns the reply text; `error:`-prefixed lines mean nothing was written
+ */
+function answerDwelling(store: Store, enable: boolean, path: string | undefined): string {
+
+  if (!enable) {
+    writeConfig(store, 'dwelling.enabled', 'false');
+    return "dwelling.enabled = false — an explicit no, recorded so a later default flip cannot un-choose it." +
+           (path === undefined ? '' : ' The path argument was ignored; nothing enables.');
+  }
+
+  if (path === undefined) {
+    return 'error: enabling the dwelling requires a path argument — a directory of the ' +
+           "user's choosing; there is deliberately no default location. Ask the user " +
+           'for a directory (drive and disk space are their call), then answer again ' +
+           'with it. nothing was written';
+  }
+
+  const def = configKey('dwelling.path');
+  if (def === undefined) { return 'error: dwelling.path is not registered; nothing was written'; }
+
+  const outcome = def.validate(path);
+  if (!outcome.ok) { return `error: '${path}' is not ${outcome.expected}. nothing was written`; }
+
+  const rejected = rejectDwellingWrite(store, 'dwelling.path', outcome.canonical);
+  if (rejected !== null) { return `${rejected}. nothing was written`; }
+
+  writeConfig(store, 'dwelling.path', outcome.canonical);
+  writeConfig(store, 'dwelling.enabled', 'true');
+
+  return `dwelling.path = ${outcome.canonical}; dwelling.enabled = true — ` +
+         (dwellingChangeNotice('dwelling.enabled') ?? '');
+
+}
+
+/**
+ * Handles `onboard`: the first-run questionnaire over the config table (issue #40).
+ *
+ * Four ops:
+ *
+ * - `status` — read-only: the pending questions, the ledger, and whether the
+ *   questionnaire is complete. A session that only ever calls `status` writes
+ *   nothing, so the offer recurs next session — that is the implicit "defer".
+ * - `answer` — one question per call: validates the value against the question's
+ *   kind, writes the config key(s) through the same `writeConfig` path `configure`
+ *   uses, and marks the id resolved. An explicit answer writes its row even when it
+ *   equals the current default — the user chose the value, and a later default flip
+ *   must not silently un-choose it. A dwelling enable without `path` is refused.
+ * - `skip` — marks every currently-pending question resolved and writes no config
+ *   rows, so code defaults apply — including future changed defaults. This is the
+ *   "defaults are fine" fast path.
+ * - `reset` — clears the ledger only; config values are untouched, and hand-set
+ *   keys still count as answered, so only never-configured questions re-ask.
+ *
+ * @example
+ *   handleOnboard(store, { op: 'answer', id: 'roster', value: 'true' })
+ *   // => { content: [{ type: 'text', text: 'roster.enabled = true …' }] }
+ *
+ * @see ../channels/onboarding.js
+ * @see handleConfigure
+ */
+export function handleOnboard(store: Store, args: OnboardArgs): ToolReply {
+
+  if (args.op === 'status') {
+    const pending = pendingQuestions(store);
+    return reply(JSON.stringify({
+      pending  : pending.map(pendingReport),
+      answered : answeredIds(store),
+      complete : pending.length === 0,
+    }, null, 2));
+  }
+
+  if (args.op === 'reset') {
+    const cleared = resetOnboarding(store);
+    return reply((cleared
+      ? 'onboarding ledger cleared — the questionnaire is pending again. '
+      : 'the ledger was already empty. ')
+      + 'Config values are untouched, and hand-configured keys still count as '
+      + 'answered; a truly blank slate means clearing those keys through configure.'
+      + pendingTail(store));
+  }
+
+  if (args.op === 'skip') {
+    const pending = pendingQuestions(store);
+    if (pending.length === 0) { return reply('nothing pending; onboarding is already complete.'); }
+    for (const question of pending) { resolveQuestion(store, question.id); }
+    return reply(
+      `marked ${String(pending.length)} pending question${pending.length === 1 ? '' : 's'} resolved; ` +
+      'no config rows were written, so code defaults apply — including future changed ' +
+      "defaults. Change any single choice later with configure, or re-run onboarding " +
+      "with onboard {op:'reset'}.");
+  }
+
+  if (args.id === undefined)    { return reply("error: 'id' is required for answer"); }
+  if (args.value === undefined) { return reply("error: 'value' is required for answer"); }
+
+  const question = onboardingQuestion(args.id);
+  if (question === undefined) {
+    return reply(`error: '${args.id}' is not a question this version knows; ` +
+                 `valid ids: ${QUESTION_IDS.join(', ')}`);
+  }
+
+  if (question.kind === 'channel-list') {
+    const outcome = validateChannelList(args.value);
+    if (!outcome.ok) { return reply(`error: ${outcome.expected}. nothing was written`); }
+    writeConfig(store, ENABLED_KEY, outcome.canonical);
+    resolveQuestion(store, question.id);
+    return reply(`${ENABLED_KEY} = ${outcome.canonical} — takes full effect next server ` +
+                 'start; the channel enum is baked into the tool schema at startup.' +
+                 pendingTail(store));
+  }
+
+  const bool = validateBool(args.value);
+  if (!bool.ok) { return reply(`error: '${args.value}' is not ${bool.expected}. nothing was written`); }
+  const enable = bool.canonical === 'true';
+
+  if (question.kind === 'path-gated boolean') {
+    const text = answerDwelling(store, enable, args.path);
+    if (text.startsWith('error:')) { return reply(text); }
+    resolveQuestion(store, question.id);
+    return reply(text + pendingTail(store));
+  }
+
+  if (question.channel !== undefined) {
+    const text = answerChannelMembership(store, question.channel, enable);
+    if (text.startsWith('error:')) { return reply(text); }
+    resolveQuestion(store, question.id);
+    return reply(text + pendingTail(store));
+  }
+
+  const [key] = question.keys;
+  if (key === undefined) { return reply(`error: question '${question.id}' names no config key`); }
+
+  writeConfig(store, key, bool.canonical);
+  resolveQuestion(store, question.id);
+
+  const pinned = bool.canonical === question.defaultAnswer
+    ? ' — matches the current default, and written anyway: an explicit choice holds even if a later release flips the default'
+    : '';
+
+  return reply(`${key} = ${bool.canonical}${pinned}.${pendingTail(store)}`);
+
+}
+
+/**
  * Register every tool on `server`.
  *
  * `pluginVersion` is stamped onto each row so a future reader can tell which release
@@ -681,7 +958,10 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'valid signature — the requirement is to look, not to produce.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
-      text           : z.string().min(1).max(280).describe('the content; terse, honest over flattering'),
+      text           : z.string().min(1).max(MAX_TEXT_CEILING).describe(
+        'the content; terse, honest over flattering. The real limit is per-channel and ' +
+        'user-configurable (channels.<name>.max_chars, default 200) and is checked when ' +
+        'the entry is recorded; this schema bound is only the hard ceiling no limit may exceed'),
       session        : z.string().optional().describe(
         'usually omit — the hook supplies it, and an observed session beats a claimed one'),
       promptId       : z.string().optional().describe('turn identifier; groups a turn'),
@@ -767,7 +1047,9 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     inputSchema : {
       notes   : z.array(z.object({
         channel      : z.enum(tuple(channels)).describe('which kind of expression this note is'),
-        text         : z.string().min(1).max(280).describe('the note; terse, one thought'),
+        text         : z.string().min(1).max(MAX_TEXT_CEILING).describe(
+          "the note; terse, one thought. The channel's own configured limit is checked at " +
+          'write, exactly as in express — this bound is only the ceiling any of them may reach'),
         face         : z.string().optional().describe('the feeling face this note ends with'),
         anchorKind   : z.enum(tuple(ANCHOR_KINDS)).describe(
           'required here — a note with no anchor belongs in express, not in a batch of annotations'),
@@ -830,5 +1112,33 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       value : z.string().optional().describe('required for set'),
     },
   }, (args) => handleConfigure(store, args));
+
+  server.registerTool('onboard', {
+    title       : 'Onboard',
+    description :
+      'The first-run preference questionnaire, shared across hosts through the ' +
+      'database. Etiquette is normative: onboarding is an offer, never a gate. Never ' +
+      "hijack the first turn — do the user's actual task first, and offer at the " +
+      'first natural pause, once per session at most. One short offer naming the ' +
+      "count and the fast path; \"defaults\" means op skip, which writes nothing and " +
+      'is done forever. If the user talks past the offer, drop it for the session — ' +
+      'a status-only session writes nothing and the offer recurs next session. ' +
+      'status lists what is pending; answer records one question (a dwelling enable ' +
+      'requires a user-chosen path — ask for the directory, never guess one); skip ' +
+      'resolves everything pending with code defaults; reset re-runs the ' +
+      'questionnaire without touching config values.',
+    inputSchema : {
+      op    : z.enum(['status', 'answer', 'skip', 'reset']).describe(
+        'status lists pending questions read-only; answer records one; skip accepts ' +
+        'the defaults for everything pending; reset makes the questionnaire pending again'),
+      id    : z.enum(tuple([...QUESTION_IDS])).optional().describe('required for answer: which question'),
+      value : z.string().optional().describe(
+        "required for answer: 'true'/'false' for the yes/no questions, or the " +
+        'comma-separated channel list for the channels question'),
+      path  : z.string().optional().describe(
+        'dwelling only: the user-chosen directory, required when enabling — there is ' +
+        'deliberately no default location'),
+    },
+  }, (args) => handleOnboard(store, args));
 
 }

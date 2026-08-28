@@ -22,36 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 12:36:16 PM
-
-Commit [d7424964c5cacd9802105c89f3fe50ee893d366b](https://github.com/StoneCypher/self-expression/commit/d7424964c5cacd9802105c89f3fe50ee893d366b)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: anchoring tests — resolver, renderer, migration, tools, stochastic
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:34:38 PM
-
-Commit [feef2ea14fed5ec07a5b8102a88461779f2c3826](https://github.com/StoneCypher/self-expression/commit/feef2ea14fed5ec07a5b8102a88461779f2c3826)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: rebuild generated artifacts after merging origin/main (#40 onboarding)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 28, 2026 12:31:46 PM
 
 Commit [e0d80d2ae17cf50e42ae6f47c02b04e1f3f1af8a](https://github.com/StoneCypher/self-expression/commit/e0d80d2ae17cf50e42ae6f47c02b04e1f3f1af8a)
@@ -292,3 +262,49 @@ Merges [6d38073, 8964990]
   * Source conflict was the CONFIG_KEYS pin test: unioned so it lists the eleven
 audio.* keys and onboarding.answered. Generated artifacts (CHANGELOG*, README.md,
 coverage-stoch/) took main's side; the rebuild regenerates them.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:11:21 PM
+
+Commit [6d38073c8391fc7d1052a68514bcaa81710c1b92](https://github.com/StoneCypher/self-expression/commit/6d38073c8391fc7d1052a68514bcaa81710c1b92)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: first-run onboarding — question registry, ledger, and the onboard tool
+  * Records the design in the plugin-layout doc and closes out the #40 work: the
+questionnaire is a code-resident registry with a per-question ledger
+(onboarding.answered), deliberately no completion boolean, surfaced through the
+MCP handshake instructions string rather than a hook so it reaches every host.
+  * Also unions the CONFIG_KEYS pin test with the new onboarding.answered key and
+drops an unnecessary template expression in the dwelling-enable reply.
+  * Closes #40
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:11:21 PM
+
+Commit [d90c4a0a1ab2e79c1360bd8fade6b4027e3b5575](https://github.com/StoneCypher/self-expression/commit/d90c4a0a1ab2e79c1360bd8fade6b4027e3b5575)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * @
+feat: first-run onboarding — question registry, ledger, and the onboard tool
+  * Records the design in the plugin-layout doc and closes out the #40 work: the
+questionnaire is a code-resident registry with a per-question ledger
+(onboarding.answered), deliberately no completion boolean, surfaced through the
+MCP handshake instructions string rather than a hook so it reaches every host.
+  * Also unions the CONFIG_KEYS pin test with the new onboarding.answered key and
+drops an unnecessary template expression in the dwelling-enable reply.
+  * Closes #40
+@

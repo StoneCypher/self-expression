@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787946612723` from hash `d742496`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787945642256` from hash `e0d80d2`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787946612723 Friday, August 28, 2026 at GMT-07:00 94.39 313 90 d742496 49.9 63.51 62.7 62.85 137 1583 88.41 91.78 94.73 1446 0.2.1 -->
+<!-- Supported embeds: 1787945642256 Friday, August 28, 2026 at GMT-07:00 94.19 291 91 e0d80d2 51.37 64.37 63.52 63.7 131 1492 87.82 91.5 94.59 1361 0.2.1 -->
 
 
 
@@ -36,64 +36,10 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 4) and
+Schema versioning is stored in the database (`schema_version`, currently 3) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
-
-&nbsp;
-
-&nbsp;
-
-## Anchoring — commentary bound to a location
-
-A note can be **attached** to the thing it is about instead of mentioning it in
-prose. Anchoring is a qualifier, not a channel: an anchored dissent is still a
-dissent, still one row, still on its own channel. Five kinds are addressable:
-
-| Kind | Target | Span grammar | How it ages |
-|---|---|---|---|
-| `file` | repo-relative path | `L40` or `L40-52` | **drifts** — lines move, content is edited, files vanish |
-| `prompt` | a message from your partner, by hook-observed `prompt_id` | `#2`, an occurrence ordinal | immutable; only *access* degrades |
-| `reply` | the model's own earlier output | `#2` | immutable, but self-reported — no hook sees responses |
-| `checklist` | a series by its stable `seriesKey` | `@3`, a history point | item labels rename; the series persists |
-| `entry` | an entry id | *(none — the id is exact)* | permanent |
-
-Four optional `express` arguments carry it — `anchorKind`, `anchorTarget`,
-`anchorSpan`, `anchorQuote` — plus a derived `anchorHash`, sixteen hex characters
-of SHA-256 over the normalized quote. The hash is **never accepted from a
-caller**: a supplied hash could disagree with its own quote, and the whole value
-of the field is that it is a function of the content. On a `prompt` anchor,
-omitting `anchorTarget` adopts the message being answered, so annotating the turn
-you are replying to needs only the quote.
-
-The **`annotate`** tool is the batch: 1–25 notes in one call, one row each, all
-validated before any is written and all written in one transaction. A single bad
-note rejects the batch naming its index — a half-recorded review is worse than a
-rejected one. The reply hands back the recorded ids plus the canonical rendered
-block, so the model pastes the rendering instead of imitating it:
-
-```text
-⚓ src/ts/channels/store.ts
-   L141  `readConfig(store, key)`  » null for unset and for empty 😕
-   L162  `writeConfig`             » local timestamp never updated 🤨
-
-⚓ your message
-   `ship it when ready`     » "ready" reads three ways; assuming tests-green 🤔
-   `the old config format`  » two old formats exist; assuming v1 😬
-```
-
-Resolution is **computed at read time and never stored** — it is a fact about the
-target's present state, not about the entry. The ladder is `fresh` (the content
-still fingerprints at its recorded span) → `moved` (gone from the span, found
-**exactly once** elsewhere, rendered `L141→L158 (moved)`) → `orphaned` (gone, or
-ambiguous, or the file is gone). There is deliberately **no fuzzy matching**: a
-note confidently pinned to the wrong line is the worst failure this system can
-have, so two identical candidates degrade to `orphaned` rather than guessing. An
-orphaned annotation loses its address, never its content — which is exactly what
-floating prose already gets right, so orphaning degrades *to* today's behavior and
-never below it. Message anchors never move; their ladder is `fresh` versus
-`distant`.
 
 &nbsp;
 
@@ -125,12 +71,12 @@ The registered keys:
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
+| `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
 | `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
-| `privacy.store_quotes` | bool | `true` | Record the verbatim `anchorQuote` of a **`prompt`** anchor — your own words, the most sensitive field the schema holds. Suppressed at write time when exactly `false`, and `anchorHash` still records: a one-way digest keeps drift detection and grouping working without keeping the language. `file`, `reply`, `checklist`, and `entry` quotes are the repo's or the model's own text and record regardless. |
 | `format.version` | string | `1` | Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral. |
 | `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording, the conventions flags, and the open-signature reminder remain. |
 | `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
@@ -146,12 +92,46 @@ The registered keys:
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
+| `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
+
+Two of those families reach the *skills*, which are static Markdown and cannot read
+configuration at all. The turn-start hook carries them on the context line it already
+injects: a `conventions:` segment for the prose toggles, and a `lengths:` segment for
+the per-channel text ceilings — rendered against whichever limit the most channels
+share, so `lengths: 200 all` is the usual cost and `lengths: 200 except signature:70`
+names only genuine deviations. The skill states its *recommended* length (≤70, because
+a signature that has to be read has stopped being a glance) as a constant, and takes
+its *ceiling* from that segment; a raised ceiling is headroom for the occasional line
+that earns it, never an invitation to fill it.
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
 an ambiguous value records rather than silently suppressing. `share.enabled` inverts
 that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Onboarding
+
+Several features are durably toggleable and default off precisely because they are
+matters of taste, size, or consent. On a fresh database the server's MCP handshake
+says onboarding is pending, and the assistant offers a short questionnaire — at a
+natural pause, never interrupting the work: the party roster, forecasts, visible
+revision, the ⭑ salience glyph, the taste line, the gift register, the dwelling (which
+requires a directory of your choosing — there is deliberately no default path), and
+trimming the channel set.
+
+Saying **"defaults"** ends it in one word and writes nothing, so later releases'
+changed defaults still reach you; every explicitly answered question writes a real
+config row, so a later default flip cannot silently un-choose it. Answers persist in
+the shared database — answer once under one host and no other host re-asks. A key you
+have already set by hand counts as answered. Say **"re-run onboarding"**
+(`onboard {op:'reset'}`) to be asked again; config values are untouched. Progress
+lives in the single `onboarding.answered` ledger key — there is deliberately no
+completion boolean, so a new question in a later release re-asks only itself.
 
 &nbsp;
 
@@ -179,19 +159,14 @@ build if a future schema column is ever left unclassified. The treatments:
 - **Coarsened** — timestamps truncated to the hour (or day); lengths and token counts
   as log2 buckets; small counters capped at `33+`; host version to its major.
 - **Hashed** — `session`, `prompt_id`, `machine_id`, `agent_id`, `uuid`, `series_key`,
-  correction edges, and `anchor_hash`, under a fresh per-submission salt that is never
-  persisted: grouping works within one submission, nothing joins across submissions.
-  `anchor_hash` is re-blinded despite already being a digest, because an *unsalted*
-  content hash is a global join key — two people quoting the same public line would
-  link across submissions.
+  and correction edges, under a fresh per-submission salt that is never persisted:
+  grouping works within one submission, nothing joins across submissions.
 - **Derived** — `local_period` (six-hour band) and `local_dow` (weekday/weekend)
   replace any timezone export; `cctype` and `face` export only when they validate
   against a closed list or as exactly one emoji grapheme, else `NULL`.
 - **Excluded** — `text`, `title`, `cwd`, `project`, `git_branch`, `tz`, `agent_type`,
-  `context_emoji`, `permission_mode`, `turn_index`, `resolve_by`, `anchor_quote`,
-  `anchor_target`, `anchor_span`, and every raw identifier. `anchor_kind` is the one
-  anchor column that exports verbatim: "what fraction of dissents are anchored, and
-  onto what kinds" needs no words to answer.
+  `context_emoji`, `permission_mode`, `turn_index`, `resolve_by`, and every raw
+  identifier.
 
 Opting in is an **event, never retroactive**: setting `share.enabled` to `true`
 records the moment, and only rows recorded at or after the most recent opt-in are
@@ -230,13 +205,6 @@ stability). Profiles are data (`src/ts/charts/profiles.ts`), the renderer is
 (the lead line's argmax — the one digest element keeping a single unit's identity),
 `overallBucket`, and `nestDigest` (nesting by digest substitution: a child artifact
 counts as one unit in its parent, bucketed by its overall state) are exported with it.
-
-Alongside them, `renderAnnotations` and `renderAnchorSegment`
-(`src/ts/charts/annotations.ts`) render anchored commentary — the grouped block the
-`annotate` tool returns, and the `⚓ … »` segment that splices into a channel line.
-Same contract as every other renderer: data in, exact string out, `RangeError` naming
-the accepted domain. Resolution verdicts are passed *in* rather than computed, so the
-renderers stay pure while `channels/anchors.ts` does the looking.
 
 Every renderer behind these tools is also exported directly from the library
 (`self-expression`'s `src/ts/charts/index.ts`), for use outside MCP.
@@ -482,19 +450,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1446</td>
-    <td>94.39<small>%</small></td>
-    <td>88.41<small>%</small></td>
-    <td>91.78<small>%</small></td>
-    <td>94.73<small>%</small></td>
+    <td>1361</td>
+    <td>94.19<small>%</small></td>
+    <td>87.82<small>%</small></td>
+    <td>91.5<small>%</small></td>
+    <td>94.59<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>137</td>
-    <td>94.39<small>%</small></td>
-    <td>49.9<small>%</small></td>
-    <td>62.7<small>%</small></td>
-    <td>62.85<small>%</small></td>
+    <td>131</td>
+    <td>94.19<small>%</small></td>
+    <td>51.37<small>%</small></td>
+    <td>63.52<small>%</small></td>
+    <td>63.7<small>%</small></td>
   </tr>
 </table>
 
@@ -502,12 +470,12 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>90<small>%</small></th>
+    <th>91<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>313</td>
-    <td>90<small>%</small></td>
+    <td>291</td>
+    <td>91<small>%</small></td>
   </tr>
 </table>
 

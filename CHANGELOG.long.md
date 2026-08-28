@@ -22,36 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 12:36:16 PM
-
-Commit [d7424964c5cacd9802105c89f3fe50ee893d366b](https://github.com/StoneCypher/self-expression/commit/d7424964c5cacd9802105c89f3fe50ee893d366b)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: anchoring tests — resolver, renderer, migration, tools, stochastic
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:34:38 PM
-
-Commit [feef2ea14fed5ec07a5b8102a88461779f2c3826](https://github.com/StoneCypher/self-expression/commit/feef2ea14fed5ec07a5b8102a88461779f2c3826)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: rebuild generated artifacts after merging origin/main (#40 onboarding)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 28, 2026 12:31:46 PM
 
 Commit [e0d80d2ae17cf50e42ae6f47c02b04e1f3f1af8a](https://github.com/StoneCypher/self-expression/commit/e0d80d2ae17cf50e42ae6f47c02b04e1f3f1af8a)

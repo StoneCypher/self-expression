@@ -153,6 +153,19 @@ tracking the code default, and `list` reports the effective configuration rather
 the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
 server startup — it never archives, and never touches `meta` or `config`.
 
+**Text length is per-channel and configurable (issue #76).** One
+`channels.<name>.max_chars` key per channel, generated from `CHANNELS` so a new channel
+arrives with its limit already registered, each defaulting to 200. The `express` zod
+schema is built once at registration and cannot read config, so it carries only the hard
+ceiling (2000, the same cap `post_message` uses); the configured per-channel check runs
+in `handleExpress` beside the forecast check, and its rejection names the channel, the
+limit, the length received, and the key that changes it. The skill cannot read config
+either, so the turn-start hook carries the ceilings on the context line as a `lengths:`
+segment beside #42's `conventions:` flags — the same transport, not a second one. Limits
+govern **writes only**: an entry already stored longer than a later-lowered limit is
+never truncated, hidden from a read, excluded from an export, or pruned; deletion
+belongs to `retention.days` and to age alone.
+
 **The messagebox is a facility, not a channel (issue #41).** Audience-tagged messages
 (`self` / `agents` / `user` / `record`) live in two tables beside the expression log —
 `messages` plus an append-only `message_reads` receipt table — and never appear in the
@@ -199,6 +212,27 @@ been seen this session, and the whole surface is off by default behind an event-
 never-retroactive opt-in (`share.enabled` / `share.opted_in_utc`). Free text never
 exports; the honest claim is *no free text, reduced linkage, coarsened time* — nothing
 stronger.
+
+**Onboarding is a per-question ledger, not a completion flag (issue #40).** The
+questionnaire lives in code (`src/ts/channels/onboarding.ts`), for the same reason the
+config registry does: static markdown cannot track registry growth or answered state.
+What it records is a single `onboarding.answered` key holding the question ids resolved
+so far — answered or explicitly skipped — in the same list-in-a-string idiom as
+`channels.enabled`, unknown ids preserved so a newer version's entries survive a write by
+an older one. There is deliberately no "onboarding is done" boolean: the questionnaire
+demonstrably grows, and under a boolean every added question either re-runs the whole
+interview or reaches nobody who already onboarded, while under the ledger an upgrade
+shipping a new question produces exactly one pending item. An explicit `config` row on any
+key a question writes counts as answered too, so a user who already set `roster.enabled`
+by hand is never asked about it; first run is a property of the shared database rather
+than the host, machine, or session, so answering under one host is not re-asked under
+another. Pending questions surface through the MCP server's `instructions` string,
+delivered by the initialize handshake — hooks are deliberately excluded from that
+detection path, because they are the least portable layer and onboarding must reach
+exactly the hosts that host-native prompting misses. The `onboard` tool is registered
+unconditionally so permission caches never see it flicker, and the etiquette is
+offer-not-gate: one offer at a natural pause, never blocking work, an ignored offer simply
+recurring next session.
 
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ

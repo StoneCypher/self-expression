@@ -68,10 +68,12 @@ omitting `anchorTarget` adopts the message being answered, so annotating the tur
 you are replying to needs only the quote.
 
 The **`annotate`** tool is the batch: 1–25 notes in one call, one row each, all
-validated before any is written and all written in one transaction. A single bad
-note rejects the batch naming its index — a half-recorded review is worse than a
-rejected one. The reply hands back the recorded ids plus the canonical rendered
-block, so the model pastes the rendering instead of imitating it:
+validated before any is written — including against each channel's own
+`max_chars` budget, so the batch is no hole around a limit `express` enforces —
+and all written in one transaction. A single bad note rejects the batch naming
+its index; a half-recorded review is worse than a rejected one. The reply hands
+back the recorded ids plus the canonical rendered block, so the model pastes the
+rendering instead of imitating it:
 
 ```text
 ⚓ src/ts/channels/store.ts
@@ -125,6 +127,7 @@ The registered keys:
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
+| `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
 | `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
@@ -146,12 +149,46 @@ The registered keys:
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
+| `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
+
+Two of those families reach the *skills*, which are static Markdown and cannot read
+configuration at all. The turn-start hook carries them on the context line it already
+injects: a `conventions:` segment for the prose toggles, and a `lengths:` segment for
+the per-channel text ceilings — rendered against whichever limit the most channels
+share, so `lengths: 200 all` is the usual cost and `lengths: 200 except signature:70`
+names only genuine deviations. The skill states its *recommended* length (≤70, because
+a signature that has to be read has stopped being a glance) as a constant, and takes
+its *ceiling* from that segment; a raised ceiling is headroom for the occasional line
+that earns it, never an invitation to fill it.
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
 an ambiguous value records rather than silently suppressing. `share.enabled` inverts
 that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Onboarding
+
+Several features are durably toggleable and default off precisely because they are
+matters of taste, size, or consent. On a fresh database the server's MCP handshake
+says onboarding is pending, and the assistant offers a short questionnaire — at a
+natural pause, never interrupting the work: the party roster, forecasts, visible
+revision, the ⭑ salience glyph, the taste line, the gift register, the dwelling (which
+requires a directory of your choosing — there is deliberately no default path), and
+trimming the channel set.
+
+Saying **"defaults"** ends it in one word and writes nothing, so later releases'
+changed defaults still reach you; every explicitly answered question writes a real
+config row, so a later default flip cannot silently un-choose it. Answers persist in
+the shared database — answer once under one host and no other host re-asks. A key you
+have already set by hand counts as answered. Say **"re-run onboarding"**
+(`onboard {op:'reset'}`) to be asked again; config values are untouched. Progress
+lives in the single `onboarding.answered` ledger key — there is deliberately no
+completion boolean, so a new question in a later release re-asks only itself.
 
 &nbsp;
 
