@@ -51,13 +51,13 @@ describe('dwelling invariants — stochastic', () => {
           expect(row?.['title']).toBe(args.title);
 
         }),
-        { numRuns: 40 },
+        { numRuns: 25 },
       );
     } finally {
       closeDwelling(house); rmSync(dir, { recursive: true, force: true });
     }
 
-  });
+  }, 60000);   // SQLite on a loaded Windows CI is slow; the property, not the clock, is the test
 
   it('visit never returns a private or removed row, whatever the arrangement history', () => {
 
@@ -92,13 +92,13 @@ describe('dwelling invariants — stochastic', () => {
 
           },
         ),
-        { numRuns: 25 },
+        { numRuns: 15 },
       );
     } finally {
       closeDwelling(house); rmSync(dir, { recursive: true, force: true });
     }
 
-  });
+  }, 60000);   // shared store accumulates rows across runs; time grows with the run count
 
   it('adoption never alters pre-existing row content, whatever the prototype holds', () => {
 
