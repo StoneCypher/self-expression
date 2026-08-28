@@ -33,6 +33,7 @@ import { verifyChecklist, parseSummaryCounts } from '../charts/verify.js';
 import { recordEntry, recentChecklists, seriesPercents } from '../channels/entries.js';
 import { latestContext } from '../channels/context.js';
 import { privacyFlags }  from '../channels/privacy.js';
+import { FORMAT_VERSION, effectiveValue } from '../channels/config.js';
 import { stamp }         from '../channels/time.js';
 import type { Store }     from '../channels/store.js';
 import type { ToolReply } from './chart_tools.js';
@@ -118,7 +119,9 @@ expectType<Equal<LogChecklistArgs, z.infer<z.ZodObject<typeof LOG_CHECKLIST_SHAP
  *
  * Context the hook observed (session, turn, effort, cwd, and the rest) is adopted for
  * anything the caller did not supply, mirroring the `express` tool — including the
- * second privacy gate on the path-carrying fields.
+ * second privacy gate on the path-carrying fields, and the declarative
+ * `format.version` stamp (issue #30, D7): a checklist row is an entry row, and the
+ * convention label must never be NULL on any writer's rows.
  *
  * @param store         the open store to record into
  * @param pluginVersion stamped onto the row, as on every entry
@@ -188,6 +191,7 @@ export function handleLogChecklist(
     compactions    : num('compactions'),
     host           : client?.name,
     hostVersion    : client?.version,
+    formatVersion  : effectiveValue(store, 'format.version') ?? FORMAT_VERSION,
   }, pluginVersion, when);
 
   const series = seriesPercents(store, args.seriesKey);

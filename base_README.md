@@ -41,18 +41,56 @@ Schema versioning is stored in the database (`schema_version`, currently 2) and
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
 
-Config keys (defaults live in code; the `config` table stores overrides only):
+&nbsp;
 
-| Key | Default | Effect |
-|---|---|---|
-| `channels.enabled` | all channels | comma-separated allowlist; a disabled channel vanishes from the tool schema |
-| `forecast.enabled` | `true` | `false` bakes the `predicted` ground out of the tool schema |
-| `salience.enabled` | `true` | the ⭑ salience glyph convention (carried to skills via the hook context line's `conventions:` segment) |
-| `revision.enabled` | `false` | visible-revision prose convention (same transport) |
-| `gifts.enabled` | `false` | the gift register (same transport) |
-| `roster.enabled` | `false` | the party-roster convention (same transport) |
-| `gate.signature` | `true` | `false` disables the Stop-gate signature check |
-| `privacy.store_cwd` / `privacy.store_prompt_len` | `true` | `false` suppresses the field at capture |
+&nbsp;
+
+## Configuration
+
+Configuration lives in the log database's `config` table, reached through the `configure`
+MCP tool — never in host-specific plugin config, so a choice made under one host holds
+under all of them. Precedence is exactly two layers:
+
+1. **`SELF_EXPRESSION_HOME`** (environment variable) locates the data directory —
+   default `~/.self-expression` — and does nothing else.
+2. Every other choice is a **`config` row, else the code default**. Defaults are never
+   seeded as rows, so a later release changing a default actually reaches existing
+   installs; a zero-row table is a valid, fully-working state.
+
+The `configure` tool takes an `op`:
+
+| Op | Effect |
+|---|---|
+| `get` | One key's stored override, or which code default applies. |
+| `set` | Validate and store one value in canonical form. Known keys are typed — an invalid value is rejected naming what would have been accepted, and nothing is written. An unknown key is stored as given, with a stated warning (a newer version may legitimately have written it). |
+| `unset` | Delete the override so the code default applies again — including a future changed default. |
+| `list` | The **effective** configuration: every known key with its value and source (`override` or `default`), plus any unknown override rows, labeled. |
+
+The registered keys:
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
+| `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
+| `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
+| `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
+| `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
+| `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
+| `format.version` | string | `1` | Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral. |
+| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording, the conventions flags, and the open-signature reminder remain. |
+| `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
+| `salience.enabled` | bool | `true` | The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's `conventions:` segment. |
+| `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
+| `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
+| `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
+| `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
+| `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
+| `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+
+Readers are tolerant: a stored value that fails validation behaves as unset, so a
+hand-edited database or a downgrade can never wedge the server or the gates. The
+privacy and `time.hook` switches additionally act only on the exact string `false` —
+an ambiguous value records rather than silently suppressing.
 
 &nbsp;
 

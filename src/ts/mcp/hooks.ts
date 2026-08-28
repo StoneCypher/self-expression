@@ -17,6 +17,7 @@
 import { recordContext, latestContext, turnCount } from '../channels/context.js';
 import { hasClosingSignature }                     from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
+import { effectiveValue }                          from '../channels/config.js';
 import type { Store }                              from '../channels/store.js';
 import { clockTime, zoneAbbreviation }             from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
@@ -92,10 +93,12 @@ export const CONVENTION_FLAGS: readonly { label: string; key: string; fallback: 
  * The context line's conventions-flags segment, e.g.
  * `conventions: salience:on revision:off gifts:off roster:off`.
  *
- * Only the exact strings `'true'` and `'false'` override a default; anything else —
- * unset, a typo — falls back, on the principle that a toggle should take effect only
- * when unambiguously set. Costs one SELECT per key on a database the hook holds open
- * anyway; no extra tool call, no extra process.
+ * Reads through the tolerant effective-value accessor (issue #30, D5), so a stored
+ * override that fails its key's validator behaves as unset; the registered defaults
+ * and the fallbacks here agree by test. Only a canonical `'true'` / `'false'` flips a
+ * flag — anything else falls back, on the principle that a toggle should take effect
+ * only when unambiguously set. Costs one SELECT per key on a database the hook holds
+ * open anyway; no extra tool call, no extra process.
  *
  * @returns the segment text, without trailing punctuation
  *
@@ -108,8 +111,8 @@ export const CONVENTION_FLAGS: readonly { label: string; key: string; fallback: 
  */
 export function conventionFlags(store: Store): string {
   const parts = CONVENTION_FLAGS.map(({ label, key, fallback }) => {
-    const raw = readConfig(store, key),
-          on  = raw === 'true' ? true : raw === 'false' ? false : fallback;
+    const value = effectiveValue(store, key),
+          on    = value === 'true' ? true : value === 'false' ? false : fallback;
     return `${label}:${on ? 'on' : 'off'}`;
   });
   return `conventions: ${parts.join(' ')}`;
@@ -131,6 +134,18 @@ export const OPEN_REMINDER =
   'Open this turn with a signature before working, using the timestamp above.';
 
 /**
+ * The open-signature reminder for the clockless case — `time.hook` set exactly to
+ * `'false'` (issue #30, D9).
+ *
+ * The reminder still goes out when the clock sentence is suppressed, because it
+ * belongs to enforcement (the `gate.*` family's concern), not to time injection — but
+ * the shipped wording says "using the timestamp above", which must not dangle when no
+ * timestamp was injected. Hence this variant.
+ */
+export const OPEN_REMINDER_CLOCKLESS =
+  'Open this turn with a signature before working.';
+
+/**
  * `UserPromptSubmit`: record what the harness knows, and hand back the clock.
  *
  * The context write is the important half. It is the only way session identity,
@@ -147,6 +162,11 @@ export const OPEN_REMINDER =
  * between the clock and the open reminder — the transport by which config keys reach
  * pure-prose skill conventions. It fails open separately: a flags error still delivers
  * the clock and the reminder, just without flags.
+ *
+ * When `time.hook` is exactly `'false'`, the clock sentence is omitted and the
+ * open-signature reminder goes out in its clockless wording — presentation changes,
+ * observation does not (issue #30, D9). The conventions flags are config transport,
+ * not time presentation, so they still lead the clockless line.
  *
  * @example
  *   onUserPromptSubmit(store, { session_id: 'abc', prompt_id: 'p1' }, new Date())
@@ -178,10 +198,25 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: the clock and reminder still get delivered */ }
   }
 
+  // `time.hook` suppresses the clock sentence, and only that (issue #30, D9): the
+  // context write above is observational, not presentational, and is unaffected; the
+  // open-signature reminder still goes out, reworded for the clockless case. Only the
+  // exact string 'false' suppresses — the same asymmetry the privacy keys use — and
+  // the read fails open to keeping the clock, since suppressing on an error would be
+  // enforcing a choice nobody made.
+  let clock = true;
+  if (store !== null) {
+    try { clock = readConfig(store, 'time.hook') !== 'false'; }
+    catch { /* fail open: keep the clock */ }
+  }
+
+  const head     = clock ? `${describeMoment(now)}${flags}` : flags.trimStart(),
+        reminder = clock ? OPEN_REMINDER : OPEN_REMINDER_CLOCKLESS;
+
   return {
     hookSpecificOutput: {
       hookEventName    : 'UserPromptSubmit',
-      additionalContext: `${describeMoment(now)}${flags} ${OPEN_REMINDER}`,
+      additionalContext: head === '' ? reminder : `${head} ${reminder}`,
     },
   };
 
