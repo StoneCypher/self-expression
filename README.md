@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787941582619` from hash `db54ef9`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787942498605` from hash `cb24f76`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787941582619 Friday, August 28, 2026 at GMT-07:00 94.8 291 91 db54ef9 52.41 68.24 66.79 67.29 109 1204 88.37 92.85 95.21 1095 0.2.1 -->
+<!-- Supported embeds: 1787942498605 Friday, August 28, 2026 at GMT-07:00 94.6 291 91 cb24f76 51.68 66.13 65.57 65.44 111 1291 88.52 92.71 95.07 1180 0.2.1 -->
 
 
 
@@ -36,7 +36,7 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 2) and
+Schema versioning is stored in the database (`schema_version`, currently 3) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
@@ -83,6 +83,8 @@ The registered keys:
 | `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
 | `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
+| `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
+| `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
@@ -253,6 +255,48 @@ from a rendered body's markers).
 
 &nbsp;
 
+## Messagebox
+
+Audience-tagged messages with real delivery and readback semantics, stored beside the
+expression log — its own facility, not a rendered channel. One transcript can carry
+several conversations without any of them appearing in it: notes to future-self that
+survive compaction, coordination between sibling agents, asides for the human to read
+later, remarks for the record. Read-state is append-only receipt rows, never a mutable
+flag; **unread** means "no receipt from this reader, and not expired". `expires_utc`
+only excludes a message from delivery — deletion belongs to `retention.days` alone.
+
+The audiences:
+
+| audience | scope | who collects | unread notification |
+|---|---|---|---|
+| `self` | sender's session | the same session, later — after compaction or resume | `SessionStart` injects the notes; the per-turn line shows a count |
+| `agents` | `box` (required) | any agent working that box | none — workers poll by instruction |
+| `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count |
+| `record` | global | nobody; consultable history | never |
+
+Two MCP tools:
+
+| Tool | Purpose |
+|---|---|
+| `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
+| `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
+
+The user's own door, with no model in the loop:
+
+```text
+self-expression messages [--audience A] [--box B] [--ack] [--limit N]
+```
+
+Default audience is `user`; `--ack` collects (writing the human's own receipts), its
+absence peeks. Delivery is pull on every host; on Claude, hooks add two pull triggers —
+a per-turn unread-count line (config-gated by `messages.notify`) and a `SessionStart`
+injection of unread self notes on `compact`/`resume`, which is what makes a note to
+future-self genuinely survive compaction.
+
+&nbsp;
+
+&nbsp;
+
 ## The dwelling
 
 A per-assistant keepsake database: a tended space whose **current arrangement** is the
@@ -312,19 +356,19 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1095</td>
-    <td>94.8<small>%</small></td>
-    <td>88.37<small>%</small></td>
-    <td>92.85<small>%</small></td>
-    <td>95.21<small>%</small></td>
+    <td>1180</td>
+    <td>94.6<small>%</small></td>
+    <td>88.52<small>%</small></td>
+    <td>92.71<small>%</small></td>
+    <td>95.07<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>109</td>
-    <td>94.8<small>%</small></td>
-    <td>52.41<small>%</small></td>
-    <td>66.79<small>%</small></td>
-    <td>67.29<small>%</small></td>
+    <td>111</td>
+    <td>94.6<small>%</small></td>
+    <td>51.68<small>%</small></td>
+    <td>65.57<small>%</small></td>
+    <td>65.44<small>%</small></td>
   </tr>
 </table>
 

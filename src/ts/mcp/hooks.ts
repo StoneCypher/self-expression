@@ -18,6 +18,7 @@ import { recordContext, latestContext, turnCount } from '../channels/context.js'
 import { hasClosingSignature }                     from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
 import { effectiveValue }                          from '../channels/config.js';
+import { unreadCounts, readMessages }              from '../channels/messages.js';
 import type { Store }                              from '../channels/store.js';
 import { clockTime, zoneAbbreviation }             from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
@@ -33,6 +34,8 @@ export interface HookPayload {
   readonly user_input?      : string;
   readonly effort?          : { readonly level?: string };
   readonly hook_event_name? : string;
+  /** `SessionStart` only: what began the session — `startup`, `resume`, `clear`, or `compact`. */
+  readonly source?          : string;
 }
 
 /** What a handler wants written to stdout, and nothing else. */
@@ -119,6 +122,44 @@ export function conventionFlags(store: Store): string {
 }
 
 /**
+ * The context line's mailbox segment, e.g.
+ * `Mailbox: 2 unread for you, 1 for your human partner (self-expression read_messages).`
+ * — or `null` when there is nothing to report.
+ *
+ * Counts only, never text: full injection every turn would spend context on notes the
+ * model usually still remembers. Gated on both `messages.enabled` (the facility's
+ * kill switch) and `messages.notify` (this line specifically — someone may want the
+ * facility without per-turn context spent on it), read through the tolerant
+ * effective-value accessor. Silent — `null` — when both counts are zero, so the
+ * common no-mail turn costs nothing.
+ *
+ * @param session the reader session fencing the self count; absent counts user mail only
+ *
+ * @example
+ *   mailboxLine(store, 'sess-1')
+ *   // => 'Mailbox: 2 unread for you, 1 for your human partner (self-expression read_messages).'
+ *
+ * @see onUserPromptSubmit
+ * @see ../channels/messages.js unreadCounts
+ */
+export function mailboxLine(store: Store, session: string | undefined, now: Date = new Date()): string | null {
+
+  if (effectiveValue(store, 'messages.enabled') === 'false') { return null; }
+  if (effectiveValue(store, 'messages.notify')  === 'false') { return null; }
+
+  const counts = unreadCounts(store, session, now),
+        parts: string[] = [];
+
+  if (counts.forModel > 0) { parts.push(`${String(counts.forModel)} unread for you`); }
+  if (counts.forUser  > 0) { parts.push(`${String(counts.forUser)} for your human partner`); }
+
+  if (parts.length === 0) { return null; }
+
+  return `Mailbox: ${parts.join(', ')} (self-expression read_messages).`;
+
+}
+
+/**
  * Asks for the opening signature at the only moment it can honestly be written.
  *
  * The opening read is deliberately not enforced at the end of the turn: blocking a stop
@@ -163,6 +204,10 @@ export const OPEN_REMINDER_CLOCKLESS =
  * pure-prose skill conventions. It fails open separately: a flags error still delivers
  * the clock and the reminder, just without flags.
  *
+ * After the flags comes the messagebox count line ({@link mailboxLine}, issue #41),
+ * present only when something is actually unread and both `messages.*` keys allow it.
+ * It fails open separately too: a mailbox error costs the count line and nothing else.
+ *
  * When `time.hook` is exactly `'false'`, the clock sentence is omitted and the
  * open-signature reminder goes out in its clockless wording — presentation changes,
  * observation does not (issue #30, D9). The conventions flags are config transport,
@@ -198,6 +243,14 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: the clock and reminder still get delivered */ }
   }
 
+  let mail = '';
+  if (store !== null) {
+    try {
+      const line = mailboxLine(store, payload.session_id, now);
+      if (line !== null) { mail = ` ${line}`; }
+    } catch { /* fail open: the clock, flags, and reminder still get delivered */ }
+  }
+
   // `time.hook` suppresses the clock sentence, and only that (issue #30, D9): the
   // context write above is observational, not presentational, and is unaffected; the
   // open-signature reminder still goes out, reworded for the clockless case. Only the
@@ -210,7 +263,7 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: keep the clock */ }
   }
 
-  const head     = clock ? `${describeMoment(now)}${flags}` : flags.trimStart(),
+  const head     = clock ? `${describeMoment(now)}${flags}${mail}` : `${flags}${mail}`.trimStart(),
         reminder = clock ? OPEN_REMINDER : OPEN_REMINDER_CLOCKLESS;
 
   return {
@@ -271,6 +324,66 @@ export function onStop(store: Store | null, payload: HookPayload): HookOutput {
 }
 
 /**
+ * `SessionStart`: hand a resumed or compacted session its unread notes to self —
+ * the compaction-survival mechanism, and the reason the messagebox earns the word
+ * "memory" (issue #41).
+ *
+ * Fires only on `source: 'compact'` or `'resume'` — the one moment the notes are
+ * guaranteed relevant and guaranteed forgotten. On `startup` it stays silent: a fresh
+ * session has no past self. Injects the **full text** of the session's unread `self`
+ * messages as `additionalContext` and receipts them (`reader: 'model'`) as delivered,
+ * so nothing is handed over twice. Governed by `messages.enabled` alone — not
+ * `messages.notify`, which gates only the per-turn count line — because compaction
+ * recovery is the point of the facility.
+ *
+ * Fails open like every handler: no store, a read error, or a receipt error yields
+ * `null` (inject nothing) rather than wedging the session start.
+ *
+ * @example
+ *   onSessionStart(store, { session_id: 's1', source: 'compact' }, new Date())
+ *   // => { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: '…' } }
+ *
+ * @see ../channels/messages.js readMessages
+ */
+export function onSessionStart(store: Store | null, payload: HookPayload, now: Date): HookOutput {
+
+  if (store === null)                                             { return null; }
+  if (payload.source !== 'compact' && payload.source !== 'resume') { return null; }
+
+  const session = payload.session_id;
+  if (typeof session !== 'string' || session === '') { return null; }
+
+  try {
+
+    if (effectiveValue(store, 'messages.enabled') === 'false') { return null; }
+
+    const notes = readMessages(store,
+      { reader: 'model', session, promptId: payload.prompt_id },
+      { audience: 'self', limit: 100 }, now);
+
+    if (notes.length === 0) { return null; }
+
+    const rendered = notes
+      .map(note => `- [${String(note['ts_local'])}] ${String(note['text'])}`)
+      .join('\n');
+
+    return {
+      hookSpecificOutput: {
+        hookEventName    : 'SessionStart',
+        additionalContext:
+          `Unread notes from your earlier self in this session (now delivered):\n${rendered}`,
+      },
+    };
+
+  } catch {
+
+    return null;   // fail open on every error path
+
+  }
+
+}
+
+/**
  * Dispatch a named hook.
  *
  * Unknown names allow rather than erroring, so a hooks file referencing a handler this
@@ -288,6 +401,7 @@ export function handleHook(
 
   if (name === 'user-prompt-submit') { return onUserPromptSubmit(store, payload, now); }
   if (name === 'stop')               { return onStop(store, payload); }
+  if (name === 'session-start')      { return onSessionStart(store, payload, now); }
 
   return null;
 

@@ -16,6 +16,22 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/dist/cli.cjs",
+              "hook",
+              "session-start"
+            ],
+            "statusMessage": "Delivering notes to self"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

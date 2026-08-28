@@ -14,6 +14,8 @@
 
 import { HISTORY_CHARTS } from './raster/compose.js';
 import type { HistoryChart } from './raster/compose.js';
+import { AUDIENCES, describeVocabulary } from './channels/vocabulary.js';
+import type { Audience } from './channels/vocabulary.js';
 
 /** A resolved `render` subcommand: the window, the chart, and where to write. */
 export interface RenderCommand {
@@ -26,12 +28,29 @@ export interface RenderCommand {
   readonly out   : string | null;
 }
 
+/**
+ * A resolved `messages` subcommand — the user's direct door into the messagebox
+ * (issue #41), with no model in the loop.
+ */
+export interface MessagesCommand {
+  readonly kind     : 'messages';
+  /** Which mailbox to read; defaults to `user`, the human's own mail. */
+  readonly audience : Audience;
+  /** Coordination-box filter, or `null` for no filter. */
+  readonly box      : string | null;
+  /** Whether to write `reader: 'user'` receipts; collecting rather than peeking. */
+  readonly ack      : boolean;
+  /** Most messages printed; a positive integer, capped at 100. */
+  readonly limit    : number;
+}
+
 /** A resolved command line, after parsing but before execution. */
 export type CliCommand =
   | { readonly kind: 'mcp' }
   | { readonly kind: 'hook'; readonly name: string }
   | { readonly kind: 'help' }
   | RenderCommand
+  | MessagesCommand
   | { readonly kind: 'invalid'; readonly message: string }
   | { readonly kind: 'unknown'; readonly token: string };
 
@@ -65,6 +84,7 @@ export function parseCommand(argv: readonly string[]): CliCommand {
   if (first === 'mcp')                                        { return { kind: 'mcp'  }; }
   if (first === 'hook')                                       { return { kind: 'hook', name: argv[1] ?? '' }; }
   if (first === 'render')                                     { return parseRender(argv.slice(1)); }
+  if (first === 'messages')                                   { return parseMessages(argv.slice(1)); }
   if (first === 'help' || first === '--help' || first === '-h') { return { kind: 'help' }; }
 
   return { kind: 'unknown', token: first };
@@ -137,6 +157,83 @@ function parseRender(rest: readonly string[]): CliCommand {
 }
 
 /**
+ * Parse the flags after `messages` into a {@link MessagesCommand}, or an `invalid`
+ * command naming exactly what was wrong.
+ *
+ * Grammar: `messages [--audience A] [--box B] [--ack] [--limit N]`, flags in any
+ * order. `--ack` is a bare flag — collecting is a decision, not a value — so this
+ * loop advances one token at a time rather than two. A bad value is reported rather
+ * than silently defaulted, because a typo'd audience quietly becoming `user` would
+ * read the wrong mailbox while looking like success.
+ *
+ * @example
+ *   parseMessages([])
+ *   // => { kind: 'messages', audience: 'user', box: null, ack: false, limit: 20 }
+ *   parseMessages(['--audience', 'agents', '--box', 'issue-41', '--ack'])
+ *   // => { kind: 'messages', audience: 'agents', box: 'issue-41', ack: true, limit: 20 }
+ *   parseMessages(['--audience', 'everyone'])
+ *   // => { kind: 'invalid', message: "--audience must be one of 'self', 'agents', …" }
+ */
+function parseMessages(rest: readonly string[]): CliCommand {
+
+  let audience: Audience    = 'user',
+      box: string | null    = null,
+      ack                   = false,
+      limit                 = 20;
+
+  let i = 0;
+  while (i < rest.length) {
+
+    const flag = rest[i];
+    if (flag === undefined) { break; }
+
+    if (flag === '--ack') { ack = true; i += 1; continue; }
+
+    const value = rest[i + 1];
+    if (value === undefined) {
+      return { kind: 'invalid', message: `${flag} requires a value` };
+    }
+
+    switch (flag) {
+
+      case '--audience': {
+        const found = AUDIENCES.find(name => name === value);
+        if (found === undefined) {
+          return { kind: 'invalid',
+                   message: `--audience must be one of ${describeVocabulary(AUDIENCES)}; got '${value}'` };
+        }
+        audience = found;
+        break;
+      }
+
+      case '--box': {
+        box = value;
+        break;
+      }
+
+      case '--limit': {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+          return { kind: 'invalid', message: `--limit must be an integer from 1 to 100; got '${value}'` };
+        }
+        limit = parsed;
+        break;
+      }
+
+      default:
+        return { kind: 'invalid', message: `messages does not understand '${flag}'` };
+
+    }
+
+    i += 2;
+
+  }
+
+  return { kind: 'messages', audience, box, ack, limit };
+
+}
+
+/**
  * The text shown for `--help` and for a bare invocation.
  *
  * Kept as a pure function returning one string so it can be asserted against directly,
@@ -154,6 +251,8 @@ export function helpText(): string {
     '  self-expression hook <name>  run a lifecycle hook, payload on stdin',
     '  self-expression render [--days N] [--chart X] [--out P]',
     '                               render logged history as a PNG; prints the path',
+    '  self-expression messages [--audience A] [--box B] [--ack] [--limit N]',
+    '                               read messagebox mail (default: yours); --ack marks it read',
     '  self-expression help         show this message',
     '',
     'The MCP server is normally started by a host plugin rather than by hand;',
@@ -170,6 +269,9 @@ export type HookRunner = (name: string) => Promise<void>;
 /** Renders the history PNG and resolves to the absolute path it was written at. */
 export type RenderRunner = (command: RenderCommand) => Promise<string>;
 
+/** Reads messagebox mail and resolves to the human-first report to print. */
+export type MessagesRunner = (command: MessagesCommand) => Promise<string>;
+
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -177,14 +279,14 @@ export type RenderRunner = (command: RenderCommand) => Promise<string>;
  * returns a number. Everything else delegates to `run` unchanged, so the pure dispatch
  * stays pure and only the genuinely asynchronous path lives here.
  *
- * `startServer`, `runHook`, and `runRender` are injected so this can be tested
- * without opening a pipe, a database, or writing an image to disk.
+ * `startServer`, `runHook`, `runRender`, and `runMessages` are injected so this can
+ * be tested without opening a pipe, a database, or writing an image to disk.
  *
  * @example
- *   await runAsync(['help'], streams, start, hook, render)  // => 0, never calls start
- *   await runAsync(['mcp'],  streams, start, hook, render)  // => 0 once the transport closes
- *   await runAsync(['render', '--days', '30'], streams, start, hook, render)
- *   // => 0, having written the rendered path to streams.out
+ *   await runAsync(['help'], streams, start, hook, render, messages)  // => 0, never calls start
+ *   await runAsync(['mcp'],  streams, start, hook, render, messages)  // => 0 once the transport closes
+ *   await runAsync(['messages', '--ack'], streams, start, hook, render, messages)
+ *   // => 0, having written the mail report to streams.out
  */
 export async function runAsync(
   argv        : readonly string[],
@@ -192,6 +294,7 @@ export async function runAsync(
   startServer : ServerStarter,
   runHook     : HookRunner,
   runRender   : RenderRunner,
+  runMessages : MessagesRunner,
 ): Promise<number> {
 
   const command = parseCommand(argv);
@@ -201,6 +304,11 @@ export async function runAsync(
 
   if (command.kind === 'render') {
     streams.out(await runRender(command));
+    return 0;
+  }
+
+  if (command.kind === 'messages') {
+    streams.out(await runMessages(command));
     return 0;
   }
 
@@ -234,6 +342,7 @@ export function run(argv: readonly string[], streams: CliStreams): number {
     case 'mcp':
     case 'hook':
     case 'render':
+    case 'messages':
       streams.err(`self-expression: '${command.kind}' must be dispatched through runAsync.`);
       return 70;   // EX_SOFTWARE — reachable only by calling run() directly, which is a bug
 

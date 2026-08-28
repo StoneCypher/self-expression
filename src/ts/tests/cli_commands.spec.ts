@@ -137,9 +137,60 @@ describe('hook parsing', () => {
 
 });
 
+describe('messages parsing (#41)', () => {
+
+  test("a bare messages reads the human's own mail as a peek", () => {
+    expect(parseCommand(['messages']))
+      .toEqual({ kind: 'messages', audience: 'user', box: null, ack: false, limit: 20 });
+  });
+
+  test('all flags parse, --ack as a bare flag among valued ones', () => {
+    expect(parseCommand(['messages', '--audience', 'agents', '--box', 'issue-41', '--ack', '--limit', '5']))
+      .toEqual({ kind: 'messages', audience: 'agents', box: 'issue-41', ack: true, limit: 5 });
+  });
+
+  test('--ack parses in any position', () => {
+    expect(parseCommand(['messages', '--ack', '--limit', '3']))
+      .toEqual({ kind: 'messages', audience: 'user', box: null, ack: true, limit: 3 });
+  });
+
+  test('an unknown audience is invalid and the message lists the real ones', () => {
+    const command = parseCommand(['messages', '--audience', 'everyone']);
+    expect(command).toEqual({
+      kind: 'invalid',
+      message: "--audience must be one of 'self', 'agents', 'user', 'record'; got 'everyone'",
+    });
+  });
+
+  test.each(['0', '101', '1.5', 'many'])('--limit %s is invalid, not silently defaulted', (bad) => {
+    expect(parseCommand(['messages', '--limit', bad]).kind).toBe('invalid');
+  });
+
+  test('a valued flag with no value is invalid', () => {
+    expect(parseCommand(['messages', '--box']).kind).toBe('invalid');
+  });
+
+  test('an unknown flag is invalid', () => {
+    expect(parseCommand(['messages', '--unread']).kind).toBe('invalid');
+  });
+
+  test('the synchronous path refuses a valid messages rather than pretending to read', () => {
+    const { streams, err } = capture();
+    expect(run(['messages'], streams)).toBe(70);
+    expect(err.join('\n')).toContain('runAsync');
+  });
+
+  test('help names the subcommand', () => {
+    expect(helpText()).toContain('messages');
+    expect(helpText()).toContain('--ack');
+  });
+
+});
+
 describe('runAsync', () => {
 
-  const noRender = (): Promise<string> => Promise.resolve('unused.png');
+  const noRender   = (): Promise<string> => Promise.resolve('unused.png');
+  const noMessages = (): Promise<string> => Promise.resolve('no messages.');
 
   test('hook dispatches by name and never starts a server', async () => {
     const { streams } = capture();
@@ -147,7 +198,7 @@ describe('runAsync', () => {
     const code = await runAsync(['hook', 'stop'], streams,
       () => { served = true; return Promise.resolve(); },
       (n) => { ran = n; return Promise.resolve(); },
-      noRender);
+      noRender, noMessages);
     expect(ran).toBe('stop');
     expect(served).toBe(false);
     expect(code).toBe(0);
@@ -158,7 +209,7 @@ describe('runAsync', () => {
     const { streams } = capture();
     let started = false;
     const noHook = (): Promise<void> => Promise.resolve();
-    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); }, noHook, noRender);
+    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); }, noHook, noRender, noMessages);
     expect(started).toBe(true);
     expect(code).toBe(0);
   });
@@ -169,7 +220,7 @@ describe('runAsync', () => {
     const start  = (): Promise<void> => { started = true; return Promise.resolve(); },
           noHook = (): Promise<void> => Promise.resolve();
     for (const argv of [['help'], [], ['--help'], ['frobnicate']]) {
-      await runAsync(argv, streams, start, noHook, noRender);
+      await runAsync(argv, streams, start, noHook, noRender, noMessages);
     }
     expect(started).toBe(false);
   });
@@ -177,14 +228,14 @@ describe('runAsync', () => {
   test('delegates non-mcp exit codes unchanged', async () => {
     const a = capture(), b = capture();
     const start = (): Promise<void> => Promise.resolve();
-    expect(await runAsync(['help'], a.streams, start, start, noRender)).toBe(0);
-    expect(await runAsync(['frobnicate'], b.streams, start, start, noRender)).toBe(64);
+    expect(await runAsync(['help'], a.streams, start, start, noRender, noMessages)).toBe(0);
+    expect(await runAsync(['frobnicate'], b.streams, start, start, noRender, noMessages)).toBe(64);
   });
 
   test('propagates a startup failure rather than reporting success', async () => {
     const { streams } = capture();
     const noHook = (): Promise<void> => Promise.resolve();
-    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk')), noHook, noRender))
+    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk')), noHook, noRender, noMessages))
       .rejects.toThrow('no disk');
   });
 
@@ -194,7 +245,8 @@ describe('runAsync', () => {
     const code = await runAsync(['render', '--days', '30', '--chart', 'stems'], streams,
       () => Promise.resolve(),
       () => Promise.resolve(),
-      (command) => { received = command; return Promise.resolve('/tmp/out.png'); });
+      (command) => { received = command; return Promise.resolve('/tmp/out.png'); },
+      noMessages);
     expect(received).toEqual({ kind: 'render', days: 30, chart: 'stems', out: null });
     expect(out).toEqual(['/tmp/out.png']);
     expect(code).toBe(0);
@@ -206,10 +258,37 @@ describe('runAsync', () => {
     const code = await runAsync(['render', '--days', 'soon'], streams,
       () => Promise.resolve(),
       () => Promise.resolve(),
-      () => { rendered = true; return Promise.resolve('nope.png'); });
+      () => { rendered = true; return Promise.resolve('nope.png'); },
+      noMessages);
     expect(rendered).toBe(false);
     expect(code).toBe(64);
     expect(err.join('\n')).toContain('--days');
+  });
+
+  test('messages dispatches to the messages runner with the parsed command and prints the report', async () => {
+    const { streams, out } = capture();
+    let received: unknown = null;
+    const code = await runAsync(['messages', '--ack'], streams,
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      noRender,
+      (command) => { received = command; return Promise.resolve('#1 · mail'); });
+    expect(received).toEqual({ kind: 'messages', audience: 'user', box: null, ack: true, limit: 20 });
+    expect(out).toEqual(['#1 · mail']);
+    expect(code).toBe(0);
+  });
+
+  test('an invalid messages flag never reaches the messages runner', async () => {
+    const { streams, err } = capture();
+    let read = false;
+    const code = await runAsync(['messages', '--audience', 'everyone'], streams,
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      noRender,
+      () => { read = true; return Promise.resolve('nope'); });
+    expect(read).toBe(false);
+    expect(code).toBe(64);
+    expect(err.join('\n')).toContain('--audience');
   });
 
   test('the old help-equivalence still holds', () => {

@@ -1,14 +1,14 @@
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
   isMember, describeVocabulary,
 } from '../channels/vocabulary.js';
 
 const ALL: readonly (readonly string[])[] = [
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
 ];
 
 describe('vocabularies', () => {
@@ -61,6 +61,15 @@ describe('vocabularies', () => {
   test('the two new vocabularies pin their exact contents', () => {
     expect(FORECAST_OUTCOMES).toEqual(['hit', 'miss', 'void']);
     expect(SILENCE_KINDS).toEqual(['empty', 'unlooked', 'held', 'depth']);
+  });
+
+  test('the #41 audiences pin their exact contents — the closed messagebox vocabulary', () => {
+    expect(AUDIENCES).toEqual(['self', 'agents', 'user', 'record']);
+  });
+
+  test('an audience is not a channel, and vice versa', () => {
+    expect(isMember(AUDIENCES, 'signature')).toBe(false);
+    expect(isMember(CHANNELS, 'record')).toBe(false);
   });
 
   test('predicted is a confidence ground, faded a divergence kind, load and taste channels', () => {

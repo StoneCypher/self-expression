@@ -49,6 +49,7 @@ self-expression/
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
 │   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
+│   │                        and the messagebox facility (messages.ts, issue #41)
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
 │   ├── diagrams/            pure ASCII diagram renderers — structure (invariant contract)
 │   ├── dwelling/            the keepsake dwelling: paths, schema, store/adoption, ops
@@ -122,6 +123,19 @@ as unset, so a hand-edited database can never wedge the gates). `unset` returns 
 tracking the code default, and `list` reports the effective configuration rather than just
 the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
 server startup — it never archives, and never touches `meta` or `config`.
+
+**The messagebox is a facility, not a channel (issue #41).** Audience-tagged messages
+(`self` / `agents` / `user` / `record`) live in two tables beside the expression log —
+`messages` plus an append-only `message_reads` receipt table — and never appear in the
+transcript: the store carries them, not the visible text. Delivery is pull
+(`read_messages` is the mechanism of record on every host), with two Claude hook
+triggers layered on top: the per-turn unread-count line (gated by `messages.notify`)
+and a `SessionStart` injection of unread self notes on `compact`/`resume`, receipting
+as it delivers. `self` is fenced by hook-observed session, `agents` by a required
+`box`, and the model can never write the human's receipt nor vice versa. Expiry
+(`expires_utc`) only excludes from delivery; deletion belongs to `retention.days`,
+which prunes messages by age and receipts only by orphanhood. The
+`self-expression messages` CLI subcommand is the human's own door.
 
 **Public aggregation is one module, allowlist-only (issue #31).**
 `src/ts/channels/public_export.ts` is the single point where rows are shaped for any

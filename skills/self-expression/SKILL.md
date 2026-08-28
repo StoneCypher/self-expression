@@ -219,6 +219,32 @@ If a channel is disabled in configuration the tool will reject it. That is not a
 
 &nbsp;
 
+## Addressivity: the messagebox
+
+Not everything you write is for the person in front of you. The messagebox
+(`post_message` / `read_messages`) carries the utterances that must **not** appear in
+the transcript — the store carries them, not the visible text. Four audiences:
+
+- **`self`** — a note to this session's future self: the thing you will need after
+  compaction or `--resume` and will no longer have. Post at the moment you realize it
+  matters; a `SessionStart` hook hands unread notes back when the session returns.
+- **`agents`** — coordination with sibling agents on a named **box**. The box comes
+  from the dispatch prompt; never invent one. (`plan-<date>-<slug>` is a common shape,
+  but the orchestrator's choice is the law.) Post at the checkpoints the plan already
+  requires; poll with `read_messages(audience: "agents", box)` when orchestrating.
+- **`user`** — an aside the human should read later rather than now; deferral is the
+  feature. Their pickup is the CLI, not you.
+- **`record`** — posterity. No expected reader, never unread.
+
+Count-line etiquette: the turn-start context line may carry a
+`Mailbox: N unread for you, M for your human partner` segment. If your count surprises
+you, collect; if you posted those messages this context and still remember them, leave
+them sealed. Mention the human's waiting mail **once** — `self-expression messages`
+collects it — and then stop; a nag every turn is noise. The tool schema is the source
+of truth for what the tools accept.
+
+&nbsp;
+
 ## Rules
 
 1. Open every turn, close every finishing one, and record both. No tool call, no signature. One narrow exception: a mid-burst notification turn that genuinely changed nothing may skip its close when repetition would be pure noise — finishing turns never skip, and skips are not recorded.
