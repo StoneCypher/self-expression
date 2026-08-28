@@ -22,12 +22,17 @@ import {
   CHANNELS, POSITIONS, DELTAS, STEMS, EFFORTS, TURNS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
 } from '../channels/vocabulary.js';
-import type { Channel }        from '../channels/vocabulary.js';
+import type {
+  Channel, Position, Delta, Stem, Turn, Effort,
+  ConfidenceGround, DivergenceKind, Modality,
+} from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
-import { readConfig, writeConfig, allConfig }                                 from '../channels/store.js';
+import { readConfig, writeConfig, deleteConfig }                              from '../channels/store.js';
+import { FORMAT_VERSION, configKey, effectiveValue, effectiveConfig }         from '../channels/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
-import type { Store } from '../channels/store.js';
+import type { Store }     from '../channels/store.js';
+import type { ToolReply } from './chart_tools.js';
 
 /** Config key holding the comma-separated list of active channels. */
 export const ENABLED_KEY = 'channels.enabled';
@@ -72,8 +77,220 @@ function tuple<T extends string>(values: readonly T[]): [T, ...T[]] {
 }
 
 /** Wraps a value as the text content an MCP tool result carries. */
-function reply(text: string): { content: { type: 'text'; text: string }[] } {
+function reply(text: string): ToolReply {
   return { content: [{ type: 'text', text }] };
+}
+
+/** What the MCP handshake reports about the connected host. */
+interface ClientIdentity {
+  readonly name?    : string | undefined;
+  readonly version? : string | undefined;
+}
+
+/**
+ * What a caller supplies to `express`, after schema validation.
+ *
+ * Hand-written rather than `z.infer`-derived because the zod shape is built at
+ * registration time — its `channel` enum is narrowed to the enabled set — so there is
+ * no static shape to infer from. The registration call site keeps this honest: the
+ * inferred handler arguments must be assignable here or `registerTools` stops
+ * compiling.
+ */
+export interface ExpressArgs {
+  readonly channel         : Channel;
+  readonly text            : string;
+  readonly session?        : string | undefined;
+  readonly promptId?       : string | undefined;
+  readonly position?       : Position | undefined;
+  readonly delta?          : Delta | undefined;
+  readonly face?           : string | undefined;
+  readonly contextEmoji?   : string | undefined;
+  readonly stem?           : Stem | undefined;
+  readonly uncertain?      : boolean | undefined;
+  readonly modality?       : Modality | undefined;
+  readonly confidence?     : ConfidenceGround | undefined;
+  readonly divergenceKind? : DivergenceKind | undefined;
+  readonly visible?        : boolean | undefined;
+  readonly correctsId?     : number | undefined;
+  readonly effort?         : Effort | undefined;
+  readonly turn?           : Turn | undefined;
+  readonly model?          : string | undefined;
+  readonly cctype?         : string | undefined;
+  readonly project?        : string | undefined;
+  readonly seriesKey?      : string | undefined;
+  readonly title?          : string | undefined;
+  readonly succ?           : number | undefined;
+  readonly active?         : number | undefined;
+  readonly fail?           : number | undefined;
+  readonly percent?        : number | undefined;
+}
+
+/**
+ * Handles `express`: records one expression, adopting hook-observed context for
+ * anything the caller did not supply and stamping the row's provenance.
+ *
+ * Exported separately from registration, matching `checklist_tools.ts`, so tests can
+ * exercise the real write path without a transport. Every row is stamped with the
+ * effective `format.version` — the configured override when one validates, else the
+ * {@link FORMAT_VERSION} constant — a declarative label of the recording convention in
+ * force, never a behavioral switch (issue #30, D7).
+ *
+ * @param store         the open store to record into
+ * @param pluginVersion stamped onto the row, as on every entry
+ * @param args          the validated tool arguments
+ * @param client        what the MCP handshake reported about the host, if anything
+ *
+ * @example
+ *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
+ *   // => { content: [{ type: 'text', text: 'recorded #1 …' }] }
+ *
+ * @throws {Error} If entry validation fails — a closed field outside its vocabulary —
+ *                 naming every problem and the values that would have been accepted.
+ *
+ * @see ../channels/entries.js recordEntry
+ */
+export function handleExpress(
+  store         : Store,
+  pluginVersion : string,
+  args          : ExpressArgs,
+  client?       : ClientIdentity,
+): ToolReply {
+
+  const context = latestContext(store, args.session),
+        privacy = privacyFlags(store),
+        str     = (k: string): string | undefined => {
+          const v = context?.[k];
+          return typeof v === 'string' && v !== '' ? v : undefined;
+        },
+        num     = (k: string): number | undefined => {
+          const v = context?.[k];
+          return typeof v === 'number' ? v : undefined;
+        };
+
+  // Anything the caller supplied wins; everything else is adopted from what the hook
+  // observed. A row that reaches here with no context at all is marked 'no-hook'
+  // rather than given a plausible-looking session, so the gap is visible in the data
+  // instead of being disguised as an ordinary row.
+  //
+  // The path-carrying fields (cwd, git_branch, project) and the prompt length are gated
+  // on the privacy config a second time here: the hook already drops them at capture, but
+  // a direct express call carries its own project argument and must not be able to smuggle
+  // one in when the user has opted out.
+  const written = recordEntry(store, {
+    ...args,
+    session        : args.session ?? str('session') ?? 'no-hook',
+    promptId       : args.promptId ?? str('prompt_id'),
+    turn           : args.turn     ?? (str('turn') as never),
+    effort         : args.effort   ?? (str('effort') as never),
+    turnIndex      : num('turn_index'),
+    cwd            : privacy.storeCwd ? str('cwd') : undefined,
+    gitBranch      : privacy.storeCwd ? str('git_branch') : undefined,
+    project        : privacy.storeCwd ? args.project : undefined,
+    permissionMode : str('permission_mode'),
+    agentId        : str('agent_id'),
+    agentType      : str('agent_type'),
+    compactions    : num('compactions'),
+    promptLen      : privacy.storePromptLen ? num('prompt_len') : undefined,
+    host           : client?.name,
+    hostVersion    : client?.version,
+    formatVersion  : effectiveValue(store, 'format.version') ?? FORMAT_VERSION,
+  }, pluginVersion);
+
+  return reply(`recorded #${String(written.id)} ${written.uuid}`);
+
+}
+
+/**
+ * What a caller supplies to `configure`, after schema validation.
+ *
+ * Hand-written for the same `isolatedDeclarations` reason as the checklist tools'
+ * argument interfaces; the registration call site keeps it honest against the zod
+ * shape.
+ */
+export interface ConfigureArgs {
+  readonly op     : 'get' | 'set' | 'unset' | 'list';
+  readonly key?   : string | undefined;
+  readonly value? : string | undefined;
+}
+
+/**
+ * Handles `configure`: typed, validated writes over the config table, plus the
+ * effective-configuration report.
+ *
+ * The four ops implement issue #30's D2–D4:
+ *
+ * - `set` on a registered key runs its validator and stores the canonical text; an
+ *   invalid value is rejected with a reply naming the key's kind and what would have
+ *   been accepted, and **nothing is written**. An unknown key is stored as given, with
+ *   a stated warning — a typo surfaces at the moment of writing, while a newer
+ *   version's keys still work.
+ * - `unset` deletes the override so the code default applies again — including a
+ *   future changed default. A no-op when nothing was set; on an unknown key it removes
+ *   any row present.
+ * - `get` returns the stored override, or says which code default applies.
+ * - `list` reports the **effective** configuration: every registered key with its
+ *   value and source, plus unknown override rows labeled as such.
+ *
+ * @example
+ *   handleConfigure(store, { op: 'set', key: 'retention.days', value: '90' })
+ *   // => { content: [{ type: 'text', text: 'retention.days = 90' }] }
+ *   handleConfigure(store, { op: 'set', key: 'retention.days', value: 'sometimes' })
+ *   // => { content: [{ type: 'text', text: "error: 'sometimes' is not a valid int …" }] }
+ *
+ * @see ../channels/config.js
+ */
+export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
+
+  if (args.op === 'list') { return reply(JSON.stringify(effectiveConfig(store), null, 2)); }
+
+  if (args.key === undefined) { return reply("error: 'key' is required for get, set, and unset"); }
+
+  const def = configKey(args.key);
+
+  if (args.op === 'get') {
+    const stored = readConfig(store, args.key);
+    if (stored !== null)   { return reply(stored); }
+    if (def === undefined) { return reply('(unset; code default applies)'); }
+    return reply(def.fallback === null
+      ? '(unset; no code default — the key is simply absent)'
+      : `(unset; code default '${def.fallback}' applies)`);
+  }
+
+  if (args.op === 'unset') {
+    const removed = deleteConfig(store, args.key),
+          tail    = def === undefined ? ''
+                  : def.fallback === null ? '; the key is simply absent now'
+                  : `; code default '${def.fallback}' applies`;
+    return reply(removed
+      ? `${args.key} unset${tail}`
+      : `${args.key} had no override; nothing to unset${tail}`);
+  }
+
+  if (args.value === undefined) { return reply("error: 'value' is required for set"); }
+
+  if (def === undefined) {
+    writeConfig(store, args.key, args.value);
+    return reply(
+      `${args.key} = ${args.value} — stored, but this key is unknown to this version: ` +
+      'check the spelling, or ignore this if a newer version wrote it');
+  }
+
+  const outcome = def.validate(args.value);
+
+  if (!outcome.ok) {
+    return reply(
+      `error: '${args.value}' is not a valid ${def.kind} for ${args.key}; ` +
+      `expected ${outcome.expected}. nothing was written`);
+  }
+
+  writeConfig(store, args.key, outcome.canonical);
+
+  const restart = args.key === ENABLED_KEY
+    ? ' — takes effect at the next server start; the channel enum is baked into the tool schema at startup'
+    : '';
+
+  return reply(`${args.key} = ${outcome.canonical}${restart}`);
+
 }
 
 /**
@@ -143,51 +360,7 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
         "checklists only: the summary line's completion percent for this snapshot; requires " +
         'seriesKey, so the snapshot joins a series instead of being silently orphaned'),
     },
-  }, (args) => {
-
-    const client  = server.server.getClientVersion(),
-          context = latestContext(store, args.session),
-          privacy = privacyFlags(store),
-          str     = (k: string): string | undefined => {
-            const v = context?.[k];
-            return typeof v === 'string' && v !== '' ? v : undefined;
-          },
-          num     = (k: string): number | undefined => {
-            const v = context?.[k];
-            return typeof v === 'number' ? v : undefined;
-          };
-
-    // Anything the caller supplied wins; everything else is adopted from what the hook
-    // observed. A row that reaches here with no context at all is marked 'no-hook'
-    // rather than given a plausible-looking session, so the gap is visible in the data
-    // instead of being disguised as an ordinary row.
-    //
-    // The path-carrying fields (cwd, git_branch, project) and the prompt length are gated
-    // on the privacy config a second time here: the hook already drops them at capture, but
-    // a direct express call carries its own project argument and must not be able to smuggle
-    // one in when the user has opted out.
-    const written = recordEntry(store, {
-      ...args,
-      session        : args.session ?? str('session') ?? 'no-hook',
-      promptId       : args.promptId ?? str('prompt_id'),
-      turn           : args.turn     ?? (str('turn') as never),
-      effort         : args.effort   ?? (str('effort') as never),
-      turnIndex      : num('turn_index'),
-      cwd            : privacy.storeCwd ? str('cwd') : undefined,
-      gitBranch      : privacy.storeCwd ? str('git_branch') : undefined,
-      project        : privacy.storeCwd ? args.project : undefined,
-      permissionMode : str('permission_mode'),
-      agentId        : str('agent_id'),
-      agentType      : str('agent_type'),
-      compactions    : num('compactions'),
-      promptLen      : privacy.storePromptLen ? num('prompt_len') : undefined,
-      host           : client?.name,
-      hostVersion    : client?.version,
-    }, pluginVersion);
-
-    return reply(`recorded #${String(written.id)} ${written.uuid}`);
-
-  });
+  }, (args) => handleExpress(store, pluginVersion, args, server.server.getClientVersion()));
 
   server.registerTool('recall', {
     title       : 'Recall',
@@ -224,25 +397,16 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     title       : 'Configure',
     description :
       'Read or change settings. Stored in the database rather than in host-specific ' +
-      'plugin config, so a choice made under one host holds under all of them.',
+      'plugin config, so a choice made under one host holds under all of them. set ' +
+      'validates known keys and stores the canonical form; unset deletes an override ' +
+      'so the code default applies again; list reports the effective configuration — ' +
+      'every known key with its value and source, plus any unknown override rows.',
     inputSchema : {
-      op    : z.enum(['get', 'set', 'list']),
-      key   : z.string().optional(),
-      value : z.string().optional(),
+      op    : z.enum(['get', 'set', 'unset', 'list']).describe(
+        'get one override, set one value, unset one override, or list the effective configuration'),
+      key   : z.string().optional().describe('required for get, set, and unset'),
+      value : z.string().optional().describe('required for set'),
     },
-  }, (args) => {
-
-    if (args.op === 'list') { return reply(JSON.stringify(allConfig(store), null, 2)); }
-
-    if (args.key === undefined) { return reply("error: 'key' is required for get and set"); }
-
-    if (args.op === 'get') { return reply(readConfig(store, args.key) ?? '(unset; code default applies)'); }
-
-    if (args.value === undefined) { return reply("error: 'value' is required for set"); }
-
-    writeConfig(store, args.key, args.value);
-    return reply(`${args.key} = ${args.value}`);
-
-  });
+  }, (args) => handleConfigure(store, args));
 
 }
