@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
 import {
-  ALL_DDL, TABLE_DDL, ALL_INDEX_DDL, INDEX_DDL, MESSAGE_INDEX_DDL,
+  ALL_DDL, TABLE_DDL, ALL_INDEX_DDL,
   SCHEMA_VERSION, check, entriesDdl,
 } from '../channels/schema.js';
 import {
@@ -44,8 +44,9 @@ describe('schema', () => {
     const { db, dir } = freshDb();
     const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                   .all().map(r => r.name as string);
-    // Counted from the DDL rather than hardcoded, so adding an index cannot break this.
-    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length);
+    // Counted from the whole index DDL rather than hardcoded, or family by family, so
+    // neither adding an index nor adding a family of them can break this.
+    expect(idx).toHaveLength(ALL_INDEX_DDL.length);
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
@@ -263,8 +264,8 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 4 — the #18 anchoring shape', () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  test('is 5 — the #43 held-note shape', () => {
+    expect(SCHEMA_VERSION).toBe(5);
   });
 
 });

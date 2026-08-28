@@ -300,7 +300,10 @@ export function channelMaxCharsKey(channel: string): string {
  * mechanism), while the claudio server reads them through its own tolerant reader
  * in `../claudio/config.ts`. The `channels.<name>.max_chars` family belongs to issue
  * #76 and is generated from `CHANNELS`, so a channel added to the vocabulary arrives
- * with its length key already registered rather than silently unbounded.
+ * with its length key already registered rather than silently unbounded. The
+ * `mailbox.*` family belongs to issue #43's held notes: one kill switch plus four
+ * numeric budgets and a TTL, all riding this registry so the consent surface and the
+ * facility cannot disagree about a default.
  */
 export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
@@ -358,6 +361,37 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'messages.notify', kind: 'bool', fallback: 'true',
     description: 'the per-turn unread-count line specifically; SessionStart injection is governed by messages.enabled alone',
     validate: validateBool },
+  { key: 'mailbox.enabled', kind: 'bool', fallback: 'false',
+    description:
+      'self-initiated held notes (#43): the one switch that stops composition, offering, ' +
+      "and surfacing at once. Off by default — until a human says yes, no note is ever " +
+      'composed and no mailbox line is ever injected',
+    validate: validateBool },
+  { key: 'mailbox.surface_budget', kind: 'int', fallback: '1',
+    description:
+      'how many held notes one reply turn may be offered; 0 offers none, which holds ' +
+      'everything without composing being disabled',
+    validate: intValidator(0, 10) },
+  { key: 'mailbox.daily_cap', kind: 'int', fallback: '3',
+    description:
+      'held notes that may be surfaced in any rolling 24 hours; a ceiling on the whole ' +
+      'facility, not per-series — scarcity is what makes each note cost something',
+    validate: intValidator(0, 100) },
+  { key: 'mailbox.max_pending', kind: 'int', fallback: '10',
+    description:
+      'queue depth; composing past it fails loudly rather than queueing silently, so a ' +
+      'runaway composer is a visible error instead of a backlog nobody asked for',
+    validate: intValidator(1, 1000) },
+  { key: 'mailbox.offer_cap', kind: 'int', fallback: '3',
+    description:
+      'offers a note gets before it expires unsurfaced; a note gets a few chances at an ' +
+      'entrance and then it is over — there is no state from which a note can pester forever',
+    validate: intValidator(1, 100) },
+  { key: 'mailbox.default_ttl_days', kind: 'int', fallback: '14',
+    description:
+      'default lifetime of a composed note, in days, when no expiry is given; expiry is ' +
+      'mandatory, so this is the default rather than an opt-in',
+    validate: intValidator(1, 3650) },
   { key: 'dwelling.enabled', kind: 'bool', fallback: 'false',
     description: 'whether the dwelling facility (#45) is active; requires dwelling.path to be set',
     validate: validateBool },

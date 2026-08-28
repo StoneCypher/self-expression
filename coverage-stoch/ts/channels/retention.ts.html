@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/10</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>9/9</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
@@ -147,7 +147,33 @@
 <a name='L82'></a><a href='#L82'>82</a>
 <a name='L83'></a><a href='#L83'>83</a>
 <a name='L84'></a><a href='#L84'>84</a>
-<a name='L85'></a><a href='#L85'>85</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -209,21 +235,37 @@
 <span class="cline-any cline-yes">80x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">80x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">40x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">40x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -247,8 +289,9 @@
  * `messages` prunes by age, and `message_reads` prunes **only by orphanhood** — a
  * receipt whose message survived must survive too, because deleting it would
  * resurrect the message as unread. Message expiry (`expires_utc`) is not retention:
- * it only stops delivery, and only this horizon ever deletes. `meta` and `config`
- * are never touched.
+ * it only stops delivery, and only this horizon ever deletes. The held-note tables
+ * (#43) hang off `messages` and prune by orphanhood on the same terms. `meta` and
+ * `config` are never touched.
  *
  * @see ./config.js
  * @see ./store.js
@@ -264,6 +307,10 @@ export interface Pruned {
   readonly messages     : number;
   /** Receipts removed because their message was pruned — never by their own age. */
   readonly messageReads : number;
+  /** Held-note sidecars removed because their message was pruned (#43). */
+  readonly notes        : number;
+  /** Note ledger rows removed because their note was pruned — never by their own age. */
+  readonly noteEvents   : number;
 }
 &nbsp;
 /** Milliseconds in one day, for the horizon arithmetic. */
@@ -292,7 +339,9 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
 &nbsp;
   const days = Number(effectiveValue(store, 'retention.days') ?? <span class="branch-1 cbranch-no" title="branch not covered" >'0')</span>;
 &nbsp;
-  if (days === 0) { return { entries: 0, turnContext: 0, messages: 0, messageReads: 0 }; }
+  if (days === 0) {
+    return { entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 };
+  }
 &nbsp;
   const horizon = new Date(now.getTime() - days * DAY_MS).toISOString();
 &nbsp;
@@ -305,6 +354,18 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
         reads       = store.db.prepare(
           'DELETE FROM message_reads WHERE message_id IN (SELECT id FROM messages WHERE ts_utc &lt; ?)')
           .run(horizon),
+        // Held notes (#43) hang off `messages` the same way, two links deep: the ledger
+        // references the note, the note references the message. Both go by orphanhood,
+        // innermost first, for exactly the receipts' reason — and a note whose message
+        // is pruned is gone as a matter of the horizon, never of the note ladder, which
+        // only ever ends a note by expiry, withdrawal, or surfacing.
+        noteEvents  = store.db.prepare(`
+          DELETE FROM note_events WHERE note_id IN (
+            SELECT n.id FROM notes n JOIN messages m ON m.id = n.message_id WHERE m.ts_utc &lt; ?)`)
+          .run(horizon),
+        notes       = store.db.prepare(
+          'DELETE FROM notes WHERE message_id IN (SELECT id FROM messages WHERE ts_utc &lt; ?)')
+          .run(horizon),
         messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc &lt; ?').run(horizon);
 &nbsp;
   return {
@@ -312,6 +373,8 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
     turnContext  : Number(turnContext.changes),
     messages     : Number(messages.changes),
     messageReads : Number(reads.changes),
+    notes        : Number(notes.changes),
+    noteEvents   : Number(noteEvents.changes),
   };
 &nbsp;
 }
@@ -322,7 +385,7 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T19:57:37.783Z
+                at 2026-08-28T20:35:16.545Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

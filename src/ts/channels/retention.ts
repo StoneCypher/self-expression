@@ -14,8 +14,9 @@
  * `messages` prunes by age, and `message_reads` prunes **only by orphanhood** — a
  * receipt whose message survived must survive too, because deleting it would
  * resurrect the message as unread. Message expiry (`expires_utc`) is not retention:
- * it only stops delivery, and only this horizon ever deletes. `meta` and `config`
- * are never touched.
+ * it only stops delivery, and only this horizon ever deletes. The held-note tables
+ * (#43) hang off `messages` and prune by orphanhood on the same terms. `meta` and
+ * `config` are never touched.
  *
  * @see ./config.js
  * @see ./store.js
@@ -31,6 +32,10 @@ export interface Pruned {
   readonly messages     : number;
   /** Receipts removed because their message was pruned — never by their own age. */
   readonly messageReads : number;
+  /** Held-note sidecars removed because their message was pruned (#43). */
+  readonly notes        : number;
+  /** Note ledger rows removed because their note was pruned — never by their own age. */
+  readonly noteEvents   : number;
 }
 
 /** Milliseconds in one day, for the horizon arithmetic. */
@@ -59,7 +64,9 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
 
   const days = Number(effectiveValue(store, 'retention.days') ?? '0');
 
-  if (days === 0) { return { entries: 0, turnContext: 0, messages: 0, messageReads: 0 }; }
+  if (days === 0) {
+    return { entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 };
+  }
 
   const horizon = new Date(now.getTime() - days * DAY_MS).toISOString();
 
@@ -72,6 +79,18 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
         reads       = store.db.prepare(
           'DELETE FROM message_reads WHERE message_id IN (SELECT id FROM messages WHERE ts_utc < ?)')
           .run(horizon),
+        // Held notes (#43) hang off `messages` the same way, two links deep: the ledger
+        // references the note, the note references the message. Both go by orphanhood,
+        // innermost first, for exactly the receipts' reason — and a note whose message
+        // is pruned is gone as a matter of the horizon, never of the note ladder, which
+        // only ever ends a note by expiry, withdrawal, or surfacing.
+        noteEvents  = store.db.prepare(`
+          DELETE FROM note_events WHERE note_id IN (
+            SELECT n.id FROM notes n JOIN messages m ON m.id = n.message_id WHERE m.ts_utc < ?)`)
+          .run(horizon),
+        notes       = store.db.prepare(
+          'DELETE FROM notes WHERE message_id IN (SELECT id FROM messages WHERE ts_utc < ?)')
+          .run(horizon),
         messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon);
 
   return {
@@ -79,6 +98,8 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
     turnContext  : Number(turnContext.changes),
     messages     : Number(messages.changes),
     messageReads : Number(reads.changes),
+    notes        : Number(notes.changes),
+    noteEvents   : Number(noteEvents.changes),
   };
 
 }

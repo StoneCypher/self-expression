@@ -95,6 +95,13 @@ export const QUESTIONS: readonly Question[] = [
             'the channel set.' },
   { id: 'gifts', kind: 'boolean', keys: ['gifts.enabled'], defaultAnswer: 'false',
     prompt: 'The gift register? Off by default.' },
+  { id: 'mailbox', kind: 'boolean', keys: ['mailbox.enabled'], defaultAnswer: 'false',
+    prompt: 'Held notes — may the assistant write something down at a moment of its own ' +
+            'choosing (including an unattended wakeup) for you to read at the start of a ' +
+            'later turn of yours? Off by default. Nothing is ever said into an empty ' +
+            'room: a note is only ever surfaced on a turn you started, at most one per ' +
+            'turn and three a day, each with a stated reason, a visible "held since" ' +
+            'line, and an expiry.' },
   { id: 'dwelling', kind: 'path-gated boolean',
     keys: ['dwelling.enabled', 'dwelling.path'], defaultAnswer: 'false',
     prompt: 'A keepsake dwelling — a small database of kept things? Off by default. ' +

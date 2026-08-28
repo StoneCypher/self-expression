@@ -12,7 +12,7 @@
  * @see ../doc_md/plugin-layout.md
  */
 import type { HistoryChart } from './raster/compose.js';
-import type { Audience } from './channels/vocabulary.js';
+import type { Audience, NoteState } from './channels/vocabulary.js';
 /** A resolved `render` subcommand: the window, the chart, and where to write. */
 export interface RenderCommand {
     readonly kind: 'render';
@@ -38,6 +38,20 @@ export interface MessagesCommand {
     /** Most messages printed; a positive integer, capped at 100. */
     readonly limit: number;
 }
+/**
+ * A resolved `notes` subcommand — the human's audit door onto held notes (issue #43).
+ *
+ * Read-only by design. The whole facility must work for someone who never runs this, so
+ * the door is for looking; it is deliberately not a drain, and there is nothing here
+ * that could mark a note delivered.
+ */
+export interface NotesCommand {
+    readonly kind: 'notes';
+    /** State filter, or `null` for everything — including the notes that died. */
+    readonly state: NoteState | null;
+    /** Most notes printed; a positive integer, capped at 200. */
+    readonly limit: number;
+}
 /** A resolved command line, after parsing but before execution. */
 export type CliCommand = {
     readonly kind: 'mcp';
@@ -46,7 +60,7 @@ export type CliCommand = {
     readonly name: string;
 } | {
     readonly kind: 'help';
-} | RenderCommand | MessagesCommand | {
+} | RenderCommand | MessagesCommand | NotesCommand | {
     readonly kind: 'invalid';
     readonly message: string;
 } | {
@@ -93,6 +107,8 @@ export type HookRunner = (name: string) => Promise<void>;
 export type RenderRunner = (command: RenderCommand) => Promise<string>;
 /** Reads messagebox mail and resolves to the human-first report to print. */
 export type MessagesRunner = (command: MessagesCommand) => Promise<string>;
+/** Reads the held-note queue and resolves to the human-first report to print. */
+export type NotesRunner = (command: NotesCommand) => Promise<string>;
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -100,16 +116,16 @@ export type MessagesRunner = (command: MessagesCommand) => Promise<string>;
  * returns a number. Everything else delegates to `run` unchanged, so the pure dispatch
  * stays pure and only the genuinely asynchronous path lives here.
  *
- * `startServer`, `runHook`, `runRender`, and `runMessages` are injected so this can
- * be tested without opening a pipe, a database, or writing an image to disk.
+ * `startServer`, `runHook`, `runRender`, `runMessages`, and `runNotes` are injected so
+ * this can be tested without opening a pipe, a database, or writing an image to disk.
  *
  * @example
- *   await runAsync(['help'], streams, start, hook, render, messages)  // => 0, never calls start
- *   await runAsync(['mcp'],  streams, start, hook, render, messages)  // => 0 once the transport closes
- *   await runAsync(['messages', '--ack'], streams, start, hook, render, messages)
+ *   await runAsync(['help'], streams, start, hook, render, messages, notes)  // => 0, never calls start
+ *   await runAsync(['mcp'],  streams, start, hook, render, messages, notes)  // => 0 once the transport closes
+ *   await runAsync(['messages', '--ack'], streams, start, hook, render, messages, notes)
  *   // => 0, having written the mail report to streams.out
  */
-export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner, runRender: RenderRunner, runMessages: MessagesRunner): Promise<number>;
+export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner, runRender: RenderRunner, runMessages: MessagesRunner, runNotes: NotesRunner): Promise<number>;
 /**
  * Execute a parsed command and report the process exit code.
  *

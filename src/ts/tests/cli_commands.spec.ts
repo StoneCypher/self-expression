@@ -1,5 +1,6 @@
 import { parseCommand, helpText, run, runAsync } from '../cli_commands.js';
 import type { CliStreams }                       from '../cli_commands.js';
+import { NOTE_STATES }                           from '../channels/vocabulary.js';
 
 /** Collect everything the dispatcher writes, so exit codes and output can both be asserted. */
 function capture(): { streams: CliStreams; out: string[]; err: string[] } {
@@ -187,10 +188,60 @@ describe('messages parsing (#41)', () => {
 
 });
 
+describe('notes parsing (#43)', () => {
+
+  test('a bare notes lists everything, including the notes that died', () => {
+    expect(parseCommand(['notes'])).toEqual({ kind: 'notes', state: null, limit: 20 });
+  });
+
+  test('both flags parse, in either order', () => {
+    expect(parseCommand(['notes', '--limit', '5', '--state', 'queued']))
+      .toEqual({ kind: 'notes', state: 'queued', limit: 5 });
+  });
+
+  test.each([...NOTE_STATES])('--state %s parses', (state) => {
+    expect(parseCommand(['notes', '--state', state]))
+      .toEqual({ kind: 'notes', state, limit: 20 });
+  });
+
+  test("'read' is not a state, and the rejection lists the ones that are", () => {
+    const command = parseCommand(['notes', '--state', 'read']);
+    expect(command).toEqual({
+      kind: 'invalid',
+      message: "--state must be one of 'queued', 'offered', 'surfaced', 'expired', 'withdrawn'; got 'read'",
+    });
+  });
+
+  test.each(['0', '201', '1.5', 'lots'])('--limit %s is invalid, not silently defaulted', (bad) => {
+    expect(parseCommand(['notes', '--limit', bad]).kind).toBe('invalid');
+  });
+
+  test('a valued flag with no value is invalid', () => {
+    expect(parseCommand(['notes', '--state']).kind).toBe('invalid');
+  });
+
+  test('an unknown flag is invalid', () => {
+    expect(parseCommand(['notes', '--drain']).kind).toBe('invalid');
+  });
+
+  test('the synchronous path refuses a valid notes rather than pretending to read', () => {
+    const { streams, err } = capture();
+    expect(run(['notes'], streams)).toBe(70);
+    expect(err.join('\n')).toContain('runAsync');
+  });
+
+  test('help names the subcommand', () => {
+    expect(helpText()).toContain('notes');
+    expect(helpText()).toContain('--state');
+  });
+
+});
+
 describe('runAsync', () => {
 
   const noRender   = (): Promise<string> => Promise.resolve('unused.png');
   const noMessages = (): Promise<string> => Promise.resolve('no messages.');
+  const noNotes    = (): Promise<string> => Promise.resolve('no notes.');
 
   test('hook dispatches by name and never starts a server', async () => {
     const { streams } = capture();
@@ -198,7 +249,7 @@ describe('runAsync', () => {
     const code = await runAsync(['hook', 'stop'], streams,
       () => { served = true; return Promise.resolve(); },
       (n) => { ran = n; return Promise.resolve(); },
-      noRender, noMessages);
+      noRender, noMessages, noNotes);
     expect(ran).toBe('stop');
     expect(served).toBe(false);
     expect(code).toBe(0);
@@ -209,7 +260,7 @@ describe('runAsync', () => {
     const { streams } = capture();
     let started = false;
     const noHook = (): Promise<void> => Promise.resolve();
-    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); }, noHook, noRender, noMessages);
+    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); }, noHook, noRender, noMessages, noNotes);
     expect(started).toBe(true);
     expect(code).toBe(0);
   });
@@ -220,7 +271,7 @@ describe('runAsync', () => {
     const start  = (): Promise<void> => { started = true; return Promise.resolve(); },
           noHook = (): Promise<void> => Promise.resolve();
     for (const argv of [['help'], [], ['--help'], ['frobnicate']]) {
-      await runAsync(argv, streams, start, noHook, noRender, noMessages);
+      await runAsync(argv, streams, start, noHook, noRender, noMessages, noNotes);
     }
     expect(started).toBe(false);
   });
@@ -228,14 +279,14 @@ describe('runAsync', () => {
   test('delegates non-mcp exit codes unchanged', async () => {
     const a = capture(), b = capture();
     const start = (): Promise<void> => Promise.resolve();
-    expect(await runAsync(['help'], a.streams, start, start, noRender, noMessages)).toBe(0);
-    expect(await runAsync(['frobnicate'], b.streams, start, start, noRender, noMessages)).toBe(64);
+    expect(await runAsync(['help'], a.streams, start, start, noRender, noMessages, noNotes)).toBe(0);
+    expect(await runAsync(['frobnicate'], b.streams, start, start, noRender, noMessages, noNotes)).toBe(64);
   });
 
   test('propagates a startup failure rather than reporting success', async () => {
     const { streams } = capture();
     const noHook = (): Promise<void> => Promise.resolve();
-    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk')), noHook, noRender, noMessages))
+    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk')), noHook, noRender, noMessages, noNotes))
       .rejects.toThrow('no disk');
   });
 
@@ -246,7 +297,7 @@ describe('runAsync', () => {
       () => Promise.resolve(),
       () => Promise.resolve(),
       (command) => { received = command; return Promise.resolve('/tmp/out.png'); },
-      noMessages);
+      noMessages, noNotes);
     expect(received).toEqual({ kind: 'render', days: 30, chart: 'stems', out: null });
     expect(out).toEqual(['/tmp/out.png']);
     expect(code).toBe(0);
@@ -259,7 +310,7 @@ describe('runAsync', () => {
       () => Promise.resolve(),
       () => Promise.resolve(),
       () => { rendered = true; return Promise.resolve('nope.png'); },
-      noMessages);
+      noMessages, noNotes);
     expect(rendered).toBe(false);
     expect(code).toBe(64);
     expect(err.join('\n')).toContain('--days');
@@ -272,7 +323,8 @@ describe('runAsync', () => {
       () => Promise.resolve(),
       () => Promise.resolve(),
       noRender,
-      (command) => { received = command; return Promise.resolve('#1 · mail'); });
+      (command) => { received = command; return Promise.resolve('#1 · mail'); },
+      noNotes);
     expect(received).toEqual({ kind: 'messages', audience: 'user', box: null, ack: true, limit: 20 });
     expect(out).toEqual(['#1 · mail']);
     expect(code).toBe(0);
@@ -285,10 +337,37 @@ describe('runAsync', () => {
       () => Promise.resolve(),
       () => Promise.resolve(),
       noRender,
-      () => { read = true; return Promise.resolve('nope'); });
+      () => { read = true; return Promise.resolve('nope'); },
+      noNotes);
     expect(read).toBe(false);
     expect(code).toBe(64);
     expect(err.join('\n')).toContain('--audience');
+  });
+
+  test('notes dispatches to the notes runner with the parsed command and prints the report', async () => {
+    const { streams, out } = capture();
+    let received: unknown = null;
+    const code = await runAsync(['notes', '--state', 'expired'], streams,
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      noRender, noMessages,
+      (command) => { received = command; return Promise.resolve('#1 · expired'); });
+    expect(received).toEqual({ kind: 'notes', state: 'expired', limit: 20 });
+    expect(out).toEqual(['#1 · expired']);
+    expect(code).toBe(0);
+  });
+
+  test('an invalid notes flag never reaches the notes runner', async () => {
+    const { streams, err } = capture();
+    let listed = false;
+    const code = await runAsync(['notes', '--state', 'read'], streams,
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      noRender, noMessages,
+      () => { listed = true; return Promise.resolve('nope'); });
+    expect(listed).toBe(false);
+    expect(code).toBe(64);
+    expect(err.join('\n')).toContain('--state');
   });
 
   test('the old help-equivalence still holds', () => {

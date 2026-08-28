@@ -8,6 +8,7 @@ import { recordEntry }   from '../channels/entries.js';
 import { recordContext } from '../channels/context.js';
 import { pruneExpired }  from '../channels/retention.js';
 import { postMessage, readMessages, unreadCounts } from '../channels/messages.js';
+import { composeNote, listNotes } from '../channels/notes.js';
 
 const VERSION = '0.2.1';
 
@@ -47,14 +48,15 @@ describe('pruneExpired', () => {
 
   test('the default — 0 — disables pruning entirely', () => withStore(s => {
     seed(s);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
     expect(counts(s)).toEqual({ entries: 4, context: 4 });
   }));
 
   test('prunes both tables past the horizon and keeps everything inside it', () => withStore(s => {
     seed(s);
     writeConfig(s, 'retention.days', 30);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 2, turnContext: 2, messages: 0, messageReads: 0 });
+    expect(pruneExpired(s, NOW))
+      .toEqual({ entries: 2, turnContext: 2, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
     expect(counts(s)).toEqual({ entries: 2, context: 2 });
     const texts = s.db.prepare('SELECT text FROM entries ORDER BY id').all().map(r => r['text']);
     expect(texts).toEqual(['recent', 'today']);
@@ -81,7 +83,7 @@ describe('pruneExpired', () => {
   test('an invalid stored horizon behaves as unset — nothing is pruned (D5)', () => withStore(s => {
     seed(s);
     writeConfig(s, 'retention.days', 'sometimes');
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
     expect(counts(s)).toEqual({ entries: 4, context: 4 });
   }));
 
@@ -89,7 +91,7 @@ describe('pruneExpired', () => {
     seed(s);
     writeConfig(s, 'retention.days', 30);
     pruneExpired(s, NOW);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
   }));
 
   test('messages ride the same horizon (#41): old rows pruned, fresh rows kept', () => withStore(s => {
@@ -120,6 +122,25 @@ describe('pruneExpired', () => {
     const orphans = s.db.prepare(
       'SELECT COUNT(*) AS n FROM message_reads WHERE message_id NOT IN (SELECT id FROM messages)').get();
     expect(Number(orphans?.['n'])).toBe(0);
+  }));
+
+  test('held notes and their ledger prune by orphanhood with their message (#43)', () => withStore(s => {
+    writeConfig(s, 'mailbox.enabled', 'true');
+    composeNote(s, { text: 'ancient', reason: 'r', session: 's1' }, VERSION, daysAgo(90));
+    composeNote(s, { text: 'today',   reason: 'r', session: 's1' }, VERSION, NOW);
+    writeConfig(s, 'retention.days', 30);
+
+    const pruned = pruneExpired(s, NOW);
+    expect(pruned.messages).toBe(1);
+    expect(pruned.notes).toBe(1);
+    expect(pruned.noteEvents).toBe(1);
+
+    // Exactly the survivor is left, and nothing dangles: an orphaned note or ledger row
+    // would be a state the derivation could not read at all.
+    expect(listNotes(s, {}, NOW).map(n => n.text)).toEqual(['today']);
+    const dangling = s.db.prepare(
+      'SELECT COUNT(*) AS n FROM note_events WHERE note_id NOT IN (SELECT id FROM notes)').get();
+    expect(Number(dangling?.['n'])).toBe(0);
   }));
 
   test('expiry is not retention: an expired message survives pruning inside the horizon', () => withStore(s => {

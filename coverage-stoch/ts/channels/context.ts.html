@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10.34% </span>
+                <span class="strong">82.75% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/29</span>
+                <span class='fraction'>24/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -218,7 +218,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">123x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -258,15 +258,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">418x</span>
+<span class="cline-any cline-yes">426x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">418x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">426x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -275,9 +271,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">123x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">123x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * The bridge between the hooks and the server.
@@ -324,18 +324,18 @@ export interface TurnContext {
  * @example
  *   recordContext(store, { session: 'abc', promptId: 'p1', effort: 'high' });
  */
-export function <span class="fstat-no" title="function not covered" >recordContext(s</span>tore: Store, context: TurnContext, when: Date = <span class="branch-0 cbranch-no" title="branch not covered" >new Date()): void {</span>
+export function recordContext(store: Store, context: TurnContext, when: Date = new Date()): void {
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  store.db.prepare(`</span>
+  store.db.prepare(`
     INSERT INTO turn_context (
       ts_utc, session, prompt_id, turn_index, turn, cwd, git_branch,
       permission_mode, agent_id, agent_type, effort, compactions, prompt_len
     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     stamp(when).utc,
     context.session,
-    context.promptId       ?? null,
-    context.turnIndex      ?? null,
-    context.turn           ?? null,
+    context.promptId       ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span>
+    context.turnIndex      ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span>
+    context.turn           ?? <span class="branch-1 cbranch-no" title="branch not covered" >null,</span>
     context.cwd            ?? null,
     context.gitBranch      ?? null,
     context.permissionMode ?? null,
@@ -382,10 +382,10 @@ export function latestContext(store: Store, session?: string): Record&lt;string,
  * @example
  *   turnCount(store, 'abc')  // =&gt; 12
  */
-export function <span class="fstat-no" title="function not covered" >turnCount(s</span>tore: Store, session: string): number {
-  const row = <span class="cstat-no" title="statement not covered" >store.db.prepare(</span>
+export function turnCount(store: Store, session: string): number {
+  const row = store.db.prepare(
     'SELECT COUNT(*) AS n FROM turn_context WHERE session = ?').get(session);
-<span class="cstat-no" title="statement not covered" >  return Number(row?.['n'] ?? 0);</span>
+  return Number(row?.['n'] ?? <span class="branch-1 cbranch-no" title="branch not covered" >0)</span>;
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -394,7 +394,7 @@ export function <span class="fstat-no" title="function not covered" >turnCount(s
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T19:57:37.783Z
+                at 2026-08-28T20:35:16.545Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

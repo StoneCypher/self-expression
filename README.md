@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787947060757` from hash `66da9d1`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787949318837` from hash `79e589d`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787947060757 Friday, August 28, 2026 at GMT-07:00 94.48 313 90 66da9d1 50.97 64.28 64.68 63.79 146 1662 88.39 92 94.86 1516 0.2.1 -->
+<!-- Supported embeds: 1787949318837 Friday, August 28, 2026 at GMT-07:00 94.42 313 90 79e589d 53.62 65.7 65.85 65.51 153 1771 88.56 91.86 94.78 1618 0.2.1 -->
 
 
 
@@ -143,6 +143,12 @@ The registered keys:
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
 | `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
+| `mailbox.enabled` | bool | `false` | Held notes (#43): the one switch that stops composition, offering, and surfacing at once. **Off by default**, and only the exact value `true` enables — this is a consent surface, so an ambiguous value means no. |
+| `mailbox.surface_budget` | int | `1` | How many held notes one turn of yours may be offered. `0` holds everything without disabling composition. |
+| `mailbox.daily_cap` | int | `3` | Held notes that may be surfaced in any **rolling** 24 hours — rolling, so midnight is not a free refill. |
+| `mailbox.max_pending` | int | `10` | Queue depth. Composing past it fails loudly rather than queueing silently: a dropped note is a note its author believes was written. |
+| `mailbox.offer_cap` | int | `3` | Offers a note gets before it expires unsurfaced. A note gets a few chances at an entrance, and then it is over. |
+| `mailbox.default_ttl_days` | int | `14` | Default note lifetime when no expiry is given. Expiry is mandatory, so this is a default rather than an opt-in. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
@@ -177,9 +183,10 @@ Several features are durably toggleable and default off precisely because they a
 matters of taste, size, or consent. On a fresh database the server's MCP handshake
 says onboarding is pending, and the assistant offers a short questionnaire — at a
 natural pause, never interrupting the work: the party roster, forecasts, visible
-revision, the ⭑ salience glyph, the taste line, the gift register, the dwelling (which
-requires a directory of your choosing — there is deliberately no default path), and
-trimming the channel set.
+revision, the ⭑ salience glyph, the taste line, the gift register, held notes (whether
+the assistant may write something down at a moment of its own choosing for you to read
+later), the dwelling (which requires a directory of your choosing — there is deliberately
+no default path), and trimming the channel set.
 
 Saying **"defaults"** ends it in one word and writes nothing, so later releases'
 changed defaults still reach you; every explicitly answered question writes a real
@@ -375,7 +382,7 @@ The audiences:
 |---|---|---|---|
 | `self` | sender's session | the same session, later — after compaction or resume | `SessionStart` injects the notes; the per-turn line shows a count |
 | `agents` | `box` (required) | any agent working that box | none — workers poll by instruction |
-| `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count |
+| `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count (held notes excluded — see below) |
 | `record` | global | nobody; consultable history | never |
 
 Two MCP tools:
@@ -396,6 +403,104 @@ absence peeks. Delivery is pull on every host; on Claude, hooks add two pull tri
 a per-turn unread-count line (config-gated by `messages.notify`) and a `SessionStart`
 injection of unread self notes on `compact`/`resume`, which is what makes a note to
 future-self genuinely survive compaction.
+
+Held notes (below) are stored as `user` messages with a timing sidecar, so one table
+carries every assistant-authored text — but they are **excluded from unread `user`
+delivery and from the count line**, because their delivery is the note ladder's and one
+text must not carry two disagreeing delivery records. They remain visible in the
+`ack: false` peek, which claims nothing about delivery.
+
+&nbsp;
+
+&nbsp;
+
+## Held notes — choosing when to speak
+
+**Off by default.** Everything else this plugin records is reactive: you send a prompt,
+the assistant answers, and the channels decorate that answer. A held note is the other
+thing — agency over *when* to speak. Something ripens at 2 am during an unattended
+wakeup, or is worth saying but only once Tuesday's deploy window opens, and the words
+have to survive an interval in which nobody is present and land at a moment when someone
+is.
+
+The reason this is a facility rather than "just say it during the wakeup" is one blunt
+fact: **false-belief-of-delivery is worse than silence.** Output written into an
+unattended terminal scrolls past cron noise, and the assistant is left holding a durable
+memory of having told you something you never saw. So the discipline is:
+
+> **Compose on any turn; deliver only on a human's turn.**
+
+A wakeup may write a note. It may not deliver one. The sole delivery vehicle is the
+`UserPromptSubmit` hook riding your next prompt — the one moment in the whole stack with
+a presence guarantee, because you definitionally just acted.
+
+The ladder a note climbs, and where it stops:
+
+| state | meaning |
+|---|---|
+| `queued` | written and waiting. Ripeness (`now ≥ notBefore`) is derived, never stored. |
+| `offered` | the turn-start hook found it ripe on a turn **it** stamped `reply`, and handed it over. Lasts one turn. |
+| `surfaced` | rendered into a reply you prompted. **Terminal success — and the ceiling.** |
+| `expired` | the mandatory TTL passed, or the offer cap ran out. Never resurrected. |
+| `withdrawn` | retracted by a later, wiser turn, or superseded by a newer note in its series. |
+
+**There is deliberately no `read` state, and there never will be.** Nothing in this stack
+can observe you reading anything — no read receipts, no unread indicator, no presence
+detection — so a `read` term would name a fact nothing can collect. `surfaced` means
+exactly "this text was rendered into a reply the human explicitly prompted", and the
+record never claims more. Ask the assistant whether a note reached you and the true
+answer is available: *surfaced into Tuesday's 9:40 am reply*, or *expired unoffered* —
+never a comfortable fiction.
+
+That guarantee is structural rather than promised. Offers are recorded by the hook, with
+the turn type the harness supplied, and `surface_note` refuses unless the note carries an
+offer stamped `reply` on that same turn. No sequence of tool calls, retries, or wakeups
+manufactures a delivery claim the hook did not authorize; a property test asserts exactly
+that over arbitrary operation sequences.
+
+Four MCP tools:
+
+| Tool | Purpose |
+|---|---|
+| `post_note` | Write one now to be said later: `text`, a mandatory `reason`, optional `notBefore`, `expiresUtc`, and `seriesKey`. Legal on any turn, wakeups included. |
+| `withdraw_note` | Retract a queued note. Terminal — the composing turn and the surfacing turn can be days apart, and a later turn must be able to take something back. |
+| `surface_note` | Report that an offered note was rendered into *this* reply. The enforcement point; every other claim is refused. |
+| `list_notes` | The audit surface: every note with its derived state and the budgets in force, **including the ones that died**. |
+
+A surfaced note always carries its provenance, which is a safety property rather than
+decoration — a held note presenting itself as a spontaneous thought would be a small
+deception about exactly the dimension this feature grants agency over:
+
+```text
+📬 Held note #12 — written Saturday evening, held until Tuesday morning; reason: the
+   deploy window opens then
+   The migration in #52 assumes the store is v1; run the reconcile step first.
+```
+
+Timing may target availability and relevance. It may **never** target your state of mind:
+no scheduling conditioned on mood or persuadability, no burying an unwelcome note at a
+low-attention moment. Mandatory provenance is the enforcement surface — every timing
+choice is visible and attributable.
+
+A note for Tuesday morning lands with the first prompt you send after Tuesday morning. If
+you first type at 2 pm, it lands at 2 pm. That bound is the point, not a compromise:
+landing at 9:00 sharp in an empty room is the failure this design exists to foreclose.
+
+Your own read-only door, with no model in the loop:
+
+```text
+self-expression notes [--state S] [--limit N]
+```
+
+Scarcity is structural, not aspirational: a per-turn budget, a rolling-24-hour cap, a
+queue depth that fails loudly rather than silently, an offer cap after which a note dies,
+a mandatory expiry, and `seriesKey` dedupe so a recurring worry replaces itself instead
+of piling up. Nothing anywhere prompts the assistant to write a note — a prompted note is
+a performed note. Notes are ordinary rows in the same local database as everything else,
+under the same privacy flags; they never leave the machine, and public aggregation
+carries counts and states, never text. On a host with no `UserPromptSubmit` hook, notes
+still compose and queue but nothing is ever offered — degraded means *held longer*, never
+*claimed delivered*.
 
 &nbsp;
 
@@ -519,19 +624,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1516</td>
-    <td>94.48<small>%</small></td>
-    <td>88.39<small>%</small></td>
-    <td>92<small>%</small></td>
-    <td>94.86<small>%</small></td>
+    <td>1618</td>
+    <td>94.42<small>%</small></td>
+    <td>88.56<small>%</small></td>
+    <td>91.86<small>%</small></td>
+    <td>94.78<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>146</td>
-    <td>94.48<small>%</small></td>
-    <td>50.97<small>%</small></td>
-    <td>64.68<small>%</small></td>
-    <td>63.79<small>%</small></td>
+    <td>153</td>
+    <td>94.42<small>%</small></td>
+    <td>53.62<small>%</small></td>
+    <td>65.85<small>%</small></td>
+    <td>65.51<small>%</small></td>
   </tr>
 </table>
 

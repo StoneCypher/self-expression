@@ -52,8 +52,10 @@ self-expression/
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
 │   │                        migrations (migrate.ts; CHECK growth forces table rebuilds),
-│   │                        the messagebox facility (messages.ts, issue #41), and
-│   │                        anchoring's pure resolvers (anchors.ts, issue #18)
+│   │                        the messagebox facility (messages.ts, issue #41),
+│   │                        anchoring's pure resolvers (anchors.ts, issue #18), and
+│   │                        held notes (notes.ts, issue #43) — a timing sidecar on
+│   │                        messages whose only delivery door is the turn-start hook
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
 │   ├── claudio/             the voluntary audio facility: its own MCP server, gate, ledger,
 │   │                        WAV pipeline, and PowerShell player seam (issue #44)
@@ -178,6 +180,44 @@ as it delivers. `self` is fenced by hook-observed session, `agents` by a require
 (`expires_utc`) only excludes from delivery; deletion belongs to `retention.days`,
 which prunes messages by age and receipts only by orphanhood. The
 `self-expression messages` CLI subcommand is the human's own door.
+
+**Held notes are a sidecar on the messagebox, and the hook is the only door
+(issue #43).** Self-initiated speech — agency over *when* to speak — hangs entirely from
+one asymmetry: an autonomous wakeup is a fine moment to *decide* something is worth saying
+and to *write it down*, and a provably terrible moment to *say* it, because nothing is
+watching an unattended terminal and the assistant would be left believing it had
+communicated something nobody saw. False-belief-of-delivery is worse than silence. So the
+rule is **compose on any turn; deliver only on a human's turn**, and the `UserPromptSubmit`
+hook is the sole delivery vehicle, because it is the one moment in the stack with a
+presence guarantee.
+
+Storage reuses #41 rather than rivalling it: a note *is* a `user` message plus timing, so
+`notes` carries only `not_before`, `reason`, and `series_key` beside a `message_id`, and
+the words, sender identity, and expiry stay on `messages`. State is never a column — it
+is derived from the append-only `note_events` ledger, whose `turn` column carries the
+**hook-supplied** turn type. That is what makes the discipline structural: an `offered`
+row can only exist with `turn = 'reply'`, and `surface_note` refuses unless such a row
+exists for the same `prompt_id`, so no sequence of tool calls manufactures a delivery
+claim the hook did not authorize. The ladder is `queued → offered → surfaced` with
+`expired` and `withdrawn` terminal, and **there is deliberately no `read` state** — the
+platform has no read receipts, no unread indicator, and no presence detection, so a
+`read` term would name a fact nothing can collect. `surfaced` means exactly "this text
+was rendered into a reply the human explicitly prompted", and the record never says more.
+
+Held notes are excluded from ordinary unread `user` mail (counts and delivery, not the
+peek): one text must not carry two disagreeing delivery records, and a note timed for
+Tuesday must not nag from the per-turn count line on Saturday.
+
+Consent and scarcity are the rest of it: `mailbox.enabled` defaults **off** and only an
+exact `true` enables (the `share.enabled` posture, not the `privacy.*` one); it is asked
+during onboarding beside `roster.enabled`; and five numeric keys — per-turn budget,
+rolling-24-hour cap, queue depth, offer cap, default TTL — make each note cost something.
+A note gets a few chances at an entrance and then it is over. Nothing anywhere prompts
+the model to write a note, because a prompted note is a performed note; provenance on a
+surfaced note is mandatory, because a held note presenting itself as a spontaneous
+thought would be a small deception about exactly the dimension this feature grants agency
+over. On a host with no `UserPromptSubmit` hook, notes still compose and queue but no
+offer ever fires — degraded means "held longer", never "claimed delivered".
 
 **Anchoring is a qualifier on entries, not a table or a channel (issue #18).** Five
 nullable columns on `entries` — `anchor_kind` (CHECK-constrained), `anchor_target`,

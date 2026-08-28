@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-69 merges; 2 releases
+70 merges; 2 releases
 
 
 
@@ -14,6 +14,69 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:25:39 PM
+
+Commit [a04fc493ffe3a051ba09203b5dae16d84f46c503](https://github.com/StoneCypher/self-expression/commit/a04fc493ffe3a051ba09203b5dae16d84f46c503)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: held-note unit, tool, hook, and stochastic tests
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:16:35 PM
+
+Commit [b11d52e0b86b86bd1b8d99b9e929d54decfe52dd](https://github.com/StoneCypher/self-expression/commit/b11d52e0b86b86bd1b8d99b9e929d54decfe52dd)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: held notes core — schema v5, notes.ts, tools, hook offer path
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 1:01:12 PM
+
+Commit [2da163dbb0c2c478ec1555892d1f54415fd7f297](https://github.com/StoneCypher/self-expression/commit/2da163dbb0c2c478ec1555892d1f54415fd7f297)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [8fc723d, 9f7a387]
+
+  * Merge pull request #80 from StoneCypher/feat_26-08-28_anchoring_18
+  * feat: anchoring — commentary bound to a location instead of floating in prose (#18)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:58:22 PM
+
+Commit [9f7a387f8d2d47877cebc2e07070fb8618a010d3](https://github.com/StoneCypher/self-expression/commit/9f7a387f8d2d47877cebc2e07070fb8618a010d3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * build: regenerate artifacts after merging origin/main
 
 
 

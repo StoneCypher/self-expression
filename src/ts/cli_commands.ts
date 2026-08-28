@@ -14,8 +14,8 @@
 
 import { HISTORY_CHARTS } from './raster/compose.js';
 import type { HistoryChart } from './raster/compose.js';
-import { AUDIENCES, describeVocabulary } from './channels/vocabulary.js';
-import type { Audience } from './channels/vocabulary.js';
+import { AUDIENCES, NOTE_STATES, describeVocabulary } from './channels/vocabulary.js';
+import type { Audience, NoteState } from './channels/vocabulary.js';
 
 /** A resolved `render` subcommand: the window, the chart, and where to write. */
 export interface RenderCommand {
@@ -44,6 +44,21 @@ export interface MessagesCommand {
   readonly limit    : number;
 }
 
+/**
+ * A resolved `notes` subcommand — the human's audit door onto held notes (issue #43).
+ *
+ * Read-only by design. The whole facility must work for someone who never runs this, so
+ * the door is for looking; it is deliberately not a drain, and there is nothing here
+ * that could mark a note delivered.
+ */
+export interface NotesCommand {
+  readonly kind   : 'notes';
+  /** State filter, or `null` for everything — including the notes that died. */
+  readonly state  : NoteState | null;
+  /** Most notes printed; a positive integer, capped at 200. */
+  readonly limit  : number;
+}
+
 /** A resolved command line, after parsing but before execution. */
 export type CliCommand =
   | { readonly kind: 'mcp' }
@@ -51,6 +66,7 @@ export type CliCommand =
   | { readonly kind: 'help' }
   | RenderCommand
   | MessagesCommand
+  | NotesCommand
   | { readonly kind: 'invalid'; readonly message: string }
   | { readonly kind: 'unknown'; readonly token: string };
 
@@ -85,6 +101,7 @@ export function parseCommand(argv: readonly string[]): CliCommand {
   if (first === 'hook')                                       { return { kind: 'hook', name: argv[1] ?? '' }; }
   if (first === 'render')                                     { return parseRender(argv.slice(1)); }
   if (first === 'messages')                                   { return parseMessages(argv.slice(1)); }
+  if (first === 'notes')                                      { return parseNotes(argv.slice(1)); }
   if (first === 'help' || first === '--help' || first === '-h') { return { kind: 'help' }; }
 
   return { kind: 'unknown', token: first };
@@ -234,6 +251,69 @@ function parseMessages(rest: readonly string[]): CliCommand {
 }
 
 /**
+ * Parse the flags after `notes` into a {@link NotesCommand}, or an `invalid` command
+ * naming exactly what was wrong.
+ *
+ * Grammar: `notes [--state S] [--limit N]`, flags in any order. A bad value is reported
+ * rather than silently defaulted, for the same reason `messages` reports one: a typo'd
+ * state quietly becoming "everything" would answer a different question while looking
+ * like success.
+ *
+ * @example
+ *   parseNotes([])
+ *   // => { kind: 'notes', state: null, limit: 20 }
+ *   parseNotes(['--state', 'expired'])
+ *   // => { kind: 'notes', state: 'expired', limit: 20 }
+ *   parseNotes(['--state', 'read'])
+ *   // => { kind: 'invalid', message: "--state must be one of 'queued', … " }
+ */
+function parseNotes(rest: readonly string[]): CliCommand {
+
+  let state: NoteState | null = null,
+      limit                   = 20;
+
+  for (let i = 0; i < rest.length; i += 2) {
+
+    const flag = rest[i], value = rest[i + 1];
+
+    if (flag === undefined) { break; }
+    if (value === undefined) {
+      return { kind: 'invalid', message: `${flag} requires a value` };
+    }
+
+    switch (flag) {
+
+      case '--state': {
+        const found = NOTE_STATES.find(name => name === value);
+        if (found === undefined) {
+          return { kind: 'invalid',
+                   message: `--state must be one of ${describeVocabulary(NOTE_STATES)}; got '${value}'` };
+        }
+        state = found;
+        break;
+      }
+
+      case '--limit': {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > 200) {
+          return { kind: 'invalid', message: `--limit must be an integer from 1 to 200; got '${value}'` };
+        }
+        limit = parsed;
+        break;
+      }
+
+      default:
+        return { kind: 'invalid', message: `notes does not understand '${flag}'` };
+
+    }
+
+  }
+
+  return { kind: 'notes', state, limit };
+
+}
+
+/**
  * The text shown for `--help` and for a bare invocation.
  *
  * Kept as a pure function returning one string so it can be asserted against directly,
@@ -253,6 +333,8 @@ export function helpText(): string {
     '                               render logged history as a PNG; prints the path',
     '  self-expression messages [--audience A] [--box B] [--ack] [--limit N]',
     '                               read messagebox mail (default: yours); --ack marks it read',
+    '  self-expression notes [--state S] [--limit N]',
+    '                               list held notes and how each one ended; read-only',
     '  self-expression help         show this message',
     '',
     'The MCP server is normally started by a host plugin rather than by hand;',
@@ -272,6 +354,9 @@ export type RenderRunner = (command: RenderCommand) => Promise<string>;
 /** Reads messagebox mail and resolves to the human-first report to print. */
 export type MessagesRunner = (command: MessagesCommand) => Promise<string>;
 
+/** Reads the held-note queue and resolves to the human-first report to print. */
+export type NotesRunner = (command: NotesCommand) => Promise<string>;
+
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -279,13 +364,13 @@ export type MessagesRunner = (command: MessagesCommand) => Promise<string>;
  * returns a number. Everything else delegates to `run` unchanged, so the pure dispatch
  * stays pure and only the genuinely asynchronous path lives here.
  *
- * `startServer`, `runHook`, `runRender`, and `runMessages` are injected so this can
- * be tested without opening a pipe, a database, or writing an image to disk.
+ * `startServer`, `runHook`, `runRender`, `runMessages`, and `runNotes` are injected so
+ * this can be tested without opening a pipe, a database, or writing an image to disk.
  *
  * @example
- *   await runAsync(['help'], streams, start, hook, render, messages)  // => 0, never calls start
- *   await runAsync(['mcp'],  streams, start, hook, render, messages)  // => 0 once the transport closes
- *   await runAsync(['messages', '--ack'], streams, start, hook, render, messages)
+ *   await runAsync(['help'], streams, start, hook, render, messages, notes)  // => 0, never calls start
+ *   await runAsync(['mcp'],  streams, start, hook, render, messages, notes)  // => 0 once the transport closes
+ *   await runAsync(['messages', '--ack'], streams, start, hook, render, messages, notes)
  *   // => 0, having written the mail report to streams.out
  */
 export async function runAsync(
@@ -295,6 +380,7 @@ export async function runAsync(
   runHook     : HookRunner,
   runRender   : RenderRunner,
   runMessages : MessagesRunner,
+  runNotes    : NotesRunner,
 ): Promise<number> {
 
   const command = parseCommand(argv);
@@ -309,6 +395,11 @@ export async function runAsync(
 
   if (command.kind === 'messages') {
     streams.out(await runMessages(command));
+    return 0;
+  }
+
+  if (command.kind === 'notes') {
+    streams.out(await runNotes(command));
     return 0;
   }
 
@@ -343,6 +434,7 @@ export function run(argv: readonly string[], streams: CliStreams): number {
     case 'hook':
     case 'render':
     case 'messages':
+    case 'notes':
       streams.err(`self-expression: '${command.kind}' must be dispatched through runAsync.`);
       return 70;   // EX_SOFTWARE — reachable only by calling run() directly, which is a bug
 

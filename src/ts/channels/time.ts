@@ -75,6 +75,53 @@ export function clockTime(when: Date): string {
 }
 
 /**
+ * Which stretch of the day `when` falls in, in local time.
+ *
+ * Five buckets rather than a clock reading, because the interesting question is rarely
+ * the exact minute — it is whether this is a Tuesday morning or a Saturday at two in the
+ * morning. The `small hours` bucket is why the boundary sits at 5 rather than midnight:
+ * work at 2 am belongs with the night that preceded it, not with the day that follows.
+ *
+ * @param when the instant to classify, read in the host's local zone
+ *
+ * @example
+ *   partOfDay(new Date(2026, 7, 18, 14, 5))  // => 'afternoon'
+ *   partOfDay(new Date(2026, 7, 18,  2, 0))  // => 'small hours'
+ *
+ * @see dayPhrase
+ */
+export function partOfDay(when: Date): string {
+  const hour = when.getHours();
+  return hour <  5 ? 'small hours'
+       : hour < 12 ? 'morning'
+       : hour < 17 ? 'afternoon'
+       : hour < 21 ? 'evening'
+       :             'night';
+}
+
+/**
+ * A short human phrase naming when something happened — `Saturday evening`.
+ *
+ * Exists for held-note provenance (#43), where the surfaced note must say when it was
+ * written and how long it was held. Weekday-plus-stretch is the right resolution for
+ * that: "written Saturday evening, held until Tuesday morning" is legible at a glance,
+ * where an ISO instant is not, and the exact instant is a column away for anyone
+ * auditing.
+ *
+ * @param when the instant to describe, read in the host's local zone
+ *
+ * @example
+ *   dayPhrase(new Date(2026, 7, 22, 19, 30))  // => 'Saturday evening'
+ *   dayPhrase(new Date(2026, 7, 25,  9,  0))  // => 'Tuesday morning'
+ *
+ * @see partOfDay
+ * @see ./notes.js renderHeldNote
+ */
+export function dayPhrase(when: Date): string {
+  return `${when.toLocaleDateString('en-US', { weekday: 'long' })} ${partOfDay(when)}`;
+}
+
+/**
  * All three time fields for a single instant.
  *
  * `when` is injectable so callers and tests can pin the clock; it defaults to now.

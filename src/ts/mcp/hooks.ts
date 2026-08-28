@@ -20,8 +20,9 @@ import { readConfig }                              from '../channels/store.js';
 import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
 import { CHANNELS }                                from '../channels/vocabulary.js';
 import { unreadCounts, readMessages }              from '../channels/messages.js';
+import { offerRipeNotes, renderHeldNote }          from '../channels/notes.js';
 import type { Store }                              from '../channels/store.js';
-import { clockTime, zoneAbbreviation }             from '../channels/time.js';
+import { clockTime, zoneAbbreviation, partOfDay }  from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
 
 /** The subset of a hook payload these handlers read. */
@@ -59,16 +60,10 @@ export type HookOutput = Record<string, unknown> | null;
  */
 export function describeMoment(now: Date): string {
 
-  const hour = now.getHours(),
-        part = hour < 5 ? 'small hours'
-             : hour < 12 ? 'morning'
-             : hour < 17 ? 'afternoon'
-             : hour < 21 ? 'evening'
-             : 'night',
-        date = now.toLocaleDateString('en-US',
+  const date = now.toLocaleDateString('en-US',
                  { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  return `Turn starting ${date} at ${clockTime(now)} ${zoneAbbreviation(now)} (${part}).`;
+  return `Turn starting ${date} at ${clockTime(now)} ${zoneAbbreviation(now)} (${partOfDay(now)}).`;
 
 }
 
@@ -219,6 +214,58 @@ export function mailboxLine(store: Store, session: string | undefined, now: Date
 }
 
 /**
+ * The context line's held-note segment (issue #43) — or `null` when nothing is offered.
+ *
+ * **This is the entire delivery vehicle for self-initiated speech, and it exists only
+ * here.** A note may be composed on any turn; it can only ever be *offered* from inside
+ * this handler, on a turn the harness itself stamped `reply`, because that is the one
+ * moment in the platform with a presence guarantee — a human definitionally just acted.
+ * {@link ../channels/notes.js offerRipeNotes} refuses any other turn type outright, so
+ * there is no code path from a wakeup to a delivery claim.
+ *
+ * Unlike the messagebox count line, this carries the note **text**, not a count. The
+ * count-only shape would cost a round trip on every ripe turn and, worse, leave the
+ * model liable to render a note it had not actually fetched; carrying the words means
+ * the reply can be composed in one shot, with the provenance already rendered. The
+ * injection is still not delivery — context handed to the model is not text shown to a
+ * human — which is exactly why `surface_note` remains a separate, checked step.
+ *
+ * Ripe notes are offered as a side effect of reading this line, which is deliberate: an
+ * offer is a mechanical fact about a turn, so the hook that observed the turn is the
+ * only honest place to record it.
+ *
+ * @param turnId the hook-observed `prompt_id`; an absent one offers nothing, because a
+ *               turn with no identity cannot authorize a later surfacing
+ *
+ * @example
+ *   heldNotesLine(store, 'p-1', 'sess-1', new Date())
+ *   // => '📬 Held note #12 — written Saturday evening, held until Tuesday morning; …'
+ *
+ * @see onUserPromptSubmit
+ * @see ../channels/notes.js offerRipeNotes
+ */
+export function heldNotesLine(
+  store   : Store,
+  turnId  : string | undefined,
+  session : string | undefined,
+  now     : Date = new Date(),
+): string | null {
+
+  if (turnId === undefined || turnId === '') { return null; }
+
+  const offered = offerRipeNotes(store, { turn: 'reply', promptId: turnId, session }, now);
+
+  if (offered.length === 0) { return null; }
+
+  return `${offered.map(renderHeldNote).join('\n')}\n` +
+    'Render the note(s) above near the top of your reply, provenance line included and ' +
+    'verbatim, then call surface_note for each id you actually rendered. If this is the ' +
+    'wrong moment, render nothing and say nothing about it — the note returns to the ' +
+    'queue and gets another chance later, and a few chances is all it ever gets.';
+
+}
+
+/**
  * Asks for the opening signature at the only moment it can honestly be written.
  *
  * The opening read is deliberately not enforced at the end of the turn: blocking a stop
@@ -271,6 +318,12 @@ export const OPEN_REMINDER_CLOCKLESS =
  * present only when something is actually unread and both `messages.*` keys allow it.
  * It fails open separately too: a mailbox error costs the count line and nothing else.
  *
+ * Last comes the held-note segment ({@link heldNotesLine}, issue #43) — the **only**
+ * delivery vehicle self-initiated speech has. Notes may be composed on any turn, but
+ * they can be offered only from here, on a turn this hook stamped `reply`, which is what
+ * makes "compose on any turn; deliver only on a human's turn" a property of the code
+ * rather than a promise. It fails open on its own terms as well.
+ *
  * When `time.hook` is exactly `'false'`, the clock sentence is omitted and the
  * open-signature reminder goes out in its clockless wording — presentation changes,
  * observation does not (issue #30, D9). The conventions flags are config transport,
@@ -320,6 +373,18 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     } catch { /* fail open: the clock, flags, lengths, and reminder still get delivered */ }
   }
 
+  // Held notes (#43) ride the same fail-open boundary, and are last because they are the
+  // only segment that can be several lines long. An error here costs the note line and
+  // nothing else: the mailbox must never be able to wedge a turn, which is why the whole
+  // facility degrades to today's behaviour — a clock line and nothing more.
+  let held = '';
+  if (store !== null) {
+    try {
+      const line = heldNotesLine(store, payload.prompt_id, payload.session_id, now);
+      if (line !== null) { held = `\n${line}`; }
+    } catch { /* fail open: every other segment still gets delivered */ }
+  }
+
   // `time.hook` suppresses the clock sentence, and only that (issue #30, D9): the
   // context write above is observational, not presentational, and is unaffected; the
   // open-signature reminder still goes out, reworded for the clockless case. Only the
@@ -339,7 +404,7 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
   return {
     hookSpecificOutput: {
       hookEventName    : 'UserPromptSubmit',
-      additionalContext: head === '' ? reminder : `${head} ${reminder}`,
+      additionalContext: head === '' ? `${reminder}${held}` : `${head} ${reminder}${held}`,
     },
   };
 
