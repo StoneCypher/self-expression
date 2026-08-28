@@ -22,31 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 27, 2026 11:23:50 PM
-
-Commit [65908dd6fa46dbd28d8662674975a14f12c47ae1](https://github.com/StoneCypher/self-expression/commit/65908dd6fa46dbd28d8662674975a14f12c47ae1)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(spec): first-run onboarding questionnaire design
-  * Proposes the onboarding mechanism for issue #40: a code-resident question
-registry, a per-question 'onboarding.answered' ledger in the config table
-(no completion boolean, so questionnaire growth reaches existing installs),
-one 'onboard' MCP tool (status/answer/skip/reset), surfacing via the MCP
-instructions string rather than hooks, and an offer-not-gate etiquette.
-Inherits every feature key from its owning spec (#30, #42, #45,
-party-roster); adds only the ledger key. Includes rejected alternatives
-and the post-approval implementation checklist.
-  * Includes routine build regeneration (changelog, README stamp, coverage).
-  * Refs #40
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 27, 2026 11:18:51 PM
 
 Commit [c25abadcdbc9c0da2940e3c79243a4198ad949b8](https://github.com/StoneCypher/self-expression/commit/c25abadcdbc9c0da2940e3c79243a4198ad949b8)
