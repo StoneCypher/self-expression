@@ -19,8 +19,13 @@
     "configFile": "vitest-mutat.config.ts"
   },
   "testRunner_comment": "Take a look at https://stryker-mutator.io/docs/stryker-js/vitest-runner for information about the vitest plugin.",
+  "mutate_comment": "Charts wholesale, plus the deterministic string logic of diagrams (model, fsl parser, grid, mermaid emitter). diagrams/layout.ts and diagrams/renderers.ts are deliberately excluded: layout heuristics (barycenter ordering, slot spreading, gutter arithmetic) generate surviving-mutant noise without indicating missing tests — the diagram contract is invariants plus a few goldens, not byte-exact strings. See src/doc_md/plugin-layout.md.",
   "mutate": [
-    "src/ts/charts/**/*.ts"
+    "src/ts/charts/**/*.ts",
+    "src/ts/diagrams/model.ts",
+    "src/ts/diagrams/fsl.ts",
+    "src/ts/diagrams/grid.ts",
+    "src/ts/diagrams/mermaid.ts"
   ],
   "coverageAnalysis": "perTest"
 }

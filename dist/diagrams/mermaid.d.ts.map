@@ -1,0 +1,1 @@
+{"version":3,"file":"mermaid.d.ts","sourceRoot":"","sources":["../../../src/ts/diagrams/mermaid.ts"],"names":[],"mappings":"AAAA;;;;;;;;;;;;;GAaG;AAGH,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,YAAY,CAAC;AAE1C,6EAA6E;AAC7E,MAAM,MAAM,cAAc,GAAG,iBAAiB,GAAG,WAAW,CAAC;AAsB7D;;;;;;;;;;;;;;;;;;;;GAoBG;AACH,wBAAgB,SAAS,CAAC,KAAK,EAAE,OAAO,EAAE,OAAO,EAAE,cAAc,GAAG,MAAM,CAsCzE"}

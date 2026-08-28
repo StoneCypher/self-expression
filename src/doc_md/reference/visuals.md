@@ -79,3 +79,24 @@ Geography is schematic — equal tiles in approximate positions — a deliberate
 - **One-line FSL state machine** — for an item with genuine states and transitions, especially branching or cyclic: chained `->` transitions, `;` between statements, optional `'action'` labels, e.g. `locked 'coin' -> unlocked 'push' -> locked;`. One line only.  If a state is known to be active, write that state in bold.
 - **Retry health bar** — for an item with bounded retries left: `❤️` per retry available, `🩶` per retry spent, e.g. `❤️❤️❤️🩶🩶`. Pairs with the 🦡 marker.
 - **Weather health glyph** — at the end of an item's or group's text, summarizing a test set's health: `☀️` all green · `🌤️` mostly green · `⛅` mixed · `🌧️` failing · `⛈️` broad failure; specials `🌫️` flaky · `🌩️` crashing · `❄️` stalled/hung · `🌈` recovered.
+
+## Diagrams — when structure needs more than a line
+
+Charts express quantities; diagrams express structure. The decision rule
+(issue #19, `render_diagram` in `src/ts/diagrams/`):
+
+- **Quantities** (how much, how many, trend) → a chart: the `render_*` forms above.
+- **Linear order** (a pipeline, milestones, one path through states) → the inline forms:
+  the dependency chain, a timeline rail, or the one-line FSL state machine. A diagram of a
+  straight line is a waste of vertical space.
+- **Topology** — the moment structure branches, merges, cycles, fans in or out, or has
+  meaningfully *shaped* relationships — → `render_diagram`: `state` (a machine with more
+  than one path), `digraph` (shared dependencies, a call flow with a decision point, data
+  lineage with a join), `tree` (a strict hierarchy), or `sequence` (actors exchanging
+  messages over time). Always emit the drawing inside a ` ```text ` fence; it is framed,
+  single-width, and at most 78 columns by construction.
+- **Too big to draw** — the renderer refuses past its legibility threshold and names the
+  fallbacks: the one-line FSL form, a plain adjacency list, or the mermaid export
+  (`emit: 'mermaid'`) for a destination that actually renders mermaid, such as a GitHub PR
+  body. Never hand-draw what the renderer refused; a wrapped or misaligned diagram is worse
+  than no diagram.

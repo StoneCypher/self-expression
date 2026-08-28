@@ -31,6 +31,35 @@ Every renderer behind these tools is also exported directly from the library
 
 &nbsp;
 
+## Diagrams
+
+Charts express quantities; diagrams express **structure** — topology, relationships,
+transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issue #19):
+
+| Tool | Forms | Purpose |
+|---|---|---|
+| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, or a sequence diagram (actors, lifelines, one arrow row per message). |
+
+When to reach for it: **quantities** (how much, how many, trend) → a chart tool;
+**linear order** (a pipeline, one path through states) → `render_timeline`'s inline
+forms; **topology** — the moment structure branches, merges, cycles, or fans in or
+out — → `render_diagram`. Output is framed, single-width, at most 78 columns, and
+meant to sit inside a ```` ```text ```` fence. A graph too large or too tangled to
+draw legibly is refused with the fallbacks named in the error text (the FSL
+one-liner, an adjacency list, or the mermaid export). `emit: 'mermaid'` /
+`emit: 'both'` serialize the graph as `stateDiagram-v2` or `flowchart` source — an
+opt-in export for destinations that render mermaid (GitHub PR bodies, READMEs),
+never the in-transcript form, since the transcript surface shows mermaid as raw text.
+
+The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`),
+the FSL-subset parser (`parseFsl`, round-trip compatible with `renderFsl`), and the
+mermaid serializer (`toMermaid`) are all exported from the library
+(`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
+
+&nbsp;
+
+&nbsp;
+
 ## Checklists
 
 Three MCP tools replace the old skill's Bash-plus-scratch-file checklist loggers

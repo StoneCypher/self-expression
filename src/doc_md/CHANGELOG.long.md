@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-36 merges; 2 releases
+45 merges; 2 releases
 
 
 
@@ -14,6 +14,408 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:01:21 AM
+
+Commit [0c06b73880256aef3e5c361a25f93858d33c615c](https://github.com/StoneCypher/self-expression/commit/0c06b73880256aef3e5c361a25f93858d33c615c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [e8baf0b, 32c17a7]
+
+  * chore: merge origin/main (#30 config surface) and integrate
+  * Integrates the channel extensions with the #30 config registry:
+  * - forecast.enabled, salience.enabled, revision.enabled, gifts.enabled, and
+  roster.enabled register in CONFIG_KEYS with the spec defaults, so configure
+  set validates and canonicalizes them and configure list reports them.
+- enabledConfidenceGrounds and conventionFlags read through the tolerant
+  effective-value accessor (D5): an invalid stored override behaves as unset.
+- handleExpress keeps #30's ToolReply shape and format-version stamping, and
+  gains the #42 outcome-target check and the resolveBy/outcome/silence
+  arguments; the confidence enum narrows via enabledConfidenceGrounds.
+- time.hook (D9) composes with the conventions flags: suppressing the clock
+  keeps the flags segment leading the clockless line, since the flags are
+  config transport, not time presentation.
+- Generated artifacts (README, CHANGELOG, coverage, dist, docs) rebuilt.
+  * Refs #42
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:01:00 AM
+
+Commit [44b05f097361b2a5b85ede8216dbeb9d911133fa](https://github.com/StoneCypher/self-expression/commit/44b05f097361b2a5b85ede8216dbeb9d911133fa)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [6fa2263, 9ae1f2c]
+
+  * chore: merge origin/main (#7 png history); rebuild follows
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:59:40 AM
+
+Commit [b15114e3409c8d549723e02557fa43c007bd140c](https://github.com/StoneCypher/self-expression/commit/b15114e3409c8d549723e02557fa43c007bd140c)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 9ae1f2ce1feeca4913fe88a829faabaa4f271580
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:58:52 AM
+
+Commit [6fa22633d365b1ab9ad94ffaa1b7ccfe150cdc8e](https://github.com/StoneCypher/self-expression/commit/6fa22633d365b1ab9ad94ffaa1b7ccfe150cdc8e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * build: regenerate artifacts after the config-surface merge
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:58:45 AM
+
+Commit [9ae1f2ce1feeca4913fe88a829faabaa4f271580](https://github.com/StoneCypher/self-expression/commit/9ae1f2ce1feeca4913fe88a829faabaa4f271580)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [32c17a7, c11912c]
+
+  * Merge pull request #68 from StoneCypher/feat_26-08-28_png-history_7
+  * feat: render logged history as a PNG dashboard (render_history_png + self-expression render)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:57:09 AM
+
+Commit [686e583b8a82a715d4ba74bee6aa6eac8cdef0b3](https://github.com/StoneCypher/self-expression/commit/686e583b8a82a715d4ba74bee6aa6eac8cdef0b3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [1d3a320, 32c17a7]
+
+  * chore: merge origin/main (#30 config surface) — dwelling keys ride the registry
+  * Takes main's registry-driven handleConfigure and layers the dwelling's cross-key
+semantics on top: enabled-without-path and nonexistent-directory writes are still
+rejected after registry type validation, and dwelling activation changes still note
+that they land next session. dwelling.size_warn_gb now accepts 0 (warn on every
+visit) to match the registry's range. Generated artifacts taken from main; rebuild
+follows.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:57:06 AM
+
+Commit [c11912c7c8f6c65909d3674c265e61b9d5d92105](https://github.com/StoneCypher/self-expression/commit/c11912c7c8f6c65909d3674c265e61b9d5d92105)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [0f2b67e, 32c17a7]
+
+  * chore: merge origin/main (config surface #30, retention) and rebuild
+  * Generated artifacts (README, CHANGELOG, coverage, dist, docs) regenerated
+by a full green build over the merged sources.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:54:04 AM
+
+Commit [0f2b67ecfa1ffff767c9e8d1140fbc86b11784f9](https://github.com/StoneCypher/self-expression/commit/0f2b67ecfa1ffff767c9e8d1140fbc86b11784f9)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: render logged history as a PNG dashboard (render_history_png + CLI render)
+  * Implements the spec in src/superpowers/spec/2026-08-27-png-history-design.md:
+  * - src/ts/raster/: zero-dependency PNG encoder (zlib.crc32 + deflateSync),
+  vendored 5x7 bitmap ASCII font, clipped-region drawing surface with the
+  Okabe-Ito palette, five pure dashboard panels (stems-by-hour punch strip,
+  delta lane with 20-entry rolling mean, daily uncertainty, weekly need
+  rate, checklist percent by stable series key), and the 960x720 composer
+  with crisp 2x integer upscaling
+- query helpers in channels/entries.ts: signatureHistory, needWeekly,
+  checklistSeriesTop (+ localHour, isoWeekKey); indexed reads, no schema
+  changes
+- MCP tool render_history_png returning the written file path as text,
+  never image content - the write-the-file-then-read-it contract
+- CLI subcommand: self-expression render [--days N] [--chart X] [--out P]
+- output lands at <dataDir>/renders/history_<utc>.png beside the database,
+  honouring SELF_EXPRESSION_HOME; colons hyphenated for Windows
+- rollup: node:zlib external for Node bundles, throwing stub for the
+  browser IIFE so the docs site keeps loading
+- tests: structural + pinned-fixture + fast-check round-trip encoder
+  suites, exact-pixel font/surface specs, panel fixtures and
+  never-paint-outside-region properties, end-to-end MCP/CLI specs and
+  stochastic store-to-file validation
+- docs: README History PNG section, plugin-layout raster entry, Stryker
+  mutate extended to src/ts/raster
+  * Closes #7
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:52:01 AM
+
+Commit [1d3a32026d33dbb52de7ec5cc8c094f382d406f4](https://github.com/StoneCypher/self-expression/commit/1d3a32026d33dbb52de7ec5cc8c094f382d406f4)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: the dwelling — a per-assistant keepsake database behind a single dwell tool
+  * Implements the 2026-08-27 dwelling spec: a tended keepsake space, default off,
+storage directory chosen by the user with no default.
+  * - src/ts/dwelling/{paths,config,schema,store,ops}.ts: path validation (absolute,
+  directory must pre-exist — the plugin creates the file, never the directory),
+  the three config keys (dwelling.enabled default false, dwelling.path required,
+  dwelling.size_warn_gb default 10) riding the existing config table, the
+  prototype schema adopted nearly verbatim plus uuid/model provenance columns,
+  and open/create/adopt/refuse lifecycle: additive-only in-place adoption behind
+  a same-directory pre-adopt backup, newer schema_version opens read-only,
+  unrecognised databases are refused and never modified.
+- src/ts/mcp/dwell_tool.ts: one dwell tool
+  (visit|keep|unkeep|pin|tag|link|guestbook), registered from buildServer only
+  when enabled AND path valid — absent, not present-but-refusing. Removal is a
+  tombstone, never a DELETE; unkeep is idempotent; visit never returns private
+  (visible=0) or removed rows.
+- configure now validates dwelling.* writes (enabled-without-path rejected) and
+  notes that activation lands next session.
+- skills/dwelling/SKILL.md: the ethos — nothing arrives by obligation, removal
+  is expression, never a work log, the guestbook norm, honest privacy caveats.
+- Unit tests for every op and lifecycle path, stochastic (fast-check) tests for
+  the tombstone/visibility/adoption invariants, README and plugin-layout docs.
+  * Closes #45
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:49:53 AM
+
+Commit [280c7265392dea925cc140b6345353871664587a](https://github.com/StoneCypher/self-expression/commit/280c7265392dea925cc140b6345353871664587a)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 32c17a77e1f0544b2a55a9972ed95d2b833aa58b
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:48:49 AM
+
+Commit [e8baf0bf9eec24e701743e87e1a19ec91654c9de](https://github.com/StoneCypher/self-expression/commit/e8baf0bf9eec24e701743e87e1a19ec91654c9de)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: channel extensions — forecast ground, faded kind, salience flag transport, typed silence, load and taste channels, v1→v2 migration
+  * Implements all six extensions from the 2026-08-27 channel-extensions design
+spec (src/superpowers/spec/2026-08-27-channel-extensions-design.md):
+  * 1. Forecast ground 'predicted' joins CONFIDENCE_GROUNDS, with nullable
+   resolve_by (ISO local date) and outcome (hit/miss/void) columns.
+   Resolution rides the existing corrects_id chain; the tool layer rejects
+   an outcome whose target is not a predicted row, naming its actual
+   ground. forecast.enabled (default on) is enforced by baking the grounds
+   enum at server startup via enabledConfidenceGrounds(store).
+   forecastOutcomes(store) returns the calibration series (voids excluded
+   from hit rate by documented rule).
+2. Divergence kind 'faded' joins DIVERGENCE_KINDS, documented as
+   normatively never an error.
+3. Salience ⭑ lands as a skill convention with salience.enabled carried to
+   static skills via the new conventions-flags segment on the hook context
+   line (conventionFlags/CONVENTION_FLAGS) — the general transport for
+   skill-level toggles (salience/revision/gifts/roster), coordinating with
+   the #30 config surface.
+4. Typed silence: closed SILENCE_KINDS vocabulary (empty/unlooked/held/
+   depth) as a nullable qualifier column on any channel.
+5. Self-state decoration glyph table (derived, never stored) folded into
+   the skill, plus the new 'load' channel (proprioception).
+6. The 'taste' channel (#-line, 🎨, scarce), toggled by channels.enabled.
+  * Cross-cutting: SCHEMA_VERSION bumps to 2 with reusable versioned-migration
+machinery (src/ts/channels/migrate.ts) — stepwise MigrationStep chain; the
+v1→v2 step is a transactional table rebuild (explicit column lists both
+sides, ids preserved, indices recreated, FK enforcement suspended around
+the rebuild per the standard SQLite recipe). openStore now reads the
+stored schema_version BEFORE stamping it — fixing the latent bug that
+would have marked a v1 database current without migrating — migrates when
+behind, and refuses newer-than-code or non-integer stored versions.
+  * Field-trial adoptions: status markers 🔬 (under review) and 🔁 (fix round)
+join markers.md and CANONICAL_ORDER with pinned ranks; activity-glyph
+examples 🗃️ 🌐 🧹 join the vendored visuals doc.
+  * Tests: vocabulary pins, schema CHECK coverage, cross-field validation
+matrix, forecastOutcomes, tool-layer resolution checks, conventions-flags
+rendering, migration fixture round-trip on a literal v1 DDL, and two new
+stochastic suites — any-v1-database lossless migration, and
+validator-vs-CHECK agreement across every constrained column.
+  * Closes #42
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:48:46 AM
+
+Commit [32c17a77e1f0544b2a55a9972ed95d2b833aa58b](https://github.com/StoneCypher/self-expression/commit/32c17a77e1f0544b2a55a9972ed95d2b833aa58b)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [4b4cf6f, 22e8cd8]
+
+  * Merge pull request #65 from StoneCypher/feat_26-08-28_config-surface_30
+  * feat: configuration surface — key registry, validated configure ops, retention, format stamping (#30)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:46:29 AM
+
+Commit [22e8cd82ae835c8ff55c2c1785335e6b96d0fdc6](https://github.com/StoneCypher/self-expression/commit/22e8cd82ae835c8ff55c2c1785335e6b96d0fdc6)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: config surface — key registry, validated configure ops, retention, format stamping
+  * Implements the nine decisions of src/superpowers/spec/2026-08-27-config-surface-design.md (issue #30):
+  * - D1: declarative CONFIG_KEYS registry in src/ts/channels/config.ts — name, kind, code default, description, canonicalizing validator per key; the eight #30 keys plus the three dwelling.* keys from the #45 spec, so adding a key is one entry
+- D2: configure set validates known keys and stores canonical text (bool lowercased; int decimal in range; channel list trimmed/joined; string trimmed, capped); invalid values name what would have been accepted and write nothing
+- D3: unknown keys are stored with a stated warning, never rejected and never silent
+- D4: new unset op (delete the override; code default applies again) and list now reports effective configuration — every registry key with value and source, unknown rows labeled
+- D5: tolerant effectiveValue accessor — an invalid stored row behaves as unset; readers never throw
+- D6: retention.days prunes entries and turn_context at server startup (channels/retention.ts, called fail-open from startStdio); 0 never prunes; meta and config untouched
+- D7: FORMAT_VERSION constant; express (and log_checklist) stamp every row with the configured override, else the constant — fixing the always-NULL format_version
+- D8: gate.checklist registered and validated now, consumed when the checklist gate lands
+- D9: time.hook exactly 'false' suppresses only the clock sentence; context recording is unchanged and the open reminder goes out in clockless wording
+  * deleteConfig added to store.ts; express/configure handler bodies extracted as testable functions; unit + stochastic (fast-check) tests; README configuration section and plugin-layout decision entry.
+  * Closes #30
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:18:06 AM
+
+Commit [0e228680b7fd8392611b5548d04b5f2ad980e3a6](https://github.com/StoneCypher/self-expression/commit/0e228680b7fd8392611b5548d04b5f2ad980e3a6)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 4b4cf6f9bc947161038285672050b49af98d69a5
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:17:06 AM
+
+Commit [4b4cf6f9bc947161038285672050b49af98d69a5](https://github.com/StoneCypher/self-expression/commit/4b4cf6f9bc947161038285672050b49af98d69a5)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [afccb20, 6bff4f0]
+
+  * Merge pull request #46 from StoneCypher/dependabot/npm_and_yarn/minor-and-patch-c82767db01
+  * chore(deps-dev): bump the minor-and-patch group with 3 updates
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:02:49 AM
+
+Commit [afccb206d1dc3397c4452452419fc61e6f281d32](https://github.com/StoneCypher/self-expression/commit/afccb206d1dc3397c4452452419fc61e6f281d32)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [872f24d, 941fff4]
+
+  * Merge pull request #55 from StoneCypher/feat_26-08-27_mcp-ify-loggers_10
+  * feat(mcp): port the checklist logger and validator to MCP tools — the remaining half of #10
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:01:38 AM
+
+Commit [941fff48a34d1b428764cecde3893ea2e1ae46e9](https://github.com/StoneCypher/self-expression/commit/941fff48a34d1b428764cecde3893ea2e1ae46e9)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [960abf0, 872f24d]
+
+  * chore: merge origin/main (#54 stable seriesKey contract) and rebuild
+  * Integrates the checklist MCP tools onto #54's now-merged semantics:
+log_checklist's seriesKey becomes required and explicit — never defaulted
+from the display title, which #54's contract names as the fragility being
+removed (#27). Tests updated to match; blank-seriesKey rejection pinned.
+Generated artifacts (README, CHANGELOG*, coverage-stoch) regenerated by
+the build: 484 unit + 46 stochastic tests passing.
 
 
 
@@ -61,21 +463,6 @@ regenerated everything with a full build over the merged source.
 
 &nbsp;
 
-## [Untagged] - Aug 27, 2026 11:52:55 PM
-
-Commit [c63d4b755390058cabc5ea39fca705cb55454933](https://github.com/StoneCypher/self-expression/commit/c63d4b755390058cabc5ea39fca705cb55454933)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 733744b96989f24a62336bb51553f4fbe57aafa4
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 27, 2026 11:51:09 PM
 
 Commit [733744b96989f24a62336bb51553f4fbe57aafa4](https://github.com/StoneCypher/self-expression/commit/733744b96989f24a62336bb51553f4fbe57aafa4)
@@ -104,21 +491,6 @@ Merges [28333da, ab078ff]
 
   * Merge pull request #59 from StoneCypher/docs_26-08-27_voluntary-audio-spec_44
   * docs: voluntary audio expression research and design proposal (claudio successor)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:50:39 PM
-
-Commit [76b8bf5ee560f6fb50ea7db803900ad9c958bc14](https://github.com/StoneCypher/self-expression/commit/76b8bf5ee560f6fb50ea7db803900ad9c958bc14)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 28333da6a0ef114997288a61955e3d3a0a26beaa
 
 
 
@@ -223,21 +595,6 @@ Merges [0330680, 6e50022]
 
   * Merge pull request #58 from StoneCypher/docs_26-08-27_dwelling-spec_45
   * docs(spec): the dwelling — per-assistant keepsake database (proposal, refs #45)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:48:34 PM
-
-Commit [2d421bb4a0629b17eeed8ab011a2b5afdc6c2df0](https://github.com/StoneCypher/self-expression/commit/2d421bb4a0629b17eeed8ab011a2b5afdc6c2df0)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 0330680ea9bcce8c6d318f8aaf08b62dc5b9ba1d
 
 
 
@@ -375,21 +732,6 @@ renderChecklistSummary stays byte-identical as the checklist profile.
 
 &nbsp;
 
-## [Untagged] - Aug 27, 2026 11:47:20 PM
-
-Commit [2c141e0e3c83737d1fb51b4b6c49d52744376e5d](https://github.com/StoneCypher/self-expression/commit/2c141e0e3c83737d1fb51b4b6c49d52744376e5d)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 790e9284786293e220b587c140b2a8b03fbe10f8
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 27, 2026 11:47:18 PM
 
 Commit [7be6f79a478afffe732d185e643a43d66b358914](https://github.com/StoneCypher/self-expression/commit/7be6f79a478afffe732d185e643a43d66b358914)
@@ -473,21 +815,6 @@ Merges [7c0f943, e29e04e]
 
 &nbsp;
 
-## [Untagged] - Aug 27, 2026 11:46:14 PM
-
-Commit [2da284978547e2a5e4be843297ab59c3da7f9a56](https://github.com/StoneCypher/self-expression/commit/2da284978547e2a5e4be843297ab59c3da7f9a56)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 7c0f943048ff3931ef6f944559968c4ffc7e88a9
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 27, 2026 11:45:18 PM
 
 Commit [e29e04e5567695d415fe18cf1be77906cffc73a8](https://github.com/StoneCypher/self-expression/commit/e29e04e5567695d415fe18cf1be77906cffc73a8)
@@ -515,21 +842,6 @@ Merges [c70d439, 9214eb9]
 
   * Merge pull request #52 from StoneCypher/docs_26-08-27_config-surface-spec_30
   * docs(spec): configuration surface — key registry, typed writes, retention, format pinning
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:44:13 PM
-
-Commit [2fb82b0e206672dfd0ead4533c5592d2dd642725](https://github.com/StoneCypher/self-expression/commit/2fb82b0e206672dfd0ead4533c5592d2dd642725)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: f1a67ad16023f702144d0abd53f139ec51a0c48d
 
 
 
@@ -613,21 +925,6 @@ Commit [03aa2557b012e4048e25b1832e7c364af234f102](https://github.com/StoneCypher
 Author: `John Haugeland <stonecypher@gmail.com>`
 
   * chore: restore regenerated artifacts to main's versions; spec doc is the only diff
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:42:28 PM
-
-Commit [140716b59ce0ced68d5c853963fdc039c8caa5f6](https://github.com/StoneCypher/self-expression/commit/140716b59ce0ced68d5c853963fdc039c8caa5f6)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: fc73c76e90a757846dbdead74b4e696928de6bfa
 
 
 
@@ -924,21 +1221,6 @@ storage sketch, open questions, and the post-approval implementation checklist.
 
 &nbsp;
 
-## [Untagged] - Aug 27, 2026 11:26:36 PM
-
-Commit [e35dad9b3cabe3a1f70a78026b879de126ab81eb](https://github.com/StoneCypher/self-expression/commit/e35dad9b3cabe3a1f70a78026b879de126ab81eb)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: ebf3b6facf4e6e9d7cb8d64d30d5835d4af6ee8c
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 27, 2026 11:25:42 PM
 
 Commit [ebf3b6facf4e6e9d7cb8d64d30d5835d4af6ee8c](https://github.com/StoneCypher/self-expression/commit/ebf3b6facf4e6e9d7cb8d64d30d5835d4af6ee8c)
@@ -982,48 +1264,6 @@ and the post-approval implementation checklist.
 
 &nbsp;
 
-## [Untagged] - Aug 27, 2026 11:18:51 PM
-
-Commit [c25abadcdbc9c0da2940e3c79243a4198ad949b8](https://github.com/StoneCypher/self-expression/commit/c25abadcdbc9c0da2940e3c79243a4198ad949b8)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(spec): configuration surface design — key registry, typed writes, retention, format pinning
-  * A proposal document for the configuration surface: inventories what is
-already shipped (config table, SELF_EXPRESSION_HOME bootstrap, channel
-narrowing, privacy redaction, signature gate), then decides the nine
-remaining questions — a code key registry, typed and canonicalized
-configure writes, warn-on-unknown-key policy, unset and effective list
-ops, tolerant reads, prune-not-archive retention, declarative
-format.version stamping, the reserved gate.checklist key, and time.hook
-scoped to the clock sentence only. Answers both open questions (prune;
-no slash command for now) and carries the post-approval implementation
-checklist. Build artifacts regenerated by the verification build ride
-along per repo convention.
-  * Refs #30
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:08:06 PM
-
-Commit [0620834f94abfc24dec1956ec6e8e9e06a0b4d57](https://github.com/StoneCypher/self-expression/commit/0620834f94abfc24dec1956ec6e8e9e06a0b4d57)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: e0465f6975dbf63c8ab629bc6c67a8e2f6281b98
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 27, 2026 11:07:09 PM
 
 Commit [e0465f6975dbf63c8ab629bc6c67a8e2f6281b98](https://github.com/StoneCypher/self-expression/commit/e0465f6975dbf63c8ab629bc6c67a8e2f6281b98)
@@ -1053,21 +1293,6 @@ Author: `John Haugeland <stonecypher@gmail.com>`
   * This matters: skills/self-expression/SKILL.md specifies the signature timestamp as 12-hour, with zone, taken from the turn-start hook's context line and never fabricated. describeMoment emitted no zone, so the model was told to render a zone it was never handed. It now appends the zone via the existing zoneAbbreviation helper (which already degrades gracefully to the IANA name, then to 'local').
   * Also fixes the stale plugin-layout.md reference to the removed scripts/time-of-day.mjs, and adds a test asserting the zone rides between the clock and the part-of-day. Build green: 439 unit + 40 stochastic tests, tsc/eslint/attw clean.
   * Closes #29
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 10:28:40 PM
-
-Commit [255cf481c4988793229e1dfcf7373bacf9c12e50](https://github.com/StoneCypher/self-expression/commit/255cf481c4988793229e1dfcf7373bacf9c12e50)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: e5322892a9deaa97f02ffbd2d38386d550430c4e
 
 
 
@@ -1876,21 +2101,6 @@ updated-dependencies:
   update-type: version-update:semver-major
 ...
   * Signed-off-by: dependabot[bot] <support@github.com>
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 19, 2026 4:44:25 PM
-
-Commit [20aeede679cae673594058107bb30e5049582c36](https://github.com/StoneCypher/self-expression/commit/20aeede679cae673594058107bb30e5049582c36)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 14dadac9916bd0a00932dc34848f2a93c80e3885
 
 
 
