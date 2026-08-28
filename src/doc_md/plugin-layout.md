@@ -46,18 +46,25 @@ self-expression/
 │   └── hooks.claude.json    per-host, because event vocabularies differ; each entry runs
 │                            `node dist/cli.cjs hook <name>` — Node, never shell (Windows)
 │
+├── assets/
+│   └── leitmotifs/          vendored WAV palette for the claudio audio facility (issue #44),
+│                            generated offline by src/scripts/generate_leitmotifs.mjs
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
 │   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
 │   │                        and the messagebox facility (messages.ts, issue #41)
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
+│   ├── claudio/             the voluntary audio facility: its own MCP server, gate, ledger,
+│   │                        WAV pipeline, and PowerShell player seam (issue #44)
 │   ├── diagrams/            pure ASCII diagram renderers — structure (invariant contract)
 │   ├── dwelling/            the keepsake dwelling: paths, schema, store/adoption, ops
 │   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)
 │   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
+├── src/scripts/             permanent development scripts (leitmotif generation)
 └── dist/                    committed build output (dist is intentionally not gitignored)
+                             — includes claudio.cjs, the audio facility's own bundle
 ```
 
 &nbsp;
@@ -111,6 +118,27 @@ lives in `skills/dwelling/SKILL.md`, which defers to the tool's presence so a di
 dwelling costs no attention. Its three `dwelling.*` keys ride the #30 registry like any
 other; the dwelling layers its cross-key rule (enabled-without-path is rejected) and its
 directory-must-exist rule on top of the registry's type validation.
+
+**The audio facility is its own server inside this repository (issue #44).** The design
+ruled audio is its own facility — a separate package and plugin in the ideal — and the
+issue rules out riding the self-expression server by name. Inside this monorepo that
+lands as the closest structural equivalent: `src/ts/claudio/` builds into its **own
+bundle** (`dist/claudio.cjs`), behind its **own bin** (`self-expression-audio`) and its
+**own MCP server** (`claudio` in `.mcp.json`, over `npx -y --package=self-expression`),
+so the process boundary the design demands is real — a broken audio stack cannot take
+the backchannel down, and the main bundles load no player code. A separately published
+package remains possible later without moving anything above the seam; the choice to
+scaffold in-repo is recorded here. The facility is default off with an exact-affirmative
+enable, its tools are baked out of the schema when disabled (or on a platform with no
+player — everything non-Windows, for now), the player is a spawned
+`powershell -NoProfile -NonInteractive` child running `SoundPlayer.PlaySync()` on a
+vendored WAV with volume applied by sample-scaling in Node, and every strike attempt —
+played, refused, errored — lands in its own `audio.sqlite3` ledger. Its `audio.*` keys
+ride the #30 registry like the dwelling's; the `CLAUDIO_VOLUME_CEILING` environment
+variable is the one deliberately env-side control, because the host's MCP `env` block is
+the only surface no tool call can reach — the user's ceiling clamp can never be raised
+by the assistant. Quiet hours and the shared unprompted-output policy stay deferred to
+issue #43; the `express` cross-log stays deferred until a suitable channel exists.
 
 **Configuration is two layers, and the registry is code (issue #30).** `SELF_EXPRESSION_HOME`
 locates the database and does nothing else; every other choice is a `config` row, else the

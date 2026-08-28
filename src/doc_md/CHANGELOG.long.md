@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-64 merges; 2 releases
+63 merges; 2 releases
 
 
 
@@ -14,102 +14,6 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:55:17 AM
-
-Commit [2ec684e6ccbf91650eef4a34e636bd2c5f37bcb1](https://github.com/StoneCypher/self-expression/commit/2ec684e6ccbf91650eef4a34e636bd2c5f37bcb1)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs: onboarding etiquette in the skill and README onboarding section (wip, refs #40)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:54:25 AM
-
-Commit [a53119778fc5642e931c887589b7da5240401deb](https://github.com/StoneCypher/self-expression/commit/a53119778fc5642e931c887589b7da5240401deb)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * test: onboarding unit and stochastic suites (wip, refs #40)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:54:16 AM
-
-Commit [b2629687bfa08a1545f9b801ad27acac19487905](https://github.com/StoneCypher/self-expression/commit/b2629687bfa08a1545f9b801ad27acac19487905)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 896499021606d732e5aeafd7bf36a95320fabde9
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:53:00 AM
-
-Commit [896499021606d732e5aeafd7bf36a95320fabde9](https://github.com/StoneCypher/self-expression/commit/896499021606d732e5aeafd7bf36a95320fabde9)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [d8562eb, d3fec48]
-
-  * Merge pull request #71 from StoneCypher/feat_26-08-28_voluntary-audio_44
-  * feat: claudio — voluntary audio expression as its own facility (strike/audition/say)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:51:49 AM
-
-Commit [95b4285ccf10177a02d0e3fb6b167d2987c1fc77](https://github.com/StoneCypher/self-expression/commit/95b4285ccf10177a02d0e3fb6b167d2987c1fc77)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: onboarding question registry, ledger, and onboard MCP tool (wip, refs #40)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:51:45 AM
-
-Commit [d3fec489e7e1df2ca1385a6470de67afa851b398](https://github.com/StoneCypher/self-expression/commit/d3fec489e7e1df2ca1385a6470de67afa851b398)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: regenerate artifacts after the share/messagebox merge
-  * dist, coverage, README, and changelogs regenerated on the merged tree;
-full build green (exit 0).
-  * Refs #44
 
 
 
