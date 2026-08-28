@@ -817,8 +817,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">900x</span>
 <span class="cline-any cline-yes">900x</span>
-<span class="cline-any cline-yes">1150x</span>
-<span class="cline-any cline-yes">1150x</span>
+<span class="cline-any cline-yes">1164x</span>
+<span class="cline-any cline-yes">1164x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1185,9 +1185,9 @@ export function renderDiverging(value: number, maxAbs: number, cellsPerSide: num
   const rawFull = fraction * cellsPerSide;
   const full = Math.min(cellsPerSide, Math.floor(rawFull));
   const hasBoundary = full &lt; cellsPerSide;
-  const remainder = hasBoundary ? rawFull - full : <span class="branch-1 cbranch-no" title="branch not covered" >0;</span>
-  const boundary = hasBoundary ? boundaryGlyph(remainder) : <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
-  const padCount = cellsPerSide - full - (hasBoundary ? 1 : <span class="branch-1 cbranch-no" title="branch not covered" >0);</span>
+  const remainder = hasBoundary ? rawFull - full : 0;
+  const boundary = hasBoundary ? boundaryGlyph(remainder) : '';
+  const padCount = cellsPerSide - full - (hasBoundary ? 1 : 0);
 &nbsp;
   const grown = at(SHADES, 3).repeat(full);
   const pad = at(SHADES, 0).repeat(padCount);
