@@ -21,20 +21,26 @@ import { z }         from 'zod';
 import {
   CHANNELS, POSITIONS, DELTAS, STEMS, EFFORTS, TURNS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, ANCHOR_KINDS,
 } from '../channels/vocabulary.js';
 import type {
   Channel, Position, Delta, Stem, Turn, Effort,
   ConfidenceGround, DivergenceKind, Modality,
-  ForecastOutcome, SilenceKind,
+  ForecastOutcome, SilenceKind, AnchorKind,
 } from '../channels/vocabulary.js';
-import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
+import {
+  recordEntry, recentEntries, previousSignature, hasClosingSignature, validate,
+} from '../channels/entries.js';
+import type { EntryInput }                                                   from '../channels/entries.js';
+import { ANCHOR_QUOTE_MAX }                                                  from '../channels/anchors.js';
 import { readConfig, writeConfig, deleteConfig }                              from '../channels/store.js';
 import { FORMAT_VERSION, configKey, effectiveValue, effectiveConfig }         from '../channels/config.js';
 import { rejectDwellingWrite, dwellingChangeNotice }                          from '../dwelling/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
 import { stamp }                                                             from '../channels/time.js';
+import { renderAnnotations }                                                 from '../charts/annotations.js';
+import type { AnnotationNote } from '../charts/annotations.js';
 import type { Store }     from '../channels/store.js';
 import type { ToolReply } from './chart_tools.js';
 
@@ -143,6 +149,10 @@ export interface ExpressArgs {
   readonly resolveBy?      : string | undefined;
   readonly outcome?        : ForecastOutcome | undefined;
   readonly silence?        : SilenceKind | undefined;
+  readonly anchorKind?     : AnchorKind | undefined;
+  readonly anchorTarget?   : string | undefined;
+  readonly anchorSpan?     : string | undefined;
+  readonly anchorQuote?    : string | undefined;
   readonly visible?        : boolean | undefined;
   readonly correctsId?     : number | undefined;
   readonly effort?         : Effort | undefined;
@@ -156,6 +166,97 @@ export interface ExpressArgs {
   readonly active?         : number | undefined;
   readonly fail?           : number | undefined;
   readonly percent?        : number | undefined;
+}
+
+/**
+ * The half of anchor validation that needs the store: does the anchored thing exist?
+ *
+ * `entries.validate` can check an anchor's *shape* but not its *referent*, exactly as
+ * it can check that an `outcome` has a `correctsId` but not that the target is a
+ * forecast. Both checks return a rejection naming what would have worked — the highest
+ * id that exists, or the series keys that do — rather than only that the value failed.
+ *
+ * `file`, `prompt`, and `reply` targets are deliberately unchecked: a path may name a
+ * file the server cannot see from its cwd, and no hook observes response text or
+ * guarantees that a `prompt_id` is still in reach. Rejecting those would refuse valid
+ * annotations on unverifiable grounds; the resolution ladder reports their state at
+ * read time instead, which is where the truth actually lives.
+ *
+ * @returns the problem sentence, or `null` when there is nothing to object to
+ *
+ * @example
+ *   anchorTargetProblem(store, 'entry', '9999')
+ *   // => "anchorTarget '9999' is not an existing entry id; the highest id so far is 41"
+ *
+ * @see ../channels/entries.js anchorProblems
+ */
+export function anchorTargetProblem(
+  store  : Store,
+  kind   : AnchorKind | undefined,
+  target : string | undefined,
+): string | null {
+
+  if (kind === undefined || target === undefined) { return null; }
+
+  if (kind === 'entry') {
+    const found = store.db.prepare('SELECT 1 AS ok FROM entries WHERE id = ?').get(Number(target));
+    if (found !== undefined) { return null; }
+    const top     = store.db.prepare('SELECT MAX(id) AS top FROM entries').get(),
+          highest = top?.['top'] ?? null;
+    return `anchorTarget '${target}' is not an existing entry id; ` +
+      (highest === null ? 'no entries have been recorded yet' : `the highest id so far is ${String(highest)}`);
+  }
+
+  if (kind === 'checklist') {
+    const found = store.db.prepare(
+      'SELECT 1 AS ok FROM entries WHERE series_key = ? LIMIT 1').get(target);
+    if (found !== undefined) { return null; }
+    const keys = store.db.prepare(
+      'SELECT DISTINCT series_key FROM entries WHERE series_key IS NOT NULL ORDER BY series_key')
+      .all().map(row => `'${String(row['series_key'])}'`);
+    return `anchorTarget '${target}' names no recorded checklist series; ` +
+      (keys.length === 0 ? 'no series have been recorded yet' : `known keys are ${keys.join(', ')}`);
+  }
+
+  return null;
+
+}
+
+/**
+ * The anchor fields as they will be recorded, after the one adoption anchoring makes:
+ * a `prompt` anchor with no target adopts the hook-observed `prompt_id` of the message
+ * being answered.
+ *
+ * The common case — annotating the message you are replying to — therefore needs only
+ * the quote, exactly as `express` needs no `session`. Naming an earlier `prompt_id`
+ * explicitly stays possible for retrospective annotation, and an observed id always
+ * loses to one the caller supplied deliberately.
+ *
+ * @param args    the caller's anchor fields
+ * @param context the hook-observed turn context, or `null`
+ *
+ * @example
+ *   adoptAnchorTarget({ anchorKind: 'prompt', anchorQuote: 'ship it' }, { prompt_id: 'p-7' })
+ *   // => { anchorKind: 'prompt', anchorTarget: 'p-7', anchorQuote: 'ship it', anchorSpan: undefined }
+ */
+export function adoptAnchorTarget(
+  args    : Pick<ExpressArgs, 'anchorKind' | 'anchorTarget' | 'anchorSpan' | 'anchorQuote'>,
+  context : Record<string, unknown> | null,
+): Pick<EntryInput, 'anchorKind' | 'anchorTarget' | 'anchorSpan' | 'anchorQuote'> {
+
+  const observed = context?.['prompt_id'],
+        adopted  = args.anchorKind === 'prompt' && args.anchorTarget === undefined
+          && typeof observed === 'string' && observed !== ''
+          ? observed
+          : args.anchorTarget;
+
+  return {
+    anchorKind   : args.anchorKind,
+    anchorTarget : adopted,
+    anchorSpan   : args.anchorSpan,
+    anchorQuote  : args.anchorQuote,
+  };
+
 }
 
 /**
@@ -176,18 +277,26 @@ export interface ExpressArgs {
  * An `outcome` is additionally checked against the store (the half of forecast
  * validation `entries.validate` cannot do alone, #42): its `correctsId` must name an
  * existing row whose confidence is `'predicted'`, or the rejection names the target's
- * actual ground.
+ * actual ground. Anchors get the same treatment (#18): the referent check that needs
+ * the store runs here, and a `prompt` anchor with no target adopts the observed turn.
  *
  * @example
  *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
  *   // => { content: [{ type: 'text', text: 'recorded #1 …' }] }
  *
+ * @example
+ *   handleExpress(store, '0.2.1', { channel: 'dissent', text: '"ready" reads three ways',
+ *                                   anchorKind: 'prompt', anchorQuote: 'ship it when ready' })
+ *   // => recorded, anchored to the prompt_id the hook observed for this turn
+ *
  * @throws {Error} If entry validation fails — a closed field outside its vocabulary,
- *                 a cross-field forecast violation, or an outcome whose target is not
- *                 a `predicted` row — naming every problem and the values that would
- *                 have been accepted.
+ *                 a cross-field forecast or anchor violation, an outcome whose target
+ *                 is not a `predicted` row, or an anchor whose target does not exist —
+ *                 naming every problem and the values that would have been accepted.
  *
  * @see ../channels/entries.js recordEntry
+ * @see anchorTargetProblem
+ * @see adoptAnchorTarget
  */
 export function handleExpress(
   store         : Store,
@@ -213,6 +322,7 @@ export function handleExpress(
 
   const context = latestContext(store, args.session),
         privacy = privacyFlags(store),
+        anchor  = adoptAnchorTarget(args, context),
         str     = (k: string): string | undefined => {
           const v = context?.[k];
           return typeof v === 'string' && v !== '' ? v : undefined;
@@ -231,8 +341,12 @@ export function handleExpress(
   // on the privacy config a second time here: the hook already drops them at capture, but
   // a direct express call carries its own project argument and must not be able to smuggle
   // one in when the user has opted out.
+  const targetProblem = anchorTargetProblem(store, anchor.anchorKind, anchor.anchorTarget);
+  if (targetProblem !== null) { throw new Error(`cannot record entry:\n  - ${targetProblem}`); }
+
   const written = recordEntry(store, {
     ...args,
+    ...anchor,
     session        : args.session ?? str('session') ?? 'no-hook',
     promptId       : args.promptId ?? str('prompt_id'),
     turn           : args.turn     ?? (str('turn') as never),
@@ -252,6 +366,158 @@ export function handleExpress(
   }, pluginVersion);
 
   return reply(`recorded #${String(written.id)} ${written.uuid}`);
+
+}
+
+/** The most notes one `annotate` call may carry. */
+export const ANNOTATE_MAX_NOTES = 25;
+
+/** One note inside an `annotate` batch, after schema validation. */
+export interface AnnotateNote {
+  readonly channel       : Channel;
+  readonly text          : string;
+  readonly face?         : string | undefined;
+  readonly anchorKind    : AnchorKind;
+  readonly anchorTarget? : string | undefined;
+  readonly anchorSpan?   : string | undefined;
+  readonly anchorQuote?  : string | undefined;
+}
+
+/** What a caller supplies to `annotate`, after schema validation. */
+export interface AnnotateArgs {
+  readonly notes    : readonly AnnotateNote[];
+  readonly session? : string | undefined;
+}
+
+/**
+ * Handles `annotate`: records a batch of anchored notes as one row each,
+ * all-or-nothing, and returns the canonical rendered block.
+ *
+ * The issue's centre of gravity is "many short notes bound to many locations", and one
+ * `express` call per note makes a ten-note review cost ten tool calls. This is that
+ * batch: every note validates and records exactly as an `express` call would — same
+ * hook-context adoption, same referent checks, same write-time privacy gates, one row
+ * apiece — with two additions.
+ *
+ * **All-or-nothing.** Every note is validated before any is written, and the writes run
+ * inside one transaction, so an invalid note rejects the whole batch naming its index
+ * and its problem. A half-recorded review is worse than a rejected one: the reader
+ * cannot tell which half is missing.
+ *
+ * **The reply carries the block.** The recorded ids come back with
+ * {@link renderAnnotations}' output, so the model pastes the canonical rendering
+ * instead of imitating it — the same prevent-the-error-class argument that motivated
+ * the chart renderers. The block renders from the arguments, which is deliberate: a
+ * `prompt` quote suppressed by `privacy.store_quotes` still appeared in the transcript
+ * once, and it is the *later* recall that degrades to hash-only.
+ *
+ * @param store         the open store to record into
+ * @param pluginVersion stamped onto every row, as on every entry
+ * @param args          the validated tool arguments
+ * @param client        what the MCP handshake reported about the host, if anything
+ *
+ * @example
+ *   handleAnnotate(store, '0.2.1', { notes: [
+ *     { channel: 'dissent', text: 'null for unset and for empty', face: '😕',
+ *       anchorKind: 'file', anchorTarget: 'src/ts/channels/store.ts',
+ *       anchorSpan: 'L141', anchorQuote: 'readConfig(store, key)' },
+ *   ]})
+ *   // => { content: [{ type: 'text', text: 'recorded #1\n\n⚓ src/ts/channels/store.ts\n   …' }] }
+ *
+ * @throws {Error} If any note fails validation or names a target that does not exist —
+ *                 the message names the note's index and every problem found, and
+ *                 nothing at all is written.
+ *
+ * @see handleExpress
+ * @see ../charts/annotations.js renderAnnotations
+ */
+export function handleAnnotate(
+  store         : Store,
+  pluginVersion : string,
+  args          : AnnotateArgs,
+  client?       : ClientIdentity,
+): ToolReply {
+
+  if (args.notes.length === 0) {
+    throw new Error('cannot annotate:\n  - notes must not be empty; an annotation batch with no notes records nothing');
+  }
+
+  if (args.notes.length > ANNOTATE_MAX_NOTES) {
+    throw new Error(
+      `cannot annotate:\n  - ${String(args.notes.length)} notes exceeds the limit of ` +
+      `${String(ANNOTATE_MAX_NOTES)}; split the review, or say less about each location`);
+  }
+
+  const context = latestContext(store, args.session),
+        privacy = privacyFlags(store),
+        str     = (k: string): string | undefined => {
+          const v = context?.[k];
+          return typeof v === 'string' && v !== '' ? v : undefined;
+        },
+        num     = (k: string): number | undefined => {
+          const v = context?.[k];
+          return typeof v === 'number' ? v : undefined;
+        };
+
+  const inputs: EntryInput[] = args.notes.map(note => ({
+    channel        : note.channel,
+    text           : note.text,
+    face           : note.face,
+    ...adoptAnchorTarget(note, context),
+    session        : args.session ?? str('session') ?? 'no-hook',
+    promptId       : str('prompt_id'),
+    turn           : str('turn')   as never,
+    effort         : str('effort') as never,
+    turnIndex      : num('turn_index'),
+    cwd            : privacy.storeCwd ? str('cwd') : undefined,
+    gitBranch      : privacy.storeCwd ? str('git_branch') : undefined,
+    permissionMode : str('permission_mode'),
+    agentId        : str('agent_id'),
+    agentType      : str('agent_type'),
+    compactions    : num('compactions'),
+    promptLen      : privacy.storePromptLen ? num('prompt_len') : undefined,
+    host           : client?.name,
+    hostVersion    : client?.version,
+    formatVersion  : effectiveValue(store, 'format.version') ?? FORMAT_VERSION,
+  }));
+
+  // Validate every note before writing any of them. Reporting all the bad notes at once
+  // matters for the same reason `validate` reports every bad field at once: a ten-note
+  // review with three problems should cost one round trip, not three.
+  const problems: string[] = [];
+  for (const [index, input] of inputs.entries()) {
+    const found  = validate(input),
+          target = anchorTargetProblem(store, input.anchorKind, input.anchorTarget);
+    if (input.anchorKind === undefined) { found.push('every annotate note requires an anchorKind — use express for a floating note'); }
+    if (target !== null) { found.push(target); }
+    for (const problem of found) { problems.push(`note ${String(index)}: ${problem}`); }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`cannot annotate:\n  - ${problems.join('\n  - ')}\nnothing was written`);
+  }
+
+  const ids: number[] = [];
+
+  store.db.exec('BEGIN');
+  try {
+    for (const input of inputs) { ids.push(recordEntry(store, input, pluginVersion).id); }
+    store.db.exec('COMMIT');
+  } catch (error) {
+    store.db.exec('ROLLBACK');
+    throw error;
+  }
+
+  const block = renderAnnotations(args.notes.map((note, index): AnnotationNote => ({
+    text         : note.text,
+    face         : note.face,
+    anchorKind   : note.anchorKind,
+    anchorTarget : inputs[index]?.anchorTarget ?? note.anchorTarget ?? '',
+    anchorSpan   : note.anchorSpan,
+    anchorQuote  : note.anchorQuote,
+  })));
+
+  return reply(`recorded ${ids.map(id => `#${String(id)}`).join(', ')}\n\n${block}`);
 
 }
 
@@ -443,6 +709,23 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
         'which honest shape of nothing this entry reports: empty (looked, found nothing), ' +
         'unlooked (did not look), held (withholding pending evidence), depth (beyond ' +
         'ability to evaluate)'),
+      anchorKind     : z.enum(tuple(ANCHOR_KINDS)).optional().describe(
+        'attach this note to a location instead of leaving it floating in prose: file ' +
+        '(repo-relative path), prompt (a message from your partner), reply (your own ' +
+        'earlier output), checklist (a series by its seriesKey), entry (an entry id). ' +
+        'An anchored note is still its own channel — an anchored dissent is a dissent'),
+      anchorTarget   : z.string().optional().describe(
+        'the path, prompt id, series key, or entry id being pointed at; omit on a ' +
+        'prompt anchor to adopt the message you are answering, which is the common case'),
+      anchorSpan     : z.string().optional().describe(
+        "position within the target: 'L40' or 'L40-52' for a file, an occurrence " +
+        "ordinal like '#2' for prompt/reply when the quote appears more than once, " +
+        "'@3' for a checklist history point; entry anchors take none"),
+      anchorQuote    : z.string().max(ANCHOR_QUOTE_MAX).optional().describe(
+        `the exact excerpt being annotated, at most ${String(ANCHOR_QUOTE_MAX)} characters — quote ` +
+        'the shortest span that is unambiguous. REQUIRED for prompt and reply anchors. ' +
+        'A one-way hash of it is stored too, and survives quote suppression so drift ' +
+        'detection keeps working without keeping the words'),
       visible        : z.boolean().optional().describe('false when logged but not surfaced'),
       correctsId     : z.number().int().optional().describe('id of an entry this retracts'),
       effort         : z.enum(tuple(EFFORTS)).optional(),
@@ -469,6 +752,37 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
         'seriesKey, so the snapshot joins a series instead of being silently orphaned'),
     },
   }, (args) => handleExpress(store, pluginVersion, args, server.server.getClientVersion()));
+
+  server.registerTool('annotate', {
+    title       : 'Annotate',
+    description :
+      'Record several anchored notes at once — the code-review shape: many short notes ' +
+      'bound to many locations, instead of prose that mentions locations. Each note is ' +
+      'one row on its own channel, exactly as express would record it; the reply hands ' +
+      'back the canonical rendered block to paste verbatim rather than imitate. ' +
+      'All-or-nothing: one bad note rejects the batch naming its index, because a ' +
+      'half-recorded review is worse than a rejected one. An anchored ambiguity mark is ' +
+      'a notification, not a question — state which reading you took and carry on; a ' +
+      'genuine blocker is still a need.',
+    inputSchema : {
+      notes   : z.array(z.object({
+        channel      : z.enum(tuple(channels)).describe('which kind of expression this note is'),
+        text         : z.string().min(1).max(280).describe('the note; terse, one thought'),
+        face         : z.string().optional().describe('the feeling face this note ends with'),
+        anchorKind   : z.enum(tuple(ANCHOR_KINDS)).describe(
+          'required here — a note with no anchor belongs in express, not in a batch of annotations'),
+        anchorTarget : z.string().optional().describe(
+          'path, prompt id, series key, or entry id; omit on a prompt anchor to adopt the message being answered'),
+        anchorSpan   : z.string().optional().describe(
+          "'L40' / 'L40-52' for a file, '#2' for a repeated quote, '@3' for a checklist history point"),
+        anchorQuote  : z.string().max(ANCHOR_QUOTE_MAX).optional().describe(
+          'the exact excerpt; REQUIRED for prompt and reply anchors'),
+      })).min(1).max(ANNOTATE_MAX_NOTES).describe(
+        `1 to ${String(ANNOTATE_MAX_NOTES)} notes; grouped by target in the returned block`),
+      session : z.string().optional().describe(
+        'usually omit — the hook supplies it, and an observed session beats a claimed one'),
+    },
+  }, (args) => handleAnnotate(store, pluginVersion, args, server.server.getClientVersion()));
 
   server.registerTool('recall', {
     title       : 'Recall',

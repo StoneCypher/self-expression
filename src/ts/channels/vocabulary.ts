@@ -188,6 +188,43 @@ export const AUDIENCES = [
 ] as const;
 
 /**
+ * What an anchored expression can point at (issue #18).
+ *
+ * An anchor is a qualifier, not a channel: an anchored dissent is still a dissent, and
+ * every kind here names something the system *already observes*, so a pointer can be
+ * checked rather than merely asserted. The five differ mainly in how their target
+ * behaves over time, which is what the read-time resolution ladder reasons about:
+ *
+ * - `file` — a repo-relative path plus an optional line span. The only **drifting**
+ *   kind: lines move, content is edited, files vanish. Span grammar `L40` or `L40-52`,
+ *   1-based, the GitHub fragment convention already in use.
+ * - `prompt` — a human message, identified by its hook-observed `prompt_id` plus a
+ *   quoted span. **Immutable**: a sent message never changes; only *access* to it
+ *   degrades as it scrolls away, compacts out, or belongs to a prior session. Span
+ *   grammar is an occurrence ordinal `#2`, used only when the quote appears more than
+ *   once; omitted means the first occurrence.
+ * - `reply` — the model's own earlier output, same identification and span grammar.
+ *   Flagged honestly as **self-reported**: no hook observes response text, so the quote
+ *   is an assertion rather than an observation.
+ * - `checklist` — a checklist series by its stable `series_key` (#27). The quote
+ *   carries the item label; span grammar `@3` addresses the third point of the series'
+ *   percent history, which is how a chart element is anchored without a sixth kind.
+ * - `entry` — an entry id, as text. **Permanent**: rows are never deleted. No span; the
+ *   id is exact. Distinct from `corrects_id`, which means "this replaces that" — an
+ *   anchor means "this is about that", with the earlier entry still standing.
+ *
+ * @see ./anchors.js
+ * @see ./entries.js
+ */
+export const ANCHOR_KINDS = [
+  'file',       // repo-relative path + optional line span; drifts
+  'prompt',     // a human message by prompt_id + quoted span; immutable, access degrades
+  'reply',      // the model's own earlier output; immutable but self-reported
+  'checklist',  // a checklist series by series_key; labels rename, the series persists
+  'entry',      // an entry id; permanent and exact
+] as const;
+
+/**
  * `model` is deliberately NOT a closed vocabulary.
  *
  * Model identifiers appear faster than any enum could track, and rejecting an unknown
@@ -219,6 +256,7 @@ export type Modality         = typeof MODALITIES[number];
 export type ForecastOutcome  = typeof FORECAST_OUTCOMES[number];
 export type SilenceKind      = typeof SILENCE_KINDS[number];
 export type Audience         = typeof AUDIENCES[number];
+export type AnchorKind       = typeof ANCHOR_KINDS[number];
 
 /**
  * Whether `value` belongs to the closed vocabulary `vocabulary`, narrowing its type

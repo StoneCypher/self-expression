@@ -14,13 +14,17 @@
  * occasional, so the dominant case gets real columns and the minority carries NULLs,
  * which SQLite stores in about a bit each.
  *
+ * The same shape carries **qualifiers**: typed silence (#42) and the five anchor
+ * columns (#18) are nullable columns any channel may fill, not tables or channels of
+ * their own. An anchored dissent is still a dissent, so it is still one row.
+ *
  * @see ../../doc_md/plugin-layout.md
  */
 
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES, STEMS,
-  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
 } from './vocabulary.js';
 
 /**
@@ -39,9 +43,14 @@ import {
  * data moves — so the v2→v3 step only creates what is missing; the bump exists so the
  * recorded history says when the shape changed.
  *
+ * v4 (issue #18): `entries` gained the five nullable anchor columns and
+ * `idx_entries_anchor`. Additive in data terms, but `anchor_kind` carries a `CHECK`
+ * over `ANCHOR_KINDS`, and SQLite cannot add a constraint in place — so the v3→v4 step
+ * is another table rebuild, the same recipe v1→v2 used.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -135,6 +144,12 @@ CREATE TABLE IF NOT EXISTS ${table} (
   resolve_by      TEXT,
   outcome         TEXT ${check('outcome', FORECAST_OUTCOMES)},
   silence         TEXT ${check('silence', SILENCE_KINDS)},
+
+  anchor_kind     TEXT ${check('anchor_kind', ANCHOR_KINDS)},
+  anchor_target   TEXT,
+  anchor_span     TEXT,
+  anchor_quote    TEXT,
+  anchor_hash     TEXT,
 
   series_key      TEXT,
   title           TEXT,
@@ -277,6 +292,9 @@ export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_session ON entries(session, id)',
   'CREATE INDEX IF NOT EXISTS idx_entries_channel ON entries(channel, ts_utc)',
   'CREATE INDEX IF NOT EXISTS idx_entries_series  ON entries(series_key, id)',
+  // "every note ever attached to this file / this message / this series" is the one
+  // question anchoring exists to answer, so it gets the one index anchoring adds (#18).
+  'CREATE INDEX IF NOT EXISTS idx_entries_anchor  ON entries(anchor_kind, anchor_target)',
   'CREATE INDEX IF NOT EXISTS idx_context_session ON turn_context(session, id)',
 ];
 

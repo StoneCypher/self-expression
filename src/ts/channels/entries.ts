@@ -15,14 +15,16 @@ import { randomUUID } from 'node:crypto';
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS, STEMS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, ANCHOR_KINDS,
   isMember, describeVocabulary,
 } from './vocabulary.js';
 import type {
   Channel, Position, Delta, Turn, Effort, Stem,
   ConfidenceGround, DivergenceKind, Modality,
-  ForecastOutcome, SilenceKind,
+  ForecastOutcome, SilenceKind, AnchorKind,
 } from './vocabulary.js';
+import { normalizeQuote, anchorHash, spanProblem, ANCHOR_QUOTE_MAX } from './anchors.js';
+import { privacyFlags } from './privacy.js';
 import { stamp } from './time.js';
 import type { Store } from './store.js';
 import type { ChecklistSeriesRow, NeedWeekRow, SignatureRow } from '../raster/panels.js';
@@ -88,6 +90,16 @@ export interface EntryInput {
   // channel whose content is an absence. Nullable; the untyped shrug remains valid.
   readonly silence?         : SilenceKind | undefined;
 
+  // Anchor fields (#18): where this commentary is attached, as a qualifier on any
+  // channel — an anchored dissent is still a dissent. `anchorHash` is deliberately NOT
+  // here: it is derived from the quote at write time by {@link recordEntry}, because a
+  // supplied hash could disagree with its own quote and the whole point of the field is
+  // that it is a function of the content.
+  readonly anchorKind?      : AnchorKind | undefined;
+  readonly anchorTarget?    : string | undefined;
+  readonly anchorSpan?      : string | undefined;
+  readonly anchorQuote?     : string | undefined;
+
   // Checklist only. `seriesKey` is the series' stable identity (#27): chosen once at
   // the checklist's first render and repeated verbatim on every re-render, so `title`
   // — display prose — may be reworded freely without silently forking the percent
@@ -121,7 +133,14 @@ const CONSTRAINED: readonly [keyof EntryInput, readonly string[]][] = [
   ['modality',       MODALITIES],
   ['outcome',        FORECAST_OUTCOMES],
   ['silence',        SILENCE_KINDS],
+  ['anchorKind',     ANCHOR_KINDS],
 ];
+
+/** The anchor fields that mean nothing without an `anchorKind` to interpret them. */
+const ANCHOR_QUALIFIERS: readonly (keyof EntryInput)[] = ['anchorTarget', 'anchorSpan', 'anchorQuote'];
+
+/** Anchor kinds whose quote *is* the anchor: without it there is nothing to resolve. */
+const QUOTE_REQUIRED: readonly string[] = ['prompt', 'reply'];
 
 /** The shape `resolveBy` must take: an ISO-8601 local date, so it stays queryable. */
 const ISO_LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -194,6 +213,84 @@ export function validate(input: EntryInput): string[] {
     problems.push('outcome requires a correctsId naming the forecast it resolves');
   }
 
+  problems.push(...anchorProblems(input));
+
+  return problems;
+
+}
+
+/**
+ * The anchor cross-field rules (#18), returned as problem sentences.
+ *
+ * Split out of {@link validate} because the anchor rules are a self-contained matrix —
+ * kind × target × span-grammar × quote-requirement — and keeping them together makes
+ * the matrix readable next to the tests that pin it. Every rule fails toward *not*
+ * recording an unresolvable anchor:
+ *
+ * - a qualifier without a kind is a pointer with no way to read it;
+ * - a kind without a target names no thing at all;
+ * - `prompt` and `reply` demand a quote, because a message anchor with no quote is
+ *   unresolvable by construction — a `file` can still be found by span, a message
+ *   cannot;
+ * - the span must parse in its kind's grammar;
+ * - the quote must survive normalization non-empty and fit {@link ANCHOR_QUOTE_MAX}.
+ *
+ * The two checks that need the store — that an `entry` target exists, and that a
+ * `checklist` series has rows — live at the tool layer, exactly as the forecast rules
+ * split.
+ *
+ * @example
+ *   anchorProblems({ channel: 'dissent', text: 'x', session: 's', anchorQuote: 'y' })
+ *   // => ['anchorQuote requires an anchorKind — an anchor field with no kind …']
+ *
+ * @see validate
+ * @see ./anchors.js spanProblem
+ */
+export function anchorProblems(input: EntryInput): string[] {
+
+  const problems: string[] = [];
+
+  if (input.anchorKind === undefined) {
+    for (const field of ANCHOR_QUALIFIERS) {
+      if (input[field] !== undefined) {
+        problems.push(
+          `${String(field)} requires an anchorKind — an anchor field with no kind ` +
+          'is a pointer with no way to read it');
+      }
+    }
+    return problems;
+  }
+
+  if (!isMember(ANCHOR_KINDS, input.anchorKind)) { return problems; }
+
+  if (input.anchorTarget === undefined || input.anchorTarget.trim() === '') {
+    problems.push(
+      `anchorKind '${input.anchorKind}' requires an anchorTarget — the path, prompt id, ` +
+      'series key, or entry id the note is attached to');
+  }
+
+  if (QUOTE_REQUIRED.includes(input.anchorKind) && input.anchorQuote === undefined) {
+    problems.push(
+      `a ${input.anchorKind} anchor requires an anchorQuote — a message anchor with no ` +
+      'quote is unresolvable by construction; a file may anchor by span alone, a message may not');
+  }
+
+  if (input.anchorSpan !== undefined) {
+    const problem = spanProblem(input.anchorKind, input.anchorSpan);
+    if (problem !== null) { problems.push(problem); }
+  }
+
+  if (input.anchorQuote !== undefined) {
+    const normalized = normalizeQuote(input.anchorQuote);
+    if (normalized === '') {
+      problems.push('anchorQuote must not be blank once whitespace is collapsed');
+    } else if (normalized.length > ANCHOR_QUOTE_MAX) {
+      problems.push(
+        `anchorQuote must be at most ${String(ANCHOR_QUOTE_MAX)} characters once whitespace is ` +
+        `collapsed; received ${String(normalized.length)} — quote the shortest span that is unambiguous`);
+    }
+  }
+
   return problems;
 
 }
@@ -203,19 +300,79 @@ function bit(value: boolean | undefined): number | null {
   return value === undefined ? null : (value ? 1 : 0);
 }
 
+/** What actually reaches the two quote columns, once privacy has had its say. */
+interface StoredQuote {
+  readonly quote : string | null;
+  readonly hash  : string | null;
+}
+
+/**
+ * Decide what the `anchor_quote` and `anchor_hash` columns receive: the normalized
+ * quote and its fingerprint, with the quote dropped when it is the human's words and
+ * `privacy.store_quotes` is off.
+ *
+ * The redaction is **write-time, never captured-then-hidden** — the suppressed text
+ * does not reach the database at all — and the hash survives it, which is the whole
+ * design: sixteen hex characters keep drift detection and same-target grouping working
+ * while carrying no language. Only `prompt` anchors are gated, because only they quote
+ * the human; a `file`, `reply`, `checklist`, or `entry` quote is the repo's or the
+ * model's own text.
+ *
+ * The hash is always derived here rather than accepted, so it cannot disagree with the
+ * quote it summarizes.
+ *
+ * @param kind        the anchor kind, or `undefined` on an unanchored entry
+ * @param quote       the caller's excerpt, before normalization
+ * @param storeQuotes the effective `privacy.store_quotes` flag
+ *
+ * @example
+ *   storedQuote('prompt', 'ship it when ready', false)
+ *   // => { quote: null, hash: 'a1b2c3d4e5f60718' }   — hash present, words gone
+ *   storedQuote('file', 'readConfig(store, key)', false)
+ *   // => { quote: 'readConfig(store, key)', hash: '…' }  — the repo's own text
+ *
+ * @see ./privacy.js
+ */
+export function storedQuote(
+  kind        : AnchorKind | undefined,
+  quote       : string | undefined,
+  storeQuotes : boolean,
+): StoredQuote {
+
+  if (quote === undefined) { return { quote: null, hash: null }; }
+
+  const normalized = normalizeQuote(quote),
+        suppressed = kind === 'prompt' && !storeQuotes;
+
+  return { quote: suppressed ? null : normalized, hash: anchorHash(normalized) };
+
+}
+
 /**
  * Record one entry, returning its identity.
  *
  * Generates the uuid, all three timestamps, and the machine identity rather than
  * accepting them. `when` is injectable so tests can pin the clock.
  *
+ * `anchor_hash` is likewise derived here rather than accepted, and the `prompt`-anchor
+ * quote redaction of `privacy.store_quotes` is applied here rather than at each call
+ * site — one place, so the invariant "the hash records even when the words do not"
+ * cannot be got wrong by a second writer (see {@link storedQuote}).
+ *
  * @example
  *   recordEntry(store, { channel: 'need', text: 'merge #21?', session: 's1' })
  *   // => { id: 1, uuid: '…' }
  *
- * @throws {Error} If validation fails — a closed field outside its vocabulary, or a
- *                 checklist series violation (see {@link validate}) — naming every
- *                 problem and the values that would have been accepted.
+ * @example
+ *   recordEntry(store, { channel: 'dissent', text: '"ready" reads three ways', session: 's1',
+ *                        anchorKind: 'prompt', anchorTarget: 'p-7',
+ *                        anchorQuote: 'ship it when ready' })
+ *   // => { id: 2, uuid: '…' }
+ *
+ * @throws {Error} If validation fails — a closed field outside its vocabulary, a
+ *                 checklist series violation, or an anchor cross-field violation (see
+ *                 {@link validate}) — naming every problem and the values that would
+ *                 have been accepted.
  */
 export function recordEntry(
   store         : Store,
@@ -229,8 +386,9 @@ export function recordEntry(
     throw new Error(`cannot record entry:\n  - ${problems.join('\n  - ')}`);
   }
 
-  const at   = stamp(when),
-        uuid = randomUUID();
+  const at     = stamp(when),
+        uuid   = randomUUID(),
+        quoted = storedQuote(input.anchorKind, input.anchorQuote, privacyFlags(store).storeQuotes);
 
   store.db.prepare(`
     INSERT INTO entries (
@@ -243,6 +401,7 @@ export function recordEntry(
       context_tokens, output_tokens, thinking_tokens, corrects_id,
       position, delta, uncertain, face, context_emoji, stem, cctype,
       confidence, divergence_kind, resolve_by, outcome, silence,
+      anchor_kind, anchor_target, anchor_span, anchor_quote, anchor_hash,
       series_key, title, succ, active, fail, percent,
       plugin_version, format_version
     ) VALUES (
@@ -254,6 +413,7 @@ export function recordEntry(
       ?,?,?,?,?,
       ?,?,?,?,
       ?,?,COALESCE(?,0),?,?,?,?,
+      ?,?,?,?,?,
       ?,?,?,?,?,
       ?,?,?,?,?,?,
       ?,?
@@ -274,6 +434,8 @@ export function recordEntry(
     input.face ?? null, input.contextEmoji ?? null, input.stem ?? null, input.cctype ?? null,
     input.confidence ?? null, input.divergenceKind ?? null,
     input.resolveBy ?? null, input.outcome ?? null, input.silence ?? null,
+    input.anchorKind ?? null, input.anchorTarget ?? null, input.anchorSpan ?? null,
+    quoted.quote, quoted.hash,
     input.seriesKey ?? null, input.title ?? null,
     input.succ ?? null, input.active ?? null, input.fail ?? null, input.percent ?? null,
     pluginVersion, input.formatVersion ?? null,
@@ -328,17 +490,48 @@ export function previousSignature(store: Store, session: string): Record<string,
  *
  * Carries `confidence`, `divergence_kind`, `silence`, and `outcome` alongside the
  * display fields, so delta-derivation's neighbor — "what did I recently forecast, and
- * what silences did I type" — is answerable without raw SQL.
+ * what silences did I type" — is answerable without raw SQL. The five anchor columns
+ * ride along for the same reason (#18): "what did I recently annotate, and was it
+ * answered" should not require raw SQL either.
  *
  * @example
  *   recentEntries(store, 3)  // => [{ … }, { … }, { … }]
  */
 export function recentEntries(store: Store, limit = 10): Record<string, unknown>[] {
   const rows = store.db.prepare(
-    `SELECT ts_local, tz, channel, position, delta, face, stem, text,
-            confidence, divergence_kind, silence, outcome
+    `SELECT id, ts_local, tz, channel, position, delta, face, stem, text,
+            confidence, divergence_kind, silence, outcome,
+            anchor_kind, anchor_target, anchor_span, anchor_quote, anchor_hash
        FROM entries ORDER BY id DESC LIMIT ?`).all(limit);
   return rows.reverse();
+}
+
+/**
+ * Every note ever attached to one target, oldest first — the query anchoring exists to
+ * answer, and the reason `idx_entries_anchor` exists.
+ *
+ * Returns the anchor columns beside the note itself, so a caller can re-resolve each
+ * one against the target's present state (resolution is never stored) without a second
+ * read. An unannotated target returns an empty array rather than throwing: nothing
+ * having been said about a file is not an error.
+ *
+ * @param kind   which addressable kind the target is
+ * @param target the path, prompt id, series key, or entry id as text
+ * @returns one row per anchored entry, ascending by id (recording order)
+ *
+ * @example
+ *   anchoredEntries(store, 'file', 'src/ts/channels/store.ts')
+ *   // => [{ id: 41, channel: 'dissent', anchor_span: 'L141', anchor_quote: '…', … }]
+ *
+ * @see ./anchors.js resolveAnchor
+ */
+export function anchoredEntries(store: Store, kind: AnchorKind, target: string): Record<string, unknown>[] {
+  return store.db.prepare(
+    `SELECT id, ts_local, tz, channel, face, text,
+            anchor_kind, anchor_target, anchor_span, anchor_quote, anchor_hash
+       FROM entries
+      WHERE anchor_kind = ? AND anchor_target = ?
+      ORDER BY id ASC`).all(kind, target);
 }
 
 /**
