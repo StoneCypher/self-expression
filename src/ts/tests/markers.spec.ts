@@ -21,6 +21,11 @@ describe('classifyMarker', () => {
     expect(classifyMarker('🤷')).toBe('active');
   });
 
+  test('the field-trial markers 🔬 and 🔁 classify active+pending', () => {
+    expect(classifyMarker('🔬')).toBe('active');
+    expect(classifyMarker('🔁')).toBe('active');
+  });
+
   test('an override wins outright, for markers whose bucket the glyph cannot carry', () => {
     expect(classifyMarker('🛳️', 'success')).toBe('success');
     expect(classifyMarker('🛳️', 'failure')).toBe('failure');
@@ -45,6 +50,12 @@ describe('canonicalRank', () => {
 
   test('an unrecognized marker ranks after every known marker', () => {
     expect(canonicalRank('🤷')).toBe(CANONICAL_ORDER.length);
+  });
+
+  test('🔬 and 🔁 sit between 🌐 and 🛠️, in that order', () => {
+    expect(canonicalRank('🔬')).toBe(canonicalRank('🌐') + 1);
+    expect(canonicalRank('🔁')).toBe(canonicalRank('🔬') + 1);
+    expect(canonicalRank('🛠️')).toBe(canonicalRank('🔁') + 1);
   });
 
   test('every marker has a distinct rank', () => {
@@ -129,11 +140,16 @@ describe('multi-code-point marker fidelity (regression guard)', () => {
   });
 
   test('⚠️ has a fixed, independently-known canonical rank', () => {
-    expect(canonicalRank('⚠️')).toBe(18);
+    expect(canonicalRank('⚠️')).toBe(20);
   });
 
   test('🛠️ has a fixed, independently-known canonical rank', () => {
-    expect(canonicalRank('🛠️')).toBe(5);
+    expect(canonicalRank('🛠️')).toBe(7);
+  });
+
+  test('🔬 and 🔁 have fixed, independently-known canonical ranks', () => {
+    expect(canonicalRank('🔬')).toBe(5);
+    expect(canonicalRank('🔁')).toBe(6);
   });
 
 });

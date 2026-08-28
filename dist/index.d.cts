@@ -237,10 +237,10 @@ declare const FAILURE_MARKERS: readonly ["❌", "🚫", "🦗", "💀", "🧟", 
  * list entry), followed by the topic/action markers group by group, top to
  * bottom, in each group's left-to-right listed order.
  *
- * `markers.md`'s "Status markers" heading says "(22, canonical order)", but
- * the bulleted list beneath it has 23 entries — a stale
- * count in the source doc. This array transcribes the actual list, per the
- * rule "every marker... in its listed order".
+ * `markers.md`'s status-marker list carries 25 entries (the 2026-08-27 field
+ * trial added 🔬 "under review" and 🔁 "in a fix round", both classifying
+ * active+pending). This array transcribes the actual list, per the rule
+ * "every marker... in its listed order".
  *
  * This is the tiebreaker `status-checklists-skill.md` specifies for sorting
  * a summary line's per-marker icon list: equal-count markers sort by first
@@ -251,7 +251,7 @@ declare const FAILURE_MARKERS: readonly ["❌", "🚫", "🦗", "💀", "🧟", 
  *   CANONICAL_ORDER.indexOf('✅')  // => 0
  *   CANONICAL_ORDER.indexOf('💯')  // => 1 — immediately after ✅
  */
-declare const CANONICAL_ORDER: readonly ["✅", "💯", "🤖", "⏳", "🌐", "🛠️", "🛰️", "🔜", "🦥", "🌗", "🫨", "🦡", "❌", "🚫", "🦗", "⏭️", "⏸️", "❗", "⚠️", "⏰", "😴", "🧠", "❓", "🤔", "📋", "🐙", "📅", "📩", "👔", "📝", "📖", "📎", "📺", "🎙️", "🖨️", "🧪", "🦆", "🔍", "🔗", "🎫", "🏁", "🪚", "🐀", "⚡", "🐛", "🧹", "🗑️", "🦤", "🧐", "⚖️", "👑", "👍", "👎", "✋", "🛳️", "♾️", "↩️", "🏗️", "📦", "⚙️", "🔑", "🩹", "🩺", "☸️", "⬆️", "⬇️", "⏫", "⏬", "🔌", "💽", "🧬", "🌱", "💾", "🪵", "🧮", "📊", "🔮", "🔥", "🚨", "🧯", "🤕", "🗿", "🪦", "🕵️", "🦓", "🏷️", "🔀", "🚀", "🔨", "🆙", "🤮", "🎨", "♿", "📐", "🗺️", "🎣", "🪓", "🦹", "🪪", "🩻", "🔒", "🕳️", "🐒", "🧌", "🤬", "🛡️", "👁️", "💰", "🌪️", "🧊", "👻", "💀", "🧟", "🌋", "🤡", "😕", "🤌", "🤥", "🥵", "😎", "🦙", "💅", "🤓"];
+declare const CANONICAL_ORDER: readonly ["✅", "💯", "🤖", "⏳", "🌐", "🔬", "🔁", "🛠️", "🛰️", "🔜", "🦥", "🌗", "🫨", "🦡", "❌", "🚫", "🦗", "⏭️", "⏸️", "❗", "⚠️", "⏰", "😴", "🧠", "❓", "🤔", "📋", "🐙", "📅", "📩", "👔", "📝", "📖", "📎", "📺", "🎙️", "🖨️", "🧪", "🦆", "🔍", "🔗", "🎫", "🏁", "🪚", "🐀", "⚡", "🐛", "🧹", "🗑️", "🦤", "🧐", "⚖️", "👑", "👍", "👎", "✋", "🛳️", "♾️", "↩️", "🏗️", "📦", "⚙️", "🔑", "🩹", "🩺", "☸️", "⬆️", "⬇️", "⏫", "⏬", "🔌", "💽", "🧬", "🌱", "💾", "🪵", "🧮", "📊", "🔮", "🔥", "🚨", "🧯", "🤕", "🗿", "🪦", "🕵️", "🦓", "🏷️", "🔀", "🚀", "🔨", "🆙", "🤮", "🎨", "♿", "📐", "🗺️", "🎣", "🪓", "🦹", "🪪", "🩻", "🔒", "🕳️", "🐒", "🧌", "🤬", "🛡️", "👁️", "💰", "🌪️", "🧊", "👻", "💀", "🧟", "🌋", "🤡", "😕", "🤌", "🤥", "🥵", "😎", "🦙", "💅", "🤓"];
 /**
  * The bucket a marker's item counts toward in a checklist summary line.
  *
@@ -934,356 +934,6 @@ type WeatherState = typeof WEATHER_STATES[number];
 declare function renderWeather(state: WeatherState): string;
 
 /**
- * The digest profiles: per-domain parameterizations of the compression mechanic,
- * promoted from the design spec's table to runtime data.
- *
- * `2026-08-27-compression-mechanic-design.md` (issue #20) reframes the status-checklist
- * summary line as one instance of a general digest grammar —
- * `<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — whose
- * per-domain variation is entirely data: the unit noun, the bucket partition and its
- * marker classification, and whether a scalar axis exists. This module is that data,
- * in the `vocabulary.ts` / `markers.ts` pattern: exported `const` profile tables that
- * feed both rendering (`digest.ts`) and validation (`verify.ts`), so the partition
- * rules live in exactly one place instead of being re-derived per caller.
- *
- * The glyph vocabulary is shared across profiles — every marker any profile names must
- * appear in `markers.md` (and thus `markers.ts`'s `CANONICAL_ORDER`); a profile never
- * introduces a glyph privately. Bucket membership below mirrors the "Profile bucket
- * membership" section of `markers.md`, which is the prose source of truth.
- *
- * @see ./digest.ts
- * @see ./markers.ts
- * @see ../../doc_md/reference/markers.md
- * @see ../../superpowers/spec/2026-08-27-compression-mechanic-design.md
- */
-/**
- * One bucket of a profile's partition: its id (the name validation and overrides refer
- * to) and the markers that classify into it.
- *
- * An empty `markers` list means no marker classifies here by glyph alone — units land
- * in such a bucket only by explicit override (the diff profile's change-kind buckets)
- * or by being the profile's residual bucket.
- */
-interface DigestBucketSpec {
-    /** The bucket's id, unique within its profile — e.g. `'success'`, `'blocking'`. */
-    readonly id: string;
-    /** Markers whose units classify into this bucket, exactly as rendered (see the multi-code-point note in `markers.ts`). */
-    readonly markers: readonly string[];
-}
-/**
- * One digest profile: everything the general renderer and validator need to know about
- * a domain, as data.
- *
- * The invariants (spec § The invariants) constrain the data: `buckets` is a partition
- * in canonical order (invariant 2), `residual` names the bucket a unit falls into when
- * no marker list claims it (so every unit is counted exactly once), and `scalar` exists
- * only for a genuinely monotone axis — no percent is fabricated for a profile without
- * one (spec § Alternatives rejected).
- */
-interface DigestProfile {
-    /** The profile's name, the key it is registered under — e.g. `'checklist'`. */
-    readonly name: string;
-    /** The unit noun rendered after the counts — one word, plural, unique across profiles; it is the reader's cue for which profile grammar to pattern-match, and the validator's profile-inference key. */
-    readonly noun: string;
-    /** The partition, in canonical (rendered) order. */
-    readonly buckets: readonly DigestBucketSpec[];
-    /** The id of the bucket a unit counts toward when no bucket's marker list contains its marker — the partition's completeness guarantee. */
-    readonly residual: string;
-    /** When present, the id of the bucket whose share of the total renders as `(<P>%) <bar>`; absent for profiles with no monotone axis. */
-    readonly scalar?: string;
-    /** When `true`, the digest carries a `+N −M` line-count tail after the noun, summed from the units' `plus`/`minus` fields (the diff profile). */
-    readonly plusMinus?: boolean;
-    /** Bucket ids, most-defining-first: an artifact's overall state is the first bucket in this order that holds at least one unit — how a nested artifact is bucketed in its parent (spec § Composition rules, rule 3). Must cover every bucket id. */
-    readonly overallOrder: readonly string[];
-    /** Markers, most-salient-first, that qualify a unit as the lead line's argmax; empty when the profile has no mechanical salience rule (diff — the riskiest file is a judgment call). */
-    readonly attention: readonly string[];
-}
-/**
- * The status-checklist profile — the deepest-developed instance, and the one
- * `renderChecklistSummary` must reproduce byte-identically.
- *
- * Bucket membership comes straight from `markers.ts` (`SUCCESS_MARKERS`,
- * `FAILURE_MARKERS`); the residual `active` bucket is the skill's "active+pending:
- * every other marker" rule. The scalar axis is completion: percent = success ÷ total.
- *
- * @example
- *   CHECKLIST_PROFILE.noun               // => 'items'
- *   CHECKLIST_PROFILE.buckets[0]?.id     // => 'success'
- */
-declare const CHECKLIST_PROFILE: DigestProfile;
-/**
- * The findings profile: the digest a review or audit closes with — severity tallies
- * readable instead of the findings. Blocking leads the bucket order because the
- * digest's first number is the one a glance reads first, and for findings the blocker
- * count is the headline. No scalar: 60% of findings being minor is not 60% of anything
- * a bar should imply progress toward.
- *
- * @example
- *   // ❗❗ ⚠️⚠️⚠️⚠️⚠️ 🐛🐛🐛 🔍🔍 as findings:
- *   // => '2/8/2 findings  ⚠️ 5  🐛 3  ❗ 2  🔍 2'
- */
-declare const FINDINGS_PROFILE: DigestProfile;
-/**
- * The options profile: the decision summary over per-option detail. The verdict is the
- * lead line ("✅ chose sqlite: single-file, zero-daemon"); the digest says at a glance
- * whether the decision is still open (`0/4/1 options`). No scalar — a decided tradeoff
- * is not 25% complete.
- *
- * `overallOrder` puts `open` first (any open option means the decision is undecided),
- * then `chosen` (a made decision), then `rejected` (everything was declined).
- *
- * @example
- *   // ✅ 🤔🤔 ❌❌❌ as options:
- *   // => '1/2/3 options  ❌ 3  🤔 2  ✅ 1'
- */
-declare const OPTIONS_PROFILE: DigestProfile;
-/**
- * The diff profile: the shape of the change over the hunks — `git diff --stat` restated
- * in the house grammar so it composes. The first profile to classify by something other
- * than the marker: buckets are change kinds, assigned per unit via the explicit
- * `bucket` override (`'added'` | `'modified'` | `'removed'`), leaving the marker free
- * to carry the work kind (🪚 📝 🧪 …). A unit with no stated change kind counts as
- * `modified`, the residual. Instead of a bar, the digest carries a `+N −M` line-count
- * tail summed from the units' `plus`/`minus` fields.
- *
- * `attention` is empty: the spec puts the lead line on "the riskiest file", which is a
- * judgment call, not a marker rule — the caller picks the lead unit by hand.
- *
- * @example
- *   // 16 changed files, 214 lines added, 96 removed:
- *   // => '3/11/2 files +214 −96  🪚 6  📝 4  🧪 3  🗑️ 2  🔨 1'
- */
-declare const DIFF_PROFILE: DigestProfile;
-/**
- * The results profile: what was found over where. The digest answers "did the search
- * pay?" before the reader commits to the detail; the `missed` bucket (🦗 for a source
- * that returned nothing) makes silent-miss reporting structural rather than optional.
- * Anything neither partial nor missed counts as `matched`, the residual.
- *
- * @example
- *   // 🔍×14 🌗×2 🦗×1 as results:
- *   // => '14/2/1 hits  🔍 14  🌗 2  🦗 1'
- */
-declare const RESULTS_PROFILE: DigestProfile;
-/**
- * Every registered profile name, in the spec's listed order — the closed vocabulary
- * the `render_digest` MCP tool's `profile` enum is built from, so a misspelled profile
- * is unnameable.
- *
- * @example
- *   PROFILE_NAMES.includes('findings')  // => true
- */
-declare const PROFILE_NAMES: readonly ["checklist", "findings", "options", "diff", "results"];
-/** One of the registered profile names. */
-type ProfileName = (typeof PROFILE_NAMES)[number];
-/**
- * The registered profiles by name — the single lookup rendering and tooling share.
- *
- * @example
- *   PROFILES.findings.noun  // => 'findings'
- */
-declare const PROFILES: Readonly<Record<ProfileName, DigestProfile>>;
-/**
- * The profile whose noun is `noun`, or `undefined` when no profile renders that noun —
- * the validator's profile inference, per the fixed-grammar rule that the digest's noun
- * cues the profile.
- *
- * @param noun the unit noun exactly as rendered in a digest line, e.g. `'findings'`
- * @returns the matching profile, or `undefined` for an unknown noun
- * @example
- *   profileForNoun('items')?.name  // => 'checklist'
- *   profileForNoun('zebras')       // => undefined
- * @see ./verify.ts verifyDigest
- */
-declare function profileForNoun(noun: string): DigestProfile | undefined;
-
-/**
- * The general digest renderer: the profile-independent machinery of the compression
- * mechanic, extracted from `checklist.ts` (issue #20).
- *
- * A compressed artifact is a body of comparable units plus a digest derived from them;
- * this module renders the digest — one fixed-shape line (plus the existing overflow
- * block) per the grammar
- * `<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — for any
- * profile in `profiles.ts`. The grouping by `(marker, bucket)`, the tallying, the
- * count-desc/canonical-rank sort, the 8-entry inline/block split, and the 12-entry
- * wrap were all pinned by the status-checklist convention and are unchanged here; only
- * the bucket set, the noun, and the scalar formula became parameters. The status-
- * checklist summary line is this grammar with the checklist profile plugged in —
- * byte-identical, which the existing checklist suites prove.
- *
- * Also here: the two composition helpers the spec's invariants call for —
- * {@link leadUnitIndex} (the lead line's argmax, the one digest element that keeps a
- * single unit's identity) and {@link overallBucket} / {@link nestDigest} (nesting by
- * digest substitution: a child artifact appears in its parent as one line carrying the
- * child's digest, counted as one unit bucketed by the child's overall state).
- *
- * Pure: no I/O, no clock, no randomness.
- *
- * @see ./profiles.ts
- * @see ./checklist.ts
- * @see ../../superpowers/spec/2026-08-27-compression-mechanic-design.md
- */
-
-/**
- * One unit of a compressed artifact, reduced to exactly what the digest needs: the
- * marker glyph it renders with, and — when the glyph alone can't carry it — which
- * bucket it counts toward.
- *
- * `bucket` names one of the profile's bucket ids and wins outright over the marker's
- * own classification when it does; an id the profile does not define is ignored and
- * the unit classifies by marker as usual. Profiles that classify by something other
- * than the marker (the diff profile's change kinds) rely on it entirely.
- *
- * `plus`/`minus` feed the `+N −M` tail of a `plusMinus` profile (lines added and
- * removed by this unit, for the diff profile) and are ignored everywhere else.
- */
-interface DigestUnit {
-    marker: string;
-    bucket?: string;
-    plus?: number;
-    minus?: number;
-}
-/** Options accepted by {@link renderDigest}. */
-interface DigestOptions {
-    series?: readonly number[];
-}
-/**
- * The icon list moves from inline (after the head) to its own block below once it
- * holds more than this many distinct `(marker, bucket)` entries.
- */
-declare const INLINE_ENTRY_LIMIT = 8;
-/** Within the block form, a bucket line wraps onto a new line after this many entries. */
-declare const MAX_ENTRIES_PER_LINE = 12;
-/**
- * Renders a compressed artifact's digest, per the general grammar:
- * the per-bucket count section, the profile's unit noun, an optional scalar percent
- * with the 10-cell anti-aliased progress bar (only when the profile declares a scalar
- * axis — no percent is fabricated otherwise), an optional `+N −M` line-count tail
- * (only for a `plusMinus` profile), an optional trend sparkline, and the per-marker
- * icon list — inline when it is short, or split into per-bucket blocks below when it
- * isn't.
- *
- * Every layout rule is exactly the status-checklist convention's, with the bucket set
- * as a parameter: the icon list moves from inline to block form past
- * {@link INLINE_ENTRY_LIMIT} distinct `(marker, bucket)` entries; block bucket lines
- * appear in the profile's canonical bucket order (empty buckets omitted), wrap past
- * {@link MAX_ENTRIES_PER_LINE} entries, and are blank-separated exactly when any
- * bucket line wrapped.
- *
- * @param units   every unit of the artifact, one entry each; must be non-empty — a
- *   digest has nothing to summarize otherwise
- * @param profile the digest profile: buckets, noun, scalar axis, tail — see
- *   `profiles.ts`
- * @param options `series`, the artifact's scalar history in chronological order; a
- *   trend sparkline is appended only when it has 4 or more points (fewer is silently
- *   omitted, not an error), always on the `'absolute'` scale so digests of different
- *   artifacts stay comparable
- *
- * @example
- *   renderDigest(
- *     [
- *       ...Array(2).fill({ marker: '❗' }), ...Array(5).fill({ marker: '⚠️' }),
- *       ...Array(3).fill({ marker: '🐛' }), ...Array(2).fill({ marker: '🔍' }),
- *     ],
- *     FINDINGS_PROFILE,
- *   )
- *   // => '2/8/2 findings  ⚠️ 5  🐛 3  ❗ 2  🔍 2'
- *
- * @throws {RangeError} when `units` is empty.
- * @see ./profiles.ts
- * @see ./checklist.ts renderChecklistSummary — the checklist-profile instantiation
- */
-declare function renderDigest(units: readonly DigestUnit[], profile: DigestProfile, options?: DigestOptions): string;
-/**
- * The index of the artifact's lead unit — the argmax of the body by the profile's
- * attention order — or `-1` when no unit qualifies.
- *
- * This is the lead-line exception made mechanical: the lead line is the one digest
- * element that keeps a unit's identity, a 1-unit compression sitting between the
- * digest (0 units of identity) and the body (all of them) — which is why the result is
- * a single index, never a list: two lead lines would be a body. The winner is the unit
- * whose marker appears earliest in `profile.attention`; ties go to the earliest unit
- * in body order. A `-1` means nothing needs attention — the caller leads with the
- * all-clear (✅) or omits the lead line entirely, per the skill's own rule.
- *
- * @param units   the artifact's units, in body order
- * @param profile the profile whose `attention` order ranks salience
- * @returns the winning unit's index in `units`, or `-1` when no marker qualifies
- *
- * @example
- *   leadUnitIndex(
- *     [{ marker: '✅' }, { marker: '🚫' }, { marker: '❌' }],
- *     CHECKLIST_PROFILE,
- *   )  // => 2 — ❌ outranks 🚫 in the checklist attention order
- *
- * @see ./profiles.ts
- */
-declare function leadUnitIndex(units: readonly DigestUnit[], profile: DigestProfile): number;
-/**
- * The artifact's overall state: the first bucket in the profile's `overallOrder` that
- * holds at least one unit.
- *
- * This is how a nested artifact is bucketed in its parent (spec § Composition rules,
- * rule 3): a checklist with any failure is overall `'failure'`, one with work still
- * running is `'active'`, one fully landed is `'success'`; an options artifact with any
- * open option is overall `'open'`. Guaranteed to return a bucket id as long as
- * `overallOrder` covers every bucket (which every registered profile's does); the
- * residual bucket is the defensive fallback.
- *
- * @param units   the artifact's units; must be non-empty — an empty artifact has no state
- * @param profile the profile whose `overallOrder` defines "overall"
- * @returns the id of the artifact's overall bucket
- *
- * @example
- *   overallBucket([{ marker: '✅' }, { marker: '⏳' }], CHECKLIST_PROFILE)  // => 'active'
- *   overallBucket([{ marker: '✅' }, { marker: '✅' }], CHECKLIST_PROFILE)  // => 'success'
- *
- * @throws {RangeError} when `units` is empty.
- * @see nestDigest
- */
-declare function overallBucket(units: readonly DigestUnit[], profile: DigestProfile): string;
-/** What {@link nestDigest} hands the parent artifact: the child's one-line representation and overall bucket. */
-interface NestedDigest {
-    /** The child's digest head line — the fixed-shape part, safe to embed as one body line even when the child's own icon list went block-form. */
-    readonly line: string;
-    /** The child's overall bucket id, per {@link overallBucket} — what the parent's partition counts the child under. */
-    readonly bucket: string;
-}
-/**
- * Represents a whole child artifact as one unit-sized line for a parent artifact's
- * body — nesting by digest substitution (spec § Composition rules, rule 3).
- *
- * When a unit is itself a compressed artifact, the child appears in the parent's body
- * as one line carrying the child's *digest*, and counts as exactly **one** unit in the
- * parent's partition, bucketed by the child's overall state — its units are never
- * double-counted into the parent, because the digest is its representation. The
- * returned `line` is the child digest's head line (identical to the full digest when
- * the child's icon list fit inline); the returned `bucket` is what the parent passes
- * as the unit's explicit `bucket` override when parent and child share a bucket
- * vocabulary (checklist-in-checklist), or maps into its own partition otherwise.
- *
- * Within a single artifact, plain indentation sub-items remain individually counted
- * exactly as before — this rule applies only across artifacts, where the nested thing
- * has a digest of its own.
- *
- * @param childUnits   the child artifact's units; must be non-empty
- * @param childProfile the child artifact's profile
- * @param options      passed through to the child's {@link renderDigest} (trend series)
- * @returns the child's head line and overall bucket
- *
- * @example
- *   nestDigest([{ marker: '✅' }, { marker: '❌' }], CHECKLIST_PROFILE)
- *   // => { line: '1/0/1 items (50%) █████░░░░░  ✅ 1  ❌ 1', bucket: 'failure' }
- *   // The parent then carries e.g. `- 📋 subplan — 1/0/1 items (50%) …` as ONE unit,
- *   // with { marker: '📋', bucket: 'failure' } in its own units list.
- *
- * @throws {RangeError} when `childUnits` is empty (via {@link renderDigest}).
- * @see overallBucket
- */
-declare function nestDigest(childUnits: readonly DigestUnit[], childProfile: DigestProfile, options?: DigestOptions): NestedDigest;
-
-/**
  * The status-checklist summary line, computed instead of imitated.
  *
  * `status-checklists-skill.md` § The summary line spells out, in prose, exactly how the
@@ -1291,19 +941,15 @@ declare function nestDigest(childUnits: readonly DigestUnit[], childProfile: Dig
  * derived from a checklist's items — and every one of those rules has an edge (the
  * 0.17/0.5/0.83 anti-aliasing boundary, the count-desc-then-canonical-order sort, the
  * 8-vs-9 inline/block split, the 12-entry wrap) that a hand-drawn checklist has
- * historically gotten wrong by eye.
+ * historically gotten wrong by eye. This module is the single place that arithmetic
+ * lives, composed entirely from the already-pinned primitives in `scale.ts`,
+ * `markers.ts`, and `series.ts` rather than re-deriving any of it. Pure: no I/O, no
+ * clock, no randomness.
  *
- * Since issue #20 reframed the summary line as the checklist **profile** of the
- * general digest grammar, the machinery lives in `digest.ts` and this module is the
- * checklist-profile instantiation: same signature, byte-identical output (the
- * exact-string and stochastic suites are the proof), with the arithmetic composed from
- * the already-pinned primitives in `scale.ts`, `markers.ts`, and `series.ts` rather
- * than re-deriving any of it. Pure: no I/O, no clock, no randomness.
- *
- * @see ./digest.ts
- * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
+ * @see ./scale.ts
  * @see ./markers.ts
+ * @see ./series.ts
  */
 
 /**
@@ -1311,8 +957,8 @@ declare function nestDigest(childUnits: readonly DigestUnit[], childProfile: Dig
  * it renders with, and — only for a marker like `🛳️` whose bucket the glyph alone can't
  * carry — which bucket it counts toward.
  *
- * `bucket` wins outright over the marker's own classification whenever supplied,
- * exactly as `classifyMarker`'s `override` parameter always has.
+ * `bucket` is passed straight through to {@link classifyMarker}'s `override` parameter,
+ * so it wins outright over the marker's own classification whenever supplied.
  */
 interface ChecklistItem {
     marker: string;
@@ -1329,13 +975,13 @@ interface SummaryOptions {
  * short, or split into a success/active+pending/failure block below the bar when it
  * isn't.
  *
- * This is `renderDigest` with the checklist profile plugged in (issue #20): the icon
- * list moves from inline to the block form past 8 distinct `(marker, bucket)` entries,
- * bucket lines wrap past 12 entries, and every bucket's block (success, then
- * active+pending, then failure — empty buckets omitted) is blank-separated exactly
- * when any bucket line wrapped, matching this skill's own `check-checklist.mjs`
- * validator. Callers should not need to know the framing changed: the signature and
- * the rendered bytes are exactly what they were before the extraction.
+ * The icon list moves from inline to the block form once it holds more than
+ * {@link INLINE_ENTRY_LIMIT} distinct `(marker, bucket)` entries. In the block form, a
+ * bucket line wraps onto additional lines past {@link MAX_ENTRIES_PER_LINE} entries;
+ * when *any* bucket line wrapped this way, every bucket's block (success, then
+ * active+pending, then failure — empty buckets omitted) is separated from the next by a
+ * blank line, matching this skill's own `check-checklist.mjs` validator. When nothing
+ * wrapped, the bucket blocks sit flush against one another with no blank line between.
  *
  * @param items   every checklist item at every nesting level, one entry each; must be
  *   non-empty — a summary line has nothing to summarize otherwise
@@ -1368,8 +1014,8 @@ interface SummaryOptions {
  *
  * @throws {RangeError} when `items` is empty.
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./digest.ts renderDigest
- * @see ./profiles.ts CHECKLIST_PROFILE
+ * @see ./scale.ts
+ * @see ./markers.ts
  */
 declare function renderChecklistSummary(items: readonly ChecklistItem[], options?: SummaryOptions): string;
 
@@ -1406,19 +1052,11 @@ declare function renderChecklistSummary(items: readonly ChecklistItem[], options
  * Not checked (documented limitations, inherited from the original): ship-to-targets
  * destination syntax and the optional visuals.
  *
- * Since issue #20 this module also carries {@link verifyDigest}, the generalization of
- * the same re-derivation to every digest profile in `profiles.ts` — the profile is
- * inferred from the digest line's noun, a checklist digest delegates to
- * {@link verifyChecklist} unchanged, and the icon-list layout checks are shared
- * between the two via one parameterized helper rather than duplicated.
- *
  * Pure: no I/O, no clock, no randomness.
  *
  * @see ./markers.ts
  * @see ./scale.ts
  * @see ./checklist.ts
- * @see ./digest.ts
- * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 /**
@@ -1495,44 +1133,661 @@ interface ChecklistVerification {
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 declare function verifyChecklist(text: string): ChecklistVerification;
+
 /**
- * Validates a rendered compressed-artifact digest of **any** profile against the
- * general digest grammar, reporting every mismatch rather than stopping at the first —
- * the generalization of {@link verifyChecklist} the compression-mechanic spec calls
- * for (issue #20).
+ * The shared graph model for the diagram renderers: nodes, edges, and the
+ * normalization that turns a caller's edge list into a validated {@link Digraph}.
  *
- * The profile is inferred from the digest line's noun, per the fixed-grammar rule that
- * the noun cues the profile (`items` → checklist, `findings`, `options`, `files`,
- * `hits` — see `profiles.ts`). A checklist digest delegates wholesale to
- * {@link verifyChecklist}, so the two validators can never disagree about the
- * deepest-developed profile. For other profiles the checks re-derive what is derivable
- * from the body: marker vocabulary, indentation, the count partition (recomputed from
- * the body's markers for marker-classified profiles; sum-only for the diff profile,
- * whose change kinds a rendered body does not carry), the scalar percent and bar
- * exactly when the profile declares a scalar axis (a fabricated percent on a
- * scalar-less profile is a FAIL), the `+N −M` tail exactly when the profile declares
- * one, and the full set of icon-list layout rules shared with the checklist validator.
+ * Diagrams draw structure on a single-width monospace character grid, so the model
+ * layer is where grid-hostile text is rejected: double-width glyphs (emoji, CJK),
+ * combining marks, and embedded newlines all corrupt column alignment silently if
+ * they reach the drawing surface, so they are a `RangeError` here instead
+ * (`2026-08-27-diagrams-design.md` § Rendering-compatibility constraints).
  *
- * `text` may be a bare block or a Markdown document containing one fenced block —
- * see {@link extractChecklistBlock}.
+ * Pure: no I/O, no store access, no clock, no randomness.
  *
- * @param text the rendered artifact, digest line included
- * @returns every check's outcome plus the formatted report, in the same shape
- *   {@link verifyChecklist} returns
- *
- * @example
- *   verifyDigest('- ❗ auth bypass\n- ⚠️ slow query\n\n1/1/0 findings  ❗ 1  ⚠️ 1')
- *   // => { ok: true, itemCount: 2, report: 'ok: 2 findings parsed\nok: all checks passed', … }
- *
- * @example
- *   verifyDigest('- 🔍 a\n- 🔍 b\n\n2/0/0 hits (100%) ██████████  🔍 2')
- *   // => { ok: false, … }  — the results profile has no scalar axis; the percent is fabricated
- *
- * @see verifyChecklist
- * @see ./profiles.ts
- * @see ./digest.ts
+ * @see ./grid.js
+ * @see ./layout.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
  */
-declare function verifyDigest(text: string): ChecklistVerification;
+/** One vertex of a diagram: its identity, and optionally a display label. */
+interface DiagramNode {
+    /** The node's unique identity, referenced by edges. */
+    id: string;
+    /** The text drawn inside the node's box; defaults to `id` when absent. */
+    label?: string;
+}
+/** One directed edge of a diagram, optionally labeled (e.g. by a transition action). */
+interface DiagramEdge {
+    /** The id of the node this edge leaves. */
+    from: string;
+    /** The id of the node this edge enters. */
+    to: string;
+    /** The text drawn along the edge, if any — an action, a dependency kind, a verb. */
+    label?: string;
+}
+/** A validated directed graph: the input shape every diagram renderer draws from. */
+interface Digraph {
+    /** Every node exactly once, in first-appearance order. */
+    nodes: readonly DiagramNode[];
+    /** Every edge, in input order; parallel edges and self-loops are legal. */
+    edges: readonly DiagramEdge[];
+}
+/**
+ * Guards that `text` can be drawn on the single-width grid: no control characters or
+ * newlines (they break the line structure) and no double-width or combining glyphs
+ * (they break column alignment). Shared by every diagram entry point that accepts
+ * caller text — silently corrupting the grid is the failure class this module exists
+ * to prevent.
+ *
+ * @param text the caller-supplied text about to be drawn
+ * @param what names the offending field in the error, e.g. `"node id 'a'"`
+ *
+ * @example
+ *   requireGridSafe('locked', "node id 'locked'");   // returns quietly
+ *
+ * @throws {RangeError} If `text` contains a control character, a newline, a combining
+ *                        mark, or a double-width glyph such as an emoji or CJK
+ *                        character.
+ * @see normalizeGraph
+ */
+declare function requireGridSafe(text: string, what: string): void;
+/**
+ * The text a node draws inside its box: its label when present, its id otherwise.
+ *
+ * @example
+ *   displayLabel({ id: 'a', label: 'alpha' })   // => 'alpha'
+ *   displayLabel({ id: 'a' })                   // => 'a'
+ */
+declare function displayLabel(node: DiagramNode): string;
+/**
+ * Builds a validated {@link Digraph} from an edge list, inferring the node set from
+ * edge endpoints (in first-appearance order) when `nodes` is not given, and checking
+ * everything a renderer relies on: unique node ids, no dangling edge references, and
+ * grid-safe text throughout.
+ *
+ * @param edges the graph's edges; may be empty only when `nodes` supplies at least
+ *               one node, since a diagram of nothing is unrenderable
+ * @param nodes the explicit node set, when node order or labels matter; every edge
+ *               endpoint must appear in it
+ *
+ * @example
+ *   normalizeGraph([{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }])
+ *   // => { nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [...] }
+ *
+ * @throws {RangeError} If two nodes share an id, an edge references a node absent
+ *                        from an explicit `nodes` list, the graph has no nodes at
+ *                        all, or any id or label fails {@link requireGridSafe}.
+ * @see requireGridSafe
+ */
+declare function normalizeGraph(edges: readonly DiagramEdge[], nodes?: readonly DiagramNode[]): Digraph;
+
+/**
+ * The character grid every diagram is drawn on: a mutable width×height cell buffer
+ * with line, box, text, and path drawing, box-drawing junction resolution, and the
+ * final framed-or-padded string render.
+ *
+ * Junction resolution is the one piece of cleverness the whole drawing layer shares:
+ * each light box-drawing character is a bitmask of up/right/down/left arms, and
+ * drawing a line across an existing line ORs the masks — `─` over `│` yields `┼`,
+ * `│` descending into a box's `─` bottom border yields `┬` — so crossings and
+ * junctions come out right regardless of drawing order (mask OR is commutative,
+ * associative, and idempotent, which the stochastic suite pins).
+ *
+ * Pure and deterministic; the buffer is mutable but nothing here touches I/O, the
+ * clock, or randomness.
+ *
+ * @see ./layout.js
+ * @see ./renderers.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+/** A mutable drawing surface: `cells[y][x]` is the single-width character at (x, y). */
+interface CharGrid {
+    /** Total columns; x runs [0, width). */
+    readonly width: number;
+    /** Total rows; y runs [0, height). */
+    readonly height: number;
+    /** The cell buffer, row-major, every cell exactly one single-width character. */
+    readonly cells: string[][];
+}
+/** One cell coordinate on a {@link CharGrid}; x grows rightward, y grows downward. */
+interface GridPoint {
+    /** Column, in cells. */
+    x: number;
+    /** Row, in cells. */
+    y: number;
+}
+/**
+ * Allocates an all-space grid.
+ *
+ * @param width  columns, a positive integer
+ * @param height rows, a positive integer
+ *
+ * @example
+ *   const grid = makeGrid(10, 3);   // 10 columns × 3 rows of ' '
+ *
+ * @throws {RangeError} If either dimension is not a positive integer.
+ */
+declare function makeGrid(width: number, height: number): CharGrid;
+/**
+ * Writes one character to one cell, overwriting whatever is there. Line drawing
+ * should go through {@link mergeLine} instead so junctions resolve; `setCell` is for
+ * text and arrowheads, which deliberately replace.
+ *
+ * @example
+ *   setCell(grid, 3, 1, '▼');
+ *
+ * @throws {Error} If (x, y) is outside the grid — an internal bug in the caller's
+ *                 layout arithmetic, never a user-input condition.
+ */
+declare function setCell(grid: CharGrid, x: number, y: number, ch: string): void;
+/**
+ * Merges a line-arm mask into one cell: if the cell already holds a box-drawing
+ * character the masks OR together (junction resolution); anything else is replaced
+ * by the mask's own character.
+ *
+ * @param mask an OR of the arm bits; must map to a drawable character
+ *
+ * @example
+ *   // cell holds '│'; merging a horizontal produces the crossing:
+ *   mergeLine(grid, 4, 2, 0b1010);   // cell becomes '┼'
+ *
+ * @throws {Error} If out of bounds, or the merged mask has no character (impossible
+ *                 for masks built from real arms; guards table drift).
+ */
+declare function mergeLine(grid: CharGrid, x: number, y: number, mask: number): void;
+/**
+ * Merges a single directional stub arm into one cell — the attachment point where a
+ * line meets a border it does not cross: `attach(grid, x, y, 'down')` on a box's
+ * `─` bottom border yields `┬` without adding the `┼`-producing up arm a full
+ * `drawVline` would.
+ *
+ * @example
+ *   attach(grid, 6, 2, 'down');   // border '─' at (6,2) becomes '┬'
+ *
+ * @throws {Error} If (x, y) is outside the grid.
+ */
+declare function attach(grid: CharGrid, x: number, y: number, direction: 'up' | 'down' | 'left' | 'right'): void;
+/**
+ * Draws a horizontal line from (x1, y) to (x2, y) inclusive, merging junctions with
+ * anything already drawn. Endpoint order does not matter.
+ *
+ * @example
+ *   drawHline(grid, 2, 8, 0);   // '───────' across row 0
+ */
+declare function drawHline(grid: CharGrid, x1: number, x2: number, y: number): void;
+/**
+ * Draws a vertical line from (x, y1) to (x, y2) inclusive, merging junctions with
+ * anything already drawn. Endpoint order does not matter.
+ *
+ * @example
+ *   drawVline(grid, 4, 1, 5);   // '│' down column 4
+ */
+declare function drawVline(grid: CharGrid, x: number, y1: number, y2: number): void;
+/**
+ * Draws a rectangular box border with corners at (x, y) and (x+width-1, y+height-1),
+ * merging with anything already drawn (two boxes sharing an edge resolve their
+ * shared border's junctions correctly).
+ *
+ * @param width  total box width in cells, at least 2
+ * @param height total box height in cells, at least 2
+ *
+ * @example
+ *   drawBox(grid, 0, 0, 8, 3);
+ *   // ┌──────┐
+ *   // │      │
+ *   // └──────┘
+ *
+ * @throws {RangeError} If `width` or `height` is less than 2 — a box needs room for
+ *                        all four corners.
+ */
+declare function drawBox(grid: CharGrid, x: number, y: number, width: number, height: number): void;
+/**
+ * Writes `text` left to right starting at (x, y), one character per cell,
+ * overwriting whatever is there (an edge label deliberately interrupts its line).
+ *
+ * @example
+ *   drawText(grid, 2, 1, 'locked');
+ *
+ * @throws {Error} If any character would land outside the grid.
+ */
+declare function drawText(grid: CharGrid, x: number, y: number, text: string): void;
+/**
+ * Expands orthogonal waypoints into the full unit-step cell sequence between them,
+ * dropping zero-length steps. The result is what {@link drawPath} draws and what the
+ * layout layer records for edge-traceability tests.
+ *
+ * @param waypoints the path's corners, in order; consecutive points must share a row
+ *                   or a column
+ *
+ * @example
+ *   expandWaypoints([{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 1 }])
+ *   // => [{x:0,y:0}, {x:1,y:0}, {x:2,y:0}, {x:2,y:1}]
+ *
+ * @throws {Error} If consecutive waypoints are diagonal to each other.
+ */
+declare function expandWaypoints(waypoints: readonly GridPoint[]): GridPoint[];
+/**
+ * Draws one edge path: every cell but the last merges its in/out line arms (so
+ * borders become junctions and crossings become `┼`), and the last cell gets the
+ * arrowhead for its approach direction (`▶ ◀ ▲ ▼`).
+ *
+ * The first cell merges only its outgoing arm — placed on a box's border character
+ * this is exactly what turns `─` into `┬`: the visible attachment point.
+ *
+ * @param points the full unit-step cell sequence, from source attachment to
+ *                arrowhead cell; at least 2 points
+ *
+ * @example
+ *   drawPath(grid, expandWaypoints([{ x: 3, y: 2 }, { x: 3, y: 4 }]));
+ *   // column 3: row 2 merges '┬' into a box bottom, row 3 '│', row 4 '▼'
+ *
+ * @throws {Error} If fewer than 2 points, or points are not unit orthogonal steps.
+ */
+declare function drawPath(grid: CharGrid, points: readonly GridPoint[]): void;
+/**
+ * The grid's used extent: the smallest (width, height) containing every non-space
+ * cell. Used to crop the canvas before framing, so a generously allocated grid
+ * frames to its content.
+ *
+ * @example
+ *   usedExtent(grid)   // => { width: 14, height: 5 }
+ *
+ * @throws {RangeError} If the grid is entirely blank — a diagram with no content is
+ *                        a caller bug upstream of rendering.
+ */
+declare function usedExtent(grid: CharGrid): {
+    width: number;
+    height: number;
+};
+/** Options for {@link renderGrid} and {@link renderLines}. */
+interface RenderGridOptions {
+    /** Frame the output in a visible box (default true); see the spec's ragged-edge finding. */
+    frame?: boolean;
+}
+/**
+ * Joins pre-built lines into the final diagram string: framed by default (the frame
+ * guarantees a visible rectangle that editors cannot strip, costing two lines and
+ * four columns), or unframed with trailing whitespace stripped from every line (the
+ * interior stays aligned; only the invisible right pad is dropped, so a consumer
+ * that re-pads loses nothing).
+ *
+ * @param lines the diagram's rows, top to bottom, without trailing newlines
+ *
+ * @example
+ *   renderLines(['a', 'bb'])
+ *   // => '┌────┐\n│ a  │\n│ bb │\n└────┘'
+ *
+ * @throws {RangeError} If `lines` is empty.
+ * @see renderGrid
+ */
+declare function renderLines(lines: readonly string[], options?: RenderGridOptions): string;
+/**
+ * Renders the grid to its final string: cropped to its used extent, then framed (or
+ * trailing-whitespace-stripped) per {@link renderLines}.
+ *
+ * @example
+ *   const grid = makeGrid(20, 3);
+ *   drawBox(grid, 0, 0, 5, 3);
+ *   renderGrid(grid, { frame: false })
+ *   // => '┌───┐\n│   │\n└───┘'
+ *
+ * @throws {RangeError} If the grid is entirely blank.
+ * @see renderLines
+ * @see usedExtent
+ */
+declare function renderGrid(grid: CharGrid, options?: RenderGridOptions): string;
+
+/**
+ * A small FSL-subset parser: exactly the fragment `renderFsl` (in
+ * `../charts/timeline.ts`) emits, turned back into a {@link Digraph}.
+ *
+ * The subset is: bare transitions (`a -> b;`), action-labeled transitions
+ * (`a 'action' -> b;`), chained arrows (`a -> b -> c;`), multiple `;`-separated
+ * statements, and the active-state `**bold**` marks (stripped on parse). Everything
+ * else in real FSL/jssm — probabilities, named machines, themes, other arrow kinds —
+ * is a `RangeError` naming the subset, never a silent skip: this project carries
+ * zero runtime dependencies, so jssm's full grammar deliberately stays out of scope
+ * (`2026-08-27-diagrams-design.md` § FSL / jssm). A caller with a full FSL machine
+ * has jssm; a transcript diagram needs the topology.
+ *
+ * Round-trip property, pinned by the stochastic suite: for any transition list `t`,
+ * `parseFsl(renderFsl(t))` yields the same edge sequence as `t`, actions and all.
+ *
+ * @see ../charts/timeline.js
+ * @see ./model.js
+ */
+
+/**
+ * Parses an FSL-subset source string into a validated {@link Digraph}: each
+ * transition becomes an edge, each quoted action its edge's label, and the node set
+ * is inferred in first-appearance order. `**bold**` active-state marks are stripped
+ * — the active state is display information, carried separately by
+ * `renderStateDiagram`'s `activeState` option, not part of the topology.
+ *
+ * @param source the FSL text, e.g. output of `renderFsl`; must contain at least one
+ *                transition, and every statement must end with `;`
+ *
+ * @example
+ *   parseFsl("locked 'coin' -> unlocked 'push' -> locked;")
+ *   // => {
+ *   //   nodes: [{ id: 'locked' }, { id: 'unlocked' }],
+ *   //   edges: [
+ *   //     { from: 'locked', to: 'unlocked', label: 'coin' },
+ *   //     { from: 'unlocked', to: 'locked', label: 'push' },
+ *   //   ],
+ *   // }
+ *
+ * @throws {RangeError} If the source is empty, a statement is malformed or missing
+ *                        its `;`, or the text uses FSL features outside the subset
+ *                        (probabilities, named machines, other arrow kinds); every
+ *                        rejection names the subset.
+ * @see normalizeGraph
+ */
+declare function parseFsl(source: string): Digraph;
+
+/**
+ * Layered layout for digraphs — deliberately modest, per the design spec: longest-path
+ * layering, barycenter ordering within layers (a heuristic, explicitly not optimal),
+ * and orthogonal edge routing on the grid.
+ *
+ * The shape of a drawing: layers stack top to bottom, each node a 3-row framed box;
+ * between layers sit gutters where edges run. Every edge leaves its source through the
+ * bottom border and enters its target through the top border with a `▼`, which makes
+ * arrow direction uniform and legible. Edges to the next layer route inside one gutter
+ * (straight, or with one horizontal jog on a row of their own); every other edge —
+ * spanning multiple layers, looping back, or self-referencing — routes out to its own
+ * corridor column on the right, giving cycles the classic wrap-around return arrow.
+ * Back edges are found by depth-first search and never used for layering, so a
+ * two-state toggle draws as two boxes with a forward and a return arrow rather than
+ * recursing.
+ *
+ * Refusal is a feature: a graph past {@link MAX_DIAGRAM_NODES} nodes, a node with more
+ * edges than its box has border cells, or a drawing wider than the budget is a
+ * `RangeError` naming the fallbacks ({@link DIAGRAM_FALLBACKS}) — a wrapped or tangled
+ * diagram is worse than no diagram.
+ *
+ * Pure and deterministic: identical input always yields the identical layout.
+ *
+ * @see ./grid.js
+ * @see ./renderers.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+
+/**
+ * The legibility threshold: layout refuses graphs with more nodes than this. Chosen
+ * from typical 78-column capacity (spec § Open questions, shipped as a reviewable
+ * constant to tune against real use), not measured law.
+ */
+declare const MAX_DIAGRAM_NODES = 20;
+/**
+ * The fallback menu every layout refusal names, so the caller's next action is named
+ * rather than guessed: the inline FSL form, a plain adjacency list, or the mermaid
+ * emission for a destination that renders it.
+ */
+declare const DIAGRAM_FALLBACKS: string;
+/** One node's placed box: position and size in grid cells, plus its display label. */
+interface NodeBox {
+    /** The node's id, matching the graph. */
+    id: string;
+    /** The text drawn inside the box (already includes any active-state marker). */
+    label: string;
+    /** Left column of the box border. */
+    x: number;
+    /** Top row of the box border. */
+    y: number;
+    /** Total box width including borders: label length + 4. */
+    width: number;
+    /** Total box height including borders; always 3 in this layout. */
+    height: number;
+}
+/** One routed edge: its endpoints, optional label, and full unit-step cell path. */
+interface RoutedEdge {
+    /** Source node id. */
+    from: string;
+    /** Target node id. */
+    to: string;
+    /** The edge's label, when it has one; placement is the renderer's job. */
+    label?: string;
+    /**
+     * Every cell of the path in order, from the attachment cell on the source's bottom
+     * border to the arrowhead cell just above the target's top border.
+     */
+    points: readonly GridPoint[];
+}
+/** A finished digraph layout, ready to draw: geometry only, no characters yet. */
+interface DigraphLayout {
+    /** Columns the drawing needs; guaranteed ≤ the requested budget. */
+    surfaceWidth: number;
+    /** Rows the drawing needs. */
+    surfaceHeight: number;
+    /** Every node's placed box. */
+    boxes: readonly NodeBox[];
+    /** Every edge's route, in the graph's edge order. */
+    routes: readonly RoutedEdge[];
+}
+/** Options for {@link layoutDigraph}. */
+interface DigraphLayoutOptions {
+    /** The width budget in columns; a layout that cannot fit refuses rather than wraps. */
+    surfaceWidth: number;
+    /** Per-node display-label overrides (e.g. the state form's `▶ ` active marker). */
+    labels?: ReadonlyMap<string, string> | undefined;
+}
+/**
+ * Computes the full layered layout for a validated digraph: layer assignment,
+ * barycenter ordering, box placement, and an orthogonal route (with arrowhead cell)
+ * for every edge.
+ *
+ * @param graph   a {@link Digraph}, normally from `normalizeGraph` or `parseFsl`
+ * @param options the width budget and optional per-node display labels
+ *
+ * @example
+ *   const graph = parseFsl("locked 'coin' -> unlocked 'push' -> locked;");
+ *   const layout = layoutDigraph(graph, { surfaceWidth: 74 });
+ *   // layout.boxes: locked at the top, unlocked below it;
+ *   // layout.routes: a straight forward edge and a wrap-around return edge
+ *
+ * @throws {RangeError} If the graph exceeds {@link MAX_DIAGRAM_NODES} nodes, a node
+ *                        has more edges than its box border can attach, or the
+ *                        drawing cannot fit `surfaceWidth` columns; each refusal
+ *                        names {@link DIAGRAM_FALLBACKS}.
+ * @see ./renderers.js
+ */
+declare function layoutDigraph(graph: Digraph, options: DigraphLayoutOptions): DigraphLayout;
+
+/**
+ * The public diagram forms: state diagram, digraph, tree, and sequence — data in,
+ * exact framed ASCII string out, the error class of hand-drawn diagrams (misaligned
+ * edges, arrows touching the wrong box, ragged margins) prevented rather than
+ * detected.
+ *
+ * All four share the rendering-compatibility constraints from the design spec:
+ * single-width glyphs only (light box-drawing set plus `▶ ◀ ▲ ▼` arrowheads), a
+ * width budget defaulting to {@link DEFAULT_DIAGRAM_WIDTH} columns, framed output by
+ * default, no trailing whitespace ever, and refusal — naming fallbacks — over an
+ * illegible or wrapped drawing. Emit the result inside a ` ```text ` fence; outside
+ * one, proportional fonts destroy the alignment these renderers guarantee.
+ *
+ * Pure: no I/O, no store access, no clock, no randomness.
+ *
+ * @see ./layout.js
+ * @see ./grid.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+
+/**
+ * The default maximum output width in columns, frame included: fits an 80-column
+ * terminal inside a code fence without wrapping.
+ */
+declare const DEFAULT_DIAGRAM_WIDTH = 78;
+/** Options shared by every diagram form. */
+interface DiagramRenderOptions {
+    /** Frame the diagram in a visible box; default true (see the ragged-edge finding). */
+    frame?: boolean | undefined;
+    /** Maximum output width in columns, frame included; default {@link DEFAULT_DIAGRAM_WIDTH}. */
+    width?: number | undefined;
+}
+/** Options for {@link renderStateDiagram}. */
+interface StateDiagramOptions extends DiagramRenderOptions {
+    /** The state currently occupied, if known; its box's label gets a `▶ ` marker. */
+    activeState?: string | undefined;
+}
+/**
+ * Renders a state machine as boxes and labeled arrows: layers top to bottom, every
+ * transition entering its target from above with a `▼`, cycles drawn as wrap-around
+ * return arrows on the right. Input is either a {@link Digraph} or FSL-subset source
+ * (the text `renderFsl` emits); the active state — a display fact, not topology — is
+ * marked with `▶ ` inside its box, since bolding does not exist inside a code fence.
+ *
+ * @param machine a graph, or FSL-subset source such as `"a 'go' -> b;"`
+ * @param options `activeState` plus the shared frame/width options
+ *
+ * @example
+ *   renderStateDiagram("locked 'coin' -> unlocked 'push' -> locked;")
+ *   // => a framed drawing: locked's box above unlocked's, a labeled 'coin' arrow
+ *   //    down, and a labeled 'push' return arrow wrapping around the right side
+ *
+ * @throws {RangeError} If the FSL source is outside the parser's subset, the graph
+ *                        fails validation, `activeState` names an unknown state, or
+ *                        layout refuses (too many nodes, too tangled, or over the
+ *                        width budget) — refusals name the fallbacks.
+ * @see parseFsl
+ * @see renderDigraph
+ */
+declare function renderStateDiagram(machine: Digraph | string, options?: StateDiagramOptions): string;
+/**
+ * Renders a directed graph — dependencies, call flows, data lineage — with the same
+ * drawing engine as {@link renderStateDiagram} but no state-machine affordances.
+ * Reach for it the moment structure branches, merges, cycles, or fans in or out; a
+ * straight line is better served by the inline chain forms.
+ *
+ * @param graph the graph to draw; run through `normalizeGraph` internally, so a
+ *               hand-built edge list is fine
+ *
+ * @example
+ *   renderDigraph(normalizeGraph([
+ *     { from: 'claude', to: 'root' }, { from: 'codex', to: 'root' },
+ *     { from: 'root', to: 'skills' }, { from: 'root', to: 'commands' },
+ *   ]))
+ *   // => a framed fan-in/fan-out drawing: two manifests converging on root,
+ *   //    root forking to skills and commands
+ *
+ * @throws {RangeError} If the graph fails validation or layout refuses (too many
+ *                        nodes, too tangled, or over the width budget) — refusals
+ *                        name the fallbacks.
+ * @see renderStateDiagram
+ * @see renderTree
+ */
+declare function renderDigraph(graph: Digraph, options?: DiagramRenderOptions): string;
+/** Options for {@link renderTree}. */
+interface TreeRenderOptions extends DiagramRenderOptions {
+    /** Display labels by node id; a node absent from the map draws its id. */
+    labels?: Readonly<Record<string, string>> | undefined;
+}
+/**
+ * Renders a strict hierarchy — a decision tree, a module tree with annotations — as
+ * a connector tree (`├─`/`└─`/`│`), the simpler tidy layout the spec reserves for
+ * input that is genuinely a tree. Non-tree input is refused by naming the first node
+ * that appears under two parents (or in a cycle), so the caller knows to use
+ * {@link renderDigraph} instead.
+ *
+ * @param root     the root node's id
+ * @param children each node's ordered children, by parent id; ids absent from the
+ *                  map are leaves, and every key must be reachable from `root`
+ *
+ * @example
+ *   renderTree('plugin', { plugin: ['skills', 'commands'], commands: ['claude', 'gemini'] })
+ *   // => '┌────────────────┐\n' +
+ *   //    '│ plugin         │\n' +
+ *   //    '│ ├─ skills      │\n' +
+ *   //    '│ └─ commands    │\n' +
+ *   //    '│    ├─ claude   │\n' +
+ *   //    '│    └─ gemini   │\n' +
+ *   //    '└────────────────┘'
+ *
+ * @throws {RangeError} If a node repeats (shared child or cycle — the error names
+ *                        it), a `children` key is unreachable from `root`, the tree
+ *                        exceeds the node threshold, or a line exceeds the width
+ *                        budget; refusals name the fallbacks.
+ * @see renderDigraph
+ */
+declare function renderTree(root: string, children: Readonly<Record<string, readonly string[]>>, options?: TreeRenderOptions): string;
+/** One message of a sequence diagram: source actor, target actor, optional label. */
+interface SequenceMessage {
+    /** The sending actor's name, which must appear in `actors`. */
+    from: string;
+    /** The receiving actor's name, which must appear in `actors`; may equal `from`. */
+    to: string;
+    /** The text drawn on its own row above the arrow, if any. */
+    label?: string;
+}
+/**
+ * Renders a sequence diagram: one boxed actor per column, a lifeline under each, and
+ * one horizontal arrow row per message, top to bottom in message order — the shape
+ * the issue thread singles out as the most painful to hand-draw and the most
+ * mechanical to render (fixed lifeline columns, monotone rows, no layout search).
+ * Self-messages draw as a small right-hand loop; labels sit on their own row above
+ * their arrow.
+ *
+ * @param actors   the lifeline columns, left to right; unique, non-empty names
+ * @param messages the messages in time order; may be empty (actors and lifelines
+ *                  still draw)
+ *
+ * @example
+ *   renderSequence(['human', 'agent'], [
+ *     { from: 'human', to: 'agent', label: 'ask' },
+ *     { from: 'agent', to: 'human', label: 'answer' },
+ *   ])
+ *   // => a framed drawing: two boxed actors, lifelines, an 'ask' arrow rightward
+ *   //    and an 'answer' arrow back leftward, each labeled on the row above
+ *
+ * @throws {RangeError} If `actors` is empty, repeats a name, or exceeds the node
+ *                        threshold; a message names an unknown actor; or the
+ *                        drawing exceeds the width budget — refusals name the
+ *                        fallbacks.
+ * @see renderDigraph
+ */
+declare function renderSequence(actors: readonly string[], messages: readonly SequenceMessage[], options?: DiagramRenderOptions): string;
+
+/**
+ * The secondary emission: a mermaid serializer, no layout. Mermaid does not render
+ * in the transcript surface this plugin lives in (settled empirically in issue #19 —
+ * the reader gets raw source), so this is emitted only on request, for destinations
+ * that do render it: GitHub issue/PR bodies, READMEs, and preview surfaces.
+ *
+ * Pure string emission; the graph is re-validated on the way through, and the small
+ * extra vocabulary mermaid itself cannot carry (whitespace in ids, quotes in
+ * labels) is a named `RangeError` rather than silently mangled output.
+ *
+ * @see ./model.js
+ * @see ./renderers.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+
+/** The two mermaid dialects emitted: state machines, and everything else. */
+type MermaidDialect = 'stateDiagram-v2' | 'flowchart';
+/**
+ * Serializes a graph to mermaid source: `stateDiagram-v2` for state machines (edge
+ * labels become `: action` transition annotations), `flowchart` (top-down) for
+ * everything else (every node declared with its label, edge labels in `|pipes|`).
+ * No layout, no line drawing — mermaid's renderer owns that on whatever surface
+ * this lands.
+ *
+ * @param graph   the graph to serialize; re-validated internally
+ * @param dialect which mermaid grammar to emit
+ *
+ * @example
+ *   toMermaid(normalizeGraph([
+ *     { from: 'locked', to: 'unlocked', label: 'coin' },
+ *     { from: 'unlocked', to: 'locked', label: 'push' },
+ *   ]), 'stateDiagram-v2')
+ *   // => 'stateDiagram-v2\n    locked --> unlocked: coin\n    unlocked --> locked: push'
+ *
+ * @throws {RangeError} If the graph fails validation, or an id or label uses
+ *                        characters the chosen mermaid syntax cannot carry.
+ * @see normalizeGraph
+ */
+declare function toMermaid(graph: Digraph, dialect: MermaidDialect): string;
 
 /**
  * A zero-dependency PNG encoder: RGBA bytes in, a complete PNG file `Buffer` out.
@@ -2034,5 +2289,5 @@ declare const LOGICAL_HEIGHT = 720;
  */
 declare function renderHistoryPng(data: HistoryData, options?: RenderOptions): Buffer;
 
-export { BLUE, BRAILLE, CANONICAL_ORDER, CHECKLIST_PROFILE, DELTA_WINDOW, DIFF_PROFILE, EIGHTHS, FAILURE_MARKERS, FINDINGS_PROFILE, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, INLINE_ENTRY_LIMIT, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_ENTRIES_PER_LINE, OPTIONS_PROFILE, ORANGE, OUTCOMES, PNG_SIGNATURE, PROFILES, PROFILE_NAMES, PURPLE, RESULTS_PROFILE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, double, drawChecklistSeries, drawDeltaLane, drawNeedRate, drawStemPunch, drawUncertainStrip, encodePng, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, leadUnitIndex, makeSurface, measureText, nestDigest, overallBucket, parseSummaryCounts, pixel, polyline, profileForNoun, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigest, renderDiverging, renderFsl, renderHistoryPng, renderProgressBar, renderRange, renderRetryHealth, renderSparkline, renderStacked, renderStars, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTrendTag, renderWeather, renderWinLoss, rollingMean, stemColor, subRegion, text, unhandled_external, upscale, verifyChecklist, verifyDigest, vline };
-export type { BoxWhiskerStats, Bucket, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DigestBucketSpec, DigestOptions, DigestProfile, DigestUnit, FslTransition, HistoryChart, HistoryData, Milestone, MilestoneState, NeedWeekRow, NestedDigest, Outcome, ProfileName, RangeStyle, Region, RenderOptions, Rgba, SeriesScale, SignatureRow, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TrendDirection, WeatherState };
+export { BLUE, BRAILLE, CANONICAL_ORDER, DEFAULT_DIAGRAM_WIDTH, DELTA_WINDOW, DIAGRAM_FALLBACKS, EIGHTHS, FAILURE_MARKERS, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_DIAGRAM_NODES, ORANGE, OUTCOMES, PNG_SIGNATURE, PURPLE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, layoutDigraph, makeGrid, makeSurface, measureText, mergeLine, normalizeGraph, parseFsl, parseSummaryCounts, pixel, polyline, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, vline };
+export type { BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, HistoryChart, HistoryData, MermaidDialect, Milestone, MilestoneState, NeedWeekRow, NodeBox, Outcome, RangeStyle, Region, RenderGridOptions, RenderOptions, Rgba, RoutedEdge, SequenceMessage, SeriesScale, SignatureRow, StateDiagramOptions, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };

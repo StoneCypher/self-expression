@@ -94,10 +94,10 @@ export const FAILURE_MARKERS = [
  * list entry), followed by the topic/action markers group by group, top to
  * bottom, in each group's left-to-right listed order.
  *
- * `markers.md`'s "Status markers" heading says "(22, canonical order)", but
- * the bulleted list beneath it has 23 entries — a stale
- * count in the source doc. This array transcribes the actual list, per the
- * rule "every marker... in its listed order".
+ * `markers.md`'s status-marker list carries 25 entries (the 2026-08-27 field
+ * trial added 🔬 "under review" and 🔁 "in a fix round", both classifying
+ * active+pending). This array transcribes the actual list, per the rule
+ * "every marker... in its listed order".
  *
  * This is the tiebreaker `status-checklists-skill.md` specifies for sorting
  * a summary line's per-marker icon list: equal-count markers sort by first
@@ -114,6 +114,8 @@ export const CANONICAL_ORDER = [
   '🤖',  // running in an agent (a dispatched sub-agent)
   '⏳',  // running in general (direct work or a background process, not an agent)
   '🌐',  // web search or web read in progress
+  '🔬',  // under review — the work exists and a reviewer is examining it
+  '🔁',  // in a fix round — judged by review, now being amended (distinct from the retry-after-failure badger below)
   '🛠️',  // deferred to a skill
   '🛰️',  // monitoring (waiting on a different task — a dependency-wait)
   '🔜',  // queued (not started, no specific blocker)

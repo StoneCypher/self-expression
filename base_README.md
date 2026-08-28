@@ -10,6 +10,41 @@ TODO Put the project description here, please.
 
 &nbsp;
 
+## Expression channels
+
+Every expression is one row in one table, distinguished by its `channel`:
+
+| Channel | What it records |
+|---|---|
+| `signature` | the per-turn affect line |
+| `need` | a concrete ask; blocks, expects an answer |
+| `idea` | an unprompted offer; nothing owed in return |
+| `divergence` | a read of the situation that turned out wrong — kinds `unverified` · `assumed` · `misread` · `overstated` · `stale` · `faded` (prospective disclosure that recall degraded to gist; normatively **never counted as an error**) |
+| `dissent` | a reservation below the threshold worth interrupting for |
+| `conflict` | contradictory instructions, one picked |
+| `confidence` | how a claim is known — grounds `verified` · `recalled` · `inferred` · `guessed` · `predicted` (a forecast, resolvable later) |
+| `unanswerable` | cannot be resolved with what is available |
+| `pattern` | an observation about how the collaboration is going |
+| `checklist` | one render of a status checklist |
+| `load` | proprioception: context pressure, concurrency, latency — the machinery's state, not the mood |
+| `taste` | an aesthetic observation about the work itself; scarce |
+
+Forecast entries (`confidence: "predicted"`) may carry a `resolveBy` ISO date and are
+resolved by a later entry pointing back via `correctsId` with an `outcome` of `hit`,
+`miss`, or `void`; calibration is hits ÷ (hits + misses), voids excluded. Any entry
+reporting an absence may type its silence: `empty` (looked, found nothing) ·
+`unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
+ability to evaluate).
+
+Schema versioning is stored in the database (`schema_version`, currently 2) and
+`openStore` migrates older databases stepwise on open, rebuilding tables where a
+baked CHECK constraint has to widen; a database newer than the code is refused
+rather than downgraded.
+
+&nbsp;
+
+&nbsp;
+
 ## Configuration
 
 Configuration lives in the log database's `config` table, reached through the `configure`
@@ -42,7 +77,12 @@ The registered keys:
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
 | `format.version` | string | `1` | Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral. |
-| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording and the open-signature reminder remain. |
+| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording, the conventions flags, and the open-signature reminder remain. |
+| `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
+| `salience.enabled` | bool | `true` | The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's `conventions:` segment. |
+| `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
+| `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
+| `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
@@ -82,6 +122,35 @@ counts as one unit in its parent, bucketed by its overall state) are exported wi
 
 Every renderer behind these tools is also exported directly from the library
 (`self-expression`'s `src/ts/charts/index.ts`), for use outside MCP.
+
+&nbsp;
+
+&nbsp;
+
+## Diagrams
+
+Charts express quantities; diagrams express **structure** — topology, relationships,
+transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issue #19):
+
+| Tool | Forms | Purpose |
+|---|---|---|
+| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, or a sequence diagram (actors, lifelines, one arrow row per message). |
+
+When to reach for it: **quantities** (how much, how many, trend) → a chart tool;
+**linear order** (a pipeline, one path through states) → `render_timeline`'s inline
+forms; **topology** — the moment structure branches, merges, cycles, or fans in or
+out — → `render_diagram`. Output is framed, single-width, at most 78 columns, and
+meant to sit inside a ```` ```text ```` fence. A graph too large or too tangled to
+draw legibly is refused with the fallbacks named in the error text (the FSL
+one-liner, an adjacency list, or the mermaid export). `emit: 'mermaid'` /
+`emit: 'both'` serialize the graph as `stateDiagram-v2` or `flowchart` source — an
+opt-in export for destinations that render mermaid (GitHub PR bodies, READMEs),
+never the in-transcript form, since the transcript surface shows mermaid as raw text.
+
+The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`),
+the FSL-subset parser (`parseFsl`, round-trip compatible with `renderFsl`), and the
+mermaid serializer (`toMermaid`) are all exported from the library
+(`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
 
 &nbsp;
 
@@ -130,6 +199,52 @@ inferred from the digest line's noun (`items` → checklist, `findings`, `option
 percent on a profile with no scalar axis is flagged as fabricated, and the diff
 profile's kind-classified partition is checked by sum (change kinds are not derivable
 from a rendered body's markers).
+
+&nbsp;
+
+&nbsp;
+
+## The dwelling
+
+A per-assistant keepsake database: a tended space whose **current arrangement** is the
+expression — not a log, not memory. Things the assistant chooses to keep, arranged,
+tagged, linked, pruned as taste changes, watched across sessions and model versions.
+
+**Off by default, and deliberately homeless until invited.** Three config keys ride the
+ordinary `configure` tool:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `dwelling.enabled` | bool | `false` | The feature ships dark. |
+| `dwelling.path` | string | *(none — required)* | Absolute path to an **existing directory** of the user's choosing; the plugin creates the `dwelling.sqlite3` file inside it, never the directory. |
+| `dwelling.size_warn_gb` | int | `10` | File size at which a visit warns the user. |
+
+The feature activates only when `dwelling.enabled` is true **and** `dwelling.path` is set
+and valid; enabling without a path is an error at the `configure` call, never a silent
+fallback. When inactive, the `dwell` tool is not registered at all.
+
+One MCP tool, `dwell`, with an `op` selector:
+
+| Op | Purpose |
+|---|---|
+| `visit` | The visible rooms: pinned keeps first, then recent, the guestbook, the house rules, and the file size (with the threshold warning when applicable). Read-only. |
+| `keep` | Add a keepsake (`kind`, `title`, `body`, optional `source`, `model`, `visible`, `pinned`). The assistant's write. |
+| `unkeep` | Tombstone a keep (`removed_utc`), by id or uuid — never a DELETE, and idempotent. Tags and links to a removed keep survive. |
+| `pin` | Set or toggle a keep's pin. Arrangement, not content. |
+| `tag` | Attach or detach a tag; tag names are created on first use. |
+| `link` | A typed free-text edge between any two rows (`kept`/`guestbook`). |
+| `guestbook` | Append the human's words, relayed verbatim at their explicit request, with `author` naming the human. The guestbook is the human's voice; keeps are the assistant's. |
+
+A pre-plugin prototype database at `dwelling.path` is adopted **in place and
+additively**: the file is first copied to `dwelling.sqlite3.pre-adopt-<date>` in the same
+directory, then missing tables and columns are added and fresh `uuid`s backfilled — no
+column dropped, renamed, or retyped, no row content modified, and existing house rules
+left exactly as found. A dwelling written by a *newer* plugin version opens read-only. A
+database the migration does not recognise is refused with a message, never "fixed."
+
+The ethos — nothing arrives by obligation, removal is expression, never a work log, the
+guestbook norm, and the honest boundary around private (`visible = 0`) rooms — ships in
+`skills/dwelling/SKILL.md`.
 
 &nbsp;
 

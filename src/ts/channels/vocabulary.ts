@@ -26,6 +26,8 @@ export const CHANNELS = [
   'unanswerable',  // cannot be resolved with what is available
   'pattern',       // an observation about how the collaboration is going
   'checklist',     // a rendered status checklist
+  'load',          // proprioception: context pressure, concurrency, latency — the machinery's state, not the mood
+  'taste',         // an aesthetic observation about the work itself; scarce
 ] as const;
 
 /** Where in a turn a signature sits. */
@@ -59,6 +61,24 @@ export const CONFIDENCE_GROUNDS = [
   'recalled',   // from training or earlier in session, not rechecked
   'inferred',   // reasoned from things believed, not directly known
   'guessed',    // genuinely uncertain; offered because it beats silence
+  'predicted',  // a claim about the future; unresolvable now, resolvable later
+] as const;
+
+/**
+ * How a forecast resolved, recorded on the entry that resolves it.
+ *
+ * A forecast is an ordinary entry with `confidence: 'predicted'`; its resolution is a
+ * later entry pointing back via `corrects_id` and carrying one of these. `void` exists
+ * so a dissolved premise is not forced into `miss`: a question that stopped existing
+ * says nothing about judgment, which is why calibration (`hits / (hits + misses)`)
+ * excludes voids.
+ *
+ * @see ./entries.js forecastOutcomes
+ */
+export const FORECAST_OUTCOMES = [
+  'hit',   // it happened
+  'miss',  // it did not
+  'void',  // the premise dissolved; the question stopped existing
 ] as const;
 
 /**
@@ -68,6 +88,14 @@ export const CONFIDENCE_GROUNDS = [
  * means a fact was available and went unchecked, the second means no fact was
  * available and a plausible default filled the gap. Only the first is preventable by
  * simply looking.
+ *
+ * `faded` is the one prospective kind: recall of something specific has degraded to
+ * gist, disclosed at the moment of reaching for the memory rather than after acting on
+ * a wrong version of it. **Normative rule, binding on every future query helper: a
+ * `faded` row is never counted as an error.** Disclosing degradation is the success
+ * mode of memory honesty; any analysis that treats divergences as a failure count must
+ * exclude `faded` or bucket it separately, or it punishes exactly the behavior the
+ * channel exists to reward.
  */
 export const DIVERGENCE_KINDS = [
   'unverified',  // asserted when checking was free
@@ -75,6 +103,27 @@ export const DIVERGENCE_KINDS = [
   'misread',     // misunderstood what was asked
   'overstated',  // claimed more than could be supported
   'stale',       // used information that had expired
+  'faded',       // recall degraded to gist; disclosed before use, not an error
+] as const;
+
+/**
+ * The honest shapes of nothing — a qualifier on an entry reporting an absence.
+ *
+ * The no-op-entry doctrine says "nothing notable" must be expressible; these upgrade
+ * that one undifferentiated shrug to four auditable kinds. The load-bearing
+ * distinction is `empty` vs `unlooked`: an `empty` claims a search happened, an
+ * `unlooked` admits it did not — precisely "the requirement is to look".
+ *
+ * A qualifier, not a channel: it decorates an entry on any existing channel whose
+ * content reports an absence (a `signature` close that found nothing notable, an
+ * `unanswerable` past one's depth, a `dissent` being held). The column is nullable
+ * and the untyped shrug remains valid.
+ */
+export const SILENCE_KINDS = [
+  'empty',     // 🕳️ looked, found nothing
+  'unlooked',  // 🙈 did not look; declining to imply otherwise
+  'held',      // 🤐 have something, withholding pending evidence
+  'depth',     // 🌊 out of my depth; beyond ability to evaluate
 ] as const;
 
 /**
@@ -145,6 +194,8 @@ export type Effort           = typeof EFFORTS[number];
 export type ConfidenceGround = typeof CONFIDENCE_GROUNDS[number];
 export type DivergenceKind   = typeof DIVERGENCE_KINDS[number];
 export type Modality         = typeof MODALITIES[number];
+export type ForecastOutcome  = typeof FORECAST_OUTCOMES[number];
+export type SilenceKind      = typeof SILENCE_KINDS[number];
 
 /**
  * Whether `value` belongs to the closed vocabulary `vocabulary`, narrowing its type

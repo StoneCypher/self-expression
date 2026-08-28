@@ -8,7 +8,9 @@ import { latestContext, turnCount }           from '../channels/context.js';
 import {
   onUserPromptSubmit, onStop, handleHook, describeMoment,
   OPEN_REMINDER, OPEN_REMINDER_CLOCKLESS,
+  conventionFlags, CONVENTION_FLAGS,
 } from '../mcp/hooks.js';
+import { configKey }                          from '../channels/config.js';
 import { zoneAbbreviation }                   from '../channels/time.js';
 
 const VERSION = '0.2.0';
@@ -111,6 +113,56 @@ describe('onUserPromptSubmit', () => {
     expect(latestContext(s)).toBeNull();
   }));
 
+  test('the context line carries the conventions flags between the clock and the reminder', () => withStore(s => {
+    const context = String(
+      (onUserPromptSubmit(s, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context).toContain('conventions: salience:on revision:off gifts:off roster:off');
+    expect(context.indexOf('2:05 pm')).toBeLessThan(context.indexOf('conventions:'));
+    expect(context.indexOf('conventions:')).toBeLessThan(context.indexOf(OPEN_REMINDER));
+  }));
+
+  test('with no store there is no flags segment, and the clock still arrives', () => {
+    const context = String(
+      (onUserPromptSubmit(null, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context).not.toContain('conventions:');
+    expect(context).toContain('2:05 pm');
+  });
+
+});
+
+describe('conventionFlags', () => {
+
+  test('renders the code-side defaults when nothing is configured', () => withStore(s => {
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off gifts:off roster:off');
+  }));
+
+  test('an override flips its flag in the rendered segment', () => withStore(s => {
+    writeConfig(s, 'salience.enabled', false);
+    writeConfig(s, 'revision.enabled', true);
+    expect(conventionFlags(s)).toBe('conventions: salience:off revision:on gifts:off roster:off');
+  }));
+
+  test('only the exact strings true and false override; anything else falls back', () => withStore(s => {
+    writeConfig(s, 'salience.enabled', 'off');    // a typo, not a setting
+    writeConfig(s, 'gifts.enabled',    'yes');    // likewise
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off gifts:off roster:off');
+  }));
+
+  test('every declared convention appears in the segment exactly once', () => withStore(s => {
+    const segment = conventionFlags(s);
+    for (const { label } of CONVENTION_FLAGS) {
+      expect(segment.split(`${label}:`)).toHaveLength(2);
+    }
+  }));
+
+  test('every convention key is registered, and the fallbacks agree with the registry defaults', () => {
+    for (const { key, fallback } of CONVENTION_FLAGS) {
+      expect(configKey(key)?.fallback).toBe(fallback ? 'true' : 'false');
+    }
+  });
+
 });
 
 describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
@@ -123,11 +175,20 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
   test("'false' drops the clock sentence and keeps the reminder, reworded for the clockless case", () => withStore(s => {
     writeConfig(s, 'time.hook', false);
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW));
-    expect(context).toBe(OPEN_REMINDER_CLOCKLESS);
+    // The conventions flags are config transport, not time presentation (#42), so they
+    // still lead the clockless line; only the clock sentence is suppressed.
+    expect(context).toBe(`${conventionFlags(s)}. ${OPEN_REMINDER_CLOCKLESS}`);
     expect(context).not.toContain('2:05 pm');
     expect(context).not.toContain('Turn starting');
     expect(context).not.toContain('timestamp above');   // the shipped wording must not dangle
   }));
+
+  test("'false' with no store yields exactly the clockless reminder — nothing dangles", () => {
+    // No store means no config read at all, so the suppression path cannot fire; this
+    // pins the other boundary: flags absent, clock present, reminder intact.
+    const context = additionalContext(onUserPromptSubmit(null, { session_id: 'x' }, NOW));
+    expect(context).toBe(`${describeMoment(NOW)} ${OPEN_REMINDER}`);
+  });
 
   test("context recording is unaffected — the write is observational, not presentational", () => withStore(s => {
     writeConfig(s, 'time.hook', false);
@@ -145,9 +206,9 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     expect(context).toContain(OPEN_REMINDER);
   }));
 
-  test('unset keeps the clock, exactly as before the key existed', () => withStore(s => {
+  test('unset keeps the clock, with the conventions flags between clock and reminder', () => withStore(s => {
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
-    expect(context).toBe(`${describeMoment(NOW)} ${OPEN_REMINDER}`);
+    expect(context).toBe(`${describeMoment(NOW)} ${conventionFlags(s)}. ${OPEN_REMINDER}`);
   }));
 
 });

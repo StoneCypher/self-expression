@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">91.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>12/12</span>
+                <span class='fraction'>11/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">87.5% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>7/8</span>
+                <span class='fraction'>6/8</span>
             </div>
         
             
@@ -352,7 +352,9 @@
 <a name='L287'></a><a href='#L287'>287</a>
 <a name='L288'></a><a href='#L288'>288</a>
 <a name='L289'></a><a href='#L289'>289</a>
-<a name='L290'></a><a href='#L290'>290</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -406,7 +408,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -421,7 +423,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -462,7 +464,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -614,12 +616,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">17749x</span>
-<span class="cline-any cline-yes">12639x</span>
-<span class="cline-any cline-yes">10600x</span>
-<span class="cline-any cline-yes">7493x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">43267x</span>
+<span class="cline-any cline-yes">43267x</span>
+<span class="cline-any cline-yes">36546x</span>
+<span class="cline-any cline-yes">25511x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -638,8 +640,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">89790x</span>
-<span class="cline-any cline-yes">89790x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">36734x</span>
+<span class="cline-any cline-yes">36734x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * The checklist marker vocabulary, promoted from prose to code.
@@ -737,10 +741,10 @@ export const FAILURE_MARKERS = [
  * list entry), followed by the topic/action markers group by group, top to
  * bottom, in each group's left-to-right listed order.
  *
- * `markers.md`'s "Status markers" heading says "(22, canonical order)", but
- * the bulleted list beneath it has 23 entries — a stale
- * count in the source doc. This array transcribes the actual list, per the
- * rule "every marker... in its listed order".
+ * `markers.md`'s status-marker list carries 25 entries (the 2026-08-27 field
+ * trial added 🔬 "under review" and 🔁 "in a fix round", both classifying
+ * active+pending). This array transcribes the actual list, per the rule
+ * "every marker... in its listed order".
  *
  * This is the tiebreaker `status-checklists-skill.md` specifies for sorting
  * a summary line's per-marker icon list: equal-count markers sort by first
@@ -757,6 +761,8 @@ export const CANONICAL_ORDER = [
   '🤖',  // running in an agent (a dispatched sub-agent)
   '⏳',  // running in general (direct work or a background process, not an agent)
   '🌐',  // web search or web read in progress
+  '🔬',  // under review — the work exists and a reviewer is examining it
+  '🔁',  // in a fix round — judged by review, now being amended (distinct from the retry-after-failure badger below)
   '🛠️',  // deferred to a skill
   '🛰️',  // monitoring (waiting on a different task — a dependency-wait)
   '🔜',  // queued (not started, no specific blocker)
@@ -903,7 +909,7 @@ export const CANONICAL_ORDER = [
  *   classifyMarker('🛳️', 'success')  // =&gt; 'success' — deploy completed
  */
 export function classifyMarker(marker: string, override?: Bucket): Bucket {
-  if (override !== undefined) return override;
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (override !== undefined) <span class="cstat-no" title="statement not covered" >return override;</span>
   if ((SUCCESS_MARKERS as readonly string[]).includes(marker)) return 'success';
   if ((FAILURE_MARKERS as readonly string[]).includes(marker)) return 'failure';
   return 'active';
@@ -937,7 +943,7 @@ export function canonicalRank(marker: string): number {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T15:25:23.055Z
+                at 2026-08-28T15:22:13.478Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
