@@ -152,6 +152,19 @@ tracking the code default, and `list` reports the effective configuration rather
 the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
 server startup — it never archives, and never touches `meta` or `config`.
 
+**Text length is per-channel and configurable (issue #76).** One
+`channels.<name>.max_chars` key per channel, generated from `CHANNELS` so a new channel
+arrives with its limit already registered, each defaulting to 200. The `express` zod
+schema is built once at registration and cannot read config, so it carries only the hard
+ceiling (2000, the same cap `post_message` uses); the configured per-channel check runs
+in `handleExpress` beside the forecast check, and its rejection names the channel, the
+limit, the length received, and the key that changes it. The skill cannot read config
+either, so the turn-start hook carries the ceilings on the context line as a `lengths:`
+segment beside #42's `conventions:` flags — the same transport, not a second one. Limits
+govern **writes only**: an entry already stored longer than a later-lowered limit is
+never truncated, hidden from a read, excluded from an export, or pruned; deletion
+belongs to `retention.days` and to age alone.
+
 **The messagebox is a facility, not a channel (issue #41).** Audience-tagged messages
 (`self` / `agents` / `user` / `record`) live in two tables beside the expression log —
 `messages` plus an append-only `message_reads` receipt table — and never appear in the

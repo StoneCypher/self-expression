@@ -71,6 +71,7 @@ The registered keys:
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
+| `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
 | `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
@@ -92,6 +93,16 @@ The registered keys:
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
 | `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
+
+Two of those families reach the *skills*, which are static Markdown and cannot read
+configuration at all. The turn-start hook carries them on the context line it already
+injects: a `conventions:` segment for the prose toggles, and a `lengths:` segment for
+the per-channel text ceilings — rendered against whichever limit the most channels
+share, so `lengths: 200 all` is the usual cost and `lengths: 200 except signature:70`
+names only genuine deviations. The skill states its *recommended* length (≤70, because
+a signature that has to be read has stopped being a glance) as a constant, and takes
+its *ceiling* from that segment; a raised ceiling is headroom for the occasional line
+that earns it, never an invitation to fill it.
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The

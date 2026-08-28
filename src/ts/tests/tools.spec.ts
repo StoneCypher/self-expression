@@ -5,7 +5,11 @@ import { join }                from 'node:path';
 import { openStore, closeStore, writeConfig, readConfig } from '../channels/store.js';
 import type { Store } from '../channels/store.js';
 import { recordContext }  from '../channels/context.js';
-import { FORMAT_VERSION, CONFIG_KEYS } from '../channels/config.js';
+import { recentEntries } from '../channels/entries.js';
+import { pruneExpired }  from '../channels/retention.js';
+import {
+  FORMAT_VERSION, CONFIG_KEYS, MAX_TEXT_CEILING, channelMaxCharsKey,
+} from '../channels/config.js';
 import { CHANNELS, CONFIDENCE_GROUNDS } from '../channels/vocabulary.js';
 import {
   handleConfigure, handleExpress, enabledChannels, enabledConfidenceGrounds,
@@ -320,6 +324,82 @@ describe('handleExpress — #42 new channels and silence', () => {
     const row = s.db.prepare('SELECT host, host_version FROM entries WHERE id = ?').get(id);
     expect(row?.['host']).toBe('claude-code');
     expect(row?.['host_version']).toBe('2.0.1');
+  }));
+
+});
+
+describe('handleExpress — #76 per-channel text length', () => {
+
+  /** A string of exactly `n` characters. */
+  function chars(n: number): string { return 'x'.repeat(n); }
+
+  test('the default admits 200 characters on every channel', () => withStore(s => {
+    for (const channel of CHANNELS) {
+      expect(text(handleExpress(s, VERSION, { channel, text: chars(200) })))
+        .toMatch(/^recorded #\d+ /);
+    }
+  }));
+
+  test('201 characters is refused on every channel, and nothing is written', () => withStore(s => {
+    for (const channel of CHANNELS) {
+      const before = Number(s.db.prepare('SELECT COUNT(*) c FROM entries').get()?.['c']);
+      expect(() => handleExpress(s, VERSION, { channel, text: chars(201) })).toThrow();
+      expect(Number(s.db.prepare('SELECT COUNT(*) c FROM entries').get()?.['c'])).toBe(before);
+    }
+  }));
+
+  test('the rejection names the channel, the configured limit, the length, and the key', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('signature'), '70');
+    expect(() => handleExpress(s, VERSION, { channel: 'signature', text: chars(93) }))
+      .toThrow(/'signature'/);
+    expect(() => handleExpress(s, VERSION, { channel: 'signature', text: chars(93) }))
+      .toThrow(/at most 70/);
+    expect(() => handleExpress(s, VERSION, { channel: 'signature', text: chars(93) }))
+      .toThrow(/93 characters/);
+    expect(() => handleExpress(s, VERSION, { channel: 'signature', text: chars(93) }))
+      .toThrow(/channels\.signature\.max_chars/);
+  }));
+
+  test('a limit governs the channel it names and no other', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('signature'), '70');
+    expect(() => handleExpress(s, VERSION, { channel: 'signature', text: chars(80) })).toThrow();
+    expect(text(handleExpress(s, VERSION, { channel: 'need', text: chars(80) })))
+      .toMatch(/^recorded #\d+ /);
+  }));
+
+  test('a raised limit is honored immediately — no restart, unlike the baked enums', () => withStore(s => {
+    expect(() => handleExpress(s, VERSION, { channel: 'taste', text: chars(400) })).toThrow();
+    handleConfigure(s, { op: 'set', key: channelMaxCharsKey('taste'), value: '400' });
+    expect(text(handleExpress(s, VERSION, { channel: 'taste', text: chars(400) })))
+      .toMatch(/^recorded #\d+ /);
+  }));
+
+  test('a lowered limit never touches rows already stored longer', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, { channel: 'pattern', text: chars(180) }));
+    handleConfigure(s, { op: 'set', key: channelMaxCharsKey('pattern'), value: '40' });
+    const row = s.db.prepare('SELECT text FROM entries WHERE id = ?').get(id);
+    expect(String(row?.['text'])).toHaveLength(180);
+    expect(recentEntries(s, 10).some(e => String(e['text']).length === 180)).toBe(true);
+    expect(pruneExpired(s).entries).toBe(0);
+    expect(s.db.prepare('SELECT COUNT(*) c FROM entries WHERE id = ?').get(id)?.['c']).toBe(1);
+  }));
+
+  test('the hard ceiling is the largest value any key accepts', () => withStore(s => {
+    const key = channelMaxCharsKey('conflict'),
+          out = text(handleConfigure(s, { op: 'set', key, value: String(MAX_TEXT_CEILING + 1) }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('nothing was written');
+    expect(text(handleConfigure(s, { op: 'set', key, value: String(MAX_TEXT_CEILING) })))
+      .toBe(`${key} = ${String(MAX_TEXT_CEILING)}`);
+    expect(text(handleExpress(s, VERSION, { channel: 'conflict', text: chars(MAX_TEXT_CEILING) })))
+      .toMatch(/^recorded #\d+ /);
+  }));
+
+  test('a garbage stored limit falls back to the default rather than blocking every write', () => withStore(s => {
+    writeConfig(s, channelMaxCharsKey('dissent'), 'short');
+    expect(text(handleExpress(s, VERSION, { channel: 'dissent', text: chars(200) })))
+      .toMatch(/^recorded #\d+ /);
+    expect(() => handleExpress(s, VERSION, { channel: 'dissent', text: chars(201) })).toThrow();
   }));
 
 });
