@@ -5,11 +5,38 @@ import dts         from 'rollup-plugin-dts';
 
 
 
+// The raster PNG encoder (src/ts/raster/encoder.ts, issue #7) imports node:zlib
+// for deflateSync and crc32. The ES and CJS bundles run under Node, where the
+// builtin resolves at load; marking it external keeps the import as written and
+// silences the "unresolved dependency" warning. The IIFE bundle is loaded by the
+// docs site in a browser, where a bare external would be a ReferenceError at
+// script load — so it swaps node:zlib for a stub whose functions throw only if
+// actually called. Every other raster export (font, surface, panels) is pure JS
+// and works in the browser unchanged.
+const nodeBuiltinExternal = (id) => id.startsWith('node:');
+
+const zlibBrowserStub = {
+  name: 'zlib-browser-stub',
+  resolveId(id) { return id === 'node:zlib' ? '\0zlib-browser-stub' : null; },
+  load(id) {
+    if (id !== '\0zlib-browser-stub') return null;
+    return [
+      'const unavailable = (name) => () => {',
+      '  throw new Error(`node:zlib is unavailable in the browser bundle; ${name} requires Node`);',
+      '};',
+      'export const deflateSync = unavailable("deflateSync");',
+      'export const crc32       = unavailable("crc32");',
+    ].join('\n');
+  },
+};
+
 
 
 const es_config = {
 
   input: 'build/ts/index.js',
+
+  external: nodeBuiltinExternal,
 
   output: {
     file      : 'build/rollup/index.mjs',
@@ -40,6 +67,8 @@ const es_config = {
 const cjs_config = {
 
   input: 'build/ts/index.js',
+
+  external: nodeBuiltinExternal,
 
   output: {
     file      : 'build/rollup/index.cjs',
@@ -79,6 +108,8 @@ const iife_config = {
   },
 
   plugins : [
+
+    zlibBrowserStub,
 
     nodeResolve({
       mainFields     : ['module', 'main'],

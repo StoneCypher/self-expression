@@ -34,11 +34,60 @@ describe('parseCommand', () => {
 
 describe('helpText', () => {
 
-  test('names the binary and both subcommands', () => {
+  test('names the binary and its subcommands, render included', () => {
     const text = helpText();
     expect(text).toContain('self-expression');
     expect(text).toContain('mcp');
+    expect(text).toContain('render');
+    expect(text).toContain('--days');
     expect(text).toContain('help');
+  });
+
+});
+
+describe('render parsing', () => {
+
+  test('a bare render takes the documented defaults', () => {
+    expect(parseCommand(['render'])).toEqual({ kind: 'render', days: 90, chart: 'dashboard', out: null });
+  });
+
+  test('all three flags parse, in any order', () => {
+    expect(parseCommand(['render', '--out', 'x.png', '--chart', 'need', '--days', '7']))
+      .toEqual({ kind: 'render', days: 7, chart: 'need', out: 'x.png' });
+  });
+
+  test.each(['0', '-3', '1.5', 'soon'])('--days %s is invalid, not silently defaulted', (bad) => {
+    const command = parseCommand(['render', '--days', bad]);
+    expect(command.kind).toBe('invalid');
+  });
+
+  test('an unknown chart is invalid and the message lists the real ones', () => {
+    const command = parseCommand(['render', '--chart', 'pie']);
+    expect(command).toEqual({
+      kind: 'invalid',
+      message: "--chart must be one of dashboard|stems|delta|uncertain|need|checklist; got 'pie'",
+    });
+  });
+
+  test('a flag with no value is invalid', () => {
+    expect(parseCommand(['render', '--out']).kind).toBe('invalid');
+  });
+
+  test('an unknown flag is invalid', () => {
+    expect(parseCommand(['render', '--frames', '9']).kind).toBe('invalid');
+  });
+
+  test('an invalid render exits EX_USAGE through run, with help on stderr', () => {
+    const { streams, err } = capture();
+    expect(run(['render', '--days', 'soon'], streams)).toBe(64);
+    expect(err.join('\n')).toContain('--days');
+    expect(err.join('\n')).toContain('Usage:');
+  });
+
+  test('the synchronous path refuses a valid render rather than pretending to draw', () => {
+    const { streams, err } = capture();
+    expect(run(['render'], streams)).toBe(70);
+    expect(err.join('\n')).toContain('runAsync');
   });
 
 });
@@ -90,12 +139,15 @@ describe('hook parsing', () => {
 
 describe('runAsync', () => {
 
+  const noRender = (): Promise<string> => Promise.resolve('unused.png');
+
   test('hook dispatches by name and never starts a server', async () => {
     const { streams } = capture();
     let ran = '', served = false;
     const code = await runAsync(['hook', 'stop'], streams,
       () => { served = true; return Promise.resolve(); },
-      (n) => { ran = n; return Promise.resolve(); });
+      (n) => { ran = n; return Promise.resolve(); },
+      noRender);
     expect(ran).toBe('stop');
     expect(served).toBe(false);
     expect(code).toBe(0);
@@ -106,7 +158,7 @@ describe('runAsync', () => {
     const { streams } = capture();
     let started = false;
     const noHook = (): Promise<void> => Promise.resolve();
-    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); }, noHook);
+    const code = await runAsync(['mcp'], streams, () => { started = true; return Promise.resolve(); }, noHook, noRender);
     expect(started).toBe(true);
     expect(code).toBe(0);
   });
@@ -117,7 +169,7 @@ describe('runAsync', () => {
     const start  = (): Promise<void> => { started = true; return Promise.resolve(); },
           noHook = (): Promise<void> => Promise.resolve();
     for (const argv of [['help'], [], ['--help'], ['frobnicate']]) {
-      await runAsync(argv, streams, start, noHook);
+      await runAsync(argv, streams, start, noHook, noRender);
     }
     expect(started).toBe(false);
   });
@@ -125,15 +177,39 @@ describe('runAsync', () => {
   test('delegates non-mcp exit codes unchanged', async () => {
     const a = capture(), b = capture();
     const start = (): Promise<void> => Promise.resolve();
-    expect(await runAsync(['help'], a.streams, start, start)).toBe(0);
-    expect(await runAsync(['frobnicate'], b.streams, start, start)).toBe(64);
+    expect(await runAsync(['help'], a.streams, start, start, noRender)).toBe(0);
+    expect(await runAsync(['frobnicate'], b.streams, start, start, noRender)).toBe(64);
   });
 
   test('propagates a startup failure rather than reporting success', async () => {
     const { streams } = capture();
     const noHook = (): Promise<void> => Promise.resolve();
-    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk')), noHook))
+    await expect(runAsync(['mcp'], streams, () => Promise.reject(new Error('no disk')), noHook, noRender))
       .rejects.toThrow('no disk');
+  });
+
+  test('render dispatches to the render runner with the parsed command and prints the path', async () => {
+    const { streams, out } = capture();
+    let received: unknown = null;
+    const code = await runAsync(['render', '--days', '30', '--chart', 'stems'], streams,
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      (command) => { received = command; return Promise.resolve('/tmp/out.png'); });
+    expect(received).toEqual({ kind: 'render', days: 30, chart: 'stems', out: null });
+    expect(out).toEqual(['/tmp/out.png']);
+    expect(code).toBe(0);
+  });
+
+  test('an invalid render flag never reaches the render runner', async () => {
+    const { streams, err } = capture();
+    let rendered = false;
+    const code = await runAsync(['render', '--days', 'soon'], streams,
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      () => { rendered = true; return Promise.resolve('nope.png'); });
+    expect(rendered).toBe(false);
+    expect(code).toBe(64);
+    expect(err.join('\n')).toContain('--days');
   });
 
   test('the old help-equivalence still holds', () => {

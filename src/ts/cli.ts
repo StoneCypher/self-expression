@@ -15,10 +15,12 @@
 import { readFileSync }  from 'node:fs';
 import { join }          from 'node:path';
 import { runAsync }      from './cli_commands.js';
+import type { RenderCommand } from './cli_commands.js';
 import { startStdio }    from './mcp/server.js';
 import { handleHook }    from './mcp/hooks.js';
 import type { HookPayload } from './mcp/hooks.js';
-import { openStore }     from './channels/store.js';
+import { renderHistoryToFile } from './mcp/chart_tools.js';
+import { openStore, closeStore } from './channels/store.js';
 import type { Store }    from './channels/store.js';
 
 /** Present in the CommonJS bundle Rollup emits; this file is never imported as ESM. */
@@ -79,12 +81,31 @@ async function runHook(name: string): Promise<void> {
 
 }
 
+/**
+ * Run one `render` command against the real store: query, draw, write the PNG,
+ * and resolve to the path it landed at. The store is closed even when the
+ * render throws, so a failed write cannot leak a database handle.
+ */
+function runRender(command: RenderCommand): Promise<string> {
+  const store = openStore();
+  try {
+    const result = renderHistoryToFile(store, {
+      days  : command.days,
+      chart : command.chart,
+      ...(command.out === null ? {} : { out: command.out }),
+    });
+    return Promise.resolve(result.path);
+  } finally {
+    closeStore(store);
+  }
+}
+
 const streams = {
   out: (line: string): void => { console.log(line);   },
   err: (line: string): void => { console.error(line); },
 };
 
-runAsync(process.argv.slice(2), streams, () => startStdio(version()), runHook)
+runAsync(process.argv.slice(2), streams, () => startStdio(version()), runHook, runRender)
   .then(code => { process.exit(code); })
   .catch((error: unknown) => {
     console.error(`self-expression: ${error instanceof Error ? error.message : String(error)}`);
