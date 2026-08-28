@@ -33,7 +33,8 @@ import type { Store }         from '../channels/store.js';
 import type { ToolReply }     from './chart_tools.js';
 
 /** The reply every entry point returns while the facility is switched off. */
-export const NOTES_DISABLED_REPLY =
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types -- isolatedDeclarations requires the annotation
+export const NOTES_DISABLED_REPLY: string =
   `error: held notes are disabled (configure set ${MAILBOX_ENABLED_KEY} true). ` +
   'This is a consent surface: it is off until a human turns it on, and nothing is ' +
   'queued in the meantime.';

@@ -263,8 +263,8 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 4 — the #18 anchoring shape', () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  test('is 5 — the #43 held-note shape', () => {
+    expect(SCHEMA_VERSION).toBe(5);
   });
 
 });

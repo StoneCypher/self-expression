@@ -5,12 +5,17 @@ import { join }   from 'node:path';
 import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js';
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
 import { migrate, MIGRATIONS, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS } from '../channels/migrate.js';
-import { SCHEMA_VERSION, INDEX_DDL, MESSAGE_INDEX_DDL } from '../channels/schema.js';
-import { postMessage, readMessages }                  from '../channels/messages.js';
+import {
+  SCHEMA_VERSION, INDEX_DDL, MESSAGE_INDEX_DDL, NOTE_INDEX_DDL, entriesDdl,
+} from '../channels/schema.js';
+import { postMessage, readMessages, unreadCounts }    from '../channels/messages.js';
+import { composeNote, listNotes }                     from '../channels/notes.js';
+import { writeConfig }                                from '../channels/store.js';
 import { anchoredEntries }                            from '../channels/entries.js';
 import { buildV1, insertV1 }                          from './helpers/v1_fixture.js';
 import { buildV2, insertV2 }                          from './helpers/v2_fixture.js';
 import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
+import { buildV4, insertV4Message, V4_ENTRIES_DDL }   from './helpers/v4_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -269,7 +274,7 @@ describe('openStore on a v3 database (#18)', () => {
           idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                     .all().map(r => r.name as string);
     expect(idx).toContain('idx_entries_anchor');
-    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length);
+    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length + NOTE_INDEX_DDL.length);
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
@@ -309,24 +314,104 @@ describe('openStore on a v3 database (#18)', () => {
 
 });
 
+describe('openStore on a v4 database (#43)', () => {
+
+  test('the fixture really is v4: no note tables at all', () => {
+    const dir = tmp(), db = buildV4(join(dir, 'log.sqlite3'));
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
+                     .all().map(r => String(r.name));
+    expect(tables).toContain('messages');
+    expect(tables).not.toContain('notes');
+    expect(tables).not.toContain('note_events');
+    expect(() => db.exec('SELECT 1 FROM notes')).toThrow();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('V4_ENTRIES_DDL still describes v4 — v4→v5 must stay additive', () => {
+    // The v4 fixture generates its entries DDL from the schema module, which is only
+    // sound while v4→v5 adds no entries column. If a later version widens the table,
+    // this fails and the fixture must be frozen the way v1's and v2's are.
+    expect(V4_ENTRIES_DDL).toBe(entriesDdl());
+  });
+
+  test('migrates: the messagebox survives untouched, and notes become usable', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v4  = buildV4(path);
+    insertV4Message(v4, 'm-1', 'a pre-migration aside');
+    v4.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+
+    // The pre-existing `user` message is still ordinary unread mail — a migration must
+    // not reclassify anything as a held note.
+    expect(unreadCounts(s, 's1').forUser).toBe(1);
+
+    writeConfig(s, 'mailbox.enabled', 'true');
+    composeNote(s, { text: 'run reconcile first', reason: 'the deploy window', session: 's1' }, VERSION);
+    expect(listNotes(s)).toHaveLength(1);
+    expect(unreadCounts(s, 's1').forUser).toBe(1);   // the note is not plain user mail
+
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates the note indices, which a v4 database could not have held', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV4(path).close();
+    const s   = openStore(path),
+          idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+                    .all().map(r => r.name as string);
+    expect(idx).toContain('idx_notes_ripe');
+    expect(idx).toContain('idx_note_events');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('reopening after migration is idempotent — a no-op, not a second create', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV4(path).close();
+    const a = openStore(path);
+    writeConfig(a, 'mailbox.enabled', 'true');
+    composeNote(a, { text: 'x', reason: 'y', session: 's1' }, VERSION);
+    closeStore(a);
+    const b = openStore(path);
+    expect(readMeta(b, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    expect(b.db.prepare('SELECT COUNT(*) n FROM notes').get().n).toBe(1);
+    closeStore(b); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('meta identity survives migration: created_utc and machine_id are untouched', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV4(path).close();
+    const s = openStore(path);
+    expect(readMeta(s, 'created_utc')).toBe('2026-08-28T00:00:00Z');
+    expect(s.machineId).toBe('44444444-5555-6666-7777-888888888888');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
 describe('a v1 database walks the whole chain', () => {
 
-  test('1 → 4 in one open: old rows intact, anchors and messagebox both usable', () => {
+  test('1 → 5 in one open: old rows intact, anchors, messagebox, and notes all usable', () => {
     const dir = tmp(), path = join(dir, 'log.sqlite3'),
           v1  = buildV1(path);
     insertV1(v1, 'u1', 'signature', { position: 'close', stem: 'still' });
     v1.close();
 
     const s = openStore(path);
-    expect(readMeta(s, 'schema_version')).toBe('4');
+    expect(readMeta(s, 'schema_version')).toBe('5');
     expect(s.db.prepare('SELECT uuid FROM entries').get().uuid).toBe('u1');
 
     const written = recordEntry(s, { channel: 'taste', text: 'reads like it was always true', session: 's1' }, VERSION);
     recordEntry(s, { channel: 'dissent', text: 'about that', session: 's1',
                      anchorKind: 'entry', anchorTarget: String(written.id) }, VERSION);
     postMessage(s, { audience: 'record', text: 'for posterity', session: 's1' }, VERSION);
+    writeConfig(s, 'mailbox.enabled', 'true');
+    composeNote(s, { text: 'held across four migrations', reason: 'it still matters',
+                     session: 's1' }, VERSION);
 
     expect(anchoredEntries(s, 'entry', String(written.id))).toHaveLength(1);
+    expect(listNotes(s)).toHaveLength(1);
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 

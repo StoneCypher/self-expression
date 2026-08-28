@@ -140,6 +140,19 @@ export interface NoteTurn {
   readonly session?  : string | undefined;
 }
 
+/**
+ * Who is acting, for operations a wakeup may legitimately perform.
+ *
+ * Distinct from {@link NoteTurn} precisely because these fields are *recorded* rather
+ * than *enforced*: withdrawing is safe from any turn, so the ledger notes what it saw
+ * and asks nothing. Only the delivery path demands a proven `reply` turn.
+ */
+export interface NoteActor {
+  readonly turn?     : Turn | undefined;
+  readonly promptId? : string | undefined;
+  readonly session?  : string | undefined;
+}
+
 /** What {@link composeNote} returns: the new note, and whatever it replaced. */
 export interface ComposedNote {
   readonly id         : number;
@@ -308,7 +321,7 @@ function record(
   store : Store,
   noteId: number,
   event : NoteEvent,
-  turn  : { turn?: Turn | undefined; promptId?: string | undefined; session?: string | undefined },
+  turn  : NoteActor,
   when  : Date,
 ): void {
   store.db.prepare(
@@ -639,7 +652,7 @@ export function composeNote(
 export function withdrawNote(
   store  : Store,
   noteId : number,
-  turn   : Partial<NoteTurn> = {},
+  turn   : NoteActor = {},
   when   : Date = new Date(),
 ): NoteView {
 
