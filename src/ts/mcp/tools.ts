@@ -25,6 +25,7 @@ import {
 import type { Channel }        from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
 import { readConfig, writeConfig, allConfig }                                 from '../channels/store.js';
+import { rejectDwellingWrite, dwellingChangeNotice }                          from '../dwelling/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
 import type { Store } from '../channels/store.js';
@@ -240,8 +241,15 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
 
     if (args.value === undefined) { return reply("error: 'value' is required for set"); }
 
+    // The dwelling's keys are validated at write, per its spec: enabled-without-path
+    // is an error surfaced here, never a silent fallback to a default location.
+    const rejected = rejectDwellingWrite(store, args.key, args.value);
+    if (rejected !== null) { return reply(rejected); }
+
     writeConfig(store, args.key, args.value);
-    return reply(`${args.key} = ${args.value}`);
+
+    const notice = dwellingChangeNotice(args.key);
+    return reply(notice === null ? `${args.key} = ${args.value}` : `${args.key} = ${args.value}\n${notice}`);
 
   });
 
