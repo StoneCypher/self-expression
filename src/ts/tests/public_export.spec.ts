@@ -60,12 +60,19 @@ describe('totality — the allowlist covers the whole schema, forever', () => {
     }
   });
 
-  test('the classification counts match the spec plus the classified v2 and anchor columns: 25 verbatim, 11 coarsen, 8 hash, 3 derive, 15 excluded', () => {
+  test('the classification counts match the spec plus the classified v2, anchor, and correction columns: 26 verbatim, 11 coarsen, 8 hash, 3 derive, 16 excluded', () => {
     const counts: Record<string, number> = {};
     for (const treatment of Object.values(PUBLIC_TREATMENTS)) {
       counts[treatment.kind] = (counts[treatment.kind] ?? 0) + 1;
     }
-    expect(counts).toEqual({ verbatim: 25, coarsen: 11, hash: 8, derive: 3, excluded: 15 });
+    expect(counts).toEqual({ verbatim: 26, coarsen: 11, hash: 8, derive: 3, excluded: 16 });
+  });
+
+  test('#16: the link kind is structured and exports, the quoted claim never does', () => {
+    // corrects_kind is what makes "retraction rate by confidence ground" computable off
+    // the machine; `verbatim` is a sentence someone actually wrote, so it never leaves.
+    expect(PUBLIC_TREATMENTS['corrects_kind']?.kind).toBe('verbatim');
+    expect(PUBLIC_TREATMENTS['verbatim']?.kind).toBe('excluded');
   });
 
   test('the free-text and identifier columns are excluded or blinded, by name', () => {

@@ -21,15 +21,16 @@ import { z }         from 'zod';
 import {
   CHANNELS, POSITIONS, DELTAS, STEMS, EFFORTS, TURNS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS, ANCHOR_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, ANCHOR_KINDS, CORRECTION_KINDS,
 } from '../channels/vocabulary.js';
 import type {
   Channel, Position, Delta, Stem, Turn, Effort,
   ConfidenceGround, DivergenceKind, Modality,
-  ForecastOutcome, SilenceKind, AnchorKind,
+  ForecastOutcome, SilenceKind, AnchorKind, CorrectionKind,
 } from '../channels/vocabulary.js';
 import {
   recordEntry, recentEntries, previousSignature, hasClosingSignature, validate,
+  register, REGISTER_DEFAULT_LIMIT,
 } from '../channels/entries.js';
 import type { EntryInput }                                                   from '../channels/entries.js';
 import { ANCHOR_QUOTE_MAX }                                                  from '../channels/anchors.js';
@@ -161,6 +162,8 @@ export interface ExpressArgs {
   readonly anchorQuote?    : string | undefined;
   readonly visible?        : boolean | undefined;
   readonly correctsId?     : number | undefined;
+  readonly correctsKind?   : CorrectionKind | undefined;
+  readonly verbatim?       : string | undefined;
   readonly effort?         : Effort | undefined;
   readonly turn?           : Turn | undefined;
   readonly model?          : string | undefined;
@@ -228,6 +231,98 @@ export function anchorTargetProblem(
 
 }
 
+/** What the store can say about a proposed `correctsId` link that the validator cannot. */
+export interface CorrectionCheck {
+  /** The problem sentence, or `null` when the link is sound — or absent entirely. */
+  readonly problem : string | null;
+  /** The target's channel, for the confirmation echo; `null` when there is no sound target. */
+  readonly channel : string | null;
+}
+
+/**
+ * The half of correction validation that needs the store: does the target exist, and is
+ * it the kind of thing this link claims it is?
+ *
+ * `entries.validate` can check that a link states a kind and that an `outcome` rides a
+ * `resolves` link, but not that the pointed-at row exists or that it is a forecast —
+ * exactly the split anchoring uses. Both answers come back with the target's channel,
+ * because the confirmation reply echoes it: a wrong-target retraction should be
+ * discoverable at write time, not at audit time.
+ *
+ * A `resolves` link must name a `predicted` row, because resolving something that was
+ * never a forecast resolves nothing; `retracts` and `amends` may target any row, since
+ * any claim can turn out wrong.
+ *
+ * @param correctsId the proposed link target, or `undefined` on an ordinary entry
+ * @param kind       the stated link kind
+ * @param outcome    the forecast outcome, when one rides along (#42)
+ *
+ * @example
+ *   checkCorrectionTarget(store, 171, 'retracts', undefined)
+ *   // => { problem: null, channel: 'checklist' }
+ *   checkCorrectionTarget(store, 999, 'retracts', undefined)
+ *   // => { problem: "correctsId #999 does not exist; the highest id so far is 41", channel: null }
+ *
+ * @see ../channels/entries.js correctionProblems
+ * @see anchorTargetProblem
+ */
+export function checkCorrectionTarget(
+  store      : Store,
+  correctsId : number | undefined,
+  kind       : CorrectionKind | undefined,
+  outcome    : ForecastOutcome | undefined,
+): CorrectionCheck {
+
+  if (correctsId === undefined) { return { problem: null, channel: null }; }
+
+  const target = store.db.prepare(
+    'SELECT channel, confidence FROM entries WHERE id = ?').get(correctsId);
+
+  if (target === undefined) {
+    const top     = store.db.prepare('SELECT MAX(id) AS top FROM entries').get(),
+          highest = top?.['top'] ?? null;
+    return { problem:
+      `correctsId #${String(correctsId)} does not exist; ` +
+      (highest === null ? 'no entries have been recorded yet' : `the highest id so far is ${String(highest)}`),
+      channel: null };
+  }
+
+  const channel = String(target['channel']),
+        ground  = target['confidence'];
+
+  if ((kind === 'resolves' || outcome !== undefined) && ground !== 'predicted') {
+    return { problem:
+      `entry #${String(correctsId)} is not a forecast — its confidence is ` +
+      `${ground === null || ground === undefined ? 'unset' : `'${String(ground)}'`}, not 'predicted', ` +
+      'so there is nothing for an outcome to resolve', channel: null };
+  }
+
+  return { problem: null, channel };
+
+}
+
+/**
+ * The confirmation reply's correction echo, e.g. `, retracts #171 (checklist)` — or the
+ * empty string when the entry links to nothing.
+ *
+ * Exists so a mis-aimed retraction is visible in the reply the model reads immediately,
+ * rather than in an audit months later. Naming the target's channel is the cheap half of
+ * that: "retracts #171 (signature)" reads wrong at a glance when the intent was to
+ * retract a checklist.
+ *
+ * @example
+ *   correctionEcho('retracts', 171, 'checklist')  // => ', retracts #171 (checklist)'
+ *   correctionEcho(undefined, undefined, null)    // => ''
+ */
+export function correctionEcho(
+  kind       : CorrectionKind | undefined,
+  correctsId : number | undefined,
+  channel    : string | null,
+): string {
+  if (correctsId === undefined) { return ''; }
+  return `, ${kind ?? 'corrects'} #${String(correctsId)}` + (channel === null ? '' : ` (${channel})`);
+}
+
 /**
  * The anchor fields as they will be recorded, after the one adoption anchoring makes:
  * a `prompt` anchor with no target adopts the hook-observed `prompt_id` of the message
@@ -289,10 +384,12 @@ export function adoptAnchorTarget(
  *   its limit, the length received, and the key that changes it. The check governs
  *   writes only: rows already stored longer than a later-lowered limit are untouched
  *   and stay fully readable (see {@link channelMaxChars}).
- * - An **`outcome`** is checked against the store (the half of forecast validation
- *   `entries.validate` cannot do alone, #42): its `correctsId` must name an existing
- *   row whose confidence is `'predicted'`, or the rejection names the target's actual
- *   ground.
+ * - A **`correctsId` link** is checked against the store (the half of correction
+ *   validation `entries.validate` cannot do alone, #42 and #16): the target must exist,
+ *   and a `resolves` link — the shape an `outcome` rides — must name a row whose
+ *   confidence is `'predicted'`, or the rejection names the target's actual ground. The
+ *   confirmation reply then **echoes the target**, `recorded #214, retracts #171
+ *   (checklist)`, so a wrong-target retraction is discoverable at write time.
  * - An **anchor's referent** gets the same treatment (#18): the existence check that
  *   needs the store runs here, and a `prompt` anchor with no target adopts the turn the
  *   hook observed.
@@ -338,20 +435,8 @@ export function handleExpress(
       `(configure set ${channelMaxCharsKey(args.channel)} <n> to change it)`);
   }
 
-  if (args.outcome !== undefined && args.correctsId !== undefined) {
-    const target = store.db.prepare('SELECT confidence FROM entries WHERE id = ?').get(args.correctsId);
-    if (target === undefined) {
-      throw new Error(
-        `cannot record entry:\n  - outcome's correctsId #${String(args.correctsId)} does not exist`);
-    }
-    const ground = target['confidence'];
-    if (ground !== 'predicted') {
-      throw new Error(
-        `cannot record entry:\n  - entry #${String(args.correctsId)} is not a forecast — its ` +
-        `confidence is ${ground === null ? 'unset' : `'${String(ground)}'`}, not 'predicted', ` +
-        'so there is nothing for an outcome to resolve');
-    }
-  }
+  const link = checkCorrectionTarget(store, args.correctsId, args.correctsKind, args.outcome);
+  if (link.problem !== null) { throw new Error(`cannot record entry:\n  - ${link.problem}`); }
 
   const context = latestContext(store, args.session),
         privacy = privacyFlags(store),
@@ -398,7 +483,9 @@ export function handleExpress(
     formatVersion  : effectiveValue(store, 'format.version') ?? FORMAT_VERSION,
   }, pluginVersion);
 
-  return reply(`recorded #${String(written.id)} ${written.uuid}`);
+  return reply(
+    `recorded #${String(written.id)} ${written.uuid}` +
+    correctionEcho(args.correctsKind, args.correctsId, link.channel));
 
 }
 
@@ -955,7 +1042,12 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'pressure, concurrency, latency: the machinery\'s state, not the mood, fired when ' +
       'notable rather than on a schedule; taste is a scarce aesthetic observation about ' +
       'the work itself, observing with nothing proposed. "Nothing notable" is always a ' +
-      'valid signature — the requirement is to look, not to produce.',
+      'valid signature — the requirement is to look, not to produce. ' +
+      'To take a claim back, record the correction and link it: correctsId names the ' +
+      'earlier entry, correctsKind says retracts or amends, and verbatim quotes the wrong ' +
+      'words exactly. Nothing is ever rewritten — the original stays exactly as written ' +
+      'and is marked wherever it is read again. Retract at the moment of discovery, in ' +
+      'the same response.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
       text           : z.string().min(1).max(MAX_TEXT_CEILING).describe(
@@ -984,7 +1076,7 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       outcome        : z.enum(tuple(FORECAST_OUTCOMES)).optional().describe(
         'resolutions only: how the forecast this entry corrects turned out — hit (it ' +
         'happened), miss (it did not), void (the premise dissolved); requires correctsId ' +
-        "pointing at a 'predicted' entry"),
+        "pointing at a 'predicted' entry, with correctsKind 'resolves'"),
       silence        : z.enum(tuple(SILENCE_KINDS)).optional().describe(
         'which honest shape of nothing this entry reports: empty (looked, found nothing), ' +
         'unlooked (did not look), held (withholding pending evidence), depth (beyond ' +
@@ -1007,7 +1099,20 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
         'A one-way hash of it is stored too, and survives quote suppression so drift ' +
         'detection keeps working without keeping the words'),
       visible        : z.boolean().optional().describe('false when logged but not surfaced'),
-      correctsId     : z.number().int().optional().describe('id of an entry this retracts'),
+      correctsId     : z.number().int().optional().describe(
+        'id of an earlier entry this links to; the kind says how. Take the id from ' +
+        'recall, never from memory of a recorded #N reply'),
+      correctsKind   : z.enum(tuple(CORRECTION_KINDS)).optional().describe(
+        'REQUIRED with correctsId — what the link means: retracts (the target is wrong; ' +
+        'do not rely on any of it), amends (the target stands, a detail is refined), ' +
+        'resolves (the target was an open forecast; this closes it — never wrongness). ' +
+        'If a reader acting on the original claim would be harmed, it is retracts'),
+      verbatim       : z.string().max(MAX_TEXT_CEILING).optional().describe(
+        'the retracted or amended claim, quoted EXACTLY as it appeared — the same bytes, ' +
+        'so the retraction is greppable from the error and the error from the retraction. ' +
+        'Valid with correctsKind retracts/amends, or on a divergence entry with no ' +
+        'correctsId (a prose-only retraction, where the claim was never recorded and the ' +
+        'quote is the only anchor — required there)'),
       effort         : z.enum(tuple(EFFORTS)).optional(),
       turn           : z.enum(tuple(TURNS)).optional(),
       model          : z.string().optional().describe('exact model id, including variant markers'),
@@ -1070,10 +1175,18 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     title       : 'Recall',
     description :
       'Read back what has been recorded. Use before writing a signature so delta comes ' +
-      'from the record rather than from memory, which degrades quietly.',
+      'from the record rather than from memory, which degrades quietly. Every returned ' +
+      'row carries its id and its derived status — stands, amended, or retracted — so a ' +
+      'retraction can point at what you are reading instead of at what you remember. ' +
+      'Retracted rows come back MARKED, never hidden: you should see that you took ' +
+      'something back, not develop amnesia about it. retractions:true adds the register ' +
+      'of currently taken-back claims, before → after.',
     inputSchema : {
-      session : z.string().optional().describe('omit to use the session the hook observed'),
-      limit   : z.number().int().min(1).max(100).optional(),
+      session     : z.string().optional().describe('omit to use the session the hook observed'),
+      limit       : z.number().int().min(1).max(100).optional(),
+      retractions : z.boolean().optional().describe(
+        'include the retraction register: every standing retraction and amendment, ' +
+        'newest first, each with the original and the replacement'),
     },
   }, (args) => {
 
@@ -1082,7 +1195,13 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
           previous = session === '' ? null : previousSignature(store, session),
           recent   = recentEntries(store, args.limit ?? 10);
 
-    return reply(JSON.stringify({ context, previous, recent }, null, 2));
+    // Absent rather than empty when not asked for: an always-present `retractions: []`
+    // would spend context on a key nobody requested, every single recall.
+    const retractions = args.retractions === true
+      ? register(store, { limit: args.limit ?? REGISTER_DEFAULT_LIMIT })
+      : undefined;
+
+    return reply(JSON.stringify({ context, previous, recent, retractions }, null, 2));
 
   });
 

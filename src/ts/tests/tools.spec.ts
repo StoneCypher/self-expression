@@ -263,7 +263,7 @@ describe('handleExpress — #42 forecasts', () => {
     }));
     const resolution = recordedId(handleExpress(s, VERSION, {
       channel: 'confidence', text: 'merged clean, no review comments',
-      correctsId: forecast, outcome: 'hit',
+      correctsId: forecast, correctsKind: 'resolves', outcome: 'hit',
     }));
     const row = s.db.prepare('SELECT corrects_id, outcome FROM entries WHERE id = ?').get(resolution);
     expect(row?.['corrects_id']).toBe(forecast);
@@ -275,20 +275,20 @@ describe('handleExpress — #42 forecasts', () => {
       channel: 'confidence', text: 'checked it', confidence: 'verified',
     }));
     expect(() => handleExpress(s, VERSION, {
-      channel: 'confidence', text: 'resolved?', correctsId: plain, outcome: 'hit',
+      channel: 'confidence', text: 'resolved?', correctsId: plain, correctsKind: 'resolves', outcome: 'hit',
     })).toThrow(/'verified'/);
   }));
 
   test('a resolution whose target has no ground at all is rejected too', () => withStore(s => {
     const idea = recordedId(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
     expect(() => handleExpress(s, VERSION, {
-      channel: 'confidence', text: 'resolved?', correctsId: idea, outcome: 'miss',
+      channel: 'confidence', text: 'resolved?', correctsId: idea, correctsKind: 'resolves', outcome: 'miss',
     })).toThrow(/unset/);
   }));
 
   test('a resolution pointing at a nonexistent row is rejected, and nothing is written', () => withStore(s => {
     expect(() => handleExpress(s, VERSION, {
-      channel: 'confidence', text: 'resolved?', correctsId: 999, outcome: 'void',
+      channel: 'confidence', text: 'resolved?', correctsId: 999, correctsKind: 'resolves', outcome: 'void',
     })).toThrow(/does not exist/);
     expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get()?.['n']).toBe(0);
   }));

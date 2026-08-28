@@ -8,6 +8,7 @@ import {
 } from '../channels/schema.js';
 import {
   CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
+  CORRECTION_KINDS,
 } from '../channels/vocabulary.js';
 
 /** A throwaway on-disk database; node:sqlite has no shared in-memory mode across handles. */
@@ -183,6 +184,47 @@ describe('schema', () => {
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
+  test('carries the two correction columns, nullable — an unlinked entry is the normal case', () => {
+    const { db, dir } = freshDb();
+    db.prepare(`INSERT INTO entries (${REQUIRED}) VALUES (${VALUES})`).run('signature');
+    const row = db.prepare('SELECT corrects_kind, verbatim FROM entries').get();
+    expect(row.corrects_kind).toBeNull();
+    expect(row.verbatim).toBeNull();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('accepts every correction kind and rejects one outside the vocabulary', () => {
+    const { db, dir } = freshDb();
+    for (const [i, kind] of CORRECTION_KINDS.entries()) {
+      db.prepare(`INSERT INTO entries (uuid, ts_utc, ts_local, tz, session, channel, text, plugin_version, corrects_kind)
+                  VALUES (?, '2026-08-28T00:00:00Z', '9:14 am PDT', 'PDT', 's1', 'divergence', 'x', '0.2.1', ?)`)
+        .run(`c-${String(i)}`, kind);
+    }
+    expect(() => db.prepare(
+      `INSERT INTO entries (${REQUIRED}, corrects_kind) VALUES (${VALUES}, 'supersedes')`).run('divergence'))
+      .toThrow();
+    expect(db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(CORRECTION_KINDS.length);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('there is no retracted column — standing is derived, never stored (#16)', () => {
+    const { db, dir } = freshDb();
+    const columns = db.prepare("SELECT name FROM pragma_table_info('entries')")
+                      .all().map(r => r.name as string);
+    expect(columns).not.toContain('retracted');
+    expect(columns).not.toContain('retracted_by');
+    expect(columns).not.toContain('status');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates idx_entries_corrects, the index the standing walk uses', () => {
+    const { db, dir } = freshDb();
+    const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+                  .all().map(r => r.name as string);
+    expect(idx).toContain('idx_entries_corrects');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
   test('anchoring is a qualifier, not a table or a channel — the row is still one entries row', () => {
     const { db, dir } = freshDb();
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
@@ -264,8 +306,8 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 5 — the #43 held-note shape', () => {
-    expect(SCHEMA_VERSION).toBe(5);
+  test('is 6 — the #16 retraction shape', () => {
+    expect(SCHEMA_VERSION).toBe(6);
   });
 
 });

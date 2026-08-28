@@ -105,7 +105,7 @@ describe('validate', () => {
 
   test('accepts an outcome pointing back at a forecast via correctsId', () => {
     expect(validate({ channel: 'confidence', text: 'merged clean', session: 's',
-                      correctsId: 1, outcome: 'hit' })).toEqual([]);
+                      correctsId: 1, correctsKind: 'resolves', outcome: 'hit' })).toEqual([]);
   });
 
   test('rejects an outcome without a correctsId — it resolves nothing', () => {
@@ -115,7 +115,7 @@ describe('validate', () => {
 
   test('rejects an outcome outside the vocabulary', () => {
     const problems = validate({ channel: 'confidence', text: 'x', session: 's',
-                                correctsId: 1, outcome: 'won' as never });
+                                correctsId: 1, correctsKind: 'resolves', outcome: 'won' as never });
     expect(problems.some(p => p.includes('outcome'))).toBe(true);
   });
 
@@ -443,7 +443,7 @@ describe('recentEntries', () => {
     recordEntry(s, { channel: 'confidence', text: 'lands by friday', session: 's1',
                      confidence: 'predicted', resolveBy: '2026-08-30' }, VERSION);
     recordEntry(s, { channel: 'confidence', text: 'landed', session: 's1',
-                     correctsId: 1, outcome: 'hit' }, VERSION);
+                     correctsId: 1, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
     recordEntry(s, { channel: 'signature', text: 'still; nothing notable', session: 's1',
                      silence: 'empty' }, VERSION);
     const [forecast, resolution, sig] = recentEntries(s, 3);
@@ -480,9 +480,9 @@ describe('forecastOutcomes', () => {
     const b = recordEntry(s, { channel: 'confidence', text: 'f2', session: 's1', confidence: 'predicted' }, VERSION);
     const c = recordEntry(s, { channel: 'confidence', text: 'f3', session: 's1', confidence: 'predicted' }, VERSION);
     // Resolved out of forecast order, deliberately: resolution order is what counts.
-    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1', correctsId: b.id, outcome: 'miss' }, VERSION);
-    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1', correctsId: a.id, outcome: 'hit'  }, VERSION);
-    recordEntry(s, { channel: 'confidence', text: 'r3', session: 's1', correctsId: c.id, outcome: 'void' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1', correctsId: b.id, correctsKind: 'resolves', outcome: 'miss' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1', correctsId: a.id, correctsKind: 'resolves', outcome: 'hit'  }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r3', session: 's1', correctsId: c.id, correctsKind: 'resolves', outcome: 'void' }, VERSION);
     expect(forecastOutcomes(s)).toEqual(['miss', 'hit', 'void']);
   }));
 
@@ -490,7 +490,7 @@ describe('forecastOutcomes', () => {
     const plain = recordEntry(s, { channel: 'confidence', text: 'checked', session: 's1',
                                    confidence: 'verified' }, VERSION);
     recordEntry(s, { channel: 'confidence', text: 'stray', session: 's1',
-                     correctsId: plain.id, outcome: 'hit' }, VERSION);
+                     correctsId: plain.id, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
     expect(forecastOutcomes(s)).toEqual([]);
   }));
 

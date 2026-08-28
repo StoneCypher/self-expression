@@ -82,6 +82,48 @@ export const FORECAST_OUTCOMES = [
 ] as const;
 
 /**
+ * What a `corrects_id` link *means* — the word that keeps the retraction register
+ * honest (issue #16).
+ *
+ * One column carried one meaning until #42 reused the same chain for forecast
+ * resolution, and the moment a chain carries two meanings the meaning needs a column: a
+ * register that lists every resolved forecast as a taken-back claim is a register nobody
+ * can trust, and a retraction filed as a mere resolution launders wrongness into
+ * bookkeeping. Three meanings, three names:
+ *
+ * - `retracts` — the target claim is wrong; do not rely on any of it. The target reads
+ *   as **retracted** at every marked surface.
+ * - `amends` — the target stands in substance; this entry refines or corrects a detail.
+ *   The target reads as **amended**, pointing forward at the refinement.
+ * - `resolves` — the target was a question open at write time (a `predicted` forecast,
+ *   #42); this entry closes it. The target was **not wrong** and is never marked as
+ *   such — a forecast that hit was right, and a forecast that missed is still a true
+ *   record of the prediction.
+ *
+ * **The retracts/amends boundary is normative, not stylistic: if a reader acting on the
+ * original claim would be harmed, it is `retracts`.** `amends` exists so a detail-fix
+ * does not overclaim; it is not a softer word for wrongness. Systematic softening is
+ * measurable after the fact from the grounds × standing matrix, which is the enforcement
+ * honesty tools actually have.
+ *
+ * **`resolves` is not wrongness.** Resolution links never affect standing, so calibration
+ * and the register can never contaminate each other.
+ *
+ * Legacy rows written before this column existed carry NULL and read as `retracts` —
+ * what the column's description promised since v1 — unless they carry an `outcome`, in
+ * which case they read as `resolves`. That rule lives in exactly one place, beside the
+ * standing computation.
+ *
+ * @see ./entries.js standingOf
+ * @see ./entries.js effectiveCorrectionKind
+ */
+export const CORRECTION_KINDS = [
+  'retracts',  // the target is wrong; do not rely on it
+  'amends',    // the target stands; a detail is refined
+  'resolves',  // the target was an open question; this closes it. Never wrongness
+] as const;
+
+/**
  * How a divergence happened.
  *
  * `unverified` and `assumed` are close and the distinction is load-bearing: the first
@@ -321,6 +363,7 @@ export type ConfidenceGround = typeof CONFIDENCE_GROUNDS[number];
 export type DivergenceKind   = typeof DIVERGENCE_KINDS[number];
 export type Modality         = typeof MODALITIES[number];
 export type ForecastOutcome  = typeof FORECAST_OUTCOMES[number];
+export type CorrectionKind   = typeof CORRECTION_KINDS[number];
 export type SilenceKind      = typeof SILENCE_KINDS[number];
 export type Audience         = typeof AUDIENCES[number];
 export type AnchorKind       = typeof ANCHOR_KINDS[number];

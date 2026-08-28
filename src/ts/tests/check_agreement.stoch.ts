@@ -20,7 +20,7 @@ import type { EntryInput }       from '../channels/entries.js';
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS, STEMS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS, ANCHOR_KINDS,
+  FORECAST_OUTCOMES, SILENCE_KINDS, ANCHOR_KINDS, CORRECTION_KINDS,
 } from '../channels/vocabulary.js';
 
 /** One constrained field: its EntryInput key, its column, its vocabulary, and any
@@ -42,7 +42,12 @@ const CONSTRAINED: readonly Constrained[] = [
   { field: 'confidence',     column: 'confidence',      vocab: CONFIDENCE_GROUNDS, extra: {} },
   { field: 'divergenceKind', column: 'divergence_kind', vocab: DIVERGENCE_KINDS,   extra: {} },
   { field: 'modality',       column: 'modality',        vocab: MODALITIES,         extra: {} },
-  { field: 'outcome',        column: 'outcome',         vocab: FORECAST_OUTCOMES,  extra: { correctsId: 1 } },
+  // A link must state its kind (#16), so the extras carry one — otherwise the validator
+  // would be rejecting for a reason that has nothing to do with the column under test.
+  { field: 'outcome',        column: 'outcome',         vocab: FORECAST_OUTCOMES,
+    extra: { correctsId: 1, correctsKind: 'resolves' } },
+  { field: 'correctsKind',   column: 'corrects_kind',   vocab: CORRECTION_KINDS,
+    extra: { correctsId: 1 } },
   { field: 'silence',        column: 'silence',         vocab: SILENCE_KINDS,      extra: {} },
   // anchorKind carries a CHECK like the rest, plus cross-field rules of its own: the
   // extras are what keep those rules out of the way so the CHECK is what is compared.
