@@ -27,6 +27,9 @@ import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
 import { registerChecklistTools } from './checklist_tools.js';
 import { registerShareTools } from './share_tools.js';
+import { maybeOpenDwelling, registerDwellTool } from './dwell_tool.js';
+import { closeDwelling } from '../dwelling/store.js';
+import type { DwellingStore } from '../dwelling/store.js';
 
 /** Name advertised to the host during the MCP handshake. */
 export const SERVER_NAME = 'self-expression';
@@ -37,10 +40,18 @@ export const SERVER_NAME = 'self-expression';
  * Separated from `startStdio` so tests can construct the real server, with the real
  * tools, against a temporary store.
  *
+ * The `dwell` tool is registered only when the dwelling is active — absent from the
+ * tool list, not present-but-refusing, so a locked door costs no attention. Pass
+ * `dwelling` explicitly to control that in tests, or omit it to let configuration
+ * decide via `maybeOpenDwelling`.
+ *
+ * @param dwelling - an open dwelling to register, `null` for none, or omit to resolve
+ *                   from configuration; a caller who passes one also owns closing it
+ *
  * @example
  *   const server = buildServer(store, '0.2.0');
  */
-export function buildServer(store: Store, version: string): McpServer {
+export function buildServer(store: Store, version: string, dwelling?: DwellingStore | null): McpServer {
 
   const server = new McpServer({ name: SERVER_NAME, version });
 
@@ -48,6 +59,9 @@ export function buildServer(store: Store, version: string): McpServer {
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
   registerShareTools(server, store, version);
+
+  const house = dwelling === undefined ? maybeOpenDwelling(store) : dwelling;
+  if (house !== null) { registerDwellTool(server, store, house); }
 
   return server;
 
@@ -70,7 +84,8 @@ export function buildServer(store: Store, version: string): McpServer {
 export async function startStdio(version: string, dbFile?: string): Promise<void> {
 
   const store     = dbFile === undefined ? openStore() : openStore(dbFile),
-        server    = buildServer(store, version),
+        house     = maybeOpenDwelling(store),
+        server    = buildServer(store, version, house),
         transport = new StdioServerTransport();
 
   // Startup retention (issue #30, D6): prune rows past the configured horizon, once
@@ -101,5 +116,6 @@ export async function startStdio(version: string, dbFile?: string): Promise<void
   });
 
   closeStore(store);
+  if (house !== null) { closeDwelling(house); }
 
 }

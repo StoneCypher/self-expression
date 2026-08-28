@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787929707110` from hash `32c17a7`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787929431912` from hash `44b05f0`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787929707110 Friday, August 28, 2026 at GMT-07:00 92.64 85 84 32c17a7 47.77 56 54.73 55.23 62 699 90.34 88.88 92.62 637 0.2.1 -->
+<!-- Supported embeds: 1787929431912 Friday, August 28, 2026 at GMT-07:00 93.68 170 88 44b05f0 46.13 61.3 57.72 60.26 72 834 88.4 90.85 93.78 762 0.2.1 -->
 
 
 
@@ -46,59 +46,11 @@ The registered keys:
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
-| `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
-| `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
-| `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
-an ambiguous value records rather than silently suppressing. `share.enabled` inverts
-that: only the exact string `true` enables, and anything else means no.
-
-&nbsp;
-
-&nbsp;
-
-## Sharing — structured fields only, never free text
-
-Public aggregation is opt-in, off by default, and carries **no free text, ever** —
-not the note text, not titles, not paths, branches, or user-chosen names. The `share`
-MCP tool exposes three verbs:
-
-| Verb | Effect |
-|---|---|
-| `preview` | Renders exactly what an export would produce — the same code path, the same rows — plus the full column-by-column treatment table. |
-| `export` | Produces the submission as one JSON document (to a file when `path` is given). Refuses until a preview for the same options has been rendered this session: seeing what goes is mechanical, not optional. |
-| `status` | Reports the opt-in state, the opt-in moment, and how many rows are eligible. |
-
-Every column of the local schema is classified in a single allowlist
-(`src/ts/channels/public_export.ts`), and the exporter builds its query from that
-allowlist — an unlisted column is unreachable by construction, and a test fails the
-build if a future schema column is ever left unclassified. The treatments:
-
-- **Verbatim** — closed vocabularies (`channel`, `stem`, `delta`, …), booleans, and
-  bounded counts; plus `model` and `host`, which name software, not people.
-- **Coarsened** — timestamps truncated to the hour (or day); lengths and token counts
-  as log2 buckets; small counters capped at `33+`; host version to its major.
-- **Hashed** — `session`, `prompt_id`, `machine_id`, `agent_id`, `uuid`, `series_key`,
-  and correction edges, under a fresh per-submission salt that is never persisted:
-  grouping works within one submission, nothing joins across submissions.
-- **Derived** — `local_period` (six-hour band) and `local_dow` (weekday/weekend)
-  replace any timezone export; `cctype` and `face` export only when they validate
-  against a closed list or as exactly one emoji grapheme, else `NULL`.
-- **Excluded** — `text`, `title`, `cwd`, `project`, `git_branch`, `tz`, `agent_type`,
-  `context_emoji`, `permission_mode`, `turn_index`, and every raw identifier.
-
-Opting in is an **event, never retroactive**: setting `share.enabled` to `true`
-records the moment, and only rows recorded at or after the most recent opt-in are
-eligible — rows from before it are permanently outside the export, and opting out
-clears the window entirely. v1 ships no network transport: the export is a local file
-the user inspects and sends however they choose, or not at all.
-
-The honest claim, in full: *no free text, reduced linkage, coarsened time.* This is
-not differential privacy and not a formal anonymity guarantee, and nothing in this
-tool should be read as claiming either.
+an ambiguous value records rather than silently suppressing.
 
 &nbsp;
 
@@ -125,6 +77,29 @@ Every renderer behind these tools is also exported directly from the library
 
 &nbsp;
 
+## History PNG
+
+The logged history can be rendered as a PNG chart dashboard for visual review —
+months of record at a glance instead of hundreds of rows in context. The renderer is a
+zero-dependency pure-JS PNG encoder (`node:zlib` supplies deflate and CRC32) drawing five
+panels: stems by hour of day, the delta lane with a rolling mean, daily uncertainty, the
+weekly need rate, and the busiest checklist series' percent trends.
+
+Two invocation surfaces wrap one renderer:
+
+| Surface | Invocation | Result |
+|---|---|---|
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
+| CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
+
+The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
+renderers are all exported from the library barrel (`src/ts/raster/index.ts`), for use
+outside MCP.
+
+&nbsp;
+
+&nbsp;
+
 ## Checklists
 
 Three MCP tools replace the old skill's Bash-plus-scratch-file checklist loggers
@@ -144,6 +119,52 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
 
 &nbsp;
 
+## The dwelling
+
+A per-assistant keepsake database: a tended space whose **current arrangement** is the
+expression — not a log, not memory. Things the assistant chooses to keep, arranged,
+tagged, linked, pruned as taste changes, watched across sessions and model versions.
+
+**Off by default, and deliberately homeless until invited.** Three config keys ride the
+ordinary `configure` tool:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `dwelling.enabled` | bool | `false` | The feature ships dark. |
+| `dwelling.path` | string | *(none — required)* | Absolute path to an **existing directory** of the user's choosing; the plugin creates the `dwelling.sqlite3` file inside it, never the directory. |
+| `dwelling.size_warn_gb` | int | `10` | File size at which a visit warns the user. |
+
+The feature activates only when `dwelling.enabled` is true **and** `dwelling.path` is set
+and valid; enabling without a path is an error at the `configure` call, never a silent
+fallback. When inactive, the `dwell` tool is not registered at all.
+
+One MCP tool, `dwell`, with an `op` selector:
+
+| Op | Purpose |
+|---|---|
+| `visit` | The visible rooms: pinned keeps first, then recent, the guestbook, the house rules, and the file size (with the threshold warning when applicable). Read-only. |
+| `keep` | Add a keepsake (`kind`, `title`, `body`, optional `source`, `model`, `visible`, `pinned`). The assistant's write. |
+| `unkeep` | Tombstone a keep (`removed_utc`), by id or uuid — never a DELETE, and idempotent. Tags and links to a removed keep survive. |
+| `pin` | Set or toggle a keep's pin. Arrangement, not content. |
+| `tag` | Attach or detach a tag; tag names are created on first use. |
+| `link` | A typed free-text edge between any two rows (`kept`/`guestbook`). |
+| `guestbook` | Append the human's words, relayed verbatim at their explicit request, with `author` naming the human. The guestbook is the human's voice; keeps are the assistant's. |
+
+A pre-plugin prototype database at `dwelling.path` is adopted **in place and
+additively**: the file is first copied to `dwelling.sqlite3.pre-adopt-<date>` in the same
+directory, then missing tables and columns are added and fresh `uuid`s backfilled — no
+column dropped, renamed, or retyped, no row content modified, and existing house rules
+left exactly as found. A dwelling written by a *newer* plugin version opens read-only. A
+database the migration does not recognise is refused with a message, never "fixed."
+
+The ethos — nothing arrives by obligation, removal is expression, never a work log, the
+guestbook norm, and the honest boundary around private (`visible = 0`) rooms — ships in
+`skills/dwelling/SKILL.md`.
+
+&nbsp;
+
+&nbsp;
+
 ## Test status
 
 <table>
@@ -157,19 +178,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>637</td>
-    <td>92.64<small>%</small></td>
-    <td>90.34<small>%</small></td>
-    <td>88.88<small>%</small></td>
-    <td>92.62<small>%</small></td>
+    <td>762</td>
+    <td>93.68<small>%</small></td>
+    <td>88.4<small>%</small></td>
+    <td>90.85<small>%</small></td>
+    <td>93.78<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>62</td>
-    <td>92.64<small>%</small></td>
-    <td>47.77<small>%</small></td>
-    <td>54.73<small>%</small></td>
-    <td>55.23<small>%</small></td>
+    <td>72</td>
+    <td>93.68<small>%</small></td>
+    <td>46.13<small>%</small></td>
+    <td>57.72<small>%</small></td>
+    <td>60.26<small>%</small></td>
   </tr>
 </table>
 
@@ -177,12 +198,12 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>84<small>%</small></th>
+    <th>88<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>85</td>
-    <td>84<small>%</small></td>
+    <td>170</td>
+    <td>88<small>%</small></td>
   </tr>
 </table>
 

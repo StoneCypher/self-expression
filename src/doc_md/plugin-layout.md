@@ -49,6 +49,8 @@ self-expression/
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage
 │   ├── charts/              pure ASCII renderers
+│   ├── dwelling/            the keepsake dwelling: paths, schema, store/adoption, ops
+│   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)
 │   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
@@ -93,6 +95,19 @@ recordable entry, the requirement is to *look*, and the log stays honest. If it 
 only way to satisfy the hook is to produce content — then every response with nothing behind it
 still produces a well-formed entry, and the log fills with fluent noise indistinguishable from
 signal. The obligation is safe exactly to the degree that silence is expressible.
+
+**The dwelling is voluntary by design (issue #45).** A per-assistant keepsake database —
+default off, storage directory chosen by the user with no default — served by a single
+`dwell` MCP tool that is registered only when `dwelling.enabled` is true and `dwelling.path`
+is set and valid. No hook, no gate, no obligation to visit or keep: an obligation-fed
+dwelling would fill with fluent noise, the exact failure the no-op-entry rule guards
+against, and here even a no-op entry would be wrong. Removal is a tombstone
+(`removed_utc`), never a DELETE; a pre-plugin prototype database is adopted in place,
+additively, behind a same-directory backup; a newer schema opens read-only. The ethos
+lives in `skills/dwelling/SKILL.md`, which defers to the tool's presence so a disabled
+dwelling costs no attention. Its three `dwelling.*` keys ride the #30 registry like any
+other; the dwelling layers its cross-key rule (enabled-without-path is rejected) and its
+directory-must-exist rule on top of the registry's type validation.
 
 **Configuration is two layers, and the registry is code (issue #30).** `SELF_EXPRESSION_HOME`
 locates the database and does nothing else; every other choice is a `config` row, else the
@@ -147,5 +162,11 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
 - **Mutation testing is kept, deliberately.** Unlike the Playwright suite, Stryker earns its
   place here: the ASCII renderers are pure functions emitting exact strings across dense
   threshold bands, which is the case mutation testing is actually for. It stays opt-in
-  (`ci.stryker: false`), and `mutate` is now narrowed to `src/ts/charts/**/*.ts` — the pure
-  renderer directory — so runs stay fast.
+  (`ci.stryker: false`), and `mutate` covers the pure renderer directories —
+  `src/ts/charts/**/*.ts` and `src/ts/raster/**/*.ts` (the exact-byte PNG encoder and its
+  threshold-heavy layout arithmetic are the same sweet spot) — so runs stay fast.
+- **The PNG history renderer is now implemented (issue #7).** `src/ts/raster/` carries the
+  zero-dependency encoder, 5×7 bitmap font, drawing surface, and five-panel dashboard;
+  `render_history_png` in `src/ts/mcp/chart_tools.ts` and the `self-expression render`
+  subcommand write the file and return the path — never image content over MCP. See the
+  README's History PNG section and `src/superpowers/spec/2026-08-27-png-history-design.md`.
