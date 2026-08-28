@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-59 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+58 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -22,38 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:27:04 AM
-
-Commit [29484e2ad36d069d9444658c3932f948cf649e92](https://github.com/StoneCypher/self-expression/commit/29484e2ad36d069d9444658c3932f948cf649e92)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: rebuild artifacts on the merged tree (build green, exit 0)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:26:51 AM
-
-Commit [c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800](https://github.com/StoneCypher/self-expression/commit/c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [601b81f, 384486c]
-
-  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_voluntary-audio_44
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 28, 2026 11:25:17 AM
 
 Commit [db54ef9cc4453057d85c92bf104ba578e7b23b10](https://github.com/StoneCypher/self-expression/commit/db54ef9cc4453057d85c92bf104ba578e7b23b10)
@@ -63,21 +31,6 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 Merges [676e7ad, 384486c]
 
   * chore: merge origin/main (#19 diagrams, #20 digest); union tool registrations, keep 60s stoch timeouts
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:23:21 AM
-
-Commit [a34324c4ca73bb3983f19062c2cadccccd6cc564](https://github.com/StoneCypher/self-expression/commit/a34324c4ca73bb3983f19062c2cadccccd6cc564)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 384486ce866b48bc68390bde01963c10a3a7ff7c
 
 
 
@@ -251,3 +204,59 @@ changelogs, coverage) restored by the green build are included here.
 - docs: markers.md profile bucket membership, skill summary-line pointer,
   base_README Charts/Checklists sections
   * Refs #20
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:25:10 AM
+
+Commit [9c218dcf7f97ce4eaed8c803cff2a573aeec11e2](https://github.com/StoneCypher/self-expression/commit/9c218dcf7f97ce4eaed8c803cff2a573aeec11e2)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: checkpoint before token exhaustion
+  * Addressivity (#41) mid-implementation. Build NOT yet run — source
+compiles unverified, tests not yet written. See PR body for the
+full handoff: what is done, what remains, exact next steps.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:25:09 AM
+
+Commit [601b81fc0f4a04f29400afe6cec2e5b60cf64843](https://github.com/StoneCypher/self-expression/commit/601b81fc0f4a04f29400afe6cec2e5b60cf64843)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: checkpoint before token exhaustion
+  * Claudio facility (#44) core in place: vocabulary, wav, synth, config,
+schema, ledger, gate, player, tools, server, cli entry, registry keys,
+build wiring, vendored assets. tsc compiles clean; unit/stoch tests
+partially written (wav+synth specs done); full build NOT yet run.
+  * Refs #44
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:25:09 AM
+
+Commit [52dc11c05b0f94f58c056c6bda336fd9d2ed85b2](https://github.com/StoneCypher/self-expression/commit/52dc11c05b0f94f58c056c6bda336fd9d2ed85b2)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [560ac8c, 60c2f90]
+
+  * Merge pull request #69 from StoneCypher/feat_26-08-28_diagrams_19
+  * feat: diagrams as a distinct mechanic from charts (#19)

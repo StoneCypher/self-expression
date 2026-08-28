@@ -1,12 +1,13 @@
 /**
- * The MCP chart-rendering tool surface: six ASCII tools, grouped by data shape,
+ * The MCP chart-rendering tool surface: seven ASCII tools, grouped by data shape,
  * wrapping the pure renderers in `../charts/index.js` — plus `render_history_png`,
  * which wraps the raster dashboard in `../raster/` and carries this module's one
  * impure step (the PNG file write; see {@link renderHistoryToFile}).
  *
  * Each tool takes a `form` field naming which of its renderers to use — a closed
  * `z.enum` built from a local `const` array via {@link tuple}, so a misspelled form is
- * unrepresentable rather than a runtime surprise (`render_checklist_summary` is the one
+ * unrepresentable rather than a runtime surprise (`render_digest` selects a digest
+ * `profile` the same closed-enum way, and `render_checklist_summary` is the one
  * exception: it wraps exactly one renderer, so it has no `form` field at all). Because a
  * grouped tool's per-form fields cannot all be schema-required at once — a `render_bar`
  * call needs `percent` for `'progress'` but `value`/`target`/`max` for `'bullet'` — every
@@ -40,10 +41,12 @@ import {
   renderTrendTag, renderStars, renderRetryHealth, renderWeather,
   TREND_DIRECTIONS, WEATHER_STATES,
   renderChecklistSummary,
+  renderDigest, PROFILES, PROFILE_NAMES,
 } from '../charts/index.js';
 import type {
   ComparisonRow, TileCell, FslTransition, ChecklistItem, Milestone,
   Outcome, RangeStyle, TileFill, TrendDirection, WeatherState, Bucket,
+  DigestUnit, ProfileName,
 } from '../charts/index.js';
 import {
   checklistSeriesTop, needWeekly, seriesPercents, signatureHistory,
@@ -907,6 +910,100 @@ export function handleRenderChecklistSummary(store: Store, args: ChecklistSummar
 }
 
 // ---------------------------------------------------------------------------------
+// render_digest — the general compressed-artifact digest, per profile
+// ---------------------------------------------------------------------------------
+
+/** The raw zod shape backing `render_digest`'s `inputSchema`. */
+const DIGEST_SHAPE = {
+  profile: z.enum(tuple(PROFILE_NAMES)).describe(
+    "which digest profile to render: 'checklist' (success/active/failure items with a " +
+    "completion percent and bar), 'findings' (blocking/degraded/note), 'options' " +
+    "(chosen/open/rejected), 'diff' (added/modified/removed files with a +N −M " +
+    "line-count tail), or 'results' (matched/partial/missed search hits)"),
+  units: z.array(z.object({
+    marker: z.string().describe("the marker glyph this unit renders with, e.g. '⚠️'"),
+    bucket: z.string().optional().describe(
+      "explicit bucket id override in the chosen profile, winning over the marker's " +
+      "own classification — required per unit for the 'diff' profile's change kinds " +
+      "('added' | 'modified' | 'removed'); an id the profile does not define is ignored"),
+    plus: z.number().int().min(0).optional().describe(
+      "'diff' profile only: lines added by this unit, summed into the '+N' tail"),
+    minus: z.number().int().min(0).optional().describe(
+      "'diff' profile only: lines removed by this unit, summed into the '−M' tail"),
+  })).min(1).describe(
+    'every unit of the artifact, one entry each; non-empty — a digest has nothing to ' +
+    'summarize otherwise'),
+  series: z.array(z.number()).optional().describe(
+    "the artifact's scalar history, chronological order; a trend sparkline is " +
+    "appended only when it has 4 or more points; omit when supplying 'seriesKey' instead"),
+  seriesKey: z.string().optional().describe(
+    "alternative to 'series': a series key previously recorded via the express tool; " +
+    "resolves to that series' stored percent history (seriesPercents) and becomes " +
+    'options.series'),
+};
+
+/**
+ * What a caller supplies to `render_digest`, after schema validation.
+ *
+ * Hand-written for the same `isolatedDeclarations` reason as {@link SeriesArgs}; kept
+ * honest against {@link DIGEST_SHAPE} the same way, at the `handleRenderDigest` call
+ * site.
+ */
+export interface DigestArgs {
+  profile: ProfileName;
+  units: { marker: string; bucket?: string | undefined; plus?: number | undefined; minus?: number | undefined }[];
+  series?: number[] | undefined;
+  seriesKey?: string | undefined;
+}
+
+// Fails to compile if DigestArgs drifts from DIGEST_SHAPE — see expectType's docblock.
+expectType<Equal<DigestArgs, z.infer<z.ZodObject<typeof DIGEST_SHAPE>>>>(true);
+
+/** See {@link toComparisonRow}: the same conversion for one `render_digest` unit. */
+function toDigestUnit(
+  unit: { marker: string; bucket?: string | undefined; plus?: number | undefined; minus?: number | undefined },
+): DigestUnit {
+  return {
+    marker: unit.marker,
+    ...(unit.bucket !== undefined ? { bucket: unit.bucket } : {}),
+    ...(unit.plus   !== undefined ? { plus:   unit.plus }   : {}),
+    ...(unit.minus  !== undefined ? { minus:  unit.minus }  : {}),
+  };
+}
+
+/**
+ * Handles `render_digest`: the general compressed-artifact digest — per-profile bucket
+ * counts and noun, an optional scalar percent and bar, an optional `+N −M` tail, an
+ * optional trend sparkline, and the sorted per-marker icon list.
+ *
+ * `render_checklist_summary` remains beside this tool as the checklist-profile alias —
+ * `{ profile: 'checklist' }` here and that tool render the same bytes.
+ *
+ * @param store the store `seriesKey` is resolved against
+ * @param args   the validated tool arguments
+ *
+ * @example
+ *   handleRenderDigest(store, {
+ *     profile: 'findings',
+ *     units: [{ marker: '❗' }, { marker: '⚠️' }, { marker: '⚠️' }],
+ *   })
+ *   // => { content: [{ type: 'text', text: '1/2/0 findings  ⚠️ 2  ❗ 1' }] }
+ *
+ * @see ../charts/digest.js renderDigest
+ * @see handleRenderChecklistSummary
+ */
+export function handleRenderDigest(store: Store, args: DigestArgs): ToolReply {
+  return guarded(() => {
+    const series = args.seriesKey !== undefined ? seriesPercents(store, args.seriesKey) : args.series;
+    return reply(renderDigest(
+      args.units.map(toDigestUnit),
+      PROFILES[args.profile],
+      series === undefined ? undefined : { series },
+    ));
+  });
+}
+
+// ---------------------------------------------------------------------------------
 // render_history_png — the write-the-file-then-read-it PNG dashboard
 // ---------------------------------------------------------------------------------
 
@@ -1081,7 +1178,7 @@ export function handleRenderHistoryPng(
 // ---------------------------------------------------------------------------------
 
 /**
- * Registers all seven chart-rendering tools on `server` — the six ASCII chart
+ * Registers all eight chart-rendering tools on `server` — the seven ASCII chart
  * tools plus `render_history_png`.
  *
  * Charts have no config gate in v1 — unlike `express`'s channel set, every form is
@@ -1163,6 +1260,21 @@ export function registerChartTools(server: McpServer, store: Store): void {
       'status-checklists skill specifies, not an approximation.',
     inputSchema: CHECKLIST_SUMMARY_SHAPE,
   }, (args) => handleRenderChecklistSummary(store, args));
+
+  server.registerTool('render_digest', {
+    title: 'Render digest',
+    description:
+      'Render the general compressed-artifact digest line for a body of comparable ' +
+      'units: per-profile bucket counts and unit noun, a scalar percent + 10-cell bar ' +
+      'when the profile has a completion axis (checklist), a +N −M line-count tail ' +
+      '(diff), an optional trend sparkline, and the sorted per-marker icon list ' +
+      '(inline or split into per-bucket blocks). Profiles: checklist items, review ' +
+      'findings, decision options, changed files, search hits. Reach for this to close ' +
+      'a review, decision, diff, or search report with a verifiable summary instead of ' +
+      'prose counts; render_checklist_summary is this tool with the checklist profile ' +
+      'plugged in.',
+    inputSchema: DIGEST_SHAPE,
+  }, (args) => handleRenderDigest(store, args));
 
   server.registerTool('render_history_png', {
     title: 'Render history PNG',

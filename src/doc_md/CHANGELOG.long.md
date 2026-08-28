@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-59 merges; 2 releases
+58 merges; 2 releases
 
 
 
@@ -22,38 +22,6 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:27:04 AM
-
-Commit [29484e2ad36d069d9444658c3932f948cf649e92](https://github.com/StoneCypher/self-expression/commit/29484e2ad36d069d9444658c3932f948cf649e92)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: rebuild artifacts on the merged tree (build green, exit 0)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:26:51 AM
-
-Commit [c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800](https://github.com/StoneCypher/self-expression/commit/c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [601b81f, 384486c]
-
-  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_voluntary-audio_44
-
-
-
-
-&nbsp;
-
-&nbsp;
-
 ## [Untagged] - Aug 28, 2026 11:25:17 AM
 
 Commit [db54ef9cc4453057d85c92bf104ba578e7b23b10](https://github.com/StoneCypher/self-expression/commit/db54ef9cc4453057d85c92bf104ba578e7b23b10)
@@ -63,21 +31,6 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 Merges [676e7ad, 384486c]
 
   * chore: merge origin/main (#19 diagrams, #20 digest); union tool registrations, keep 60s stoch timeouts
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:23:21 AM
-
-Commit [a34324c4ca73bb3983f19062c2cadccccd6cc564](https://github.com/StoneCypher/self-expression/commit/a34324c4ca73bb3983f19062c2cadccccd6cc564)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 384486ce866b48bc68390bde01963c10a3a7ff7c
 
 
 
