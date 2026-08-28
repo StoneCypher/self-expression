@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Thursday, August 27, 2026 at GMT-07:00 `1787887366484` from hash `b6136b9`.
+> Version 0.2.1 was built on Thursday, August 27, 2026 at GMT-07:00 `1787896241392` from hash `e532289`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787887366484 Thursday, August 27, 2026 at GMT-07:00 85.18 71 87 b6136b9 26.3 39.13 35.58 38.41 40 471 86.61 79.75 85.71 431 0.2.1 -->
+<!-- Supported embeds: 1787896241392 Thursday, August 27, 2026 at GMT-07:00 85.11 71 87 e532289 25.98 38.99 35.36 38.25 40 479 85.64 79.87 85.63 439 0.2.1 -->
 
 
 
@@ -44,19 +44,19 @@ Every renderer behind these tools is also exported directly from the library
   </tr>
   <tr>
     <th>Unit</th>
-    <td>431</td>
-    <td>85.18<small>%</small></td>
-    <td>86.61<small>%</small></td>
-    <td>79.75<small>%</small></td>
-    <td>85.71<small>%</small></td>
+    <td>439</td>
+    <td>85.11<small>%</small></td>
+    <td>85.64<small>%</small></td>
+    <td>79.87<small>%</small></td>
+    <td>85.63<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
     <td>40</td>
-    <td>85.18<small>%</small></td>
-    <td>26.3<small>%</small></td>
-    <td>35.58<small>%</small></td>
-    <td>38.41<small>%</small></td>
+    <td>85.11<small>%</small></td>
+    <td>25.98<small>%</small></td>
+    <td>35.36<small>%</small></td>
+    <td>38.25<small>%</small></td>
   </tr>
 </table>
 

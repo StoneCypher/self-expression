@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-10 merges; 2 releases
+14 merges; 2 releases
 
 
 
@@ -14,6 +14,121 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 10:28:40 PM
+
+Commit [255cf481c4988793229e1dfcf7373bacf9c12e50](https://github.com/StoneCypher/self-expression/commit/255cf481c4988793229e1dfcf7373bacf9c12e50)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: e5322892a9deaa97f02ffbd2d38386d550430c4e
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 10:27:52 PM
+
+Commit [e5322892a9deaa97f02ffbd2d38386d550430c4e](https://github.com/StoneCypher/self-expression/commit/e5322892a9deaa97f02ffbd2d38386d550430c4e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [7285d21, 36b85d4]
+
+  * Merge pull request #47 from StoneCypher/feat_26-08-27_ascii-renderers_26
+  * feat: implement the visuals vocabulary as ASCII/emoji renderers (#26)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 8:23:17 PM
+
+Commit [36b85d49bcf9461b61fde5ceedb341c0e50ef6bb](https://github.com/StoneCypher/self-expression/commit/36b85d49bcf9461b61fde5ceedb341c0e50ef6bb)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: implement the visuals vocabulary as ASCII/emoji renderers (#26)
+  * Implement every visual form in the vendored status-checklist vocabulary as
+pure TypeScript renderers plus six grouped MCP tools.
+  * - Six grouped MCP chart tools (render_series, render_bar, render_rows,
+  render_timeline, render_glyph, render_checklist_summary) backed by pure,
+  synchronous renderers in src/ts/charts (scale, markers, series, bars,
+  rows, timeline, glyphs, checklist), each exported directly from the
+  library as well.
+- README Charts section documenting the six tools and the renderer exports.
+- Strikethrough sarcasm-device carve-out in the self-expression SKILL: the
+  one device that renders inline rather than inside a code block.
+- eslint now ignores the .superpowers/** scratch dir, which was hanging the
+  linter.
+- stryker mutate narrowed to src/ts/charts/**/*.ts so opt-in mutation runs
+  stay fast.
+- Doc code-fence lint fixes: language-tagged fenced blocks in the reference
+  and plan docs, and escaped [0,100] intervals that markdown misread as
+  label references.
+- Build: dts step now also copies the charts declaration subtree into
+  dist/charts so the ESM types entry resolves (fixes an attw internal
+  resolution error).
+  * Closes #26
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 6:45:14 PM
+
+Commit [6bff4f02ad547c36ada0e82894837a69c70ff498](https://github.com/StoneCypher/self-expression/commit/6bff4f02ad547c36ada0e82894837a69c70ff498)
+
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
+
+  * chore(deps-dev): bump the minor-and-patch group with 3 updates
+  * Bumps the minor-and-patch group with 3 updates: [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node), [eslint](https://github.com/eslint/eslint) and [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint).
+  * 
+Updates `@types/node` from 26.2.0 to 26.3.0
+- [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
+- [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
+  * Updates `eslint` from 10.9.0 to 10.9.1
+- [Release notes](https://github.com/eslint/eslint/releases)
+- [Commits](https://github.com/eslint/eslint/compare/v10.9.0...v10.9.1)
+  * Updates `typescript-eslint` from 8.67.0 to 8.68.0
+- [Release notes](https://github.com/typescript-eslint/typescript-eslint/releases)
+- [Changelog](https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/typescript-eslint/CHANGELOG.md)
+- [Commits](https://github.com/typescript-eslint/typescript-eslint/commits/v8.68.0/packages/typescript-eslint)
+  * ---
+updated-dependencies:
+- dependency-name: "@types/node"
+  dependency-version: 26.3.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: eslint
+  dependency-version: 10.9.1
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+- dependency-name: typescript-eslint
+  dependency-version: 8.68.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
 
 
 
@@ -574,6 +689,82 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
+## [Untagged] - Aug 27, 2026 11:50:28 AM
+
+Commit [7285d2104fe8599eb95300df335156072ffdb4cf](https://github.com/StoneCypher/self-expression/commit/7285d2104fe8599eb95300df335156072ffdb4cf)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [8a5be26, 72e45ef]
+
+  * Merge pull request #39 from StoneCypher/feat_26-08-27_privacy-redaction
+  * feat(privacy): redact cwd, git_branch, project & prompt length at write time
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:48:04 AM
+
+Commit [72e45ef89e61e93c84e50349d926db5d424cffd2](https://github.com/StoneCypher/self-expression/commit/72e45ef89e61e93c84e50349d926db5d424cffd2)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat(privacy): redact cwd, git_branch, project, and prompt length at write time
+  * Gate the path-carrying context fields and the prompt length on two config keys,
+privacy.store_cwd and privacy.store_prompt_len (both default on), dropping a
+suppressed field at the point of capture rather than hiding it afterward. Applied
+in the UserPromptSubmit hook (capture) and again in the express tool (belt-and-
+suspenders, since a direct call carries its own project argument). New privacyFlags
+helper, unit-tested; hook-capture redaction covered end to end.
+  * Addresses the write-time privacy-redaction portion of #30.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 10:06:28 AM
+
+Commit [8a5be260ae3056854bbad7543d121d78dc00bb5e](https://github.com/StoneCypher/self-expression/commit/8a5be260ae3056854bbad7543d121d78dc00bb5e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [d27917c, 99136bb]
+
+  * Merge pull request #37 from StoneCypher/dependabot/npm_and_yarn/typescript-language-server-6.0.0
+  * chore(deps-dev): bump typescript-language-server from 5.3.0 to 6.0.0
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 10:06:23 AM
+
+Commit [d27917c5529148ff337b5604118b4ca5c4dc36f1](https://github.com/StoneCypher/self-expression/commit/d27917c5529148ff337b5604118b4ca5c4dc36f1)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [54e3e60, 6d92c08]
+
+  * Merge pull request #38 from StoneCypher/dependabot/npm_and_yarn/minor-and-patch-c21f40536c
+  * chore(deps-dev): bump the minor-and-patch group across 1 directory with 2 updates
+
+
+
+
+&nbsp;
+
+&nbsp;
+
 ## [Untagged] - Aug 27, 2026 10:04:09 AM
 
 Commit [54e3e60b9f40bef7640411df7326dca449bf79db](https://github.com/StoneCypher/self-expression/commit/54e3e60b9f40bef7640411df7326dca449bf79db)
@@ -581,6 +772,86 @@ Commit [54e3e60b9f40bef7640411df7326dca449bf79db](https://github.com/StoneCypher
 Author: `John Haugeland <stonecypher@gmail.com>`
 
   * last bits before showing to opt
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 24, 2026 6:47:55 PM
+
+Commit [6d92c081a11364302a0830e52d524b7d70a3403c](https://github.com/StoneCypher/self-expression/commit/6d92c081a11364302a0830e52d524b7d70a3403c)
+
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
+
+  * chore(deps-dev): bump the minor-and-patch group across 1 directory with 2 updates
+  * Bumps the minor-and-patch group with 2 updates in the / directory: [eslint](https://github.com/eslint/eslint) and [rollup](https://github.com/rollup/rollup).
+  * 
+Updates `eslint` from 10.8.1 to 10.9.0
+- [Release notes](https://github.com/eslint/eslint/releases)
+- [Commits](https://github.com/eslint/eslint/compare/v10.8.1...v10.9.0)
+  * Updates `rollup` from 4.62.4 to 4.62.5
+- [Release notes](https://github.com/rollup/rollup/releases)
+- [Changelog](https://github.com/rollup/rollup/blob/master/CHANGELOG.md)
+- [Commits](https://github.com/rollup/rollup/compare/v4.62.4...v4.62.5)
+  * ---
+updated-dependencies:
+- dependency-name: eslint
+  dependency-version: 10.9.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: rollup
+  dependency-version: 4.62.5
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 23, 2026 6:46:15 PM
+
+Commit [99136bbedd7a5df8fd3caf4fc7f0e17a3c502a38](https://github.com/StoneCypher/self-expression/commit/99136bbedd7a5df8fd3caf4fc7f0e17a3c502a38)
+
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
+
+  * chore(deps-dev): bump typescript-language-server from 5.3.0 to 6.0.0
+  * Bumps [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server) from 5.3.0 to 6.0.0.
+- [Release notes](https://github.com/typescript-language-server/typescript-language-server/releases)
+- [Changelog](https://github.com/typescript-language-server/typescript-language-server/blob/master/CHANGELOG.md)
+- [Commits](https://github.com/typescript-language-server/typescript-language-server/compare/v5.3.0...v6.0.0)
+  * ---
+updated-dependencies:
+- dependency-name: typescript-language-server
+  dependency-version: 6.0.0
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 19, 2026 4:44:25 PM
+
+Commit [20aeede679cae673594058107bb30e5049582c36](https://github.com/StoneCypher/self-expression/commit/20aeede679cae673594058107bb30e5049582c36)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 14dadac9916bd0a00932dc34848f2a93c80e3885
 
 
 

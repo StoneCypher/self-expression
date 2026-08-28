@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for ts/stub.ts</title>
+    <title>Code coverage report for ts/channels/privacy.ts</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../prettify.css" />
-    <link rel="stylesheet" href="../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../sort-arrow-sprite.png);
+            background-image: url(../../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">ts</a> stub.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">ts/channels</a> privacy.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/2</span>
+                <span class='fraction'>0/0</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/3</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>0/1</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -106,19 +106,7 @@
 <a name='L41'></a><a href='#L41'>41</a>
 <a name='L42'></a><a href='#L42'>42</a>
 <a name='L43'></a><a href='#L43'>43</a>
-<a name='L44'></a><a href='#L44'>44</a>
-<a name='L45'></a><a href='#L45'>45</a>
-<a name='L46'></a><a href='#L46'>46</a>
-<a name='L47'></a><a href='#L47'>47</a>
-<a name='L48'></a><a href='#L48'>48</a>
-<a name='L49'></a><a href='#L49'>49</a>
-<a name='L50'></a><a href='#L50'>50</a>
-<a name='L51'></a><a href='#L51'>51</a>
-<a name='L52'></a><a href='#L52'>52</a>
-<a name='L53'></a><a href='#L53'>53</a>
-<a name='L54'></a><a href='#L54'>54</a>
-<a name='L55'></a><a href='#L55'>55</a>
-<a name='L56'></a><a href='#L56'>56</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L44'></a><a href='#L44'>44</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -154,80 +142,56 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">100x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">100x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">&nbsp;
-/********
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * Which harness-observed fields the user has consented to record.
  *
- *  Returns the arithmetic double of the input number, or throws if not a number
+ * `cwd`, `project`, and `git_branch` are real filesystem paths and identifiers, and even
+ * a prompt's length is a signal a work machine may want kept out of the log. The design
+ * requires these to be redacted **at write time** — never captured, not
+ * captured-then-hidden — so both the `UserPromptSubmit` hook and the `express` tool read
+ * the choice here and drop a suppressed field before it ever reaches the database.
  *
- *  @summary Double a number
- *  @category stub
- *
- *  @param {number} x - The input value to be doubled
- *
- *  @returns {number} The doubled value
- *
- *  @example
- *  This will work:
- *  ```ts
- *    console.log( double(3) );  // should print "6"
- *  ```
- *  This will throw:
- *  ```ts
- *    console.log( double('three') );  // should explode
- *  ```
- *
- *  @since Introduced in v0.3.0, Mar 22 2026
- *  @author John Haugeland
- *
- *  @throws TypeError if `typeof x !== 'number'`
- *
- *  @privateRemarks
- *  This function is here to show that building, bundling, and testing are working.  It also serves to remind us what
- *  typedoc arguments are being used.  Destroy this file and this function, de-export this function from index, and
- *  remove the `spec`, `stoch`, and `mutat` tests for double before proceeding.
- *
+ * @see ./store.js
  */
 &nbsp;
-export function double(x: number): number {
+import { readConfig } from './store.js';
+import type { Store } from './store.js';
 &nbsp;
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof x !== 'number') {
-<span class="cstat-no" title="statement not covered" >    throw new TypeError('input to `double/1` must be a `number`');</span>
-  }
-&nbsp;
-  return x*2;
-&nbsp;
+/** The subset of harness context the user has permitted to be stored. */
+export interface PrivacyFlags {
+  /** Record `cwd`, `project`, and `git_branch`. Off when `privacy.store_cwd` is `'false'`. */
+  readonly storeCwd       : boolean;
+  /** Record the prompt's length. Off when `privacy.store_prompt_len` is `'false'`. */
+  readonly storePromptLen : boolean;
 }
 &nbsp;
-&nbsp;
-&nbsp;
-&nbsp;
-&nbsp;
-// not counted against doc coverage because not in api as exported by index
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-export function <span class="fstat-no" title="function not covered" >unhandled_internal(): void {</span>}
-&nbsp;
-// counted against doc coverage because exported by index
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-export function <span class="fstat-no" title="function not covered" >unhandled_external(): void {</span>}
+/**
+ * Read the privacy choices, defaulting to recording.
+ *
+ * An unset key returns `null` from `readConfig`, which is not the string `'false'`, so an
+ * unconfigured install records everything — the default lives here in code rather than as
+ * a seeded row, so a later change to it reaches existing installs. Only the exact string
+ * `'false'` suppresses a field; any other value records, on the principle that a privacy
+ * switch should take effect only when unambiguously set.
+ *
+ * @example
+ *   privacyFlags(store)                              // =&gt; { storeCwd: true, storePromptLen: true }
+ *   writeConfig(store, 'privacy.store_cwd', false);
+ *   privacyFlags(store)                              // =&gt; { storeCwd: false, storePromptLen: true }
+ */
+export function <span class="fstat-no" title="function not covered" >privacyFlags(s</span>tore: Store): PrivacyFlags {
+<span class="cstat-no" title="statement not covered" >  return {</span>
+    storeCwd       : readConfig(store, 'privacy.store_cwd')        !== 'false',
+    storePromptLen : readConfig(store, 'privacy.store_prompt_len') !== 'false',
+  };
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -237,14 +201,14 @@ export function <span class="fstat-no" title="function not covered" >unhandled_e
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
                 at 2026-08-28T05:50:39.247Z
             </div>
-        <script src="../prettify.js"></script>
+        <script src="../../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../sorter.js"></script>
-        <script src="../block-navigation.js"></script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
     </body>
 </html>
     

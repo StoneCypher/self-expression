@@ -6,6 +6,7 @@ import type { Store }                         from '../channels/store.js';
 import { recordEntry }                        from '../channels/entries.js';
 import { latestContext, turnCount }           from '../channels/context.js';
 import { onUserPromptSubmit, onStop, handleHook, describeMoment, OPEN_REMINDER } from '../mcp/hooks.js';
+import { zoneAbbreviation }                   from '../channels/time.js';
 
 const VERSION = '0.2.0';
 
@@ -24,6 +25,14 @@ describe('describeMoment', () => {
     expect(text).toContain('Tuesday');
     expect(text).toContain('2:05 pm');
     expect(text).toContain('afternoon');
+  });
+
+  test('carries the zone with the clock, so the signature can render it', () => {
+    const text = describeMoment(NOW);
+    // The signature spec is "12-hour, with zone"; the clock must be handed a zone token,
+    // sitting between the time and the part-of-day, and it must be the real machine zone.
+    expect(text).toMatch(/2:05 pm \S+ \(afternoon\)/);
+    expect(text).toContain(`2:05 pm ${zoneAbbreviation(NOW)} `);
   });
 
   test.each([

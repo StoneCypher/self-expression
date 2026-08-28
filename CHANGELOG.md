@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-10 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+14 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -14,6 +14,121 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 10:28:40 PM
+
+Commit [255cf481c4988793229e1dfcf7373bacf9c12e50](https://github.com/StoneCypher/self-expression/commit/255cf481c4988793229e1dfcf7373bacf9c12e50)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: e5322892a9deaa97f02ffbd2d38386d550430c4e
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 10:27:52 PM
+
+Commit [e5322892a9deaa97f02ffbd2d38386d550430c4e](https://github.com/StoneCypher/self-expression/commit/e5322892a9deaa97f02ffbd2d38386d550430c4e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [7285d21, 36b85d4]
+
+  * Merge pull request #47 from StoneCypher/feat_26-08-27_ascii-renderers_26
+  * feat: implement the visuals vocabulary as ASCII/emoji renderers (#26)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 8:23:17 PM
+
+Commit [36b85d49bcf9461b61fde5ceedb341c0e50ef6bb](https://github.com/StoneCypher/self-expression/commit/36b85d49bcf9461b61fde5ceedb341c0e50ef6bb)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: implement the visuals vocabulary as ASCII/emoji renderers (#26)
+  * Implement every visual form in the vendored status-checklist vocabulary as
+pure TypeScript renderers plus six grouped MCP tools.
+  * - Six grouped MCP chart tools (render_series, render_bar, render_rows,
+  render_timeline, render_glyph, render_checklist_summary) backed by pure,
+  synchronous renderers in src/ts/charts (scale, markers, series, bars,
+  rows, timeline, glyphs, checklist), each exported directly from the
+  library as well.
+- README Charts section documenting the six tools and the renderer exports.
+- Strikethrough sarcasm-device carve-out in the self-expression SKILL: the
+  one device that renders inline rather than inside a code block.
+- eslint now ignores the .superpowers/** scratch dir, which was hanging the
+  linter.
+- stryker mutate narrowed to src/ts/charts/**/*.ts so opt-in mutation runs
+  stay fast.
+- Doc code-fence lint fixes: language-tagged fenced blocks in the reference
+  and plan docs, and escaped [0,100] intervals that markdown misread as
+  label references.
+- Build: dts step now also copies the charts declaration subtree into
+  dist/charts so the ESM types entry resolves (fixes an attw internal
+  resolution error).
+  * Closes #26
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 6:45:14 PM
+
+Commit [6bff4f02ad547c36ada0e82894837a69c70ff498](https://github.com/StoneCypher/self-expression/commit/6bff4f02ad547c36ada0e82894837a69c70ff498)
+
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
+
+  * chore(deps-dev): bump the minor-and-patch group with 3 updates
+  * Bumps the minor-and-patch group with 3 updates: [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node), [eslint](https://github.com/eslint/eslint) and [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint).
+  * 
+Updates `@types/node` from 26.2.0 to 26.3.0
+- [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
+- [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
+  * Updates `eslint` from 10.9.0 to 10.9.1
+- [Release notes](https://github.com/eslint/eslint/releases)
+- [Commits](https://github.com/eslint/eslint/compare/v10.9.0...v10.9.1)
+  * Updates `typescript-eslint` from 8.67.0 to 8.68.0
+- [Release notes](https://github.com/typescript-eslint/typescript-eslint/releases)
+- [Changelog](https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/typescript-eslint/CHANGELOG.md)
+- [Commits](https://github.com/typescript-eslint/typescript-eslint/commits/v8.68.0/packages/typescript-eslint)
+  * ---
+updated-dependencies:
+- dependency-name: "@types/node"
+  dependency-version: 26.3.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: eslint
+  dependency-version: 10.9.1
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+- dependency-name: typescript-eslint
+  dependency-version: 8.68.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
 
 
 
@@ -104,63 +219,3 @@ Commit [395e6c0ea13211402e6d58ed046b53c2e8b8a78e](https://github.com/StoneCypher
 Author: `John Haugeland <stonecypher@gmail.com>`
 
   * docs(skills): bless database/network/cleanup activity glyphs
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 2:51:18 PM
-
-Commit [e86d0428bf35afe891327e732a247d747f5dbd1d](https://github.com/StoneCypher/self-expression/commit/e86d0428bf35afe891327e732a247d747f5dbd1d)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(skills): Split header takes a capital S
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 2:50:27 PM
-
-Commit [8b2e24d638a86321d89bf693f47101f828975767](https://github.com/StoneCypher/self-expression/commit/8b2e24d638a86321d89bf693f47101f828975767)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(skills): the split (polyphony) convention — parliament format, number-square voices
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 2:46:21 PM
-
-Commit [b3824e8d55a85e5a9a54dfb81bf5e8491d116f6b](https://github.com/StoneCypher/self-expression/commit/b3824e8d55a85e5a9a54dfb81bf5e8491d116f6b)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(skills): number-square lists keep a blank line between items
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 2:45:44 PM
-
-Commit [8a6b6f512205af26c31c49cdf73168460645f6ec](https://github.com/StoneCypher/self-expression/commit/8a6b6f512205af26c31c49cdf73168460645f6ec)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(skills): number-square list convention — two-space indent, never blockquoted
