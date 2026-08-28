@@ -3,7 +3,10 @@ import { parseCommand, run }      from '../cli_commands.js';
 import type { CliStreams }        from '../cli_commands.js';
 
 /** The tokens that mean something; everything else must fall through to `unknown`. */
-const RESERVED = new Set(['mcp', 'help', '--help', '-h']);
+const RESERVED = new Set(['mcp', 'help', '--help', '-h', 'hook', 'render', 'messages']);
+
+/** The subcommands whose later arguments are grammar rather than noise. */
+const TAKES_ARGUMENTS = new Set(['hook', 'render', 'messages']);
 
 describe('stochastic cli parsing', () => {
 
@@ -15,11 +18,14 @@ describe('stochastic cli parsing', () => {
     );
   });
 
-  test('stoch: trailing arguments never change which command is chosen', () => {
+  test('stoch: trailing arguments never change which command is chosen, outside flag grammars', () => {
     fc.assert(
-      fc.property(fc.string(), fc.array(fc.string()), (first: string, rest: string[]) => {
-        expect(parseCommand([first, ...rest])).toEqual(parseCommand([first]));
-      })
+      fc.property(
+        fc.string().filter((s) => !TAKES_ARGUMENTS.has(s)),
+        fc.array(fc.string()),
+        (first: string, rest: string[]) => {
+          expect(parseCommand([first, ...rest])).toEqual(parseCommand([first]));
+        })
     );
   });
 

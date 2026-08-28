@@ -36,7 +36,7 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 2) and
+Schema versioning is stored in the database (`schema_version`, currently 3) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
 baked CHECK constraint has to widen; a database newer than the code is refused
 rather than downgraded.
@@ -83,6 +83,8 @@ The registered keys:
 | `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
 | `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
+| `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
+| `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
@@ -154,6 +156,48 @@ scratchpad write plus a script invocation:
 
 The validator behind `check_checklist` is exported as `verifyChecklist` (with
 `extractChecklistBlock` and `parseSummaryCounts`) from the same charts barrel.
+
+&nbsp;
+
+&nbsp;
+
+## Messagebox
+
+Audience-tagged messages with real delivery and readback semantics, stored beside the
+expression log — its own facility, not a rendered channel. One transcript can carry
+several conversations without any of them appearing in it: notes to future-self that
+survive compaction, coordination between sibling agents, asides for the human to read
+later, remarks for the record. Read-state is append-only receipt rows, never a mutable
+flag; **unread** means "no receipt from this reader, and not expired". `expires_utc`
+only excludes a message from delivery — deletion belongs to `retention.days` alone.
+
+The audiences:
+
+| audience | scope | who collects | unread notification |
+|---|---|---|---|
+| `self` | sender's session | the same session, later — after compaction or resume | `SessionStart` injects the notes; the per-turn line shows a count |
+| `agents` | `box` (required) | any agent working that box | none — workers poll by instruction |
+| `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count |
+| `record` | global | nobody; consultable history | never |
+
+Two MCP tools:
+
+| Tool | Purpose |
+|---|---|
+| `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
+| `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
+
+The user's own door, with no model in the loop:
+
+```text
+self-expression messages [--audience A] [--box B] [--ack] [--limit N]
+```
+
+Default audience is `user`; `--ack` collects (writing the human's own receipts), its
+absence peeks. Delivery is pull on every host; on Claude, hooks add two pull triggers —
+a per-turn unread-count line (config-gated by `messages.notify`) and a `SessionStart`
+injection of unread self notes on `compact`/`resume`, which is what makes a note to
+future-self genuinely survive compaction.
 
 &nbsp;
 

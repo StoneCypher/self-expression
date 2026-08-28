@@ -115,7 +115,7 @@ function runMessages(command: MessagesCommand): Promise<string> {
     const ack  = command.audience === 'user' && command.ack,
           rows = readMessages(store, { reader: 'user' }, {
             audience : command.audience,
-            box      : command.box === null ? undefined : command.box,
+            box      : command.box ?? undefined,
             ack,
             limit    : command.limit,
           });

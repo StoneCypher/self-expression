@@ -111,13 +111,13 @@ export function validateMessage(input: MessageInput): string[] {
       `(received ${String(input.text.length)}) — a longer message is a file, whose path is the message`);
   }
 
-  if (input.audience === 'agents' && (input.box === undefined || input.box.trim() === '')) {
+  if (input.audience === 'agents' && (input.box?.trim() ?? '') === '') {
     problems.push(
       "audience 'agents' requires a box — an unscoped agent message would be delivered " +
       'to every concurrent multi-agent job sharing the database');
   }
 
-  if (input.box !== undefined && input.box.trim() === '') {
+  if (input.box?.trim() === '') {
     problems.push('box must not be blank when supplied');
   }
 
@@ -435,7 +435,8 @@ export function formatMessages(rows: readonly Record<string, unknown>[]): string
   if (rows.length === 0) { return 'no messages.'; }
 
   return rows.map(row => {
-    const box = row['box'] === null || row['box'] === undefined ? '' : ` · box ${String(row['box'])}`;
+    const boxValue = row['box'],
+          box      = typeof boxValue === 'string' && boxValue !== '' ? ` · box ${boxValue}` : '';
     return `#${String(row['id'])} · ${String(row['ts_local'])} · ${String(row['audience'])}${box}` +
            ` · from ${String(row['session'])}: ${String(row['text'])}`;
   }).join('\n');

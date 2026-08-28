@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-47 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+59 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -22,46 +22,13 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:10:00 AM
+## [Untagged] - Aug 28, 2026 11:27:04 AM
 
-Commit [ba111ff8f161c9f678a3f3ac3f0f0d9bee65ad53](https://github.com/StoneCypher/self-expression/commit/ba111ff8f161c9f678a3f3ac3f0f0d9bee65ad53)
+Commit [29484e2ad36d069d9444658c3932f948cf649e92](https://github.com/StoneCypher/self-expression/commit/29484e2ad36d069d9444658c3932f948cf649e92)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat: public aggregation carries structured fields only, never free text (#31)
-  * Implements the 2026-08-27 structured-aggregation design spec: a single
-enforcement module, src/ts/channels/public_export.ts, whose PUBLIC_TREATMENTS
-table classifies every entries column exactly once as verbatim, coarsen, hash,
-derive, or excluded. The exporter builds its SELECT from that table — allowlist
-by construction, no SELECT * anywhere on the export path — and a totality test
-against ENTRIES_DDL fails the build if a future schema column is ever left
-unclassified.
-  * Treatments follow the spec exactly: closed vocabularies and safe scalars
-verbatim (model/host capped at 64 chars); ts_utc truncated to hour or day;
-lengths and token counts as pow2 buckets; small counters capped at 33+;
-host_version to its major; session/prompt_id/machine_id/agent_id/uuid/
-series_key and correction edges HMAC-SHA-256 under a fresh per-submission salt
-never persisted (corrects_id exports as the salted hash of the target row's
-uuid); local_period and local_dow derived from ts_local with no tz export;
-cctype validated against the closed conventional-commit list and face as
-exactly one emoji grapheme, else NULL; text, title, cwd, project, git_branch,
-tz, agent_type, context_emoji, permission_mode, turn_index, and all raw
-identifiers excluded.
-  * The share MCP tool (preview / export / status) wraps the module: preview
-renders the exporter's actual return value, so it cannot drift, and export
-refuses until a preview for the same options was rendered this session. Opt-in
-is default-off, exact-affirmative, and event-based via the #30 config registry
-(share.enabled, share.opted_in_utc, share.time_granularity): setting
-share.enabled true stamps the opt-in moment, opting out clears it, and only
-rows at or after the most recent moment are ever eligible — never retroactive.
-  * Tests cover the normative plan: DDL totality, the sentinel-prose stochastic
-suite (a marker planted in every open-string field never survives export,
-through the exporter and both tool verbs), linkage (fresh salts share nothing,
-equal inputs group within one export), coarsening properties, validator
-fuzzing, the opt-in gate, and preview identity. README and plugin-layout
-document the boundary and the honest claim: no free text, reduced linkage,
-coarsened time — nothing stronger.
-  * Closes #31
+  * chore: rebuild artifacts on the merged tree (build green, exit 0)
 
 
 
@@ -70,13 +37,47 @@ coarsened time — nothing stronger.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:07:33 AM
+## [Untagged] - Aug 28, 2026 11:26:51 AM
 
-Commit [f881ea60dffef3d3b861898aeb8cb9d71a4d41d9](https://github.com/StoneCypher/self-expression/commit/f881ea60dffef3d3b861898aeb8cb9d71a4d41d9)
+Commit [c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800](https://github.com/StoneCypher/self-expression/commit/c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [601b81f, 384486c]
+
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_voluntary-audio_44
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:25:17 AM
+
+Commit [db54ef9cc4453057d85c92bf104ba578e7b23b10](https://github.com/StoneCypher/self-expression/commit/db54ef9cc4453057d85c92bf104ba578e7b23b10)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [676e7ad, 384486c]
+
+  * chore: merge origin/main (#19 diagrams, #20 digest); union tool registrations, keep 60s stoch timeouts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:23:21 AM
+
+Commit [a34324c4ca73bb3983f19062c2cadccccd6cc564](https://github.com/StoneCypher/self-expression/commit/a34324c4ca73bb3983f19062c2cadccccd6cc564)
 
 Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
-  * deploy: 6e33f56ce749526a97daadda6a9c080f89ee9418
+  * deploy: 384486ce866b48bc68390bde01963c10a3a7ff7c
 
 
 
@@ -85,16 +86,13 @@ Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:06:29 AM
+## [Untagged] - Aug 28, 2026 11:22:33 AM
 
-Commit [6e33f56ce749526a97daadda6a9c080f89ee9418](https://github.com/StoneCypher/self-expression/commit/6e33f56ce749526a97daadda6a9c080f89ee9418)
+Commit [e6126629f4edd8c45dbc4aa1fa42f31776c7508c](https://github.com/StoneCypher/self-expression/commit/e6126629f4edd8c45dbc4aa1fa42f31776c7508c)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [9ae1f2c, ef56598]
-
-  * Merge pull request #67 from StoneCypher/feat_26-08-28_dwelling_45
-  * feat: the dwelling — a per-assistant keepsake database behind a single dwell tool
+  * wip: post-checkpoint test work rescued after agent hit session rate limit mid-write
 
 
 
@@ -103,19 +101,16 @@ Merges [9ae1f2c, ef56598]
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:05:35 AM
+## [Untagged] - Aug 28, 2026 11:22:15 AM
 
-Commit [3b098ad0856b404a564721616b1a7a06556f12b4](https://github.com/StoneCypher/self-expression/commit/3b098ad0856b404a564721616b1a7a06556f12b4)
+Commit [384486ce866b48bc68390bde01963c10a3a7ff7c](https://github.com/StoneCypher/self-expression/commit/384486ce866b48bc68390bde01963c10a3a7ff7c)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [0c06b73, 9ae1f2c]
+Merges [52dc11c, 1c6d59b]
 
-  * chore: merge origin/main (#7 png history) and rebuild
-  * Generated artifacts (README, CHANGELOG, coverage, dist, docs) taken from the
-rebuild; the entries test imports union the #7 history helpers with the #42
-forecastOutcomes helper. Full build green after merge.
-  * Refs #42
+  * Merge pull request #73 from StoneCypher/feat_26-08-28_compression_20
+  * feat: treat compression as the mechanic, not lists — digest core, profiles, render_digest, verifyDigest (#20)
 
 
 
@@ -124,17 +119,18 @@ forecastOutcomes helper. Full build green after merge.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:05:01 AM
+## [Untagged] - Aug 28, 2026 8:29:41 AM
 
-Commit [ef56598203ecce04a4a121786b17abdbccffffe6](https://github.com/StoneCypher/self-expression/commit/ef56598203ecce04a4a121786b17abdbccffffe6)
+Commit [1c6d59bd98965533bb0318f941c49677e1d8f5e3](https://github.com/StoneCypher/self-expression/commit/1c6d59bd98965533bb0318f941c49677e1d8f5e3)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: regenerate artifacts after the png-history merge; widen stochastic test timeouts
-  * The dwelling stochastic properties run against real SQLite files and share the
-machine with sibling builds; the 5 s default timeout measured the machine, not
-the invariant. Explicit 60 s timeouts and slightly fewer runs keep the
-properties intact.
+  * chore: rebuild after merging origin/main (diagrams #19, dwelling #45, channel extensions #42)
+  * Post-merge full build green (exit 0): tsc, eslint, unit and stochastic
+suites, typedoc, rollup, attw. Conflicts existed only in generated
+artifacts (dist, coverage, changelogs, README); all regenerated here by
+the green build. No source-file conflicts.
+  * Refs #20
 
 
 
@@ -143,42 +139,71 @@ properties intact.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:04:46 AM
+## [Untagged] - Aug 28, 2026 8:28:10 AM
 
-Commit [1ac1ea071d07b45ae312d44467b2d24869de554f](https://github.com/StoneCypher/self-expression/commit/1ac1ea071d07b45ae312d44467b2d24869de554f)
+Commit [5b357c4204cd3d058a481e9789e0bc9dbe977c76](https://github.com/StoneCypher/self-expression/commit/5b357c4204cd3d058a481e9789e0bc9dbe977c76)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat: diagrams as a distinct mechanic from charts
-  * Adds src/ts/diagrams/ — a sibling of charts with its own correctness
-contract (invariants plus a small golden canon, not byte-exact strings):
-  * - model.ts: Digraph model, normalizeGraph, grid-safety guard rejecting
-  double-width glyphs, combining marks, and newlines by name
-- grid.ts: character grid with box-drawing junction resolution (arm-mask
-  OR), framed-by-default rendering, no trailing whitespace ever
-- fsl.ts: FSL-subset parser, round-trip compatible with renderFsl;
-  everything outside the subset is a RangeError naming the subset
-- layout.ts: longest-path layering with DFS-marked back edges,
-  barycenter ordering, orthogonal routing; refusals name the fallback
-  menu (FSL one-liner, adjacency list, mermaid export); the legibility
-  threshold ships as the reviewable constant MAX_DIAGRAM_NODES = 20
-- renderers.ts: renderStateDiagram (Digraph or FSL source, active state
-  marked with a doubled label marker), renderDigraph, renderTree,
-  renderSequence
-- mermaid.ts: toMermaid (stateDiagram-v2 | flowchart), opt-in export only
-  * MCP: one grouped render_diagram tool (state | digraph | tree | sequence)
-in src/ts/mcp/diagram_tools.ts, registered in buildServer; form is a
-closed z.enum; per-form requirements checked at dispatch; renderer
-RangeErrors returned as error: text, never a protocol fault.
-  * Tests: invariant + golden unit specs, fast-check stochastic suites
-(junction-order closure, FSL round trip, random graphs render
-well-formed or refuse by name), MCP layer specs. Stryker mutate extended
-to diagrams' deterministic string files; layout.ts/renderers.ts excluded
-with the reason recorded in mutate_comment and plugin-layout.md.
-  * Docs: README Diagrams section (via base_README.md), plugin-layout.md
-tree and carve-out updates, visuals.md chart/timeline/diagram decision
-rule; package.json dts step copies dist/diagrams declarations.
-  * Closes #19
+Merges [f0d20db, 52dc11c]
+
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_compression_20
+  * # Conflicts:
+#       CHANGELOG.long.md
+#       CHANGELOG.md
+#       README.md
+#       coverage-stoch/coverage-final.json
+#       coverage-stoch/index.html
+#       coverage-stoch/ts/channels/config.ts.html
+#       coverage-stoch/ts/channels/context.ts.html
+#       coverage-stoch/ts/channels/entries.ts.html
+#       coverage-stoch/ts/channels/index.html
+#       coverage-stoch/ts/channels/paths.ts.html
+#       coverage-stoch/ts/channels/privacy.ts.html
+#       coverage-stoch/ts/channels/retention.ts.html
+#       coverage-stoch/ts/channels/schema.ts.html
+#       coverage-stoch/ts/channels/store.ts.html
+#       coverage-stoch/ts/channels/time.ts.html
+#       coverage-stoch/ts/channels/vocabulary.ts.html
+#       coverage-stoch/ts/charts/bars.ts.html
+#       coverage-stoch/ts/charts/checklist.ts.html
+#       coverage-stoch/ts/charts/glyphs.ts.html
+#       coverage-stoch/ts/charts/index.html
+#       coverage-stoch/ts/charts/index.ts.html
+#       coverage-stoch/ts/charts/markers.ts.html
+#       coverage-stoch/ts/charts/rows.ts.html
+#       coverage-stoch/ts/charts/scale.ts.html
+#       coverage-stoch/ts/charts/series.ts.html
+#       coverage-stoch/ts/charts/timeline.ts.html
+#       coverage-stoch/ts/charts/verify.ts.html
+#       coverage-stoch/ts/cli.ts.html
+#       coverage-stoch/ts/cli_commands.ts.html
+#       coverage-stoch/ts/index.html
+#       coverage-stoch/ts/index.ts.html
+#       coverage-stoch/ts/mcp/chart_tools.ts.html
+#       coverage-stoch/ts/mcp/checklist_tools.ts.html
+#       coverage-stoch/ts/mcp/hooks.ts.html
+#       coverage-stoch/ts/mcp/index.html
+#       coverage-stoch/ts/mcp/server.ts.html
+#       coverage-stoch/ts/mcp/tools.ts.html
+#       coverage-stoch/ts/raster/compose.ts.html
+#       coverage-stoch/ts/raster/encoder.ts.html
+#       coverage-stoch/ts/raster/font.ts.html
+#       coverage-stoch/ts/raster/index.html
+#       coverage-stoch/ts/raster/index.ts.html
+#       coverage-stoch/ts/raster/panels.ts.html
+#       coverage-stoch/ts/raster/surface.ts.html
+#       coverage-stoch/ts/stub.ts.html
+#       coverage-typedoc/coverage-typedoc.json
+#       dist/index.cjs
+#       dist/index.cjs.map
+#       dist/index.d.cts
+#       dist/index.iife.js
+#       dist/index.iife.js.map
+#       dist/index.mjs
+#       dist/index.mjs.map
+#       src/doc_md/CHANGELOG.long.md
+#       src/doc_md/CHANGELOG.md
 
 
 
@@ -187,61 +212,13 @@ rule; package.json dts step copies dist/diagrams declarations.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:01:21 AM
+## [Untagged] - Aug 28, 2026 8:26:30 AM
 
-Commit [0c06b73880256aef3e5c361a25f93858d33c615c](https://github.com/StoneCypher/self-expression/commit/0c06b73880256aef3e5c361a25f93858d33c615c)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [e8baf0b, 32c17a7]
-
-  * chore: merge origin/main (#30 config surface) and integrate
-  * Integrates the channel extensions with the #30 config registry:
-  * - forecast.enabled, salience.enabled, revision.enabled, gifts.enabled, and
-  roster.enabled register in CONFIG_KEYS with the spec defaults, so configure
-  set validates and canonicalizes them and configure list reports them.
-- enabledConfidenceGrounds and conventionFlags read through the tolerant
-  effective-value accessor (D5): an invalid stored override behaves as unset.
-- handleExpress keeps #30's ToolReply shape and format-version stamping, and
-  gains the #42 outcome-target check and the resolveBy/outcome/silence
-  arguments; the confidence enum narrows via enabledConfidenceGrounds.
-- time.hook (D9) composes with the conventions flags: suppressing the clock
-  keeps the flags segment leading the clockless line, since the flags are
-  config transport, not time presentation.
-- Generated artifacts (README, CHANGELOG, coverage, dist, docs) rebuilt.
-  * Refs #42
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:01:00 AM
-
-Commit [44b05f097361b2a5b85ede8216dbeb9d911133fa](https://github.com/StoneCypher/self-expression/commit/44b05f097361b2a5b85ede8216dbeb9d911133fa)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [6fa2263, 9ae1f2c]
-
-  * chore: merge origin/main (#7 png history); rebuild follows
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 7:59:40 AM
-
-Commit [b15114e3409c8d549723e02557fa43c007bd140c](https://github.com/StoneCypher/self-expression/commit/b15114e3409c8d549723e02557fa43c007bd140c)
+Commit [0b43f5d93b9d68df313063fab394568dd5d6d514](https://github.com/StoneCypher/self-expression/commit/0b43f5d93b9d68df313063fab394568dd5d6d514)
 
 Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
-  * deploy: 9ae1f2ce1feeca4913fe88a829faabaa4f271580
+  * deploy: 52dc11c05b0f94f58c056c6bda336fd9d2ed85b2
 
 
 
@@ -250,10 +227,27 @@ Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 7:58:52 AM
+## [Untagged] - Aug 28, 2026 8:26:22 AM
 
-Commit [6fa22633d365b1ab9ad94ffaa1b7ccfe150cdc8e](https://github.com/StoneCypher/self-expression/commit/6fa22633d365b1ab9ad94ffaa1b7ccfe150cdc8e)
+Commit [f0d20db767648f2876aaadd721c7966f66850547](https://github.com/StoneCypher/self-expression/commit/f0d20db767648f2876aaadd721c7966f66850547)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: regenerate artifacts after the config-surface merge
+  * feat: treat compression as the mechanic, not lists — digest core, profiles, render_digest, verifyDigest
+  * Full build green (exit 0): tsc, eslint, unit (745), stochastic (78 incl.
+the new six-invariant properties and the 500-run byte-identity oracle),
+typedoc, rollup, attw all pass. Regenerated artifacts (dist, README,
+changelogs, coverage) restored by the green build are included here.
+  * Implements src/superpowers/spec/2026-08-27-compression-mechanic-design.md:
+  * - charts/digest.ts: profile-independent renderDigest extracted from
+  checklist.ts, plus leadUnitIndex (lead-line argmax), overallBucket,
+  and nestDigest (nesting by digest substitution)
+- charts/profiles.ts: checklist/findings/options/diff/results as data
+- charts/checklist.ts: now the checklist-profile instantiation,
+  byte-identical output, existing suites unmodified as the gate
+- charts/verify.ts: verifyDigest generalizes the validator (noun-inferred
+  profile, checklist delegation, shared icon-section checks)
+- mcp/chart_tools.ts: render_digest tool beside render_checklist_summary
+- docs: markers.md profile bucket membership, skill summary-line pointer,
+  base_README Charts/Checklists sections
+  * Refs #20

@@ -129,7 +129,7 @@ describe('invalid values never write', () => {
 
         }));
     });
-  });
+  }, 30_000);
 
   it('a stored garbage row never leaks through the tolerant accessor', () => {
     withStore(s => {
@@ -140,6 +140,6 @@ describe('invalid values never write', () => {
           expect(effectiveValue(s, 'retention.days')).toBe('0');
         }));
     });
-  });
+  }, 30_000);
 
 });

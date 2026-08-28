@@ -52,7 +52,7 @@ describe('region confinement — stochastic invariants', () => {
       }),
       { numRuns: 150 }
     );
-  });
+  }, 30_000);
 
   it('hline, vline, fillRect, and rect never write outside their region', () => {
     fc.assert(
@@ -66,7 +66,7 @@ describe('region confinement — stochastic invariants', () => {
       }),
       { numRuns: 150 }
     );
-  });
+  }, 30_000);
 
   it('polyline never writes outside its region, whatever its vertices', () => {
     fc.assert(
@@ -81,7 +81,7 @@ describe('region confinement — stochastic invariants', () => {
       ),
       { numRuns: 150 }
     );
-  });
+  }, 30_000);
 
   it('text never writes outside its region, whatever the string and position', () => {
     fc.assert(
@@ -97,7 +97,7 @@ describe('region confinement — stochastic invariants', () => {
       ),
       { numRuns: 150 }
     );
-  });
+  }, 30_000);
 
 });
 

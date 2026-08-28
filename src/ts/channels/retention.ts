@@ -65,12 +65,14 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
 
   const entries     = store.db.prepare('DELETE FROM entries      WHERE ts_utc < ?').run(horizon),
         turnContext = store.db.prepare('DELETE FROM turn_context WHERE ts_utc < ?').run(horizon),
-        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon),
-        // Orphans only: a receipt of a surviving message must survive, or the message
-        // would be resurrected as unread; a receipt of a pruned message must go, or
-        // the append-only table would reference rows that no longer exist.
+        // Receipts of doomed messages go first — the foreign key would otherwise
+        // refuse the message delete. Orphanhood, not age, is the receipts' only
+        // criterion: a receipt of a surviving message must survive, or the message
+        // would be resurrected as unread.
         reads       = store.db.prepare(
-          'DELETE FROM message_reads WHERE message_id NOT IN (SELECT id FROM messages)').run();
+          'DELETE FROM message_reads WHERE message_id IN (SELECT id FROM messages WHERE ts_utc < ?)')
+          .run(horizon),
+        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon);
 
   return {
     entries      : Number(entries.changes),
