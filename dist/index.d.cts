@@ -1300,7 +1300,7 @@ declare function mergeLine(grid: CharGrid, x: number, y: number, mask: number): 
  * Merges a single directional stub arm into one cell — the attachment point where a
  * line meets a border it does not cross: `attach(grid, x, y, 'down')` on a box's
  * `─` bottom border yields `┬` without adding the `┼`-producing up arm a full
- * `vline` would.
+ * `drawVline` would.
  *
  * @example
  *   attach(grid, 6, 2, 'down');   // border '─' at (6,2) becomes '┬'
@@ -1313,17 +1313,17 @@ declare function attach(grid: CharGrid, x: number, y: number, direction: 'up' | 
  * anything already drawn. Endpoint order does not matter.
  *
  * @example
- *   hline(grid, 2, 8, 0);   // '───────' across row 0
+ *   drawHline(grid, 2, 8, 0);   // '───────' across row 0
  */
-declare function hline(grid: CharGrid, x1: number, x2: number, y: number): void;
+declare function drawHline(grid: CharGrid, x1: number, x2: number, y: number): void;
 /**
  * Draws a vertical line from (x, y1) to (x, y2) inclusive, merging junctions with
  * anything already drawn. Endpoint order does not matter.
  *
  * @example
- *   vline(grid, 4, 1, 5);   // '│' down column 4
+ *   drawVline(grid, 4, 1, 5);   // '│' down column 4
  */
-declare function vline(grid: CharGrid, x: number, y1: number, y2: number): void;
+declare function drawVline(grid: CharGrid, x: number, y1: number, y2: number): void;
 /**
  * Draws a rectangular box border with corners at (x, y) and (x+width-1, y+height-1),
  * merging with anything already drawn (two boxes sharing an edge resolve their
@@ -1789,5 +1789,505 @@ type MermaidDialect = 'stateDiagram-v2' | 'flowchart';
  */
 declare function toMermaid(graph: Digraph, dialect: MermaidDialect): string;
 
-export { BRAILLE, CANONICAL_ORDER, DEFAULT_DIAGRAM_WIDTH, DIAGRAM_FALLBACKS, EIGHTHS, FAILURE_MARKERS, MAX_DIAGRAM_NODES, OUTCOMES, SHADES, SUCCESS_MARKERS, TREND_DIRECTIONS, WEATHER_STATES, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, displayLabel, double, drawBox, drawPath, drawText, expandWaypoints, extractChecklistBlock, hline, layoutDigraph, makeGrid, mergeLine, normalizeGraph, parseFsl, parseSummaryCounts, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigraph, renderDiverging, renderFsl, renderGrid, renderLines, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, setCell, toMermaid, unhandled_external, usedExtent, verifyChecklist, vline };
-export type { BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, MermaidDialect, Milestone, MilestoneState, NodeBox, Outcome, RangeStyle, RenderGridOptions, RoutedEdge, SequenceMessage, SeriesScale, StateDiagramOptions, SummaryCounts, SummaryOptions, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };
+/**
+ * A zero-dependency PNG encoder: RGBA bytes in, a complete PNG file `Buffer` out.
+ *
+ * PNG is a signature, a few length-prefixed chunks each carrying a CRC32, and
+ * scanlines compressed with deflate — and Node supplies both non-trivial halves
+ * (`zlib.deflateSync` always, `zlib.crc32` since v22.2.0). Since `node:sqlite`
+ * already requires Node ≥ 22.5, any install that can open the store can encode a
+ * PNG, so no CRC table fallback is carried.
+ *
+ * Output is deliberately the simplest valid encoding: 8-bit truecolor+alpha
+ * (color type 6), filter type 0 (None) on every scanline, one `IDAT` chunk.
+ * Chart rasters are large runs of flat color, which deflate at its default level
+ * compresses well enough that smarter per-scanline filters are not worth their
+ * code.
+ *
+ * @see ./surface.js
+ * @see ./compose.js
+ * @see ../../superpowers/spec/2026-08-27-png-history-design.md
+ */
+/** The eight fixed bytes every PNG file starts with. */
+declare const PNG_SIGNATURE: Buffer;
+/**
+ * Encode raw RGBA pixels as a complete PNG file.
+ *
+ * `rgba` is row-major, four bytes per pixel (red, green, blue, alpha), top row
+ * first — exactly the layout `surface.ts` maintains — and must be exactly
+ * `4 * width * height` bytes long.
+ *
+ * @param width  image width in pixels; a positive integer
+ * @param height image height in pixels; a positive integer
+ * @param rgba   the pixel bytes, row-major RGBA, length exactly `4 * width * height`
+ * @returns the bytes of a valid PNG file, ready to write to disk
+ *
+ * @example
+ *   const rgba = new Uint8Array(4 * 2 * 2).fill(255);   // a 2×2 white square
+ *   const png  = encodePng(2, 2, rgba);
+ *   writeFileSync('white.png', png);
+ *
+ * @throws {RangeError} When `width` or `height` is not a positive integer, or when
+ *                      `rgba.length` is not `4 * width * height` — the message names
+ *                      the expected length.
+ *
+ * @see ./compose.js
+ */
+declare function encodePng(width: number, height: number, rgba: Uint8Array): Buffer;
+
+/**
+ * A vendored 5×7 bitmap font covering printable ASCII — pure data, no drawing.
+ *
+ * The PNG renderer has no font stack, so text comes from bit patterns: the same
+ * class of column-packed 5×7 font every oscilloscope and BIOS uses. Each glyph is
+ * five column bytes; in each byte, bit 0 is the top row and bit 6 the bottom, so
+ * `(column >> row) & 1` answers "is this pixel inked". Codes outside 32–126 have
+ * no pattern and render as blank space rather than throwing — a chart label must
+ * never be the reason a render fails.
+ *
+ * @see ./surface.js — `text()` blits these patterns onto a surface
+ * @see ../../superpowers/spec/2026-08-27-png-history-design.md
+ */
+/** Width of every glyph cell in pixels, excluding inter-glyph spacing. */
+declare const GLYPH_WIDTH = 5;
+/** Height of every glyph cell in pixels. */
+declare const GLYPH_HEIGHT = 7;
+/** Blank columns between adjacent glyphs. */
+declare const GLYPH_SPACING = 1;
+/** Character code of the first glyph in the table (space). */
+declare const FIRST_CODE = 32;
+/** Character code of the last glyph in the table (tilde). */
+declare const LAST_CODE = 126;
+/**
+ * Every printable-ASCII glyph's five column bytes, keyed by the character itself.
+ *
+ * @example
+ *   GLYPHS['A']  // => [0x7e, 0x11, 0x11, 0x11, 0x7e]
+ *   GLYPHS['€']  // => undefined — outside printable ASCII, drawn as blank
+ *
+ * @see glyphColumns
+ */
+declare const GLYPHS: Readonly<Record<string, readonly number[]>>;
+/**
+ * The column bytes for one character, or `null` when the character has no glyph.
+ *
+ * Exists beside {@link GLYPHS} so drawing code gets an explicit "no pattern" answer
+ * instead of an `undefined` property read.
+ *
+ * @example
+ *   glyphColumns('A')  // => [0x7e, 0x11, 0x11, 0x11, 0x7e]
+ *   glyphColumns('é')  // => null
+ */
+declare function glyphColumns(character: string): readonly number[] | null;
+/**
+ * The width in pixels a string occupies at scale 1: five columns per character
+ * plus one spacing column between adjacent characters. An empty string is 0 wide.
+ *
+ * Characters without a glyph still occupy a full cell — they render blank, but
+ * their neighbours must not shift.
+ *
+ * @example
+ *   measureText('')      // => 0
+ *   measureText('A')     // => 5
+ *   measureText('days')  // => 23
+ */
+declare function measureText(text: string): number;
+
+/**
+ * A minimal drawing surface over a flat RGBA array, plus the chart palette.
+ *
+ * Every operation draws through a {@link Region} — a translated, clipped window
+ * onto a surface — so panel code can be handed its own rectangle and physically
+ * cannot scribble on a neighbouring panel: out-of-region pixels are silently
+ * skipped rather than clamped onto the edge or thrown over. Pure throughout — no
+ * I/O, no clock, no randomness — so every operation is directly assertable
+ * pixel-by-pixel.
+ *
+ * Colors are opaque and overwrite; there is no blending and no anti-aliasing,
+ * which is what keeps 2× upscaling crisp.
+ *
+ * @see ./font.js
+ * @see ./panels.js
+ * @see ./encoder.js
+ */
+/** One color as red, green, blue, alpha bytes (0–255 each). */
+type Rgba = readonly [number, number, number, number];
+/** A pixel buffer: `data` is row-major RGBA, `4 * width * height` bytes. */
+interface Surface {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array;
+}
+/**
+ * A translated, clipped drawing window onto a surface. All drawing coordinates
+ * are relative to the region's own top-left corner.
+ */
+interface Region {
+    readonly surface: Surface;
+    /** The region's left edge, in surface coordinates. */
+    readonly x: number;
+    /** The region's top edge, in surface coordinates. */
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+}
+/** Background. */
+declare const WHITE: Rgba;
+/** Ink for frames, axes, and text. */
+declare const INK: Rgba;
+/** Neutral grey for null / steady / unknown categories. */
+declare const GREY: Rgba;
+/** Light grey for background bars and gridlines. */
+declare const LIGHT_GREY: Rgba;
+/** Okabe–Ito orange. */
+declare const ORANGE: Rgba;
+/** Okabe–Ito sky blue. */
+declare const SKY: Rgba;
+/** Okabe–Ito bluish green. */
+declare const GREEN: Rgba;
+/** Okabe–Ito yellow. */
+declare const YELLOW: Rgba;
+/** Okabe–Ito blue. */
+declare const BLUE: Rgba;
+/** Okabe–Ito vermillion. */
+declare const VERMILLION: Rgba;
+/** Okabe–Ito reddish purple. */
+declare const PURPLE: Rgba;
+/**
+ * Allocate a surface filled with one color.
+ *
+ * @param width  surface width in pixels; a positive integer
+ * @param height surface height in pixels; a positive integer
+ * @param fill   the color every pixel starts as
+ *
+ * @example
+ *   const s = makeSurface(960, 720, WHITE);
+ *
+ * @throws {RangeError} When `width` or `height` is not a positive integer.
+ */
+declare function makeSurface(width: number, height: number, fill: Rgba): Surface;
+/**
+ * The region covering an entire surface.
+ *
+ * @example
+ *   const everywhere = fullRegion(makeSurface(4, 4, WHITE));
+ */
+declare function fullRegion(surface: Surface): Region;
+/**
+ * A translated sub-window of an existing region, clipped so it can never extend
+ * past its parent — the mechanism by which a panel is confined to its rectangle.
+ *
+ * A sub-region requested wholly outside the parent degenerates to zero size
+ * rather than erroring; drawing into it is then a no-op.
+ *
+ * @param region the parent window
+ * @param x      the sub-window's left edge, relative to the parent
+ * @param y      the sub-window's top edge, relative to the parent
+ *
+ * @example
+ *   const panel = subRegion(fullRegion(s), 8, 8, 592, 336);
+ */
+declare function subRegion(region: Region, x: number, y: number, width: number, height: number): Region;
+/**
+ * Set one pixel, region-relative. Coordinates outside the region are silently
+ * skipped — clipping, not clamping, so a stray coordinate never smears the edge.
+ *
+ * @example
+ *   pixel(fullRegion(s), 0, 0, INK);
+ */
+declare function pixel(region: Region, x: number, y: number, color: Rgba): void;
+/**
+ * Horizontal run of pixels starting at (`x`, `y`), `length` wide.
+ *
+ * @example
+ *   hline(region, 0, 10, 50, INK);
+ */
+declare function hline(region: Region, x: number, y: number, length: number, color: Rgba): void;
+/**
+ * Vertical run of pixels starting at (`x`, `y`), `length` tall.
+ *
+ * @example
+ *   vline(region, 10, 0, 50, INK);
+ */
+declare function vline(region: Region, x: number, y: number, length: number, color: Rgba): void;
+/**
+ * Solid filled rectangle with its top-left at (`x`, `y`).
+ *
+ * @example
+ *   fillRect(region, 2, 2, 4, 4, BLUE);
+ */
+declare function fillRect(region: Region, x: number, y: number, width: number, height: number, color: Rgba): void;
+/**
+ * One-pixel rectangle outline with its top-left at (`x`, `y`) — the panel frame.
+ *
+ * @example
+ *   rect(region, 0, 0, region.width, region.height, INK);
+ */
+declare function rect(region: Region, x: number, y: number, width: number, height: number, color: Rgba): void;
+/**
+ * Connected line segments through `points`, drawn with Bresenham's algorithm.
+ * A single point draws one pixel; an empty list draws nothing.
+ *
+ * @param points region-relative `[x, y]` vertices, in drawing order
+ *
+ * @example
+ *   polyline(region, [[0, 10], [5, 2], [10, 8]], BLUE);
+ */
+declare function polyline(region: Region, points: readonly (readonly [number, number])[], color: Rgba): void;
+/**
+ * Blit a string using the 5×7 bitmap font, top-left at (`x`, `y`), each font
+ * pixel drawn as a `scale`×`scale` block. Characters without a glyph occupy a
+ * blank cell, so mixed text never shifts alignment.
+ *
+ * @param scale integer magnification; 1 for small labels, 2 for titles
+ *
+ * @example
+ *   text(region, 4, 4, 'stems by hour', INK, 1);
+ *
+ * @see ./font.js
+ */
+declare function text(region: Region, x: number, y: number, content: string, color: Rgba, scale?: number): void;
+/**
+ * Nearest-neighbour integer upscale of a whole surface — how the logical
+ * 960×720 dashboard becomes the crisp 1920×1440 physical raster without any
+ * anti-aliasing.
+ *
+ * @param factor integer magnification, at least 1; 1 returns a copy
+ *
+ * @example
+ *   const big = upscale(s, 2);   // 960×720 -> 1920×1440
+ *
+ * @throws {RangeError} When `factor` is not a positive integer.
+ */
+declare function upscale(surface: Surface, factor: number): Surface;
+/**
+ * Read one pixel back, region-relative — the assertion primitive the pixel tests
+ * are written against. Out-of-region reads return `null`.
+ *
+ * @example
+ *   readPixel(region, 0, 0)  // => [255, 255, 255, 255]
+ */
+declare function readPixel(region: Region, x: number, y: number): Rgba | null;
+
+/**
+ * The five dashboard panels, one pure function each: typed row arrays in, pixels
+ * onto a surface region out.
+ *
+ * All layout arithmetic — scales, bucket placement, rolling means — lives here so
+ * it is directly testable without touching the store or the encoder. Every panel
+ * draws its frame and title even when it has nothing to plot, rendering the text
+ * `no data in range` instead of omitting itself: a missing panel looks like a
+ * bug, while an empty one is an answer.
+ *
+ * Category values (`stem`, `delta`) are accepted as plain strings and colored
+ * from local maps, with anything unrecognised falling into grey. This keeps the
+ * raster layer decoupled from the store's vocabulary module (mirroring how
+ * `chart_tools.ts` keeps its own literal tuples) and means a future vocabulary
+ * addition degrades to a grey dot rather than a crash.
+ *
+ * @see ./surface.js
+ * @see ./compose.js
+ * @see ../channels/entries.js — the query helpers producing these row shapes
+ * @see ../../superpowers/spec/2026-08-27-png-history-design.md
+ */
+
+/** One signature entry, as the punch/delta/uncertainty panels consume it. */
+interface SignatureRow {
+    /** Insertion order — the delta lane's x-axis. */
+    readonly id: number;
+    /** ISO 8601 UTC timestamp; the day-bucketing key. */
+    readonly tsUtc: string;
+    /** Local hour 0–23 parsed from the stored local time, or `null` when unparseable. */
+    readonly hourLocal: number | null;
+    /** The affect stem, or `null` when none was recorded. */
+    readonly stem: string | null;
+    /** Direction since the previous signature, or `null` on a session's first. */
+    readonly delta: string | null;
+    /** Whether the signature was marked uncertain. */
+    readonly uncertain: boolean;
+    /** Project name, or `null` when unrecorded (e.g. privacy off). */
+    readonly project: string | null;
+}
+/** One ISO week's turn and need counts, as the need-rate panel consumes them. */
+interface NeedWeekRow {
+    /** ISO week label, e.g. `2026-W35`. */
+    readonly week: string;
+    /** Distinct prompts that produced a signature that week. */
+    readonly turns: number;
+    /** `need` rows recorded that week. */
+    readonly needs: number;
+}
+/** One checklist series' percent history, as the checklist panel consumes it. */
+interface ChecklistSeriesRow {
+    /** The stable series identity (#27), drawn as the line's label. */
+    readonly seriesKey: string;
+    /** Percent snapshots in recording order, each 0–100. */
+    readonly percents: readonly number[];
+}
+/** Stems in vocabulary order, each with its Okabe–Ito color; unknown/null falls to grey. */
+declare const STEM_COLORS: readonly (readonly [string, Rgba])[];
+/** The delta lane's coloring: up blue, down vermillion, steady (and anything else) grey. */
+declare function deltaColor(delta: string | null): Rgba;
+/** The color for one stem value — the {@link STEM_COLORS} lookup plus the grey fallback. */
+declare function stemColor(stem: string | null): Rgba;
+/**
+ * Which day column a timestamp lands in, for a window of `days` calendar days
+ * (UTC) ending on `endUtc`'s day. Column 0 is the oldest day; the newest day is
+ * `days - 1`; timestamps outside the window return `null`.
+ *
+ * @param tsUtc  the row's ISO UTC timestamp
+ * @param endUtc the window's inclusive end instant, ISO UTC
+ * @param days   window length in calendar days; a positive integer
+ *
+ * @example
+ *   dayColumn('2026-08-27T04:00:00Z', '2026-08-27T21:00:00Z', 7)  // => 6
+ *   dayColumn('2026-08-20T04:00:00Z', '2026-08-27T21:00:00Z', 7)  // => null — 8 days back
+ */
+declare function dayColumn(tsUtc: string, endUtc: string, days: number): number | null;
+/**
+ * Rolling mean of the last `window` values at each position — the delta lane's
+ * drift line. Position `i` averages values `max(0, i - window + 1) .. i`, so the
+ * line exists from the first entry instead of starting `window` entries in.
+ *
+ * @example
+ *   rollingMean([1, 1, -1, -1], 2)  // => [1, 1, 0, -1]
+ */
+declare function rollingMean(values: readonly number[], window: number): number[];
+/**
+ * Panel A — the stem punch-strip: x is the calendar day across the queried
+ * range, y is the local hour 0–23, one 2×2 dot per signature colored by stem
+ * (grey for null). A legend along the bottom lists the stems in vocabulary
+ * order. Rows with an unparseable local hour are skipped rather than guessed.
+ *
+ * @param rows   the signatures in range
+ * @param days   the window length in calendar days; a positive integer
+ * @param endUtc the window's end instant, ISO UTC
+ *
+ * @example
+ *   drawStemPunch(panelRegion, signatureHistory(store, since), 90, nowIso);
+ *
+ * @see dayColumn
+ */
+declare function drawStemPunch(region: Region, rows: readonly SignatureRow[], days: number, endUtc: string): void;
+/** The rolling-mean window, in signatures, the delta lane's drift line averages over. */
+declare const DELTA_WINDOW = 20;
+/**
+ * Panel B — the delta lane: signatures in `id` order as thin columns colored
+ * up=blue / down=vermillion / steady=grey, with the rolling mean of (+1/−1/0)
+ * over a {@link DELTA_WINDOW}-entry window drawn as an ink polyline on top.
+ * Oscillation reads as dense color churn under a flat line; real drift reads as
+ * the line leaving the zero midline.
+ *
+ * @example
+ *   drawDeltaLane(panelRegion, signatureHistory(store, since));
+ *
+ * @see rollingMean
+ */
+declare function drawDeltaLane(region: Region, rows: readonly SignatureRow[]): void;
+/**
+ * Panel C — daily uncertainty: for each calendar day in range, the proportion of
+ * signatures with `uncertain` set, as a vermillion bar rising from the baseline.
+ * Shares panel A's day axis so spikes can be eyeballed against what was
+ * happening that day.
+ *
+ * @example
+ *   drawUncertainStrip(panelRegion, signatureHistory(store, since), 90, nowIso);
+ */
+declare function drawUncertainStrip(region: Region, rows: readonly SignatureRow[], days: number, endUtc: string): void;
+/**
+ * Panel D — weekly need rate: per ISO week, turns as a grey bar, `need` rows as
+ * a narrower orange bar overlaid, and the need-per-turn proportion as a blue
+ * polyline on an implicit right-hand 0–100% scale. Answers "how often is `need`
+ * non-null, and is that changing".
+ *
+ * @example
+ *   drawNeedRate(panelRegion, needWeekly(store, since));
+ */
+declare function drawNeedRate(region: Region, weeks: readonly NeedWeekRow[]): void;
+/** The line colors the checklist panel cycles through, one per series. */
+declare const SERIES_COLORS: readonly Rgba[];
+/**
+ * Panel E — checklist series: `percent` versus recording order, one polyline per
+ * series, labeled with its stable `series_key`. The y axis is fixed 0–100 so
+ * charts are comparable across renders, matching the absolute-scale rule the
+ * ASCII sparklines follow.
+ *
+ * @example
+ *   drawChecklistSeries(panelRegion, checklistSeriesTop(store, since, 5));
+ */
+declare function drawChecklistSeries(region: Region, series: readonly ChecklistSeriesRow[]): void;
+
+/**
+ * Dashboard composition: lay the five panels out on one surface and encode it.
+ *
+ * `renderHistoryPng` is the whole raster pipeline short of the file write: it
+ * allocates the surface, hands each panel its own clipped region, upscales, and
+ * returns the encoded PNG `Buffer`. Its only inputs are query results and
+ * options — it never touches the store, the clock, or the filesystem, so a test
+ * can drive it entirely from fixtures. The single impure step (resolving the
+ * output path and writing the file) lives in the invocation layer
+ * (`mcp/chart_tools.ts`), not here.
+ *
+ * @see ./panels.js
+ * @see ./encoder.js
+ * @see ../mcp/chart_tools.js
+ * @see ../../superpowers/spec/2026-08-27-png-history-design.md
+ */
+
+/** The charts a render can produce: the five-panel dashboard, or one panel alone at full size. */
+declare const HISTORY_CHARTS: readonly ["dashboard", "stems", "delta", "uncertain", "need", "checklist"];
+/** One of {@link HISTORY_CHARTS}. */
+type HistoryChart = typeof HISTORY_CHARTS[number];
+/** Everything the renderer needs, already queried — no store access from here down. */
+interface HistoryData {
+    /** Signatures in range, `id` order — panels A, B, and C. */
+    readonly signatures: readonly SignatureRow[];
+    /** Weekly turn/need counts — panel D. */
+    readonly needWeeks: readonly NeedWeekRow[];
+    /** Top checklist series' percent histories — panel E. */
+    readonly checklistSeries: readonly ChecklistSeriesRow[];
+    /** The window length in calendar days; a positive integer. */
+    readonly days: number;
+    /** The window's end instant, ISO 8601 UTC — normally the render time. */
+    readonly endUtc: string;
+}
+/** Rendering choices; both fields optional with dashboard/2× defaults. */
+interface RenderOptions {
+    /** Which chart to draw; defaults to `'dashboard'`. */
+    readonly chart?: HistoryChart | undefined;
+    /** Integer output magnification, 1 or 2; defaults to 2 (1920×1440 physical). */
+    readonly scale?: 1 | 2 | undefined;
+}
+/** Logical dashboard width in pixels, before scaling. */
+declare const LOGICAL_WIDTH = 960;
+/** Logical dashboard height in pixels, before scaling. */
+declare const LOGICAL_HEIGHT = 720;
+/**
+ * Render the history dashboard (or one panel alone) as a complete PNG.
+ *
+ * The dashboard is 960×720 logical pixels — panel A top-left, B top-right, C
+ * (sharing A's day axis) below A, E below C, D filling the right column — drawn
+ * with hard pixels and then integer-upscaled by `scale`, so the default output
+ * is a crisp 1920×1440 with no anti-aliasing. A single-chart option renders that
+ * panel alone at the full logical size.
+ *
+ * @param data    the queried rows plus the day window they cover
+ * @param options chart selection and output scale
+ * @returns the encoded PNG bytes, ready to write to disk
+ *
+ * @example
+ *   const png = renderHistoryPng({
+ *     signatures: [], needWeeks: [], checklistSeries: [],
+ *     days: 90, endUtc: '2026-08-27T21:15:04Z',
+ *   });
+ *   // => a 1920×1440 PNG of five framed panels, each reading 'no data in range'
+ *
+ * @throws {RangeError} When `data.days` is not a positive integer.
+ *
+ * @see drawPanel
+ * @see ./encoder.js
+ */
+declare function renderHistoryPng(data: HistoryData, options?: RenderOptions): Buffer;
+
+export { BLUE, BRAILLE, CANONICAL_ORDER, DEFAULT_DIAGRAM_WIDTH, DELTA_WINDOW, DIAGRAM_FALLBACKS, EIGHTHS, FAILURE_MARKERS, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_DIAGRAM_NODES, ORANGE, OUTCOMES, PNG_SIGNATURE, PURPLE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, layoutDigraph, makeGrid, makeSurface, measureText, mergeLine, normalizeGraph, parseFsl, parseSummaryCounts, pixel, polyline, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, vline };
+export type { BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, HistoryChart, HistoryData, MermaidDialect, Milestone, MilestoneState, NeedWeekRow, NodeBox, Outcome, RangeStyle, Region, RenderGridOptions, RenderOptions, Rgba, RoutedEdge, SequenceMessage, SeriesScale, SignatureRow, StateDiagramOptions, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };

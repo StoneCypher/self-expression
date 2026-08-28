@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import { makeGrid, hline, vline, renderLines, renderGrid, drawBox } from '../diagrams/grid.js';
+import { makeGrid, drawHline, drawVline, renderLines, renderGrid, drawBox } from '../diagrams/grid.js';
 import type { CharGrid } from '../diagrams/grid.js';
 
 const SIZE = 12;
@@ -25,8 +25,8 @@ const segmentArb: fc.Arbitrary<Segment> = fc.record({
 });
 
 function draw(grid: CharGrid, seg: Segment): void {
-  if (seg.horizontal) { hline(grid, seg.a, seg.b, seg.at); }
-  else { vline(grid, seg.at, seg.a, seg.b); }
+  if (seg.horizontal) { drawHline(grid, seg.a, seg.b, seg.at); }
+  else { drawVline(grid, seg.at, seg.a, seg.b); }
 }
 
 function drawnAll(segments: readonly Segment[]): string[] {

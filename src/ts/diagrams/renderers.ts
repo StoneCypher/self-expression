@@ -19,7 +19,7 @@
  */
 
 import {
-  makeGrid, drawBox, drawText, drawPath, expandWaypoints, renderGrid, renderLines, vline, attach,
+  makeGrid, drawBox, drawText, drawPath, expandWaypoints, renderGrid, renderLines, drawVline, attach,
 } from './grid.js';
 import type { CharGrid }   from './grid.js';
 import { layoutDigraph, MAX_DIAGRAM_NODES, DIAGRAM_FALLBACKS } from './layout.js';
@@ -484,7 +484,7 @@ export function renderSequence(
   // The lifeline attaches to the box's bottom border as a ┬ and runs to the bottom.
   for (const x of lifeX) {
     attach(grid, x, 2, 'down');
-    vline(grid, x, 3, height - 1);
+    drawVline(grid, x, 3, height - 1);
   }
 
   for (const item of placed) {

@@ -76,7 +76,7 @@ export declare function mergeLine(grid: CharGrid, x: number, y: number, mask: nu
  * Merges a single directional stub arm into one cell — the attachment point where a
  * line meets a border it does not cross: `attach(grid, x, y, 'down')` on a box's
  * `─` bottom border yields `┬` without adding the `┼`-producing up arm a full
- * `vline` would.
+ * `drawVline` would.
  *
  * @example
  *   attach(grid, 6, 2, 'down');   // border '─' at (6,2) becomes '┬'
@@ -89,17 +89,17 @@ export declare function attach(grid: CharGrid, x: number, y: number, direction: 
  * anything already drawn. Endpoint order does not matter.
  *
  * @example
- *   hline(grid, 2, 8, 0);   // '───────' across row 0
+ *   drawHline(grid, 2, 8, 0);   // '───────' across row 0
  */
-export declare function hline(grid: CharGrid, x1: number, x2: number, y: number): void;
+export declare function drawHline(grid: CharGrid, x1: number, x2: number, y: number): void;
 /**
  * Draws a vertical line from (x, y1) to (x, y2) inclusive, merging junctions with
  * anything already drawn. Endpoint order does not matter.
  *
  * @example
- *   vline(grid, 4, 1, 5);   // '│' down column 4
+ *   drawVline(grid, 4, 1, 5);   // '│' down column 4
  */
-export declare function vline(grid: CharGrid, x: number, y1: number, y2: number): void;
+export declare function drawVline(grid: CharGrid, x: number, y1: number, y2: number): void;
 /**
  * Draws a rectangular box border with corners at (x, y) and (x+width-1, y+height-1),
  * merging with anything already drawn (two boxes sharing an edge resolve their

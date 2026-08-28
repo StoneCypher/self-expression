@@ -25,7 +25,8 @@
     "src/ts/diagrams/model.ts",
     "src/ts/diagrams/fsl.ts",
     "src/ts/diagrams/grid.ts",
-    "src/ts/diagrams/mermaid.ts"
+    "src/ts/diagrams/mermaid.ts",
+    "src/ts/raster/**/*.ts"
   ],
   "coverageAnalysis": "perTest"
 }

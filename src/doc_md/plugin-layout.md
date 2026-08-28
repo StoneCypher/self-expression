@@ -50,6 +50,7 @@ self-expression/
 │   ├── channels/            backchannel capture and storage
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
 │   ├── diagrams/            pure ASCII diagram renderers — structure (invariant contract)
+│   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)
 │   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
@@ -95,6 +96,18 @@ only way to satisfy the hook is to produce content — then every response with 
 still produces a well-formed entry, and the log fills with fluent noise indistinguishable from
 signal. The obligation is safe exactly to the degree that silence is expressible.
 
+**Configuration is two layers, and the registry is code (issue #30).** `SELF_EXPRESSION_HOME`
+locates the database and does nothing else; every other choice is a `config` row, else the
+code default. The keys live in one declarative registry (`src/ts/channels/config.ts`) with
+their kinds, defaults, and validators, consumed by the `configure` tool: writers are strict
+(an invalid `set` is rejected naming what would have been accepted, and nothing is written;
+an unknown key is stored with a stated warning, because a newer version may legitimately
+have written it), while readers are tolerant (a stored value that fails validation behaves
+as unset, so a hand-edited database can never wedge the gates). `unset` returns a key to
+tracking the code default, and `list` reports the effective configuration rather than just
+the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
+server startup — it never archives, and never touches `meta` or `config`.
+
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
 there is no sharing to be had, so Claude is pointed at `claude-commands/` and Gemini keeps
@@ -131,10 +144,17 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
 - **Mutation testing is kept, deliberately.** Unlike the Playwright suite, Stryker earns its
   place here: the ASCII renderers are pure functions emitting exact strings across dense
   threshold bands, which is the case mutation testing is actually for. It stays opt-in
-  (`ci.stryker: false`), and `mutate` covers `src/ts/charts/**/*.ts` plus the deterministic
-  string logic of diagrams (`diagrams/model.ts`, `diagrams/fsl.ts`, `diagrams/grid.ts`,
-  `diagrams/mermaid.ts`). `diagrams/layout.ts` and `diagrams/renderers.ts` are deliberately
-  excluded: layout heuristics (barycenter ordering, slot spreading, gutter arithmetic) would
-  generate surviving-mutant noise without indicating missing tests — the diagram contract is
+  (`ci.stryker: false`), and `mutate` covers `src/ts/charts/**/*.ts` and
+  `src/ts/raster/**/*.ts` (the exact-byte PNG encoder and its threshold-heavy layout
+  arithmetic are the same sweet spot), plus the deterministic string logic of diagrams
+  (`diagrams/model.ts`, `diagrams/fsl.ts`, `diagrams/grid.ts`, `diagrams/mermaid.ts`).
+  `diagrams/layout.ts` and `diagrams/renderers.ts` are deliberately excluded: layout
+  heuristics (barycenter ordering, slot spreading, gutter arithmetic) would generate
+  surviving-mutant noise without indicating missing tests — the diagram contract is
   invariants plus a few goldens, not byte-exact strings everywhere. The exclusion and its
   reason are also recorded in `stryker.config.json`'s `mutate_comment`.
+- **The PNG history renderer is now implemented (issue #7).** `src/ts/raster/` carries the
+  zero-dependency encoder, 5×7 bitmap font, drawing surface, and five-panel dashboard;
+  `render_history_png` in `src/ts/mcp/chart_tools.ts` and the `self-expression render`
+  subcommand write the file and return the path — never image content over MCP. See the
+  README's History PNG section and `src/superpowers/spec/2026-08-27-png-history-design.md`.

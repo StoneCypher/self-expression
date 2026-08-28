@@ -153,7 +153,7 @@ export function mergeLine(grid: CharGrid, x: number, y: number, mask: number): v
  * Merges a single directional stub arm into one cell — the attachment point where a
  * line meets a border it does not cross: `attach(grid, x, y, 'down')` on a box's
  * `─` bottom border yields `┬` without adding the `┼`-producing up arm a full
- * `vline` would.
+ * `drawVline` would.
  *
  * @example
  *   attach(grid, 6, 2, 'down');   // border '─' at (6,2) becomes '┬'
@@ -178,9 +178,9 @@ function span(a: number, b: number): [number, number] {
  * anything already drawn. Endpoint order does not matter.
  *
  * @example
- *   hline(grid, 2, 8, 0);   // '───────' across row 0
+ *   drawHline(grid, 2, 8, 0);   // '───────' across row 0
  */
-export function hline(grid: CharGrid, x1: number, x2: number, y: number): void {
+export function drawHline(grid: CharGrid, x1: number, x2: number, y: number): void {
   const [lo, hi] = span(x1, x2);
   for (let x = lo; x <= hi; x++) { mergeLine(grid, x, y, ARM_LEFT | ARM_RIGHT); }
 }
@@ -190,9 +190,9 @@ export function hline(grid: CharGrid, x1: number, x2: number, y: number): void {
  * anything already drawn. Endpoint order does not matter.
  *
  * @example
- *   vline(grid, 4, 1, 5);   // '│' down column 4
+ *   drawVline(grid, 4, 1, 5);   // '│' down column 4
  */
-export function vline(grid: CharGrid, x: number, y1: number, y2: number): void {
+export function drawVline(grid: CharGrid, x: number, y1: number, y2: number): void {
   const [lo, hi] = span(y1, y2);
   for (let y = lo; y <= hi; y++) { mergeLine(grid, x, y, ARM_UP | ARM_DOWN); }
 }
@@ -220,10 +220,10 @@ export function drawBox(grid: CharGrid, x: number, y: number, width: number, hei
       `drawBox needs width and height of at least 2; received ${String(width)}×${String(height)}`
     );
   }
-  hline(grid, x + 1, x + width - 2, y);
-  hline(grid, x + 1, x + width - 2, y + height - 1);
-  vline(grid, x, y + 1, y + height - 2);
-  vline(grid, x + width - 1, y + 1, y + height - 2);
+  drawHline(grid, x + 1, x + width - 2, y);
+  drawHline(grid, x + 1, x + width - 2, y + height - 1);
+  drawVline(grid, x, y + 1, y + height - 2);
+  drawVline(grid, x + width - 1, y + 1, y + height - 2);
   mergeLine(grid, x, y, ARM_RIGHT | ARM_DOWN);
   mergeLine(grid, x + width - 1, y, ARM_LEFT | ARM_DOWN);
   mergeLine(grid, x, y + height - 1, ARM_UP | ARM_RIGHT);

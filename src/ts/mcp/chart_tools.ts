@@ -1,6 +1,8 @@
 /**
- * The MCP chart-rendering tool surface: six tools, grouped by data shape, wrapping the
- * pure renderers in `../charts/index.js`.
+ * The MCP chart-rendering tool surface: six ASCII tools, grouped by data shape,
+ * wrapping the pure renderers in `../charts/index.js` — plus `render_history_png`,
+ * which wraps the raster dashboard in `../raster/` and carries this module's one
+ * impure step (the PNG file write; see {@link renderHistoryToFile}).
  *
  * Each tool takes a `form` field naming which of its renderers to use — a closed
  * `z.enum` built from a local `const` array via {@link tuple}, so a misspelled form is
@@ -27,6 +29,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z }         from 'zod';
 
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve }   from 'node:path';
+
 import {
   renderSparkline, renderBraille, renderWinLoss,
   renderProgressBar, renderBullet, renderDiverging, renderStacked, renderRange, renderBoxWhisker,
@@ -40,8 +45,12 @@ import type {
   ComparisonRow, TileCell, FslTransition, ChecklistItem, Milestone,
   Outcome, RangeStyle, TileFill, TrendDirection, WeatherState, Bucket,
 } from '../charts/index.js';
-import { seriesPercents } from '../channels/entries.js';
+import {
+  checklistSeriesTop, needWeekly, seriesPercents, signatureHistory,
+} from '../channels/entries.js';
 import type { Store } from '../channels/store.js';
+import { HISTORY_CHARTS, renderHistoryPng } from '../raster/compose.js';
+import type { HistoryChart } from '../raster/compose.js';
 
 /**
  * A non-empty tuple, which is what `z.enum` requires, preserving the literal types.
@@ -898,11 +907,182 @@ export function handleRenderChecklistSummary(store: Store, args: ChecklistSummar
 }
 
 // ---------------------------------------------------------------------------------
+// render_history_png — the write-the-file-then-read-it PNG dashboard
+// ---------------------------------------------------------------------------------
+
+/** The raw zod shape backing `render_history_png`'s `inputSchema`. */
+const HISTORY_PNG_SHAPE = {
+  days: z.number().int().positive().optional().describe(
+    'how many days of history to render, counted back from now; a positive integer, ' +
+    'defaults to 90'),
+  chart: z.enum(tuple(HISTORY_CHARTS)).optional().describe(
+    "which chart to render: 'dashboard' (default; all five panels) or one of 'stems', " +
+    "'delta', 'uncertain', 'need', 'checklist' to render that panel alone at full size"),
+  project: z.string().optional().describe(
+    'optional: restrict the signature panels to entries recorded under this project name'),
+  seriesKey: z.string().optional().describe(
+    'optional: restrict the checklist panel to this one series key'),
+  scale: z.union([z.literal(1), z.literal(2)]).optional().describe(
+    'output magnification: 1 (960×720) or 2 (default; 1920×1440, crisper text)'),
+  out: z.string().optional().describe(
+    "optional: exact output file path, overriding the default " +
+    "<dataDir>/renders/history_<utc>.png beside the database"),
+};
+
+/**
+ * What a caller supplies to `render_history_png`, after schema validation.
+ *
+ * Hand-written for the same `isolatedDeclarations` reason as {@link SeriesArgs};
+ * kept honest against {@link HISTORY_PNG_SHAPE} the same way, at the
+ * `handleRenderHistoryPng` call site.
+ */
+export interface HistoryPngArgs {
+  days?: number | undefined;
+  chart?: HistoryChart | undefined;
+  project?: string | undefined;
+  seriesKey?: string | undefined;
+  scale?: 1 | 2 | undefined;
+  out?: string | undefined;
+}
+
+// Fails to compile if HistoryPngArgs drifts from HISTORY_PNG_SHAPE — see expectType's docblock.
+expectType<Equal<HistoryPngArgs, z.infer<z.ZodObject<typeof HISTORY_PNG_SHAPE>>>>(true);
+
+/** What one render produced: where the PNG landed, and how much data fed it. */
+export interface HistoryRenderResult {
+  /** Absolute path of the written PNG. */
+  readonly path            : string;
+  /** Signatures that fed panels A–C. */
+  readonly signatureCount  : number;
+  /** ISO weeks that fed panel D. */
+  readonly weekCount       : number;
+  /** Checklist series that fed panel E. */
+  readonly seriesCount     : number;
+}
+
+/**
+ * Query the store, render the history PNG, and write it to disk — the one
+ * impure step of the raster pipeline, shared verbatim by the MCP tool and the
+ * `self-expression render` CLI subcommand.
+ *
+ * The default output path is `<dataDir>/renders/history_<utc>.png` beside the
+ * database, so `SELF_EXPRESSION_HOME` relocates both together; the timestamp
+ * (colons hyphenated for Windows) keeps concurrent renders from racing on one
+ * filename. An explicit `out` overrides the whole path.
+ *
+ * @param store the store to query; also anchors the default output directory
+ * @param args   the validated tool arguments
+ * @param when   the render instant, injectable so tests can pin the filename
+ * @returns the written path plus the row counts that fed each panel group
+ *
+ * @example
+ *   renderHistoryToFile(store, { days: 30 })
+ *   // => { path: '…/.self-expression/renders/history_2026-08-27T21-15-04Z.png',
+ *   //      signatureCount: 412, weekCount: 5, seriesCount: 3 }
+ *
+ * @throws {RangeError} When `days` is not a positive integer (via `renderHistoryPng`).
+ * @throws {Error}      When the output directory cannot be created or the file
+ *                      cannot be written.
+ *
+ * @see ../raster/compose.js
+ * @see handleRenderHistoryPng
+ */
+export function renderHistoryToFile(
+  store : Store,
+  args  : HistoryPngArgs,
+  when  : Date = new Date(),
+): HistoryRenderResult {
+
+  const days     = args.days ?? 90,
+        sinceUtc = new Date(when.getTime() - days * 86_400_000).toISOString();
+
+  const allSignatures = signatureHistory(store, sinceUtc),
+        signatures    = args.project === undefined
+          ? allSignatures
+          : allSignatures.filter(row => row.project === args.project);
+
+  const needWeeks = needWeekly(store, sinceUtc);
+
+  const checklistSeries = args.seriesKey === undefined
+    ? checklistSeriesTop(store, sinceUtc, 5)
+    : checklistSeriesTop(store, sinceUtc, Number.MAX_SAFE_INTEGER)
+        .filter(series => series.seriesKey === args.seriesKey);
+
+  const png = renderHistoryPng(
+    { signatures, needWeeks, checklistSeries, days, endUtc: when.toISOString() },
+    { chart: args.chart, scale: args.scale },
+  );
+
+  const fileStamp = when.toISOString().replace(/\.\d{3}Z$/, 'Z').replaceAll(':', '-');
+
+  const path = args.out === undefined
+    ? join(dirname(store.path), 'renders', `history_${fileStamp}.png`)
+    : resolve(args.out);
+
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, png);
+
+  return {
+    path,
+    signatureCount : signatures.length,
+    weekCount      : needWeeks.length,
+    seriesCount    : checklistSeries.length,
+  };
+
+}
+
+/**
+ * Handles `render_history_png`: writes the dashboard PNG and returns its path as
+ * **text** — never image content. Returning MCP `ImageContent` costs ~15,000–
+ * 25,000 tokens of invisible base64; the consumer instead `Read`s the returned
+ * path, which produces a native image block (~1,600 tokens). The write-the-file-
+ * then-read-it contract is the issue's core finding, restated here as code.
+ *
+ * Unlike the pure chart handlers, any thrown `Error` — not just `RangeError` —
+ * is returned as `error: ` tool text, because filesystem failure (an unwritable
+ * `out` path) is a common, caller-fixable path here rather than a bug.
+ *
+ * @param store the store queried and the anchor for the default output location
+ * @param args   the validated tool arguments
+ * @param when   the render instant, injectable so tests can pin the filename
+ *
+ * @example
+ *   handleRenderHistoryPng(store, { days: 30 })
+ *   // => { content: [{ type: 'text',
+ *   //        text: 'C:\\…\\renders\\history_2026-08-27T21-15-04Z.png\n412 signatures, …' }] }
+ *
+ * @see renderHistoryToFile
+ */
+export function handleRenderHistoryPng(
+  store : Store,
+  args  : HistoryPngArgs,
+  when  : Date = new Date(),
+): ToolReply {
+
+  try {
+
+    const result = renderHistoryToFile(store, args, when);
+
+    return reply(
+      `${result.path}\n` +
+      `${String(result.signatureCount)} signatures, ${String(result.weekCount)} need weeks, ` +
+      `${String(result.seriesCount)} checklist series in the last ${String(args.days ?? 90)} days`
+    );
+
+  } catch (err) {
+    if (err instanceof Error) { return reply(`error: ${err.message}`); }
+    throw err;
+  }
+
+}
+
+// ---------------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------------
 
 /**
- * Registers all six chart-rendering tools on `server`.
+ * Registers all seven chart-rendering tools on `server` — the six ASCII chart
+ * tools plus `render_history_png`.
  *
  * Charts have no config gate in v1 — unlike `express`'s channel set, every form is
  * always available, since a disabled renderer has no analogue to "logged but
@@ -983,5 +1163,17 @@ export function registerChartTools(server: McpServer, store: Store): void {
       'status-checklists skill specifies, not an approximation.',
     inputSchema: CHECKLIST_SUMMARY_SHAPE,
   }, (args) => handleRenderChecklistSummary(store, args));
+
+  server.registerTool('render_history_png', {
+    title: 'Render history PNG',
+    description:
+      'Render the logged expression history as a PNG chart dashboard written to disk, ' +
+      'returning the file path as text: a stems-by-hour punch strip, a delta lane with ' +
+      'rolling mean, a daily uncertainty strip, a weekly need rate, and the busiest ' +
+      "checklist series' percent trends. Reach for this to actually look at months of " +
+      'history instead of pulling hundreds of rows into context. The result is a path, ' +
+      'never image data — then use the Read tool on the returned path to view the image.',
+    inputSchema: HISTORY_PNG_SHAPE,
+  }, (args) => handleRenderHistoryPng(store, args));
 
 }

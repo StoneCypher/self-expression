@@ -1,5 +1,5 @@
 import {
-  makeGrid, setCell, mergeLine, hline, vline, drawBox, drawText, drawPath, attach,
+  makeGrid, setCell, mergeLine, drawHline, drawVline, drawBox, drawText, drawPath, attach,
   expandWaypoints, usedExtent, renderGrid, renderLines,
 } from '../diagrams/grid.js';
 import type { CharGrid } from '../diagrams/grid.js';
@@ -28,15 +28,15 @@ describe('junction resolution', () => {
 
   test('a horizontal drawn across a vertical yields the crossing', () => {
     const g = makeGrid(5, 3);
-    vline(g, 2, 0, 2);
-    hline(g, 0, 4, 1);
+    drawVline(g, 2, 0, 2);
+    drawHline(g, 0, 4, 1);
     expect(raw(g)[1]).toBe('──┼──');
   });
 
   test('a full vertical across a box bottom border is a crossing; attach makes the tee', () => {
     const g = makeGrid(7, 5);
     drawBox(g, 0, 0, 7, 3);
-    vline(g, 3, 2, 4);   // carries both up and down arms through the border
+    drawVline(g, 3, 2, 4);   // carries both up and down arms through the border
     expect(raw(g)[2]).toBe('└──┼──┘');
   });
 
@@ -51,11 +51,11 @@ describe('junction resolution', () => {
 
   test('all four arms accumulated in any order produce ┼', () => {
     const g1 = makeGrid(3, 3);
-    hline(g1, 0, 2, 1);
-    vline(g1, 1, 0, 2);
+    drawHline(g1, 0, 2, 1);
+    drawVline(g1, 1, 0, 2);
     const g2 = makeGrid(3, 3);
-    vline(g2, 1, 0, 2);
-    hline(g2, 0, 2, 1);
+    drawVline(g2, 1, 0, 2);
+    drawHline(g2, 0, 2, 1);
     expect(raw(g1)).toEqual(raw(g2));
     expect(raw(g1)[1]).toBe('─┼─');
   });
@@ -96,7 +96,7 @@ describe('drawBox and drawText', () => {
 
   test('drawText writes one character per cell and overwrites', () => {
     const g = makeGrid(6, 1);
-    hline(g, 0, 5, 0);
+    drawHline(g, 0, 5, 0);
     drawText(g, 1, 0, 'ab');
     expect(raw(g)[0]).toBe('─ab───');
   });
