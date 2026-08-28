@@ -25,6 +25,7 @@ import type {
 } from './vocabulary.js';
 import { stamp } from './time.js';
 import type { Store } from './store.js';
+import type { ChecklistSeriesRow, NeedWeekRow, SignatureRow } from '../raster/panels.js';
 
 /**
  * What a caller supplies when recording. Timestamps, uuid, and machine identity are
@@ -416,4 +417,185 @@ export function seriesPercents(store: Store, seriesKey: string): number[] {
       WHERE series_key = ? AND percent IS NOT NULL
       ORDER BY id ASC`).all(seriesKey);
   return rows.map(row => Number(row['percent']));
+}
+
+/**
+ * The local hour 0–23 out of a stored `ts_local` rendering like `9:14 am PDT`,
+ * or `null` when the text does not carry a recognisable clock time.
+ *
+ * The schema stores the rendered local time precisely so local rhythm is
+ * recoverable without replaying timezone history; this is the recovery step the
+ * punch-strip panel builds on. Returning `null` rather than guessing keeps a
+ * malformed row out of the chart instead of putting it in the wrong place.
+ *
+ * @example
+ *   localHour('9:14 am PDT')   // => 9
+ *   localHour('12:03 am PDT')  // => 0
+ *   localHour('12:00 pm CET')  // => 12
+ *   localHour('whenever')      // => null
+ *
+ * @see signatureHistory
+ */
+export function localHour(tsLocal: string): number | null {
+
+  const match = /^(\d{1,2}):\d{2}\s*(am|pm)/i.exec(tsLocal.trim());
+  if (match === null) { return null; }
+
+  const twelve = Number(match[1]);
+  if (twelve < 1 || twelve > 12) { return null; }
+
+  const isPm = (match[2] ?? '').toLowerCase() === 'pm';
+  return (twelve % 12) + (isPm ? 12 : 0);
+
+}
+
+/**
+ * The ISO 8601 week a UTC instant falls in, as a label like `2026-W35`.
+ *
+ * ISO weeks start Monday and belong to the year containing their Thursday, so a
+ * label's year can differ from the calendar year at the boundaries — which is
+ * exactly why the bucketing is done once here rather than approximated per chart.
+ *
+ * @example
+ *   isoWeekKey(new Date('2026-08-27T21:00:00Z'))  // => '2026-W35'
+ *   isoWeekKey(new Date('2027-01-01T00:00:00Z'))  // => '2026-W53'
+ *
+ * @see needWeekly
+ */
+export function isoWeekKey(when: Date): string {
+
+  const thursday = new Date(Date.UTC(when.getUTCFullYear(), when.getUTCMonth(), when.getUTCDate()));
+  const weekday  = thursday.getUTCDay() === 0 ? 7 : thursday.getUTCDay();
+  thursday.setUTCDate(thursday.getUTCDate() + 4 - weekday);
+
+  const year = thursday.getUTCFullYear(),
+        week = Math.ceil(((thursday.getTime() - Date.UTC(year, 0, 1)) / 86_400_000 + 1) / 7);
+
+  return `${String(year)}-W${String(week).padStart(2, '0')}`;
+
+}
+
+/**
+ * Every signature entry since `sinceUtc`, in recording order, shaped for the
+ * raster panels: day-bucketable UTC timestamp, recovered local hour, stem,
+ * delta, uncertainty flag, and project (null when privacy withheld it).
+ *
+ * A thin read over the existing `idx_entries_channel` index — no new columns,
+ * no new indexes.
+ *
+ * @param sinceUtc inclusive ISO UTC lower bound of the window
+ * @returns one row per signature, ascending by id
+ *
+ * @example
+ *   signatureHistory(store, '2026-05-29T00:00:00.000Z')
+ *   // => [{ id: 1, tsUtc: '2026-08-18T16:14:00.000Z', hourLocal: 9, stem: 'flow', … }]
+ *
+ * @see localHour
+ * @see ../raster/panels.js
+ */
+export function signatureHistory(store: Store, sinceUtc: string): SignatureRow[] {
+
+  const rows = store.db.prepare(
+    `SELECT id, ts_utc, ts_local, stem, delta, uncertain, project
+       FROM entries
+      WHERE channel = 'signature' AND ts_utc >= ?
+      ORDER BY id ASC`).all(sinceUtc);
+
+  return rows.map(row => ({
+    id        : Number(row['id']),
+    tsUtc     : String(row['ts_utc']),
+    hourLocal : localHour(String(row['ts_local'])),
+    stem      : row['stem']    === null ? null : String(row['stem']),
+    delta     : row['delta']   === null ? null : String(row['delta']),
+    uncertain : Number(row['uncertain']) !== 0,
+    project   : row['project'] === null ? null : String(row['project']),
+  }));
+
+}
+
+/**
+ * Per-ISO-week turn and need counts since `sinceUtc`, ascending by week — the
+ * need-rate panel's data. Turns are distinct `prompt_id`s among signatures (a
+ * turn usually carries two signatures, so raw row counts would double-count);
+ * needs are `need` rows.
+ *
+ * Weeks in which either count is nonzero appear; weeks with neither are absent
+ * rather than zero-filled, since an all-idle week carries no rate to plot.
+ *
+ * @param sinceUtc inclusive ISO UTC lower bound of the window
+ *
+ * @example
+ *   needWeekly(store, '2026-05-29T00:00:00.000Z')
+ *   // => [{ week: '2026-W33', turns: 41, needs: 3 }, { week: '2026-W34', turns: 12, needs: 5 }]
+ *
+ * @see isoWeekKey
+ */
+export function needWeekly(store: Store, sinceUtc: string): NeedWeekRow[] {
+
+  const turnRows = store.db.prepare(
+    `SELECT MIN(ts_utc) AS ts_utc FROM entries
+      WHERE channel = 'signature' AND ts_utc >= ? AND prompt_id IS NOT NULL
+      GROUP BY prompt_id`).all(sinceUtc);
+
+  const needRows = store.db.prepare(
+    `SELECT ts_utc FROM entries
+      WHERE channel = 'need' AND ts_utc >= ?`).all(sinceUtc);
+
+  const buckets = new Map<string, { turns: number; needs: number }>();
+
+  const bucket = (tsUtc: unknown): { turns: number; needs: number } => {
+    const key   = isoWeekKey(new Date(String(tsUtc))),
+          found = buckets.get(key);
+    if (found !== undefined) { return found; }
+    const fresh = { turns: 0, needs: 0 };
+    buckets.set(key, fresh);
+    return fresh;
+  };
+
+  for (const row of turnRows) { bucket(row['ts_utc']).turns += 1; }
+  for (const row of needRows) { bucket(row['ts_utc']).needs += 1; }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([week, counts]) => ({ week, turns: counts.turns, needs: counts.needs }));
+
+}
+
+/**
+ * The `n` checklist series with the most percent snapshots since `sinceUtc`,
+ * each with its in-range percent history in recording order — the checklist
+ * panel's data. Series keys are the stable identities of #27, so the labels
+ * drawn from them cannot fork when a title is reworded.
+ *
+ * @param sinceUtc inclusive ISO UTC lower bound of the window
+ * @param n        how many series to return, busiest first; a positive integer
+ *
+ * @example
+ *   checklistSeriesTop(store, '2026-05-29T00:00:00.000Z', 5)
+ *   // => [{ seriesKey: 'coverage', percents: [62, 71, 84] }, …]
+ *
+ * @see seriesPercents
+ */
+export function checklistSeriesTop(store: Store, sinceUtc: string, n = 5): ChecklistSeriesRow[] {
+
+  const keys = store.db.prepare(
+    `SELECT series_key, COUNT(*) AS rows_in_range FROM entries
+      WHERE channel = 'checklist' AND series_key IS NOT NULL AND percent IS NOT NULL AND ts_utc >= ?
+      GROUP BY series_key
+      ORDER BY rows_in_range DESC, series_key ASC
+      LIMIT ?`).all(sinceUtc, n);
+
+  const history = store.db.prepare(
+    `SELECT percent FROM entries
+      WHERE channel = 'checklist' AND series_key = ? AND percent IS NOT NULL AND ts_utc >= ?
+      ORDER BY id ASC`);
+
+  return keys.map(keyRow => {
+    const seriesKey = String(keyRow['series_key']);
+    return {
+      seriesKey,
+      percents: history.all(seriesKey, sinceUtc).map(row => Number(row['percent'])),
+    };
+  });
+
 }

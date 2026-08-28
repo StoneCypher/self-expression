@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-43 merges; 2 releases
+45 merges; 2 releases
 
 
 
@@ -14,6 +14,69 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:01:21 AM
+
+Commit [0c06b73880256aef3e5c361a25f93858d33c615c](https://github.com/StoneCypher/self-expression/commit/0c06b73880256aef3e5c361a25f93858d33c615c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [e8baf0b, 32c17a7]
+
+  * chore: merge origin/main (#30 config surface) and integrate
+  * Integrates the channel extensions with the #30 config registry:
+  * - forecast.enabled, salience.enabled, revision.enabled, gifts.enabled, and
+  roster.enabled register in CONFIG_KEYS with the spec defaults, so configure
+  set validates and canonicalizes them and configure list reports them.
+- enabledConfidenceGrounds and conventionFlags read through the tolerant
+  effective-value accessor (D5): an invalid stored override behaves as unset.
+- handleExpress keeps #30's ToolReply shape and format-version stamping, and
+  gains the #42 outcome-target check and the resolveBy/outcome/silence
+  arguments; the confidence enum narrows via enabledConfidenceGrounds.
+- time.hook (D9) composes with the conventions flags: suppressing the clock
+  keeps the flags segment leading the clockless line, since the flags are
+  config transport, not time presentation.
+- Generated artifacts (README, CHANGELOG, coverage, dist, docs) rebuilt.
+  * Refs #42
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:01:00 AM
+
+Commit [44b05f097361b2a5b85ede8216dbeb9d911133fa](https://github.com/StoneCypher/self-expression/commit/44b05f097361b2a5b85ede8216dbeb9d911133fa)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [6fa2263, 9ae1f2c]
+
+  * chore: merge origin/main (#7 png history); rebuild follows
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:59:40 AM
+
+Commit [b15114e3409c8d549723e02557fa43c007bd140c](https://github.com/StoneCypher/self-expression/commit/b15114e3409c8d549723e02557fa43c007bd140c)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 9ae1f2ce1feeca4913fe88a829faabaa4f271580
 
 
 
