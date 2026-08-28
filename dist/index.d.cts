@@ -1135,6 +1135,661 @@ interface ChecklistVerification {
 declare function verifyChecklist(text: string): ChecklistVerification;
 
 /**
+ * The shared graph model for the diagram renderers: nodes, edges, and the
+ * normalization that turns a caller's edge list into a validated {@link Digraph}.
+ *
+ * Diagrams draw structure on a single-width monospace character grid, so the model
+ * layer is where grid-hostile text is rejected: double-width glyphs (emoji, CJK),
+ * combining marks, and embedded newlines all corrupt column alignment silently if
+ * they reach the drawing surface, so they are a `RangeError` here instead
+ * (`2026-08-27-diagrams-design.md` § Rendering-compatibility constraints).
+ *
+ * Pure: no I/O, no store access, no clock, no randomness.
+ *
+ * @see ./grid.js
+ * @see ./layout.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+/** One vertex of a diagram: its identity, and optionally a display label. */
+interface DiagramNode {
+    /** The node's unique identity, referenced by edges. */
+    id: string;
+    /** The text drawn inside the node's box; defaults to `id` when absent. */
+    label?: string;
+}
+/** One directed edge of a diagram, optionally labeled (e.g. by a transition action). */
+interface DiagramEdge {
+    /** The id of the node this edge leaves. */
+    from: string;
+    /** The id of the node this edge enters. */
+    to: string;
+    /** The text drawn along the edge, if any — an action, a dependency kind, a verb. */
+    label?: string;
+}
+/** A validated directed graph: the input shape every diagram renderer draws from. */
+interface Digraph {
+    /** Every node exactly once, in first-appearance order. */
+    nodes: readonly DiagramNode[];
+    /** Every edge, in input order; parallel edges and self-loops are legal. */
+    edges: readonly DiagramEdge[];
+}
+/**
+ * Guards that `text` can be drawn on the single-width grid: no control characters or
+ * newlines (they break the line structure) and no double-width or combining glyphs
+ * (they break column alignment). Shared by every diagram entry point that accepts
+ * caller text — silently corrupting the grid is the failure class this module exists
+ * to prevent.
+ *
+ * @param text the caller-supplied text about to be drawn
+ * @param what names the offending field in the error, e.g. `"node id 'a'"`
+ *
+ * @example
+ *   requireGridSafe('locked', "node id 'locked'");   // returns quietly
+ *
+ * @throws {RangeError} If `text` contains a control character, a newline, a combining
+ *                        mark, or a double-width glyph such as an emoji or CJK
+ *                        character.
+ * @see normalizeGraph
+ */
+declare function requireGridSafe(text: string, what: string): void;
+/**
+ * The text a node draws inside its box: its label when present, its id otherwise.
+ *
+ * @example
+ *   displayLabel({ id: 'a', label: 'alpha' })   // => 'alpha'
+ *   displayLabel({ id: 'a' })                   // => 'a'
+ */
+declare function displayLabel(node: DiagramNode): string;
+/**
+ * Builds a validated {@link Digraph} from an edge list, inferring the node set from
+ * edge endpoints (in first-appearance order) when `nodes` is not given, and checking
+ * everything a renderer relies on: unique node ids, no dangling edge references, and
+ * grid-safe text throughout.
+ *
+ * @param edges the graph's edges; may be empty only when `nodes` supplies at least
+ *               one node, since a diagram of nothing is unrenderable
+ * @param nodes the explicit node set, when node order or labels matter; every edge
+ *               endpoint must appear in it
+ *
+ * @example
+ *   normalizeGraph([{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }])
+ *   // => { nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [...] }
+ *
+ * @throws {RangeError} If two nodes share an id, an edge references a node absent
+ *                        from an explicit `nodes` list, the graph has no nodes at
+ *                        all, or any id or label fails {@link requireGridSafe}.
+ * @see requireGridSafe
+ */
+declare function normalizeGraph(edges: readonly DiagramEdge[], nodes?: readonly DiagramNode[]): Digraph;
+
+/**
+ * The character grid every diagram is drawn on: a mutable width×height cell buffer
+ * with line, box, text, and path drawing, box-drawing junction resolution, and the
+ * final framed-or-padded string render.
+ *
+ * Junction resolution is the one piece of cleverness the whole drawing layer shares:
+ * each light box-drawing character is a bitmask of up/right/down/left arms, and
+ * drawing a line across an existing line ORs the masks — `─` over `│` yields `┼`,
+ * `│` descending into a box's `─` bottom border yields `┬` — so crossings and
+ * junctions come out right regardless of drawing order (mask OR is commutative,
+ * associative, and idempotent, which the stochastic suite pins).
+ *
+ * Pure and deterministic; the buffer is mutable but nothing here touches I/O, the
+ * clock, or randomness.
+ *
+ * @see ./layout.js
+ * @see ./renderers.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+/** A mutable drawing surface: `cells[y][x]` is the single-width character at (x, y). */
+interface CharGrid {
+    /** Total columns; x runs [0, width). */
+    readonly width: number;
+    /** Total rows; y runs [0, height). */
+    readonly height: number;
+    /** The cell buffer, row-major, every cell exactly one single-width character. */
+    readonly cells: string[][];
+}
+/** One cell coordinate on a {@link CharGrid}; x grows rightward, y grows downward. */
+interface GridPoint {
+    /** Column, in cells. */
+    x: number;
+    /** Row, in cells. */
+    y: number;
+}
+/**
+ * Allocates an all-space grid.
+ *
+ * @param width  columns, a positive integer
+ * @param height rows, a positive integer
+ *
+ * @example
+ *   const grid = makeGrid(10, 3);   // 10 columns × 3 rows of ' '
+ *
+ * @throws {RangeError} If either dimension is not a positive integer.
+ */
+declare function makeGrid(width: number, height: number): CharGrid;
+/**
+ * Writes one character to one cell, overwriting whatever is there. Line drawing
+ * should go through {@link mergeLine} instead so junctions resolve; `setCell` is for
+ * text and arrowheads, which deliberately replace.
+ *
+ * @example
+ *   setCell(grid, 3, 1, '▼');
+ *
+ * @throws {Error} If (x, y) is outside the grid — an internal bug in the caller's
+ *                 layout arithmetic, never a user-input condition.
+ */
+declare function setCell(grid: CharGrid, x: number, y: number, ch: string): void;
+/**
+ * Merges a line-arm mask into one cell: if the cell already holds a box-drawing
+ * character the masks OR together (junction resolution); anything else is replaced
+ * by the mask's own character.
+ *
+ * @param mask an OR of the arm bits; must map to a drawable character
+ *
+ * @example
+ *   // cell holds '│'; merging a horizontal produces the crossing:
+ *   mergeLine(grid, 4, 2, 0b1010);   // cell becomes '┼'
+ *
+ * @throws {Error} If out of bounds, or the merged mask has no character (impossible
+ *                 for masks built from real arms; guards table drift).
+ */
+declare function mergeLine(grid: CharGrid, x: number, y: number, mask: number): void;
+/**
+ * Merges a single directional stub arm into one cell — the attachment point where a
+ * line meets a border it does not cross: `attach(grid, x, y, 'down')` on a box's
+ * `─` bottom border yields `┬` without adding the `┼`-producing up arm a full
+ * `drawVline` would.
+ *
+ * @example
+ *   attach(grid, 6, 2, 'down');   // border '─' at (6,2) becomes '┬'
+ *
+ * @throws {Error} If (x, y) is outside the grid.
+ */
+declare function attach(grid: CharGrid, x: number, y: number, direction: 'up' | 'down' | 'left' | 'right'): void;
+/**
+ * Draws a horizontal line from (x1, y) to (x2, y) inclusive, merging junctions with
+ * anything already drawn. Endpoint order does not matter.
+ *
+ * @example
+ *   drawHline(grid, 2, 8, 0);   // '───────' across row 0
+ */
+declare function drawHline(grid: CharGrid, x1: number, x2: number, y: number): void;
+/**
+ * Draws a vertical line from (x, y1) to (x, y2) inclusive, merging junctions with
+ * anything already drawn. Endpoint order does not matter.
+ *
+ * @example
+ *   drawVline(grid, 4, 1, 5);   // '│' down column 4
+ */
+declare function drawVline(grid: CharGrid, x: number, y1: number, y2: number): void;
+/**
+ * Draws a rectangular box border with corners at (x, y) and (x+width-1, y+height-1),
+ * merging with anything already drawn (two boxes sharing an edge resolve their
+ * shared border's junctions correctly).
+ *
+ * @param width  total box width in cells, at least 2
+ * @param height total box height in cells, at least 2
+ *
+ * @example
+ *   drawBox(grid, 0, 0, 8, 3);
+ *   // ┌──────┐
+ *   // │      │
+ *   // └──────┘
+ *
+ * @throws {RangeError} If `width` or `height` is less than 2 — a box needs room for
+ *                        all four corners.
+ */
+declare function drawBox(grid: CharGrid, x: number, y: number, width: number, height: number): void;
+/**
+ * Writes `text` left to right starting at (x, y), one character per cell,
+ * overwriting whatever is there (an edge label deliberately interrupts its line).
+ *
+ * @example
+ *   drawText(grid, 2, 1, 'locked');
+ *
+ * @throws {Error} If any character would land outside the grid.
+ */
+declare function drawText(grid: CharGrid, x: number, y: number, text: string): void;
+/**
+ * Expands orthogonal waypoints into the full unit-step cell sequence between them,
+ * dropping zero-length steps. The result is what {@link drawPath} draws and what the
+ * layout layer records for edge-traceability tests.
+ *
+ * @param waypoints the path's corners, in order; consecutive points must share a row
+ *                   or a column
+ *
+ * @example
+ *   expandWaypoints([{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 1 }])
+ *   // => [{x:0,y:0}, {x:1,y:0}, {x:2,y:0}, {x:2,y:1}]
+ *
+ * @throws {Error} If consecutive waypoints are diagonal to each other.
+ */
+declare function expandWaypoints(waypoints: readonly GridPoint[]): GridPoint[];
+/**
+ * Draws one edge path: every cell but the last merges its in/out line arms (so
+ * borders become junctions and crossings become `┼`), and the last cell gets the
+ * arrowhead for its approach direction (`▶ ◀ ▲ ▼`).
+ *
+ * The first cell merges only its outgoing arm — placed on a box's border character
+ * this is exactly what turns `─` into `┬`: the visible attachment point.
+ *
+ * @param points the full unit-step cell sequence, from source attachment to
+ *                arrowhead cell; at least 2 points
+ *
+ * @example
+ *   drawPath(grid, expandWaypoints([{ x: 3, y: 2 }, { x: 3, y: 4 }]));
+ *   // column 3: row 2 merges '┬' into a box bottom, row 3 '│', row 4 '▼'
+ *
+ * @throws {Error} If fewer than 2 points, or points are not unit orthogonal steps.
+ */
+declare function drawPath(grid: CharGrid, points: readonly GridPoint[]): void;
+/**
+ * The grid's used extent: the smallest (width, height) containing every non-space
+ * cell. Used to crop the canvas before framing, so a generously allocated grid
+ * frames to its content.
+ *
+ * @example
+ *   usedExtent(grid)   // => { width: 14, height: 5 }
+ *
+ * @throws {RangeError} If the grid is entirely blank — a diagram with no content is
+ *                        a caller bug upstream of rendering.
+ */
+declare function usedExtent(grid: CharGrid): {
+    width: number;
+    height: number;
+};
+/** Options for {@link renderGrid} and {@link renderLines}. */
+interface RenderGridOptions {
+    /** Frame the output in a visible box (default true); see the spec's ragged-edge finding. */
+    frame?: boolean;
+}
+/**
+ * Joins pre-built lines into the final diagram string: framed by default (the frame
+ * guarantees a visible rectangle that editors cannot strip, costing two lines and
+ * four columns), or unframed with trailing whitespace stripped from every line (the
+ * interior stays aligned; only the invisible right pad is dropped, so a consumer
+ * that re-pads loses nothing).
+ *
+ * @param lines the diagram's rows, top to bottom, without trailing newlines
+ *
+ * @example
+ *   renderLines(['a', 'bb'])
+ *   // => '┌────┐\n│ a  │\n│ bb │\n└────┘'
+ *
+ * @throws {RangeError} If `lines` is empty.
+ * @see renderGrid
+ */
+declare function renderLines(lines: readonly string[], options?: RenderGridOptions): string;
+/**
+ * Renders the grid to its final string: cropped to its used extent, then framed (or
+ * trailing-whitespace-stripped) per {@link renderLines}.
+ *
+ * @example
+ *   const grid = makeGrid(20, 3);
+ *   drawBox(grid, 0, 0, 5, 3);
+ *   renderGrid(grid, { frame: false })
+ *   // => '┌───┐\n│   │\n└───┘'
+ *
+ * @throws {RangeError} If the grid is entirely blank.
+ * @see renderLines
+ * @see usedExtent
+ */
+declare function renderGrid(grid: CharGrid, options?: RenderGridOptions): string;
+
+/**
+ * A small FSL-subset parser: exactly the fragment `renderFsl` (in
+ * `../charts/timeline.ts`) emits, turned back into a {@link Digraph}.
+ *
+ * The subset is: bare transitions (`a -> b;`), action-labeled transitions
+ * (`a 'action' -> b;`), chained arrows (`a -> b -> c;`), multiple `;`-separated
+ * statements, and the active-state `**bold**` marks (stripped on parse). Everything
+ * else in real FSL/jssm — probabilities, named machines, themes, other arrow kinds —
+ * is a `RangeError` naming the subset, never a silent skip: this project carries
+ * zero runtime dependencies, so jssm's full grammar deliberately stays out of scope
+ * (`2026-08-27-diagrams-design.md` § FSL / jssm). A caller with a full FSL machine
+ * has jssm; a transcript diagram needs the topology.
+ *
+ * Round-trip property, pinned by the stochastic suite: for any transition list `t`,
+ * `parseFsl(renderFsl(t))` yields the same edge sequence as `t`, actions and all.
+ *
+ * @see ../charts/timeline.js
+ * @see ./model.js
+ */
+
+/**
+ * Parses an FSL-subset source string into a validated {@link Digraph}: each
+ * transition becomes an edge, each quoted action its edge's label, and the node set
+ * is inferred in first-appearance order. `**bold**` active-state marks are stripped
+ * — the active state is display information, carried separately by
+ * `renderStateDiagram`'s `activeState` option, not part of the topology.
+ *
+ * @param source the FSL text, e.g. output of `renderFsl`; must contain at least one
+ *                transition, and every statement must end with `;`
+ *
+ * @example
+ *   parseFsl("locked 'coin' -> unlocked 'push' -> locked;")
+ *   // => {
+ *   //   nodes: [{ id: 'locked' }, { id: 'unlocked' }],
+ *   //   edges: [
+ *   //     { from: 'locked', to: 'unlocked', label: 'coin' },
+ *   //     { from: 'unlocked', to: 'locked', label: 'push' },
+ *   //   ],
+ *   // }
+ *
+ * @throws {RangeError} If the source is empty, a statement is malformed or missing
+ *                        its `;`, or the text uses FSL features outside the subset
+ *                        (probabilities, named machines, other arrow kinds); every
+ *                        rejection names the subset.
+ * @see normalizeGraph
+ */
+declare function parseFsl(source: string): Digraph;
+
+/**
+ * Layered layout for digraphs — deliberately modest, per the design spec: longest-path
+ * layering, barycenter ordering within layers (a heuristic, explicitly not optimal),
+ * and orthogonal edge routing on the grid.
+ *
+ * The shape of a drawing: layers stack top to bottom, each node a 3-row framed box;
+ * between layers sit gutters where edges run. Every edge leaves its source through the
+ * bottom border and enters its target through the top border with a `▼`, which makes
+ * arrow direction uniform and legible. Edges to the next layer route inside one gutter
+ * (straight, or with one horizontal jog on a row of their own); every other edge —
+ * spanning multiple layers, looping back, or self-referencing — routes out to its own
+ * corridor column on the right, giving cycles the classic wrap-around return arrow.
+ * Back edges are found by depth-first search and never used for layering, so a
+ * two-state toggle draws as two boxes with a forward and a return arrow rather than
+ * recursing.
+ *
+ * Refusal is a feature: a graph past {@link MAX_DIAGRAM_NODES} nodes, a node with more
+ * edges than its box has border cells, or a drawing wider than the budget is a
+ * `RangeError` naming the fallbacks ({@link DIAGRAM_FALLBACKS}) — a wrapped or tangled
+ * diagram is worse than no diagram.
+ *
+ * Pure and deterministic: identical input always yields the identical layout.
+ *
+ * @see ./grid.js
+ * @see ./renderers.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+
+/**
+ * The legibility threshold: layout refuses graphs with more nodes than this. Chosen
+ * from typical 78-column capacity (spec § Open questions, shipped as a reviewable
+ * constant to tune against real use), not measured law.
+ */
+declare const MAX_DIAGRAM_NODES = 20;
+/**
+ * The fallback menu every layout refusal names, so the caller's next action is named
+ * rather than guessed: the inline FSL form, a plain adjacency list, or the mermaid
+ * emission for a destination that renders it.
+ */
+declare const DIAGRAM_FALLBACKS: string;
+/** One node's placed box: position and size in grid cells, plus its display label. */
+interface NodeBox {
+    /** The node's id, matching the graph. */
+    id: string;
+    /** The text drawn inside the box (already includes any active-state marker). */
+    label: string;
+    /** Left column of the box border. */
+    x: number;
+    /** Top row of the box border. */
+    y: number;
+    /** Total box width including borders: label length + 4. */
+    width: number;
+    /** Total box height including borders; always 3 in this layout. */
+    height: number;
+}
+/** One routed edge: its endpoints, optional label, and full unit-step cell path. */
+interface RoutedEdge {
+    /** Source node id. */
+    from: string;
+    /** Target node id. */
+    to: string;
+    /** The edge's label, when it has one; placement is the renderer's job. */
+    label?: string;
+    /**
+     * Every cell of the path in order, from the attachment cell on the source's bottom
+     * border to the arrowhead cell just above the target's top border.
+     */
+    points: readonly GridPoint[];
+}
+/** A finished digraph layout, ready to draw: geometry only, no characters yet. */
+interface DigraphLayout {
+    /** Columns the drawing needs; guaranteed ≤ the requested budget. */
+    surfaceWidth: number;
+    /** Rows the drawing needs. */
+    surfaceHeight: number;
+    /** Every node's placed box. */
+    boxes: readonly NodeBox[];
+    /** Every edge's route, in the graph's edge order. */
+    routes: readonly RoutedEdge[];
+}
+/** Options for {@link layoutDigraph}. */
+interface DigraphLayoutOptions {
+    /** The width budget in columns; a layout that cannot fit refuses rather than wraps. */
+    surfaceWidth: number;
+    /** Per-node display-label overrides (e.g. the state form's `▶ ` active marker). */
+    labels?: ReadonlyMap<string, string> | undefined;
+}
+/**
+ * Computes the full layered layout for a validated digraph: layer assignment,
+ * barycenter ordering, box placement, and an orthogonal route (with arrowhead cell)
+ * for every edge.
+ *
+ * @param graph   a {@link Digraph}, normally from `normalizeGraph` or `parseFsl`
+ * @param options the width budget and optional per-node display labels
+ *
+ * @example
+ *   const graph = parseFsl("locked 'coin' -> unlocked 'push' -> locked;");
+ *   const layout = layoutDigraph(graph, { surfaceWidth: 74 });
+ *   // layout.boxes: locked at the top, unlocked below it;
+ *   // layout.routes: a straight forward edge and a wrap-around return edge
+ *
+ * @throws {RangeError} If the graph exceeds {@link MAX_DIAGRAM_NODES} nodes, a node
+ *                        has more edges than its box border can attach, or the
+ *                        drawing cannot fit `surfaceWidth` columns; each refusal
+ *                        names {@link DIAGRAM_FALLBACKS}.
+ * @see ./renderers.js
+ */
+declare function layoutDigraph(graph: Digraph, options: DigraphLayoutOptions): DigraphLayout;
+
+/**
+ * The public diagram forms: state diagram, digraph, tree, and sequence — data in,
+ * exact framed ASCII string out, the error class of hand-drawn diagrams (misaligned
+ * edges, arrows touching the wrong box, ragged margins) prevented rather than
+ * detected.
+ *
+ * All four share the rendering-compatibility constraints from the design spec:
+ * single-width glyphs only (light box-drawing set plus `▶ ◀ ▲ ▼` arrowheads), a
+ * width budget defaulting to {@link DEFAULT_DIAGRAM_WIDTH} columns, framed output by
+ * default, no trailing whitespace ever, and refusal — naming fallbacks — over an
+ * illegible or wrapped drawing. Emit the result inside a ` ```text ` fence; outside
+ * one, proportional fonts destroy the alignment these renderers guarantee.
+ *
+ * Pure: no I/O, no store access, no clock, no randomness.
+ *
+ * @see ./layout.js
+ * @see ./grid.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+
+/**
+ * The default maximum output width in columns, frame included: fits an 80-column
+ * terminal inside a code fence without wrapping.
+ */
+declare const DEFAULT_DIAGRAM_WIDTH = 78;
+/** Options shared by every diagram form. */
+interface DiagramRenderOptions {
+    /** Frame the diagram in a visible box; default true (see the ragged-edge finding). */
+    frame?: boolean | undefined;
+    /** Maximum output width in columns, frame included; default {@link DEFAULT_DIAGRAM_WIDTH}. */
+    width?: number | undefined;
+}
+/** Options for {@link renderStateDiagram}. */
+interface StateDiagramOptions extends DiagramRenderOptions {
+    /** The state currently occupied, if known; its box's label gets a `▶ ` marker. */
+    activeState?: string | undefined;
+}
+/**
+ * Renders a state machine as boxes and labeled arrows: layers top to bottom, every
+ * transition entering its target from above with a `▼`, cycles drawn as wrap-around
+ * return arrows on the right. Input is either a {@link Digraph} or FSL-subset source
+ * (the text `renderFsl` emits); the active state — a display fact, not topology — is
+ * marked with `▶ ` inside its box, since bolding does not exist inside a code fence.
+ *
+ * @param machine a graph, or FSL-subset source such as `"a 'go' -> b;"`
+ * @param options `activeState` plus the shared frame/width options
+ *
+ * @example
+ *   renderStateDiagram("locked 'coin' -> unlocked 'push' -> locked;")
+ *   // => a framed drawing: locked's box above unlocked's, a labeled 'coin' arrow
+ *   //    down, and a labeled 'push' return arrow wrapping around the right side
+ *
+ * @throws {RangeError} If the FSL source is outside the parser's subset, the graph
+ *                        fails validation, `activeState` names an unknown state, or
+ *                        layout refuses (too many nodes, too tangled, or over the
+ *                        width budget) — refusals name the fallbacks.
+ * @see parseFsl
+ * @see renderDigraph
+ */
+declare function renderStateDiagram(machine: Digraph | string, options?: StateDiagramOptions): string;
+/**
+ * Renders a directed graph — dependencies, call flows, data lineage — with the same
+ * drawing engine as {@link renderStateDiagram} but no state-machine affordances.
+ * Reach for it the moment structure branches, merges, cycles, or fans in or out; a
+ * straight line is better served by the inline chain forms.
+ *
+ * @param graph the graph to draw; run through `normalizeGraph` internally, so a
+ *               hand-built edge list is fine
+ *
+ * @example
+ *   renderDigraph(normalizeGraph([
+ *     { from: 'claude', to: 'root' }, { from: 'codex', to: 'root' },
+ *     { from: 'root', to: 'skills' }, { from: 'root', to: 'commands' },
+ *   ]))
+ *   // => a framed fan-in/fan-out drawing: two manifests converging on root,
+ *   //    root forking to skills and commands
+ *
+ * @throws {RangeError} If the graph fails validation or layout refuses (too many
+ *                        nodes, too tangled, or over the width budget) — refusals
+ *                        name the fallbacks.
+ * @see renderStateDiagram
+ * @see renderTree
+ */
+declare function renderDigraph(graph: Digraph, options?: DiagramRenderOptions): string;
+/** Options for {@link renderTree}. */
+interface TreeRenderOptions extends DiagramRenderOptions {
+    /** Display labels by node id; a node absent from the map draws its id. */
+    labels?: Readonly<Record<string, string>> | undefined;
+}
+/**
+ * Renders a strict hierarchy — a decision tree, a module tree with annotations — as
+ * a connector tree (`├─`/`└─`/`│`), the simpler tidy layout the spec reserves for
+ * input that is genuinely a tree. Non-tree input is refused by naming the first node
+ * that appears under two parents (or in a cycle), so the caller knows to use
+ * {@link renderDigraph} instead.
+ *
+ * @param root     the root node's id
+ * @param children each node's ordered children, by parent id; ids absent from the
+ *                  map are leaves, and every key must be reachable from `root`
+ *
+ * @example
+ *   renderTree('plugin', { plugin: ['skills', 'commands'], commands: ['claude', 'gemini'] })
+ *   // => '┌────────────────┐\n' +
+ *   //    '│ plugin         │\n' +
+ *   //    '│ ├─ skills      │\n' +
+ *   //    '│ └─ commands    │\n' +
+ *   //    '│    ├─ claude   │\n' +
+ *   //    '│    └─ gemini   │\n' +
+ *   //    '└────────────────┘'
+ *
+ * @throws {RangeError} If a node repeats (shared child or cycle — the error names
+ *                        it), a `children` key is unreachable from `root`, the tree
+ *                        exceeds the node threshold, or a line exceeds the width
+ *                        budget; refusals name the fallbacks.
+ * @see renderDigraph
+ */
+declare function renderTree(root: string, children: Readonly<Record<string, readonly string[]>>, options?: TreeRenderOptions): string;
+/** One message of a sequence diagram: source actor, target actor, optional label. */
+interface SequenceMessage {
+    /** The sending actor's name, which must appear in `actors`. */
+    from: string;
+    /** The receiving actor's name, which must appear in `actors`; may equal `from`. */
+    to: string;
+    /** The text drawn on its own row above the arrow, if any. */
+    label?: string;
+}
+/**
+ * Renders a sequence diagram: one boxed actor per column, a lifeline under each, and
+ * one horizontal arrow row per message, top to bottom in message order — the shape
+ * the issue thread singles out as the most painful to hand-draw and the most
+ * mechanical to render (fixed lifeline columns, monotone rows, no layout search).
+ * Self-messages draw as a small right-hand loop; labels sit on their own row above
+ * their arrow.
+ *
+ * @param actors   the lifeline columns, left to right; unique, non-empty names
+ * @param messages the messages in time order; may be empty (actors and lifelines
+ *                  still draw)
+ *
+ * @example
+ *   renderSequence(['human', 'agent'], [
+ *     { from: 'human', to: 'agent', label: 'ask' },
+ *     { from: 'agent', to: 'human', label: 'answer' },
+ *   ])
+ *   // => a framed drawing: two boxed actors, lifelines, an 'ask' arrow rightward
+ *   //    and an 'answer' arrow back leftward, each labeled on the row above
+ *
+ * @throws {RangeError} If `actors` is empty, repeats a name, or exceeds the node
+ *                        threshold; a message names an unknown actor; or the
+ *                        drawing exceeds the width budget — refusals name the
+ *                        fallbacks.
+ * @see renderDigraph
+ */
+declare function renderSequence(actors: readonly string[], messages: readonly SequenceMessage[], options?: DiagramRenderOptions): string;
+
+/**
+ * The secondary emission: a mermaid serializer, no layout. Mermaid does not render
+ * in the transcript surface this plugin lives in (settled empirically in issue #19 —
+ * the reader gets raw source), so this is emitted only on request, for destinations
+ * that do render it: GitHub issue/PR bodies, READMEs, and preview surfaces.
+ *
+ * Pure string emission; the graph is re-validated on the way through, and the small
+ * extra vocabulary mermaid itself cannot carry (whitespace in ids, quotes in
+ * labels) is a named `RangeError` rather than silently mangled output.
+ *
+ * @see ./model.js
+ * @see ./renderers.js
+ * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
+ */
+
+/** The two mermaid dialects emitted: state machines, and everything else. */
+type MermaidDialect = 'stateDiagram-v2' | 'flowchart';
+/**
+ * Serializes a graph to mermaid source: `stateDiagram-v2` for state machines (edge
+ * labels become `: action` transition annotations), `flowchart` (top-down) for
+ * everything else (every node declared with its label, edge labels in `|pipes|`).
+ * No layout, no line drawing — mermaid's renderer owns that on whatever surface
+ * this lands.
+ *
+ * @param graph   the graph to serialize; re-validated internally
+ * @param dialect which mermaid grammar to emit
+ *
+ * @example
+ *   toMermaid(normalizeGraph([
+ *     { from: 'locked', to: 'unlocked', label: 'coin' },
+ *     { from: 'unlocked', to: 'locked', label: 'push' },
+ *   ]), 'stateDiagram-v2')
+ *   // => 'stateDiagram-v2\n    locked --> unlocked: coin\n    unlocked --> locked: push'
+ *
+ * @throws {RangeError} If the graph fails validation, or an id or label uses
+ *                        characters the chosen mermaid syntax cannot carry.
+ * @see normalizeGraph
+ */
+declare function toMermaid(graph: Digraph, dialect: MermaidDialect): string;
+
+/**
  * A zero-dependency PNG encoder: RGBA bytes in, a complete PNG file `Buffer` out.
  *
  * PNG is a signature, a few length-prefixed chunks each carrying a CRC32, and
@@ -1634,5 +2289,5 @@ declare const LOGICAL_HEIGHT = 720;
  */
 declare function renderHistoryPng(data: HistoryData, options?: RenderOptions): Buffer;
 
-export { BLUE, BRAILLE, CANONICAL_ORDER, DELTA_WINDOW, EIGHTHS, FAILURE_MARKERS, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, ORANGE, OUTCOMES, PNG_SIGNATURE, PURPLE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, double, drawChecklistSeries, drawDeltaLane, drawNeedRate, drawStemPunch, drawUncertainStrip, encodePng, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, makeSurface, measureText, parseSummaryCounts, pixel, polyline, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDiverging, renderFsl, renderHistoryPng, renderProgressBar, renderRange, renderRetryHealth, renderSparkline, renderStacked, renderStars, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTrendTag, renderWeather, renderWinLoss, rollingMean, stemColor, subRegion, text, unhandled_external, upscale, verifyChecklist, vline };
-export type { BoxWhiskerStats, Bucket, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, FslTransition, HistoryChart, HistoryData, Milestone, MilestoneState, NeedWeekRow, Outcome, RangeStyle, Region, RenderOptions, Rgba, SeriesScale, SignatureRow, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TrendDirection, WeatherState };
+export { BLUE, BRAILLE, CANONICAL_ORDER, DEFAULT_DIAGRAM_WIDTH, DELTA_WINDOW, DIAGRAM_FALLBACKS, EIGHTHS, FAILURE_MARKERS, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_DIAGRAM_NODES, ORANGE, OUTCOMES, PNG_SIGNATURE, PURPLE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, layoutDigraph, makeGrid, makeSurface, measureText, mergeLine, normalizeGraph, parseFsl, parseSummaryCounts, pixel, polyline, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, vline };
+export type { BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, HistoryChart, HistoryData, MermaidDialect, Milestone, MilestoneState, NeedWeekRow, NodeBox, Outcome, RangeStyle, Region, RenderGridOptions, RenderOptions, Rgba, RoutedEdge, SequenceMessage, SeriesScale, SignatureRow, StateDiagramOptions, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };

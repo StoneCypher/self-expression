@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787929868148` from hash `3b098ad`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787930535552` from hash `6bfe771`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787929868148 Friday, August 28, 2026 at GMT-07:00 93.81 170 88 3b098ad 46.25 61.23 58 60.24 74 902 88.6 91.23 93.91 828 0.2.1 -->
+<!-- Supported embeds: 1787930535552 Friday, August 28, 2026 at GMT-07:00 94.84 253 91 6bfe771 50.77 67.14 65.5 66.03 91 1047 88.43 93.23 95.32 956 0.2.1 -->
 
 
 
@@ -117,6 +117,35 @@ Every renderer behind these tools is also exported directly from the library
 
 &nbsp;
 
+## Diagrams
+
+Charts express quantities; diagrams express **structure** — topology, relationships,
+transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issue #19):
+
+| Tool | Forms | Purpose |
+|---|---|---|
+| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, or a sequence diagram (actors, lifelines, one arrow row per message). |
+
+When to reach for it: **quantities** (how much, how many, trend) → a chart tool;
+**linear order** (a pipeline, one path through states) → `render_timeline`'s inline
+forms; **topology** — the moment structure branches, merges, cycles, or fans in or
+out — → `render_diagram`. Output is framed, single-width, at most 78 columns, and
+meant to sit inside a ```` ```text ```` fence. A graph too large or too tangled to
+draw legibly is refused with the fallbacks named in the error text (the FSL
+one-liner, an adjacency list, or the mermaid export). `emit: 'mermaid'` /
+`emit: 'both'` serialize the graph as `stateDiagram-v2` or `flowchart` source — an
+opt-in export for destinations that render mermaid (GitHub PR bodies, READMEs),
+never the in-transcript form, since the transcript surface shows mermaid as raw text.
+
+The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`),
+the FSL-subset parser (`parseFsl`, round-trip compatible with `renderFsl`), and the
+mermaid serializer (`toMermaid`) are all exported from the library
+(`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
+
+&nbsp;
+
+&nbsp;
+
 ## History PNG
 
 The logged history can be rendered as a PNG chart dashboard for visual review —
@@ -218,19 +247,19 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   </tr>
   <tr>
     <th>Unit</th>
-    <td>828</td>
-    <td>93.81<small>%</small></td>
-    <td>88.6<small>%</small></td>
-    <td>91.23<small>%</small></td>
-    <td>93.91<small>%</small></td>
+    <td>956</td>
+    <td>94.84<small>%</small></td>
+    <td>88.43<small>%</small></td>
+    <td>93.23<small>%</small></td>
+    <td>95.32<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>74</td>
-    <td>93.81<small>%</small></td>
-    <td>46.25<small>%</small></td>
-    <td>58<small>%</small></td>
-    <td>60.24<small>%</small></td>
+    <td>91</td>
+    <td>94.84<small>%</small></td>
+    <td>50.77<small>%</small></td>
+    <td>65.5<small>%</small></td>
+    <td>66.03<small>%</small></td>
   </tr>
 </table>
 
@@ -238,12 +267,12 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>88<small>%</small></th>
+    <th>91<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>170</td>
-    <td>88<small>%</small></td>
+    <td>253</td>
+    <td>91<small>%</small></td>
   </tr>
 </table>
 

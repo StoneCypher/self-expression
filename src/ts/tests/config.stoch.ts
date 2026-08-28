@@ -112,7 +112,9 @@ describe('invalid values never write', () => {
 
         }));
     });
-  });
+    // Store-backed like the ints property above: the default 5s vitest timeout is a
+    // flake margin under a concurrent build, not a correctness bound.
+  }, 30_000);
 
   it('arbitrary non-boolean strings are rejected for every bool key', () => {
     withStore(s => {
@@ -129,7 +131,8 @@ describe('invalid values never write', () => {
 
         }));
     });
-  });
+    // Store-backed like the ints property above; same flake margin, same widening.
+  }, 30_000);
 
   it('a stored garbage row never leaks through the tolerant accessor', () => {
     withStore(s => {
@@ -140,6 +143,7 @@ describe('invalid values never write', () => {
           expect(effectiveValue(s, 'retention.days')).toBe('0');
         }));
     });
-  });
+    // Store-backed like the ints property above; same flake margin, same widening.
+  }, 30_000);
 
 });

@@ -49,7 +49,8 @@ self-expression/
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
 │   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
-│   ├── charts/              pure ASCII renderers
+│   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
+│   ├── diagrams/            pure ASCII diagram renderers — structure (invariant contract)
 │   ├── dwelling/            the keepsake dwelling: paths, schema, store/adoption, ops
 │   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)
 │   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
@@ -135,6 +136,14 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
   ASCII/emoji renderers and `src/ts/mcp/chart_tools.ts` exposes them as six grouped MCP tools
   (`render_series`, `render_bar`, `render_rows`, `render_timeline`, `render_glyph`,
   `render_checklist_summary`) — see the README's Charts section.
+- **Diagrams are now a distinct mechanic (issue #19).** `src/ts/diagrams/` is a sibling of
+  `charts/`, not an extension of it, because the two carry different correctness contracts:
+  charts pin exact strings across dense threshold bands, diagrams pin invariants (topology
+  survives, frames are rectangles, edges trace) plus a small golden canon. Same purity rules.
+  `src/ts/mcp/diagram_tools.ts` exposes `render_diagram` (`state` · `digraph` · `tree` ·
+  `sequence`), with a small FSL-subset parser round-trip compatible with `renderFsl` and an
+  opt-in `toMermaid` export — see the README's Diagrams section and
+  `src/superpowers/spec/2026-08-27-diagrams-design.md`.
 - **Codex hooks.** Codex documents `hooks/hooks.json`, but its event names and plugin-root
   variable are not verified. The `hooks` field is deliberately absent from the Codex manifest
   rather than pointing at a guess.
@@ -150,9 +159,15 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
 - **Mutation testing is kept, deliberately.** Unlike the Playwright suite, Stryker earns its
   place here: the ASCII renderers are pure functions emitting exact strings across dense
   threshold bands, which is the case mutation testing is actually for. It stays opt-in
-  (`ci.stryker: false`), and `mutate` covers the pure renderer directories —
-  `src/ts/charts/**/*.ts` and `src/ts/raster/**/*.ts` (the exact-byte PNG encoder and its
-  threshold-heavy layout arithmetic are the same sweet spot) — so runs stay fast.
+  (`ci.stryker: false`), and `mutate` covers `src/ts/charts/**/*.ts` and
+  `src/ts/raster/**/*.ts` (the exact-byte PNG encoder and its threshold-heavy layout
+  arithmetic are the same sweet spot), plus the deterministic string logic of diagrams
+  (`diagrams/model.ts`, `diagrams/fsl.ts`, `diagrams/grid.ts`, `diagrams/mermaid.ts`).
+  `diagrams/layout.ts` and `diagrams/renderers.ts` are deliberately excluded: layout
+  heuristics (barycenter ordering, slot spreading, gutter arithmetic) would generate
+  surviving-mutant noise without indicating missing tests — the diagram contract is
+  invariants plus a few goldens, not byte-exact strings everywhere. The exclusion and its
+  reason are also recorded in `stryker.config.json`'s `mutate_comment`.
 - **The PNG history renderer is now implemented (issue #7).** `src/ts/raster/` carries the
   zero-dependency encoder, 5×7 bitmap font, drawing surface, and five-panel dashboard;
   `render_history_png` in `src/ts/mcp/chart_tools.ts` and the `self-expression render`
