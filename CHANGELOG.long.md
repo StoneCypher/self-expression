@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-40 merges; 2 releases
+39 merges; 2 releases
 
 
 
@@ -14,105 +14,6 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 7:48:49 AM
-
-Commit [e8baf0bf9eec24e701743e87e1a19ec91654c9de](https://github.com/StoneCypher/self-expression/commit/e8baf0bf9eec24e701743e87e1a19ec91654c9de)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: channel extensions — forecast ground, faded kind, salience flag transport, typed silence, load and taste channels, v1→v2 migration
-  * Implements all six extensions from the 2026-08-27 channel-extensions design
-spec (src/superpowers/spec/2026-08-27-channel-extensions-design.md):
-  * 1. Forecast ground 'predicted' joins CONFIDENCE_GROUNDS, with nullable
-   resolve_by (ISO local date) and outcome (hit/miss/void) columns.
-   Resolution rides the existing corrects_id chain; the tool layer rejects
-   an outcome whose target is not a predicted row, naming its actual
-   ground. forecast.enabled (default on) is enforced by baking the grounds
-   enum at server startup via enabledConfidenceGrounds(store).
-   forecastOutcomes(store) returns the calibration series (voids excluded
-   from hit rate by documented rule).
-2. Divergence kind 'faded' joins DIVERGENCE_KINDS, documented as
-   normatively never an error.
-3. Salience ⭑ lands as a skill convention with salience.enabled carried to
-   static skills via the new conventions-flags segment on the hook context
-   line (conventionFlags/CONVENTION_FLAGS) — the general transport for
-   skill-level toggles (salience/revision/gifts/roster), coordinating with
-   the #30 config surface.
-4. Typed silence: closed SILENCE_KINDS vocabulary (empty/unlooked/held/
-   depth) as a nullable qualifier column on any channel.
-5. Self-state decoration glyph table (derived, never stored) folded into
-   the skill, plus the new 'load' channel (proprioception).
-6. The 'taste' channel (#-line, 🎨, scarce), toggled by channels.enabled.
-  * Cross-cutting: SCHEMA_VERSION bumps to 2 with reusable versioned-migration
-machinery (src/ts/channels/migrate.ts) — stepwise MigrationStep chain; the
-v1→v2 step is a transactional table rebuild (explicit column lists both
-sides, ids preserved, indices recreated, FK enforcement suspended around
-the rebuild per the standard SQLite recipe). openStore now reads the
-stored schema_version BEFORE stamping it — fixing the latent bug that
-would have marked a v1 database current without migrating — migrates when
-behind, and refuses newer-than-code or non-integer stored versions.
-  * Field-trial adoptions: status markers 🔬 (under review) and 🔁 (fix round)
-join markers.md and CANONICAL_ORDER with pinned ranks; activity-glyph
-examples 🗃️ 🌐 🧹 join the vendored visuals doc.
-  * Tests: vocabulary pins, schema CHECK coverage, cross-field validation
-matrix, forecastOutcomes, tool-layer resolution checks, conventions-flags
-rendering, migration fixture round-trip on a literal v1 DDL, and two new
-stochastic suites — any-v1-database lossless migration, and
-validator-vs-CHECK agreement across every constrained column.
-  * Closes #42
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 7:48:46 AM
-
-Commit [32c17a77e1f0544b2a55a9972ed95d2b833aa58b](https://github.com/StoneCypher/self-expression/commit/32c17a77e1f0544b2a55a9972ed95d2b833aa58b)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [4b4cf6f, 22e8cd8]
-
-  * Merge pull request #65 from StoneCypher/feat_26-08-28_config-surface_30
-  * feat: configuration surface — key registry, validated configure ops, retention, format stamping (#30)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 7:46:29 AM
-
-Commit [22e8cd82ae835c8ff55c2c1785335e6b96d0fdc6](https://github.com/StoneCypher/self-expression/commit/22e8cd82ae835c8ff55c2c1785335e6b96d0fdc6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: config surface — key registry, validated configure ops, retention, format stamping
-  * Implements the nine decisions of src/superpowers/spec/2026-08-27-config-surface-design.md (issue #30):
-  * - D1: declarative CONFIG_KEYS registry in src/ts/channels/config.ts — name, kind, code default, description, canonicalizing validator per key; the eight #30 keys plus the three dwelling.* keys from the #45 spec, so adding a key is one entry
-- D2: configure set validates known keys and stores canonical text (bool lowercased; int decimal in range; channel list trimmed/joined; string trimmed, capped); invalid values name what would have been accepted and write nothing
-- D3: unknown keys are stored with a stated warning, never rejected and never silent
-- D4: new unset op (delete the override; code default applies again) and list now reports effective configuration — every registry key with value and source, unknown rows labeled
-- D5: tolerant effectiveValue accessor — an invalid stored row behaves as unset; readers never throw
-- D6: retention.days prunes entries and turn_context at server startup (channels/retention.ts, called fail-open from startStdio); 0 never prunes; meta and config untouched
-- D7: FORMAT_VERSION constant; express (and log_checklist) stamp every row with the configured override, else the constant — fixing the always-NULL format_version
-- D8: gate.checklist registered and validated now, consumed when the checklist gate lands
-- D9: time.hook exactly 'false' suppresses only the clock sentence; context recording is unchanged and the open reminder goes out in clockless wording
-  * deleteConfig added to store.ts; express/configure handler bodies extracted as testable functions; unit + stochastic (fast-check) tests; README configuration section and plugin-layout decision entry.
-  * Closes #30
 
 
 

@@ -99,9 +99,10 @@ describe('rejectDwellingWrite', () => {
     expect(rejectDwellingWrite(s, DWELLING_PATH_KEY, dir)).toBeNull();
   }));
 
-  test('size_warn_gb must be a positive integer', () => withStore(s => {
+  test('size_warn_gb must be a non-negative integer (0 warns on every visit)', () => withStore(s => {
     expect(rejectDwellingWrite(s, DWELLING_SIZE_WARN_KEY, '10')).toBeNull();
-    expect(rejectDwellingWrite(s, DWELLING_SIZE_WARN_KEY, '0')).toContain('error:');
+    expect(rejectDwellingWrite(s, DWELLING_SIZE_WARN_KEY, '0')).toBeNull();
+    expect(rejectDwellingWrite(s, DWELLING_SIZE_WARN_KEY, '-3')).toContain('error:');
     expect(rejectDwellingWrite(s, DWELLING_SIZE_WARN_KEY, '2.5')).toContain('error:');
     expect(rejectDwellingWrite(s, DWELLING_SIZE_WARN_KEY, 'big')).toContain('error:');
   }));

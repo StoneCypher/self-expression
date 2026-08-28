@@ -20,6 +20,7 @@ import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { openStore, closeStore } from '../channels/store.js';
+import { pruneExpired }  from '../channels/retention.js';
 import type { Store }    from '../channels/store.js';
 import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
@@ -64,7 +65,8 @@ export function buildServer(store: Store, version: string, dwelling?: DwellingSt
 }
 
 /**
- * Open the store, build the server, and serve on stdio until the transport closes.
+ * Open the store, run startup retention, build the server, and serve on stdio until
+ * the transport closes.
  *
  * Resolves when the connection ends. `dbFile` is injectable for tests; it defaults to
  * the resolved data directory.
@@ -82,6 +84,21 @@ export async function startStdio(version: string, dbFile?: string): Promise<void
         house     = maybeOpenDwelling(store),
         server    = buildServer(store, version, house),
         transport = new StdioServerTransport();
+
+  // Startup retention (issue #30, D6): prune rows past the configured horizon, once
+  // per server process, before any turn's reads. A pruning failure must not keep the
+  // server from starting — retention is a horizon, not a gate — so it fails open with
+  // a note on stderr, which is the diagnostics channel here.
+  try {
+    const pruned = pruneExpired(store);
+    if (pruned.entries > 0 || pruned.turnContext > 0) {
+      process.stderr.write(
+        `${SERVER_NAME}: retention pruned ${String(pruned.entries)} entries and ` +
+        `${String(pruned.turnContext)} turn-context rows\n`);
+    }
+  } catch (error) {
+    process.stderr.write(`${SERVER_NAME}: retention pruning failed, continuing: ${String(error)}\n`);
+  }
 
   process.stderr.write(`${SERVER_NAME} ${version} — logging to ${store.path}\n`);
 

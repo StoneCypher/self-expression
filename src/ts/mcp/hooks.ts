@@ -83,6 +83,18 @@ export const OPEN_REMINDER =
   'Open this turn with a signature before working, using the timestamp above.';
 
 /**
+ * The open-signature reminder for the clockless case — `time.hook` set exactly to
+ * `'false'` (issue #30, D9).
+ *
+ * The reminder still goes out when the clock sentence is suppressed, because it
+ * belongs to enforcement (the `gate.*` family's concern), not to time injection — but
+ * the shipped wording says "using the timestamp above", which must not dangle when no
+ * timestamp was injected. Hence this variant.
+ */
+export const OPEN_REMINDER_CLOCKLESS =
+  'Open this turn with a signature before working.';
+
+/**
  * `UserPromptSubmit`: record what the harness knows, and hand back the clock.
  *
  * The context write is the important half. It is the only way session identity,
@@ -94,6 +106,10 @@ export const OPEN_REMINDER =
  * config, at the point of capture, so a suppressed field is never written to the database
  * rather than being hidden after the fact. The config read is inside the fail-open `try`,
  * so a config error skips the context write entirely and still delivers the clock.
+ *
+ * When `time.hook` is exactly `'false'`, the clock sentence is omitted and the
+ * open-signature reminder goes out in its clockless wording — presentation changes,
+ * observation does not (issue #30, D9).
  *
  * @example
  *   onUserPromptSubmit(store, { session_id: 'abc', prompt_id: 'p1' }, new Date())
@@ -119,10 +135,22 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     } catch { /* fail open: the clock still gets delivered */ }
   }
 
+  // `time.hook` suppresses the clock sentence, and only that (issue #30, D9): the
+  // context write above is observational, not presentational, and is unaffected; the
+  // open-signature reminder still goes out, reworded for the clockless case. Only the
+  // exact string 'false' suppresses — the same asymmetry the privacy keys use — and
+  // the read fails open to keeping the clock, since suppressing on an error would be
+  // enforcing a choice nobody made.
+  let clock = true;
+  if (store !== null) {
+    try { clock = readConfig(store, 'time.hook') !== 'false'; }
+    catch { /* fail open: keep the clock */ }
+  }
+
   return {
     hookSpecificOutput: {
       hookEventName    : 'UserPromptSubmit',
-      additionalContext: `${describeMoment(now)} ${OPEN_REMINDER}`,
+      additionalContext: clock ? `${describeMoment(now)} ${OPEN_REMINDER}` : OPEN_REMINDER_CLOCKLESS,
     },
   };
 

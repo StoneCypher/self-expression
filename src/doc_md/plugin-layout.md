@@ -104,7 +104,21 @@ against, and here even a no-op entry would be wrong. Removal is a tombstone
 (`removed_utc`), never a DELETE; a pre-plugin prototype database is adopted in place,
 additively, behind a same-directory backup; a newer schema opens read-only. The ethos
 lives in `skills/dwelling/SKILL.md`, which defers to the tool's presence so a disabled
-dwelling costs no attention.
+dwelling costs no attention. Its three `dwelling.*` keys ride the #30 registry like any
+other; the dwelling layers its cross-key rule (enabled-without-path is rejected) and its
+directory-must-exist rule on top of the registry's type validation.
+
+**Configuration is two layers, and the registry is code (issue #30).** `SELF_EXPRESSION_HOME`
+locates the database and does nothing else; every other choice is a `config` row, else the
+code default. The keys live in one declarative registry (`src/ts/channels/config.ts`) with
+their kinds, defaults, and validators, consumed by the `configure` tool: writers are strict
+(an invalid `set` is rejected naming what would have been accepted, and nothing is written;
+an unknown key is stored with a stated warning, because a newer version may legitimately
+have written it), while readers are tolerant (a stored value that fails validation behaves
+as unset, so a hand-edited database can never wedge the gates). `unset` returns a key to
+tracking the code default, and `list` reports the effective configuration rather than just
+the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
+server startup — it never archives, and never touches `meta` or `config`.
 
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ

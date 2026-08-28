@@ -53,7 +53,7 @@ export function dwellingConfig(store: Store): DwellingConfig {
         rawGb   = readConfig(store, DWELLING_SIZE_WARN_KEY),
         parsed  = rawGb === null ? NaN : Number(rawGb);
 
-  const sizeWarnGb = Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_SIZE_WARN_GB;
+  const sizeWarnGb = Number.isInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_SIZE_WARN_GB;
 
   return { enabled, path, sizeWarnGb };
 
@@ -137,8 +137,8 @@ export function rejectDwellingWrite(
 
   if (key === DWELLING_SIZE_WARN_KEY) {
     const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return `error: dwelling.size_warn_gb accepts a positive integer number of gigabytes; got '${value}'`;
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      return `error: dwelling.size_warn_gb accepts a non-negative integer number of gigabytes (0 warns on every visit); got '${value}'`;
     }
     return null;
   }

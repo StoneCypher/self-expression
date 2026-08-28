@@ -1,0 +1,316 @@
+/**
+ * The canonical registry of configuration keys: names, kinds, defaults, and validators.
+ *
+ * This is a runtime registry rather than a type for the same reason
+ * `channels/vocabulary.ts` is: the keys are needed in places types cannot reach — the
+ * `configure` tool's rejection messages must name what would have been accepted, and
+ * the effective-config listing must enumerate every key with its default even when the
+ * `config` table is empty (issue #30, D1).
+ *
+ * Two rules hold everywhere:
+ *
+ * - **Writers are strict** (D2): `configure set` runs a key's validator and stores the
+ *   canonical text form, so "set once and quietly wrong for months" fails loudly at the
+ *   moment of writing instead.
+ * - **Readers are tolerant** (D5): {@link effectiveValue} treats a stored value that
+ *   fails validation as absent, so a hand-edited database or a pre-validation row can
+ *   never wedge the server or the gates.
+ *
+ * Defaults live here as code, never as seeded rows — a seeded default could never be
+ * changed by a later release, because the row would shadow it forever.
+ *
+ * @see ./store.js
+ * @see ./vocabulary.js
+ */
+
+import { CHANNELS, describeVocabulary } from './vocabulary.js';
+import { readConfig, allConfig }        from './store.js';
+import type { Store }                   from './store.js';
+
+/**
+ * The recording-convention label stamped onto every entry row when no
+ * `format.version` override is set.
+ *
+ * The pin is declarative, not behavioral (D7): the value marks which convention a row
+ * was written under so a mid-study upgrade is visible in the data — the server never
+ * emulates older conventions when pinned to an older value.
+ */
+export const FORMAT_VERSION = '1';
+
+/** The value shapes a registered key can take. */
+export type ConfigKind = 'bool' | 'int' | 'list' | 'string';
+
+/**
+ * The outcome of validating one proposed config value: either the canonical text to
+ * store, or a description of what would have been accepted — never a bare "no".
+ */
+export type Validation =
+  | { readonly ok: true;  readonly canonical: string }
+  | { readonly ok: false; readonly expected: string };
+
+/**
+ * One registered configuration key: its name, kind, code default, purpose, and the
+ * validator that canonicalizes a proposed value or explains what was expected.
+ *
+ * Adding a key to the surface is one declarative entry in {@link CONFIG_KEYS}; nothing
+ * else needs to change for `set` validation, `unset`, and the effective listing to
+ * cover it.
+ */
+export interface ConfigKeyDef {
+  readonly key         : string;
+  readonly kind        : ConfigKind;
+  /** Canonical default text, or `null` when the key deliberately has no default. */
+  readonly fallback    : string | null;
+  /** One-line purpose, surfaced by the `configure` tool's effective listing. */
+  readonly description : string;
+  /** Canonicalizes a proposed value, or names what would have been accepted. */
+  readonly validate    : (raw: string) => Validation;
+}
+
+/**
+ * Validate a boolean value: exactly `true` or `false`, case-insensitively, and
+ * canonicalized to lowercase.
+ *
+ * Synonyms (`yes`, `1`, `off`) are rejected rather than guessed at — every accepted
+ * synonym would be a second spelling that some future reader must also know about, and
+ * canonicalizing at write is what makes the read-side "only exact `'false'`
+ * suppresses" rule safe rather than fragile.
+ *
+ * @example
+ *   validateBool('TRUE')  // => { ok: true, canonical: 'true' }
+ *   validateBool('yes')   // => { ok: false, expected: "a boolean: exactly 'true' or 'false' …" }
+ */
+export function validateBool(raw: string): Validation {
+  const lowered = raw.trim().toLowerCase();
+  return lowered === 'true' || lowered === 'false'
+    ? { ok: true, canonical: lowered }
+    : { ok: false, expected:
+        "a boolean: exactly 'true' or 'false' (case-insensitive; synonyms like 'yes' or '1' are not guessed at)" };
+}
+
+/**
+ * Build a validator for an integer key: decimal digits only, within `[min, max]`
+ * inclusive, canonicalized to plain decimal (leading zeros stripped).
+ *
+ * @param min smallest accepted value, inclusive
+ * @param max largest accepted value, inclusive
+ *
+ * @example
+ *   intValidator(0, 3650)('090')   // => { ok: true, canonical: '90' }
+ *   intValidator(0, 3650)('-1')    // => { ok: false, expected: 'an integer from 0 to 3650 …' }
+ */
+export function intValidator(min: number, max: number): (raw: string) => Validation {
+  const expected = `an integer from ${String(min)} to ${String(max)}, decimal digits only`;
+  return (raw: string): Validation => {
+    const trimmed = raw.trim();
+    if (!/^\d+$/.test(trimmed)) { return { ok: false, expected }; }
+    const value = Number(trimmed);
+    return value >= min && value <= max
+      ? { ok: true, canonical: String(value) }
+      : { ok: false, expected };
+  };
+}
+
+/**
+ * Validate a channel list: comma-separated channel names, each a known channel, at
+ * least one of them, canonicalized to trimmed names joined with `,`.
+ *
+ * An unknown name rejects the whole write, naming the valid channels — a typo must
+ * fail loudly at set time, not silently disable half the plugin at read time.
+ *
+ * @example
+ *   validateChannelList(' signature , need ')  // => { ok: true, canonical: 'signature,need' }
+ *   validateChannelList('signature,vibes')     // => { ok: false, expected: "channel names from 'signature', …" }
+ */
+export function validateChannelList(raw: string): Validation {
+
+  const named = raw.split(',').map(s => s.trim()).filter(s => s !== '');
+
+  if (named.length === 0) {
+    return { ok: false, expected:
+      `a non-empty comma-separated list of channels: ${describeVocabulary(CHANNELS)}` };
+  }
+
+  const unknown = named.filter(n => !(CHANNELS as readonly string[]).includes(n));
+
+  if (unknown.length > 0) {
+    return { ok: false, expected:
+      `channel names from ${describeVocabulary(CHANNELS)}; ` +
+      `${unknown.map(u => `'${u}'`).join(', ')} ${unknown.length === 1 ? 'is' : 'are'} not recognised` };
+  }
+
+  return { ok: true, canonical: named.join(',') };
+
+}
+
+/**
+ * Build a validator for a string key: trimmed, non-empty, at most `maxLength`
+ * characters.
+ *
+ * @param maxLength longest accepted value, in characters, after trimming
+ *
+ * @example
+ *   stringValidator(64)('v18')  // => { ok: true, canonical: 'v18' }
+ *   stringValidator(64)('  ')   // => { ok: false, expected: 'a non-empty string of at most 64 characters' }
+ */
+export function stringValidator(maxLength: number): (raw: string) => Validation {
+  const expected = `a non-empty string of at most ${String(maxLength)} characters`;
+  return (raw: string): Validation => {
+    const trimmed = raw.trim();
+    return trimmed !== '' && trimmed.length <= maxLength
+      ? { ok: true, canonical: trimmed }
+      : { ok: false, expected };
+  };
+}
+
+/**
+ * Every key this version of the plugin knows about.
+ *
+ * A key a newer version writes is still stored and preserved (D3) — this registry is
+ * what makes it possible to *say* it is unknown, not a gate that rejects it. The
+ * `dwelling.*` keys belong to issue #45's facility and are registered here so the
+ * config surface and the dwelling cannot disagree about their names, kinds, or
+ * defaults.
+ */
+export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
+  { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
+    description: 'which expression channels the express tool offers; baked into the tool schema at server startup',
+    validate: validateChannelList },
+  { key: 'gate.signature', kind: 'bool', fallback: 'true',
+    description: 'whether the Stop gate blocks a turn that never signed off',
+    validate: validateBool },
+  { key: 'gate.checklist', kind: 'bool', fallback: 'true',
+    description: 'reserved for the checklist gate (D8); registered now so its name and default are settled before anything reads it',
+    validate: validateBool },
+  { key: 'retention.days', kind: 'int', fallback: '0',
+    description: 'prune entries and turn context older than this many days at server startup; 0 never prunes',
+    validate: intValidator(0, 3650) },
+  { key: 'privacy.store_cwd', kind: 'bool', fallback: 'true',
+    description: 'record cwd, project, and git branch; suppressed at write time when exactly false',
+    validate: validateBool },
+  { key: 'privacy.store_prompt_len', kind: 'bool', fallback: 'true',
+    description: 'record the prompt length; suppressed at write time when exactly false',
+    validate: validateBool },
+  { key: 'format.version', kind: 'string', fallback: FORMAT_VERSION,
+    description: 'declarative recording-convention label stamped onto each entry row; not behavioral',
+    validate: stringValidator(64) },
+  { key: 'time.hook', kind: 'bool', fallback: 'true',
+    description: 'whether the UserPromptSubmit hook injects the clock sentence; context recording is unaffected',
+    validate: validateBool },
+  { key: 'dwelling.enabled', kind: 'bool', fallback: 'false',
+    description: 'whether the dwelling facility (#45) is active; requires dwelling.path to be set',
+    validate: validateBool },
+  { key: 'dwelling.path', kind: 'string', fallback: null,
+    description: 'absolute directory the dwelling database lives in; deliberately no default — required when dwelling.enabled is true',
+    validate: stringValidator(1024) },
+  { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
+    description: 'dwelling file size, in gigabytes, at which a visit warns the user',
+    validate: intValidator(0, 1048576) },
+];
+
+/**
+ * Look up one registered key's definition, or `undefined` for a key this version does
+ * not know about.
+ *
+ * @example
+ *   configKey('gate.signature')?.fallback  // => 'true'
+ *   configKey('gate.signture')             // => undefined — the typo D3's warning exists for
+ */
+export function configKey(key: string): ConfigKeyDef | undefined {
+  return CONFIG_KEYS.find(def => def.key === key);
+}
+
+/**
+ * The tolerant effective-value accessor every consumer reads through (D5).
+ *
+ * For a registered key: the stored override in canonical form when it validates, else
+ * the code default — a hand-edited or pre-validation row behaves as unset rather than
+ * wedging anything. Returns `null` only for a key with no default (`dwelling.path`)
+ * and no valid override. For an unregistered key: the raw stored value, or `null`,
+ * because there is nothing to validate against.
+ *
+ * @param key the config key to resolve
+ * @returns the effective canonical value, or `null` when the key resolves to nothing
+ *
+ * @example
+ *   effectiveValue(store, 'retention.days')   // => '0' on a fresh install
+ *   writeConfig(store, 'retention.days', 90);
+ *   effectiveValue(store, 'retention.days')   // => '90'
+ */
+export function effectiveValue(store: Store, key: string): string | null {
+
+  const def = configKey(key),
+        raw = readConfig(store, key);
+
+  if (def === undefined) { return raw; }
+
+  if (raw !== null) {
+    const outcome = def.validate(raw);
+    if (outcome.ok) { return outcome.canonical; }
+  }
+
+  return def.fallback;
+
+}
+
+/** One line of the effective-configuration report. */
+export interface EffectiveEntry {
+  readonly key    : string;
+  /** The value in effect; `null` for a key with no default and no valid override. */
+  readonly value  : string | null;
+  /** Where the value came from — an override row, or the code default. */
+  readonly source : 'override' | 'default';
+  /** Whether this version's registry knows the key. */
+  readonly known  : boolean;
+  /** Present when something is worth flagging: an invalid stored row, or an unknown key. */
+  readonly note?  : string | undefined;
+}
+
+/**
+ * The effective configuration: every registered key with its value and source, plus
+ * any unknown override rows, labeled as unknown (D4).
+ *
+ * This answers "what is my configuration?" when the answer is mostly defaults — which
+ * the overrides-only dump it replaces never could. An override that fails its key's
+ * validator is reported at the default with a note, matching what
+ * {@link effectiveValue} will actually do.
+ *
+ * @example
+ *   effectiveConfig(store)
+ *   // => [ { key: 'channels.enabled', value: 'signature,need,…', source: 'default', known: true }, … ]
+ */
+export function effectiveConfig(store: Store): EffectiveEntry[] {
+
+  const overrides = allConfig(store),
+        out: EffectiveEntry[] = [];
+
+  for (const def of CONFIG_KEYS) {
+
+    const raw = overrides[def.key];
+
+    if (raw === undefined) {
+      out.push({ key: def.key, value: def.fallback, source: 'default', known: true });
+      continue;
+    }
+
+    const outcome = def.validate(raw);
+
+    if (outcome.ok) {
+      out.push({ key: def.key, value: outcome.canonical, source: 'override', known: true });
+    } else {
+      out.push({ key: def.key, value: def.fallback, source: 'default', known: true,
+                 note: `stored override '${raw}' is not ${outcome.expected}; treated as unset` });
+    }
+
+  }
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (configKey(key) === undefined) {
+      out.push({ key, value, source: 'override', known: false,
+                 note: 'unknown to this version; preserved — possibly written by a newer version' });
+    }
+  }
+
+  return out;
+
+}
