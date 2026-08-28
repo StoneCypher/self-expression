@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>0/14</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>0/13</span>
             </div>
         
             
@@ -142,7 +142,10 @@
 <a name='L77'></a><a href='#L77'>77</a>
 <a name='L78'></a><a href='#L78'>78</a>
 <a name='L79'></a><a href='#L79'>79</a>
-<a name='L80'></a><a href='#L80'>80</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -156,17 +159,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -181,6 +173,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -225,8 +231,8 @@
  * The stdio MCP server.
  *
  * Thin by design: it opens the store, registers the tools, and connects a transport.
- * Everything worth testing lives in `tools.ts` and the store modules, which need no
- * pipe to exercise.
+ * Everything worth testing lives in `tools.ts`, `chart_tools.ts`, and the store
+ * modules, which need no pipe to exercise.
  *
  * One constraint shapes this whole file — **stdout is the protocol channel**. Anything
  * written there that is not a JSON-RPC frame corrupts the stream and the host sees a
@@ -235,6 +241,7 @@
  * because it lands there.
  *
  * @see ./tools.js
+ * @see ./chart_tools.js
  */
 &nbsp;
 import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -243,6 +250,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }    from '../channels/store.js';
 import { registerTools } from './tools.js';
+import { registerChartTools } from './chart_tools.js';
 &nbsp;
 /** Name advertised to the host during the MCP handshake. */
 export const SERVER_NAME = <span class="cstat-no" title="statement not covered" >'self-expression';</span>
@@ -261,6 +269,7 @@ export function <span class="fstat-no" title="function not covered" >buildServer
   const server = <span class="cstat-no" title="statement not covered" >new McpServer({ name: SERVER_NAME, version });</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  registerTools(server, store, version);</span>
+<span class="cstat-no" title="statement not covered" >  registerChartTools(server, store);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return server;</span>
 &nbsp;
@@ -307,7 +316,7 @@ export async function <span class="fstat-no" title="function not covered" >start
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-19T23:31:16.361Z
+                at 2026-08-28T03:22:44.459Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

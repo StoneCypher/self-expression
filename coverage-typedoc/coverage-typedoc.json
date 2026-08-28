@@ -1,1 +1,1 @@
-{"percent":50,"expected":2,"actual":1,"notDocumented":["unhandled_external.unhandled_external"]}
+{"percent":87,"expected":71,"actual":62,"notDocumented":["BoxWhiskerStats.min","BoxWhiskerStats.q1","BoxWhiskerStats.median","BoxWhiskerStats.q3","BoxWhiskerStats.max","ChecklistItem.marker","ChecklistItem.bucket","SummaryOptions.series","unhandled_external.unhandled_external"]}

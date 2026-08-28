@@ -104,6 +104,10 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
 
 ## Unresolved
 
+- **The visuals vocabulary is now implemented (issue #26).** `src/ts/charts/` carries the pure
+  ASCII/emoji renderers and `src/ts/mcp/chart_tools.ts` exposes them as six grouped MCP tools
+  (`render_series`, `render_bar`, `render_rows`, `render_timeline`, `render_glyph`,
+  `render_checklist_summary`) — see the README's Charts section.
 - **Codex hooks.** Codex documents `hooks/hooks.json`, but its event names and plugin-root
   variable are not verified. The `hooks` field is deliberately absent from the Codex manifest
   rather than pointing at a guess.
@@ -117,7 +121,7 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
 - **npm name.** `.mcp.json` assumes the package publishes as `self-expression`. Unverified as
   available.
 - **Mutation testing is kept, deliberately.** Unlike the Playwright suite, Stryker earns its
-  place here: the ASCII renderers will be pure functions emitting exact strings across dense
+  place here: the ASCII renderers are pure functions emitting exact strings across dense
   threshold bands, which is the case mutation testing is actually for. It stays opt-in
-  (`ci.stryker: false`) until there is chart code worth mutating, and `mutate` should then be
-  narrowed to the pure directories so runs stay fast.
+  (`ci.stryker: false`), and `mutate` is now narrowed to `src/ts/charts/**/*.ts` — the pure
+  renderer directory — so runs stay fast.

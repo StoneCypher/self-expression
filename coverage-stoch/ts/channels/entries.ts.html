@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/27</span>
+                <span class='fraction'>0/30</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/25</span>
+                <span class='fraction'>0/27</span>
             </div>
         
             
@@ -333,7 +333,30 @@
 <a name='L268'></a><a href='#L268'>268</a>
 <a name='L269'></a><a href='#L269'>269</a>
 <a name='L270'></a><a href='#L270'>270</a>
-<a name='L271'></a><a href='#L271'>271</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -599,6 +622,29 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -873,6 +919,29 @@ export function <span class="fstat-no" title="function not covered" >recentEntri
        FROM entries ORDER BY id DESC LIMIT ?`).all(limit);
 <span class="cstat-no" title="statement not covered" >  return rows.reverse();</span>
 }
+&nbsp;
+/**
+ * The stored percent history for one checklist series, oldest first.
+ *
+ * Backs the chart tools' `seriesKey` resolution: a caller names a series it previously
+ * logged instead of repeating its numbers by hand, and this replays exactly what
+ * `recordEntry` persisted for it. An unknown or never-used key returns an empty array
+ * rather than throwing — a series with no history yet is not an error.
+ *
+ * @param seriesKey the series identifier entries were recorded under
+ * @returns each matching entry's `percent`, ascending by id (recording order)
+ *
+ * @example
+ *   seriesPercents(store, 'coverage')  // =&gt; [62, 71, 71, 84]
+ *   seriesPercents(store, 'nonesuch')  // =&gt; []
+ */
+export function <span class="fstat-no" title="function not covered" >seriesPercents(s</span>tore: Store, seriesKey: string): number[] {
+  const rows = <span class="cstat-no" title="statement not covered" >store.db.prepare(</span>
+    `SELECT percent FROM entries
+      WHERE series_key = ? AND percent IS NOT NULL
+      ORDER BY id ASC`).all(seriesKey);
+<span class="cstat-no" title="statement not covered" >  return rows.<span class="fstat-no" title="function not covered" >map(r</span>ow =&gt; <span class="cstat-no" title="statement not covered" >Number(row['percent']))</span>;</span>
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -880,7 +949,7 @@ export function <span class="fstat-no" title="function not covered" >recentEntri
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-19T23:31:16.361Z
+                at 2026-08-28T03:22:44.459Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

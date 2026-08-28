@@ -29,7 +29,7 @@ Do NOT use for a single task, for prose explanation, or for anything that is not
 ## A complete example
 
 **Release build — pipeline (6 steps)**
-```
+```text
 - ✅ Install dependencies
 - ✅ Lint and type-check
 - ✅ Compile bundle
@@ -70,7 +70,7 @@ The last row: `<count-section> items (<P>%) <progress-bar>  <trend sparkline?>  
 
 Example — the icon list has 11 distinct markers, more than 8, so it drops to its own block and splits into three bucket lines; no line exceeds 12 entries, so no blank lines between them:
 
-```
+```text
 8/13/4 items (32%) ███▒░░░░░░
 
 ✅ 8

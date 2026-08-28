@@ -43,7 +43,7 @@ export function barCells(percent: number, cells?: number): string;   // cells de
 - [ ] **Step 2: Run tests, verify FAIL** (module not found).
 - [ ] **Step 3: Implement.** `barCells`: `full = floor(percent/(100/cells))`; if `full < cells`, one `boundaryGlyph` cell for the fractional remainder, then `░` padding to exactly `cells` chars.
 - [ ] **Step 4: Run tests, verify PASS.**
-- [ ] **Step 5: Stoch invariants** (fast-check): `barCells` length always `cells`; count of `█` monotone nondecreasing in percent; `absoluteIndex` within `[0, steps-1]` for percent in [0,100].
+- [ ] **Step 5: Stoch invariants** (fast-check): `barCells` length always `cells`; count of `█` monotone nondecreasing in percent; `absoluteIndex` within `[0, steps-1]` for percent in \[0,100\].
 - [ ] **Step 6: Run stoch, verify PASS. Commit** `feat(charts): scale arithmetic — glyph ramps, absolute/relative index, anti-aliased bar cells`
 
 ### Task 2: `charts/markers.ts` — marker vocabulary
@@ -125,7 +125,7 @@ export function renderTileGrid(rows: readonly (TileCell|null)[][], fill: TileFil
 ```
 
 - [ ] **Step 1: Failing tests.** Comparison pinned to the visuals.md example: rows `[{label:'schema',value:80},{label:'content',value:55},{label:'media',value:20}]` with shared max 100 render exactly:
-  ```
+  ```text
   schema   ████████████████░░░░  80%
   content  ███████████░░░░░░░░░  55%
   media    ████░░░░░░░░░░░░░░░░  20%
@@ -191,7 +191,7 @@ export function renderChecklistSummary(items: readonly ChecklistItem[], options?
 ```
 
 - [ ] **Step 1: Failing tests.** The SKILL.md example must render byte-identical: items comprising ✅×8, 🤖×4, ⏳×2, 🔜×2, ❗×2, 🌐×1, 🛠️×1, 🤔×1, 🌗×2, ❌×1, 🚫×1 →
-  ```
+  ```text
   8/13/4 items (32%) ███▒░░░░░░
 
   ✅ 8
@@ -200,7 +200,7 @@ export function renderChecklistSummary(items: readonly ChecklistItem[], options?
   ```
   Also: ≤8 distinct markers → inline (`4/1/1 items (67%) ██████▓░░░  ✅ 4  🔜 1  ❌ 1`, two spaces between bar and icons and between entries); count section always three numbers summing to total; P = `round(100*success/total)`; empty items throws RangeError; 13+ same-bucket distinct markers → wrap at 12 and blank lines between all bucket lines; `options.series` with ≥4 points appends ``  trend <sparkline>`` (two spaces) after the bar, absolute scale; <4 points → no trend (not an error).
 - [ ] **Step 2: FAIL. Step 3: Implement** — sort per icon-list rule: count desc primary, `canonicalRank` tiebreak; bucket assignment via `classifyMarker(marker, bucket)`.
-- [ ] **Step 4: PASS. Step 5: Stoch:** generated marker multisets — counts partition and sum; percent in [0,100]; bar always 10 cells; icon entries sorted by (count desc, rank asc); inline iff distinct ≤ 8.
+- [ ] **Step 4: PASS. Step 5: Stoch:** generated marker multisets — counts partition and sum; percent in \[0,100\]; bar always 10 cells; icon entries sorted by (count desc, rank asc); inline iff distinct ≤ 8.
 - [ ] **Step 6: PASS. Commit** `feat(charts): checklist summary renderer — counts, bar, sorted icon list`
 
 ### Task 9: exports + store series helper

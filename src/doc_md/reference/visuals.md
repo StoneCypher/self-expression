@@ -12,14 +12,14 @@ When the checklist describes a complete process or plan end to end, the bottom m
 
 **Two-line monochrome form** — a rail of milestone markers joined by `━`, the rail running the full width of the label row (left edge of the first label to the right edge of the last); short labels on the second line, each marker centered over its label. `●` reached · `◆` current · `○` not yet reached.
 
-```
+```text
 ━━●━━━━━━━●━━━━━━━◆━━━━━━━○━━
 spec    build    test    ship
 ```
 
 **One-line colored form** — for milestone state in color. Each pip's colored emoji immediately followed by its label, milestones joined by `━━`. Color requires emoji, emoji are double-width, and double-width pips cannot align to a single-width text label row, so the colored form drops the centered-label rail and lives on one line. `🟢` reached · `🟦` current · `🔶` failed · `◎` not yet reached.
 
-```
+```text
 🟢 spec ━━ 🔶 build ━━ 🟦 test ━━ ◎ ship
 ```
 
@@ -29,7 +29,7 @@ Choose the two-line form for the centered rail, or the one-line form for color; 
 
 To compare several categories at once — progress across workstreams, counts across groups — give each its own labeled row with a shade bar sized to its value (or a `●` marker on a track, the Cleveland dot-plot form). It attaches beneath the item or group it describes, indented one level deeper, or stands in the bottom matter. Unlike the single-bar visuals (progress bar, stacked bar, bullet graph, diverging bar), this one compares many categories side by side.
 
-```
+```text
 schema   ████████████████░░░░  80%
 content  ███████████░░░░░░░░░  55%
 media    ████░░░░░░░░░░░░░░░░  20%
@@ -45,7 +45,7 @@ A true choropleth needs real region shapes, which monospace cannot draw. Use a t
 - **Colored squares, unlabeled pixel grid** — drop labels entirely and let the colored squares double as pixels: the grid becomes a low-resolution raster of the territory's actual shape, colour encoding value, with `⬛` (or blank) for everything outside it. The most image-like form — coarse, so the silhouette reads at a glance, not in detail.
 
 Abbreviation + shade:
-```
+```text
 WA█ ID▒ MT░ ND░ MN▒
 OR▓ NV▒ WY░ SD░ IA▒
 CA█ UT▒ CO▓ NE░ MO▒
@@ -54,7 +54,7 @@ low ░ ▒ ▓ █ high
 ```
 
 Unlabeled colored-square pixel grid:
-```
+```text
 ⬛🟩🟨🟨🟧🟩🟩⬛
 🟩🟨🟧🟥🟧🟨🟩🟦
 🟥🟧🟧🟨🟨🟨⬛⬛
