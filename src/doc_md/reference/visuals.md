@@ -2,6 +2,14 @@
 
 Use any of these only where the data genuinely supports it, never as decoration.
 
+## Activity glyphs (heartbeats and tool-call descriptions)
+
+One non-face activity emoji leads an agent's heartbeat line and every tool-call
+description it writes, naming what it is currently doing. Examples, not a closed
+vocabulary — any apter glyph is fine: ⚒️ implementing · 🧪 testing · 📖 reading ·
+🔍 debugging · ✍️ writing docs · 📦 committing · 🗃️ database work ·
+🌐 network/API calls · 🧹 cleanup.
+
 ## Trend sparkline
 
 Optional element of the summary line. Include it only when the series has **four or more snapshots** — fewer is a segment, not a trend, and reads as noise; a one-shot checklist has no series to plot at all. `log-checklist.mjs`'s `series` op supplies the history. (The trend-tag micro-visualization below covers the two-to-three-point case: a value plus a direction glyph.) When present, it follows the progress bar after two spaces, written `trend <sparkline>`. Build it from the eighth-block glyphs `▁▂▃▄▅▆▇█`, one glyph per snapshot in chronological order. **Completion-percent series use the absolute scale**: 0–100% mapped directly onto `▁`–`█` (glyph index = floor(percent ÷ 12.5), capped at 7), so flat reads as flat, every checklist's sparkline is comparable to every other, and a project idling at 95% looks nothing like one idling at 5%. Series without natural bounds (latency, counts) normalize relative to the series instead (lowest → `▁`, highest → `█`).

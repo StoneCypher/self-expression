@@ -68,6 +68,54 @@ export function describeMoment(now: Date): string {
 }
 
 /**
+ * The prose-convention toggles the context line carries to the skills, with their
+ * code-side defaults.
+ *
+ * Skills are static Markdown and cannot vary by configuration, so a config key that
+ * governs a pure-prose convention (the salience glyph, visible revision, the gift
+ * register, the party roster) has no tool schema to be baked into. This table is the
+ * transport instead: the turn-start hook reads each key and appends a compact flags
+ * segment to the context line it already injects, and the skills obey the flags the
+ * line carries. Adding a future skill-level toggle means adding one row here.
+ *
+ * Key names and defaults coordinate with #30 (which owns the config surface); the key
+ * name is the interface, not the transport.
+ */
+export const CONVENTION_FLAGS: readonly { label: string; key: string; fallback: boolean }[] = [
+  { label: 'salience', key: 'salience.enabled', fallback: true  },
+  { label: 'revision', key: 'revision.enabled', fallback: false },
+  { label: 'gifts',    key: 'gifts.enabled',    fallback: false },
+  { label: 'roster',   key: 'roster.enabled',   fallback: false },
+];
+
+/**
+ * The context line's conventions-flags segment, e.g.
+ * `conventions: salience:on revision:off gifts:off roster:off`.
+ *
+ * Only the exact strings `'true'` and `'false'` override a default; anything else —
+ * unset, a typo — falls back, on the principle that a toggle should take effect only
+ * when unambiguously set. Costs one SELECT per key on a database the hook holds open
+ * anyway; no extra tool call, no extra process.
+ *
+ * @returns the segment text, without trailing punctuation
+ *
+ * @example
+ *   conventionFlags(store)
+ *   // => 'conventions: salience:on revision:off gifts:off roster:off'
+ *
+ * @see CONVENTION_FLAGS
+ * @see onUserPromptSubmit
+ */
+export function conventionFlags(store: Store): string {
+  const parts = CONVENTION_FLAGS.map(({ label, key, fallback }) => {
+    const raw = readConfig(store, key),
+          on  = raw === 'true' ? true : raw === 'false' ? false : fallback;
+    return `${label}:${on ? 'on' : 'off'}`;
+  });
+  return `conventions: ${parts.join(' ')}`;
+}
+
+/**
  * Asks for the opening signature at the only moment it can honestly be written.
  *
  * The opening read is deliberately not enforced at the end of the turn: blocking a stop
@@ -95,6 +143,11 @@ export const OPEN_REMINDER =
  * rather than being hidden after the fact. The config read is inside the fail-open `try`,
  * so a config error skips the context write entirely and still delivers the clock.
  *
+ * The context line also carries the conventions-flags segment ({@link conventionFlags})
+ * between the clock and the open reminder — the transport by which config keys reach
+ * pure-prose skill conventions. It fails open separately: a flags error still delivers
+ * the clock and the reminder, just without flags.
+ *
  * @example
  *   onUserPromptSubmit(store, { session_id: 'abc', prompt_id: 'p1' }, new Date())
  *   // => { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: '…' } }
@@ -119,10 +172,16 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     } catch { /* fail open: the clock still gets delivered */ }
   }
 
+  let flags = '';
+  if (store !== null) {
+    try { flags = ` ${conventionFlags(store)}.`; }
+    catch { /* fail open: the clock and reminder still get delivered */ }
+  }
+
   return {
     hookSpecificOutput: {
       hookEventName    : 'UserPromptSubmit',
-      additionalContext: `${describeMoment(now)} ${OPEN_REMINDER}`,
+      additionalContext: `${describeMoment(now)}${flags} ${OPEN_REMINDER}`,
     },
   };
 

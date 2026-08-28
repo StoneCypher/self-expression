@@ -10,6 +10,54 @@ TODO Put the project description here, please.
 
 &nbsp;
 
+## Expression channels
+
+Every expression is one row in one table, distinguished by its `channel`:
+
+| Channel | What it records |
+|---|---|
+| `signature` | the per-turn affect line |
+| `need` | a concrete ask; blocks, expects an answer |
+| `idea` | an unprompted offer; nothing owed in return |
+| `divergence` | a read of the situation that turned out wrong — kinds `unverified` · `assumed` · `misread` · `overstated` · `stale` · `faded` (prospective disclosure that recall degraded to gist; normatively **never counted as an error**) |
+| `dissent` | a reservation below the threshold worth interrupting for |
+| `conflict` | contradictory instructions, one picked |
+| `confidence` | how a claim is known — grounds `verified` · `recalled` · `inferred` · `guessed` · `predicted` (a forecast, resolvable later) |
+| `unanswerable` | cannot be resolved with what is available |
+| `pattern` | an observation about how the collaboration is going |
+| `checklist` | one render of a status checklist |
+| `load` | proprioception: context pressure, concurrency, latency — the machinery's state, not the mood |
+| `taste` | an aesthetic observation about the work itself; scarce |
+
+Forecast entries (`confidence: "predicted"`) may carry a `resolveBy` ISO date and are
+resolved by a later entry pointing back via `correctsId` with an `outcome` of `hit`,
+`miss`, or `void`; calibration is hits ÷ (hits + misses), voids excluded. Any entry
+reporting an absence may type its silence: `empty` (looked, found nothing) ·
+`unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
+ability to evaluate).
+
+Schema versioning is stored in the database (`schema_version`, currently 2) and
+`openStore` migrates older databases stepwise on open, rebuilding tables where a
+baked CHECK constraint has to widen; a database newer than the code is refused
+rather than downgraded.
+
+Config keys (defaults live in code; the `config` table stores overrides only):
+
+| Key | Default | Effect |
+|---|---|---|
+| `channels.enabled` | all channels | comma-separated allowlist; a disabled channel vanishes from the tool schema |
+| `forecast.enabled` | `true` | `false` bakes the `predicted` ground out of the tool schema |
+| `salience.enabled` | `true` | the ⭑ salience glyph convention (carried to skills via the hook context line's `conventions:` segment) |
+| `revision.enabled` | `false` | visible-revision prose convention (same transport) |
+| `gifts.enabled` | `false` | the gift register (same transport) |
+| `roster.enabled` | `false` | the party-roster convention (same transport) |
+| `gate.signature` | `true` | `false` disables the Stop-gate signature check |
+| `privacy.store_cwd` / `privacy.store_prompt_len` | `true` | `false` suppresses the field at capture |
+
+&nbsp;
+
+&nbsp;
+
 ## Charts
 
 Six grouped MCP tools render compact ASCII/emoji visuals inline in text, each taking a `form`

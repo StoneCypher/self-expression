@@ -47,7 +47,8 @@ self-expression/
 │                            `node dist/cli.cjs hook <name>` — Node, never shell (Windows)
 │
 ├── src/ts/
-│   ├── channels/            backchannel capture and storage
+│   ├── channels/            backchannel capture and storage, incl. versioned schema
+│   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
 │   ├── charts/              pure ASCII renderers
 │   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
 │   └── tests/               unit and stochastic tests

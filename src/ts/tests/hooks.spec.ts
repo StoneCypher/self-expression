@@ -5,7 +5,10 @@ import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store }                         from '../channels/store.js';
 import { recordEntry }                        from '../channels/entries.js';
 import { latestContext, turnCount }           from '../channels/context.js';
-import { onUserPromptSubmit, onStop, handleHook, describeMoment, OPEN_REMINDER } from '../mcp/hooks.js';
+import {
+  onUserPromptSubmit, onStop, handleHook, describeMoment, OPEN_REMINDER,
+  conventionFlags, CONVENTION_FLAGS,
+} from '../mcp/hooks.js';
 import { zoneAbbreviation }                   from '../channels/time.js';
 
 const VERSION = '0.2.0';
@@ -106,6 +109,50 @@ describe('onUserPromptSubmit', () => {
   test('a payload with no session still yields the clock and records nothing', () => withStore(s => {
     expect(onUserPromptSubmit(s, {}, NOW)).not.toBeNull();
     expect(latestContext(s)).toBeNull();
+  }));
+
+  test('the context line carries the conventions flags between the clock and the reminder', () => withStore(s => {
+    const context = String(
+      (onUserPromptSubmit(s, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context).toContain('conventions: salience:on revision:off gifts:off roster:off');
+    expect(context.indexOf('2:05 pm')).toBeLessThan(context.indexOf('conventions:'));
+    expect(context.indexOf('conventions:')).toBeLessThan(context.indexOf(OPEN_REMINDER));
+  }));
+
+  test('with no store there is no flags segment, and the clock still arrives', () => {
+    const context = String(
+      (onUserPromptSubmit(null, { session_id: 'x' }, NOW) as
+        { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+    expect(context).not.toContain('conventions:');
+    expect(context).toContain('2:05 pm');
+  });
+
+});
+
+describe('conventionFlags', () => {
+
+  test('renders the code-side defaults when nothing is configured', () => withStore(s => {
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off gifts:off roster:off');
+  }));
+
+  test('an override flips its flag in the rendered segment', () => withStore(s => {
+    writeConfig(s, 'salience.enabled', false);
+    writeConfig(s, 'revision.enabled', true);
+    expect(conventionFlags(s)).toBe('conventions: salience:off revision:on gifts:off roster:off');
+  }));
+
+  test('only the exact strings true and false override; anything else falls back', () => withStore(s => {
+    writeConfig(s, 'salience.enabled', 'off');    // a typo, not a setting
+    writeConfig(s, 'gifts.enabled',    'yes');    // likewise
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off gifts:off roster:off');
+  }));
+
+  test('every declared convention appears in the segment exactly once', () => withStore(s => {
+    const segment = conventionFlags(s);
+    for (const { label } of CONVENTION_FLAGS) {
+      expect(segment.split(`${label}:`)).toHaveLength(2);
+    }
   }));
 
 });

@@ -5,8 +5,9 @@ import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
   recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
-  recentChecklists, seriesPercents,
+  recentChecklists, seriesPercents, forecastOutcomes,
 } from '../channels/entries.js';
+import { CHANNELS, SILENCE_KINDS } from '../channels/vocabulary.js';
 
 const VERSION = '0.2.0';
 
@@ -65,6 +66,66 @@ describe('validate', () => {
                                   seriesKey: 'k', percent });
       expect(problems.some(p => p.includes('percent must be an integer'))).toBe(true);
     }
+  });
+
+  test('accepts a forecast: predicted confidence with a resolveBy date', () => {
+    expect(validate({ channel: 'confidence', text: 'the stryker run passes untouched', session: 's',
+                      confidence: 'predicted', resolveBy: '2026-08-30' })).toEqual([]);
+  });
+
+  test('accepts a bare forecast — resolveBy is optional', () => {
+    expect(validate({ channel: 'confidence', text: 'x', session: 's',
+                      confidence: 'predicted' })).toEqual([]);
+  });
+
+  test('rejects resolveBy on every non-predicted ground, naming the rule', () => {
+    for (const confidence of ['verified', 'recalled', 'inferred', 'guessed'] as const) {
+      const problems = validate({ channel: 'confidence', text: 'x', session: 's',
+                                  confidence, resolveBy: '2026-08-30' });
+      expect(problems.some(p => p.includes("confidence 'predicted'"))).toBe(true);
+    }
+  });
+
+  test('rejects resolveBy with no confidence at all', () => {
+    const problems = validate({ channel: 'signature', text: 'x', session: 's', resolveBy: '2026-08-30' });
+    expect(problems.some(p => p.includes("confidence 'predicted'"))).toBe(true);
+  });
+
+  test('rejects a resolveBy that is not an ISO local date — a wakeup cannot grep prose', () => {
+    for (const bad of ['soon', 'august 30', '2026-8-3', '2026-08-30T12:00:00Z']) {
+      const problems = validate({ channel: 'confidence', text: 'x', session: 's',
+                                  confidence: 'predicted', resolveBy: bad });
+      expect(problems.some(p => p.includes('ISO-8601 local date'))).toBe(true);
+    }
+  });
+
+  test('accepts an outcome pointing back at a forecast via correctsId', () => {
+    expect(validate({ channel: 'confidence', text: 'merged clean', session: 's',
+                      correctsId: 1, outcome: 'hit' })).toEqual([]);
+  });
+
+  test('rejects an outcome without a correctsId — it resolves nothing', () => {
+    const problems = validate({ channel: 'confidence', text: 'x', session: 's', outcome: 'miss' });
+    expect(problems.some(p => p.includes('correctsId'))).toBe(true);
+  });
+
+  test('rejects an outcome outside the vocabulary', () => {
+    const problems = validate({ channel: 'confidence', text: 'x', session: 's',
+                                correctsId: 1, outcome: 'won' as never });
+    expect(problems.some(p => p.includes('outcome'))).toBe(true);
+  });
+
+  test('accepts every silence kind on every channel — it is a qualifier, not a channel', () => {
+    for (const channel of CHANNELS) {
+      for (const silence of SILENCE_KINDS) {
+        expect(validate({ channel, text: 'x', session: 's', silence })).toEqual([]);
+      }
+    }
+  });
+
+  test('rejects a silence outside the vocabulary', () => {
+    const problems = validate({ channel: 'signature', text: 'x', session: 's', silence: 'quiet' as never });
+    expect(problems.some(p => p.includes('silence'))).toBe(true);
   });
 
 });
@@ -185,6 +246,48 @@ describe('recentEntries', () => {
       recordEntry(s, { channel: 'idea', text: t, session: 's1' }, VERSION);
     }
     expect(recentEntries(s, 2)).toHaveLength(2);
+  }));
+
+  test('carries confidence, divergence_kind, silence, and outcome, so recent forecasts are readable', () => withStore(s => {
+    recordEntry(s, { channel: 'confidence', text: 'lands by friday', session: 's1',
+                     confidence: 'predicted', resolveBy: '2026-08-30' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'landed', session: 's1',
+                     correctsId: 1, outcome: 'hit' }, VERSION);
+    recordEntry(s, { channel: 'signature', text: 'still; nothing notable', session: 's1',
+                     silence: 'empty' }, VERSION);
+    const [forecast, resolution, sig] = recentEntries(s, 3);
+    expect(forecast?.['confidence']).toBe('predicted');
+    expect(resolution?.['outcome']).toBe('hit');
+    expect(sig?.['silence']).toBe('empty');
+  }));
+
+});
+
+describe('forecastOutcomes', () => {
+
+  test('is empty with no resolutions', () => withStore(s => {
+    recordEntry(s, { channel: 'confidence', text: 'open forecast', session: 's1',
+                     confidence: 'predicted' }, VERSION);
+    expect(forecastOutcomes(s)).toEqual([]);
+  }));
+
+  test('returns resolved outcomes in resolution order', () => withStore(s => {
+    const a = recordEntry(s, { channel: 'confidence', text: 'f1', session: 's1', confidence: 'predicted' }, VERSION);
+    const b = recordEntry(s, { channel: 'confidence', text: 'f2', session: 's1', confidence: 'predicted' }, VERSION);
+    const c = recordEntry(s, { channel: 'confidence', text: 'f3', session: 's1', confidence: 'predicted' }, VERSION);
+    // Resolved out of forecast order, deliberately: resolution order is what counts.
+    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1', correctsId: b.id, outcome: 'miss' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1', correctsId: a.id, outcome: 'hit'  }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r3', session: 's1', correctsId: c.id, outcome: 'void' }, VERSION);
+    expect(forecastOutcomes(s)).toEqual(['miss', 'hit', 'void']);
+  }));
+
+  test('ignores an outcome whose target is not a forecast', () => withStore(s => {
+    const plain = recordEntry(s, { channel: 'confidence', text: 'checked', session: 's1',
+                                   confidence: 'verified' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'stray', session: 's1',
+                     correctsId: plain.id, outcome: 'hit' }, VERSION);
+    expect(forecastOutcomes(s)).toEqual([]);
   }));
 
 });

@@ -237,10 +237,10 @@ declare const FAILURE_MARKERS: readonly ["❌", "🚫", "🦗", "💀", "🧟", 
  * list entry), followed by the topic/action markers group by group, top to
  * bottom, in each group's left-to-right listed order.
  *
- * `markers.md`'s "Status markers" heading says "(22, canonical order)", but
- * the bulleted list beneath it has 23 entries — a stale
- * count in the source doc. This array transcribes the actual list, per the
- * rule "every marker... in its listed order".
+ * `markers.md`'s status-marker list carries 25 entries (the 2026-08-27 field
+ * trial added 🔬 "under review" and 🔁 "in a fix round", both classifying
+ * active+pending). This array transcribes the actual list, per the rule
+ * "every marker... in its listed order".
  *
  * This is the tiebreaker `status-checklists-skill.md` specifies for sorting
  * a summary line's per-marker icon list: equal-count markers sort by first
@@ -251,7 +251,7 @@ declare const FAILURE_MARKERS: readonly ["❌", "🚫", "🦗", "💀", "🧟", 
  *   CANONICAL_ORDER.indexOf('✅')  // => 0
  *   CANONICAL_ORDER.indexOf('💯')  // => 1 — immediately after ✅
  */
-declare const CANONICAL_ORDER: readonly ["✅", "💯", "🤖", "⏳", "🌐", "🛠️", "🛰️", "🔜", "🦥", "🌗", "🫨", "🦡", "❌", "🚫", "🦗", "⏭️", "⏸️", "❗", "⚠️", "⏰", "😴", "🧠", "❓", "🤔", "📋", "🐙", "📅", "📩", "👔", "📝", "📖", "📎", "📺", "🎙️", "🖨️", "🧪", "🦆", "🔍", "🔗", "🎫", "🏁", "🪚", "🐀", "⚡", "🐛", "🧹", "🗑️", "🦤", "🧐", "⚖️", "👑", "👍", "👎", "✋", "🛳️", "♾️", "↩️", "🏗️", "📦", "⚙️", "🔑", "🩹", "🩺", "☸️", "⬆️", "⬇️", "⏫", "⏬", "🔌", "💽", "🧬", "🌱", "💾", "🪵", "🧮", "📊", "🔮", "🔥", "🚨", "🧯", "🤕", "🗿", "🪦", "🕵️", "🦓", "🏷️", "🔀", "🚀", "🔨", "🆙", "🤮", "🎨", "♿", "📐", "🗺️", "🎣", "🪓", "🦹", "🪪", "🩻", "🔒", "🕳️", "🐒", "🧌", "🤬", "🛡️", "👁️", "💰", "🌪️", "🧊", "👻", "💀", "🧟", "🌋", "🤡", "😕", "🤌", "🤥", "🥵", "😎", "🦙", "💅", "🤓"];
+declare const CANONICAL_ORDER: readonly ["✅", "💯", "🤖", "⏳", "🌐", "🔬", "🔁", "🛠️", "🛰️", "🔜", "🦥", "🌗", "🫨", "🦡", "❌", "🚫", "🦗", "⏭️", "⏸️", "❗", "⚠️", "⏰", "😴", "🧠", "❓", "🤔", "📋", "🐙", "📅", "📩", "👔", "📝", "📖", "📎", "📺", "🎙️", "🖨️", "🧪", "🦆", "🔍", "🔗", "🎫", "🏁", "🪚", "🐀", "⚡", "🐛", "🧹", "🗑️", "🦤", "🧐", "⚖️", "👑", "👍", "👎", "✋", "🛳️", "♾️", "↩️", "🏗️", "📦", "⚙️", "🔑", "🩹", "🩺", "☸️", "⬆️", "⬇️", "⏫", "⏬", "🔌", "💽", "🧬", "🌱", "💾", "🪵", "🧮", "📊", "🔮", "🔥", "🚨", "🧯", "🤕", "🗿", "🪦", "🕵️", "🦓", "🏷️", "🔀", "🚀", "🔨", "🆙", "🤮", "🎨", "♿", "📐", "🗺️", "🎣", "🪓", "🦹", "🪪", "🩻", "🔒", "🕳️", "🐒", "🧌", "🤬", "🛡️", "👁️", "💰", "🌪️", "🧊", "👻", "💀", "🧟", "🌋", "🤡", "😕", "🤌", "🤥", "🥵", "😎", "🦙", "💅", "🤓"];
 /**
  * The bucket a marker's item counts toward in a checklist summary line.
  *

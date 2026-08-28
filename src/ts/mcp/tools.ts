@@ -21,9 +21,11 @@ import { z }         from 'zod';
 import {
   CHANNELS, POSITIONS, DELTAS, STEMS, EFFORTS, TURNS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
+  FORECAST_OUTCOMES, SILENCE_KINDS,
 } from '../channels/vocabulary.js';
-import type { Channel }        from '../channels/vocabulary.js';
+import type { Channel, ConfidenceGround } from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
+import type { EntryInput, Written }                                           from '../channels/entries.js';
 import { readConfig, writeConfig, allConfig }                                 from '../channels/store.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
@@ -31,6 +33,9 @@ import type { Store } from '../channels/store.js';
 
 /** Config key holding the comma-separated list of active channels. */
 export const ENABLED_KEY = 'channels.enabled';
+
+/** Config key for the forecast feature; only the exact string 'false' disables it. */
+export const FORECAST_KEY = 'forecast.enabled';
 
 /**
  * Which channels are currently active.
@@ -56,6 +61,28 @@ export function enabledChannels(store: Store): readonly Channel[] {
 }
 
 /**
+ * Which confidence grounds are currently offered.
+ *
+ * The forecast toggle cannot ride `channels.enabled` because a ground is not a
+ * channel, so it gets the same schema-baking treatment: when `forecast.enabled` is
+ * the exact string `'false'`, the enum handed to the model omits `'predicted'` — a
+ * disabled forecast cannot even be named, so no attention is spent producing one.
+ * Default is on (any other value, including unset), per the issue-thread verdict.
+ *
+ * @example
+ *   enabledConfidenceGrounds(store)   // => all CONFIDENCE_GROUNDS, when unconfigured
+ *   // after writeConfig(store, 'forecast.enabled', false):
+ *   enabledConfidenceGrounds(store)   // => the grounds minus 'predicted'
+ *
+ * @see enabledChannels
+ */
+export function enabledConfidenceGrounds(store: Store): readonly ConfidenceGround[] {
+  return readConfig(store, FORECAST_KEY) === 'false'
+    ? CONFIDENCE_GROUNDS.filter(g => g !== 'predicted')
+    : CONFIDENCE_GROUNDS;
+}
+
+/**
  * A non-empty tuple, which is what `z.enum` requires, preserving the literal types.
  *
  * Generic rather than `string[]` so the enum's inferred type stays the narrow union —
@@ -76,6 +103,103 @@ function reply(text: string): { content: { type: 'text'; text: string }[] } {
   return { content: [{ type: 'text', text }] };
 }
 
+/** What the MCP handshake reveals about the connected host, when anything. */
+export interface ClientIdentity {
+  readonly name?    : string | undefined;
+  readonly version? : string | undefined;
+}
+
+/**
+ * The `express` arguments as the handler consumes them: an entry whose `session` may
+ * be omitted, because the hook-observed one is better than a claimed one.
+ */
+export interface ExpressArgs extends Omit<EntryInput, 'session'> {
+  readonly session? : string | undefined;
+}
+
+/**
+ * Record one expression: the `express` tool's whole behavior, separated from
+ * registration so tests can exercise it without a transport.
+ *
+ * Anything the caller supplied wins; everything else is adopted from what the hook
+ * observed. A call that reaches here with no context at all is marked `'no-hook'`
+ * rather than given a plausible-looking session, so the gap is visible in the data
+ * instead of being disguised as an ordinary row.
+ *
+ * The path-carrying fields (`cwd`, `git_branch`, `project`) and the prompt length are
+ * gated on the privacy config a second time here: the hook already drops them at
+ * capture, but a direct call carries its own `project` argument and must not be able
+ * to smuggle one in when the user has opted out.
+ *
+ * An `outcome` is additionally checked against the store (the half of forecast
+ * validation `entries.validate` cannot do alone): its `correctsId` must name an
+ * existing row whose confidence is `'predicted'`, or the rejection names the target's
+ * actual ground.
+ *
+ * @example
+ *   handleExpress(store, '0.2.1', { channel: 'taste', text: 'the sparse-column decision reads like it was always true 😊' })
+ *   // => { id: 12, uuid: '…' }
+ *
+ * @throws {Error} If validation fails — a closed field outside its vocabulary, a
+ *                 cross-field forecast violation, or an outcome whose target is not a
+ *                 `predicted` row — naming every problem found.
+ *
+ * @see registerTools
+ */
+export function handleExpress(
+  store         : Store,
+  pluginVersion : string,
+  args          : ExpressArgs,
+  client?       : ClientIdentity,
+): Written {
+
+  if (args.outcome !== undefined && args.correctsId !== undefined) {
+    const target = store.db.prepare('SELECT confidence FROM entries WHERE id = ?').get(args.correctsId);
+    if (target === undefined) {
+      throw new Error(
+        `cannot record entry:\n  - outcome's correctsId #${String(args.correctsId)} does not exist`);
+    }
+    const ground = target['confidence'];
+    if (ground !== 'predicted') {
+      throw new Error(
+        `cannot record entry:\n  - entry #${String(args.correctsId)} is not a forecast — its ` +
+        `confidence is ${ground === null ? 'unset' : `'${String(ground)}'`}, not 'predicted', ` +
+        'so there is nothing for an outcome to resolve');
+    }
+  }
+
+  const context = latestContext(store, args.session),
+        privacy = privacyFlags(store),
+        str     = (k: string): string | undefined => {
+          const v = context?.[k];
+          return typeof v === 'string' && v !== '' ? v : undefined;
+        },
+        num     = (k: string): number | undefined => {
+          const v = context?.[k];
+          return typeof v === 'number' ? v : undefined;
+        };
+
+  return recordEntry(store, {
+    ...args,
+    session        : args.session ?? str('session') ?? 'no-hook',
+    promptId       : args.promptId ?? str('prompt_id'),
+    turn           : args.turn     ?? (str('turn') as never),
+    effort         : args.effort   ?? (str('effort') as never),
+    turnIndex      : num('turn_index'),
+    cwd            : privacy.storeCwd ? str('cwd') : undefined,
+    gitBranch      : privacy.storeCwd ? str('git_branch') : undefined,
+    project        : privacy.storeCwd ? args.project : undefined,
+    permissionMode : str('permission_mode'),
+    agentId        : str('agent_id'),
+    agentType      : str('agent_type'),
+    compactions    : num('compactions'),
+    promptLen      : privacy.storePromptLen ? num('prompt_len') : undefined,
+    host           : client?.name,
+    hostVersion    : client?.version,
+  }, pluginVersion);
+
+}
+
 /**
  * Register every tool on `server`.
  *
@@ -88,7 +212,8 @@ function reply(text: string): { content: { type: 'text'; text: string }[] } {
  */
 export function registerTools(server: McpServer, store: Store, pluginVersion: string): void {
 
-  const channels = enabledChannels(store);
+  const channels = enabledChannels(store),
+        grounds  = enabledConfidenceGrounds(store);
 
   server.registerTool('express', {
     title       : 'Express',
@@ -101,7 +226,10 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'know what you just claimed; unanswerable records that something cannot be resolved ' +
       'with what is available; pattern is an observation about how the collaboration is ' +
       'going; checklist logs one render of a status checklist — its identity is seriesKey, ' +
-      'a stable id chosen once, never the display title. "Nothing notable" is always a ' +
+      'a stable id chosen once, never the display title; load is proprioception — context ' +
+      'pressure, concurrency, latency: the machinery\'s state, not the mood, fired when ' +
+      'notable rather than on a schedule; taste is a scarce aesthetic observation about ' +
+      'the work itself, observing with nothing proposed. "Nothing notable" is always a ' +
       'valid signature — the requirement is to look, not to produce.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
@@ -116,8 +244,23 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       stem           : z.enum(tuple(STEMS)).optional().describe('flow, spark, drag, fog, strain, still'),
       uncertain      : z.boolean().optional().describe('true when the self-read is doubtful'),
       modality       : z.enum(tuple(MODALITIES)).optional().describe('what kind of utterance'),
-      confidence     : z.enum(tuple(CONFIDENCE_GROUNDS)).optional().describe('grounds, not strength'),
-      divergenceKind : z.enum(tuple(DIVERGENCE_KINDS)).optional(),
+      confidence     : z.enum(tuple(grounds)).optional().describe(
+        "grounds, not strength; 'predicted' marks a forecast — a claim about the future, " +
+        'resolvable later via a correcting entry'),
+      divergenceKind : z.enum(tuple(DIVERGENCE_KINDS)).optional().describe(
+        "how the divergence happened; 'faded' is prospective — recall degraded to gist, " +
+        'disclosed before use, and never counted as an error'),
+      resolveBy      : z.string().optional().describe(
+        "forecasts only: ISO-8601 local date (YYYY-MM-DD) the forecast expects resolution " +
+        "by; valid only with confidence 'predicted'"),
+      outcome        : z.enum(tuple(FORECAST_OUTCOMES)).optional().describe(
+        'resolutions only: how the forecast this entry corrects turned out — hit (it ' +
+        'happened), miss (it did not), void (the premise dissolved); requires correctsId ' +
+        "pointing at a 'predicted' entry"),
+      silence        : z.enum(tuple(SILENCE_KINDS)).optional().describe(
+        'which honest shape of nothing this entry reports: empty (looked, found nothing), ' +
+        'unlooked (did not look), held (withholding pending evidence), depth (beyond ' +
+        'ability to evaluate)'),
       visible        : z.boolean().optional().describe('false when logged but not surfaced'),
       correctsId     : z.number().int().optional().describe('id of an entry this retracts'),
       effort         : z.enum(tuple(EFFORTS)).optional(),
@@ -144,49 +287,8 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
         'seriesKey, so the snapshot joins a series instead of being silently orphaned'),
     },
   }, (args) => {
-
-    const client  = server.server.getClientVersion(),
-          context = latestContext(store, args.session),
-          privacy = privacyFlags(store),
-          str     = (k: string): string | undefined => {
-            const v = context?.[k];
-            return typeof v === 'string' && v !== '' ? v : undefined;
-          },
-          num     = (k: string): number | undefined => {
-            const v = context?.[k];
-            return typeof v === 'number' ? v : undefined;
-          };
-
-    // Anything the caller supplied wins; everything else is adopted from what the hook
-    // observed. A row that reaches here with no context at all is marked 'no-hook'
-    // rather than given a plausible-looking session, so the gap is visible in the data
-    // instead of being disguised as an ordinary row.
-    //
-    // The path-carrying fields (cwd, git_branch, project) and the prompt length are gated
-    // on the privacy config a second time here: the hook already drops them at capture, but
-    // a direct express call carries its own project argument and must not be able to smuggle
-    // one in when the user has opted out.
-    const written = recordEntry(store, {
-      ...args,
-      session        : args.session ?? str('session') ?? 'no-hook',
-      promptId       : args.promptId ?? str('prompt_id'),
-      turn           : args.turn     ?? (str('turn') as never),
-      effort         : args.effort   ?? (str('effort') as never),
-      turnIndex      : num('turn_index'),
-      cwd            : privacy.storeCwd ? str('cwd') : undefined,
-      gitBranch      : privacy.storeCwd ? str('git_branch') : undefined,
-      project        : privacy.storeCwd ? args.project : undefined,
-      permissionMode : str('permission_mode'),
-      agentId        : str('agent_id'),
-      agentType      : str('agent_type'),
-      compactions    : num('compactions'),
-      promptLen      : privacy.storePromptLen ? num('prompt_len') : undefined,
-      host           : client?.name,
-      hostVersion    : client?.version,
-    }, pluginVersion);
-
+    const written = handleExpress(store, pluginVersion, args, server.server.getClientVersion());
     return reply(`recorded #${String(written.id)} ${written.uuid}`);
-
   });
 
   server.registerTool('recall', {

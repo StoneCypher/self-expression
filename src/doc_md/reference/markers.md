@@ -10,12 +10,14 @@ After editing this file, run `node check-checklist.mjs --file example.md` (both 
 
 The order markers appear in this file — status markers first in their listed order, then the topic/action groups top to bottom — is the **canonical order**. It is the tiebreaker when sorting the per-marker counts: equal-count markers are ordered by first appearance here. 💯 (the perfect-pass variant of ✅) sorts immediately after ✅.
 
-## Status markers (22, canonical order)
+## Status markers (25, canonical order)
 
 - ✅ done
 - 🤖 running in an agent (a dispatched sub-agent)
 - ⏳ running in general (direct work or a background process, not an agent)
 - 🌐 web search or web read in progress
+- 🔬 under review — the work exists and a reviewer is examining it
+- 🔁 in a fix round — judged by review, now being amended (distinct from the retry-after-failure badger below)
 - 🛠️ deferred to a skill
 - 🛰️ monitoring (waiting on a different task — a dependency-wait)
 - 🔜 queued (not started, no specific blocker)

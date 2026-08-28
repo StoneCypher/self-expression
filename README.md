@@ -1,12 +1,60 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787900436173` from hash `960abf0`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787928465757` from hash `4b4cf6f`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787900436173 Friday, August 28, 2026 at GMT-07:00 87.13 85 84 960abf0 44.92 51.64 45.91 50.45 46 530 86.13 81.63 87.41 484 0.2.1 -->
+<!-- Supported embeds: 1787928465757 Friday, August 28, 2026 at GMT-07:00 89.52 85 84 4b4cf6f 46.2 52.48 47.39 51.35 48 595 89.31 85.78 89.6 547 0.2.1 -->
 
 
+
+&nbsp;
+
+## Expression channels
+
+Every expression is one row in one table, distinguished by its `channel`:
+
+| Channel | What it records |
+|---|---|
+| `signature` | the per-turn affect line |
+| `need` | a concrete ask; blocks, expects an answer |
+| `idea` | an unprompted offer; nothing owed in return |
+| `divergence` | a read of the situation that turned out wrong — kinds `unverified` · `assumed` · `misread` · `overstated` · `stale` · `faded` (prospective disclosure that recall degraded to gist; normatively **never counted as an error**) |
+| `dissent` | a reservation below the threshold worth interrupting for |
+| `conflict` | contradictory instructions, one picked |
+| `confidence` | how a claim is known — grounds `verified` · `recalled` · `inferred` · `guessed` · `predicted` (a forecast, resolvable later) |
+| `unanswerable` | cannot be resolved with what is available |
+| `pattern` | an observation about how the collaboration is going |
+| `checklist` | one render of a status checklist |
+| `load` | proprioception: context pressure, concurrency, latency — the machinery's state, not the mood |
+| `taste` | an aesthetic observation about the work itself; scarce |
+
+Forecast entries (`confidence: "predicted"`) may carry a `resolveBy` ISO date and are
+resolved by a later entry pointing back via `correctsId` with an `outcome` of `hit`,
+`miss`, or `void`; calibration is hits ÷ (hits + misses), voids excluded. Any entry
+reporting an absence may type its silence: `empty` (looked, found nothing) ·
+`unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
+ability to evaluate).
+
+Schema versioning is stored in the database (`schema_version`, currently 2) and
+`openStore` migrates older databases stepwise on open, rebuilding tables where a
+baked CHECK constraint has to widen; a database newer than the code is refused
+rather than downgraded.
+
+Config keys (defaults live in code; the `config` table stores overrides only):
+
+| Key | Default | Effect |
+|---|---|---|
+| `channels.enabled` | all channels | comma-separated allowlist; a disabled channel vanishes from the tool schema |
+| `forecast.enabled` | `true` | `false` bakes the `predicted` ground out of the tool schema |
+| `salience.enabled` | `true` | the ⭑ salience glyph convention (carried to skills via the hook context line's `conventions:` segment) |
+| `revision.enabled` | `false` | visible-revision prose convention (same transport) |
+| `gifts.enabled` | `false` | the gift register (same transport) |
+| `roster.enabled` | `false` | the party-roster convention (same transport) |
+| `gate.signature` | `true` | `false` disables the Stop-gate signature check |
+| `privacy.store_cwd` / `privacy.store_prompt_len` | `true` | `false` suppresses the field at capture |
+
+&nbsp;
 
 &nbsp;
 
@@ -63,19 +111,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>484</td>
-    <td>87.13<small>%</small></td>
-    <td>86.13<small>%</small></td>
-    <td>81.63<small>%</small></td>
-    <td>87.41<small>%</small></td>
+    <td>547</td>
+    <td>89.52<small>%</small></td>
+    <td>89.31<small>%</small></td>
+    <td>85.78<small>%</small></td>
+    <td>89.6<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>46</td>
-    <td>87.13<small>%</small></td>
-    <td>44.92<small>%</small></td>
-    <td>45.91<small>%</small></td>
-    <td>50.45<small>%</small></td>
+    <td>48</td>
+    <td>89.52<small>%</small></td>
+    <td>46.2<small>%</small></td>
+    <td>47.39<small>%</small></td>
+    <td>51.35<small>%</small></td>
   </tr>
 </table>
 
