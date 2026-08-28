@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-40 merges; 2 releases
+45 merges; 2 releases
 
 
 
@@ -14,6 +14,144 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:01:21 AM
+
+Commit [0c06b73880256aef3e5c361a25f93858d33c615c](https://github.com/StoneCypher/self-expression/commit/0c06b73880256aef3e5c361a25f93858d33c615c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [e8baf0b, 32c17a7]
+
+  * chore: merge origin/main (#30 config surface) and integrate
+  * Integrates the channel extensions with the #30 config registry:
+  * - forecast.enabled, salience.enabled, revision.enabled, gifts.enabled, and
+  roster.enabled register in CONFIG_KEYS with the spec defaults, so configure
+  set validates and canonicalizes them and configure list reports them.
+- enabledConfidenceGrounds and conventionFlags read through the tolerant
+  effective-value accessor (D5): an invalid stored override behaves as unset.
+- handleExpress keeps #30's ToolReply shape and format-version stamping, and
+  gains the #42 outcome-target check and the resolveBy/outcome/silence
+  arguments; the confidence enum narrows via enabledConfidenceGrounds.
+- time.hook (D9) composes with the conventions flags: suppressing the clock
+  keeps the flags segment leading the clockless line, since the flags are
+  config transport, not time presentation.
+- Generated artifacts (README, CHANGELOG, coverage, dist, docs) rebuilt.
+  * Refs #42
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:01:00 AM
+
+Commit [44b05f097361b2a5b85ede8216dbeb9d911133fa](https://github.com/StoneCypher/self-expression/commit/44b05f097361b2a5b85ede8216dbeb9d911133fa)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [6fa2263, 9ae1f2c]
+
+  * chore: merge origin/main (#7 png history); rebuild follows
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:59:40 AM
+
+Commit [b15114e3409c8d549723e02557fa43c007bd140c](https://github.com/StoneCypher/self-expression/commit/b15114e3409c8d549723e02557fa43c007bd140c)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 9ae1f2ce1feeca4913fe88a829faabaa4f271580
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:58:52 AM
+
+Commit [6fa22633d365b1ab9ad94ffaa1b7ccfe150cdc8e](https://github.com/StoneCypher/self-expression/commit/6fa22633d365b1ab9ad94ffaa1b7ccfe150cdc8e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * build: regenerate artifacts after the config-surface merge
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:58:45 AM
+
+Commit [9ae1f2ce1feeca4913fe88a829faabaa4f271580](https://github.com/StoneCypher/self-expression/commit/9ae1f2ce1feeca4913fe88a829faabaa4f271580)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [32c17a7, c11912c]
+
+  * Merge pull request #68 from StoneCypher/feat_26-08-28_png-history_7
+  * feat: render logged history as a PNG dashboard (render_history_png + self-expression render)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:57:09 AM
+
+Commit [686e583b8a82a715d4ba74bee6aa6eac8cdef0b3](https://github.com/StoneCypher/self-expression/commit/686e583b8a82a715d4ba74bee6aa6eac8cdef0b3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [1d3a320, 32c17a7]
+
+  * chore: merge origin/main (#30 config surface) — dwelling keys ride the registry
+  * Takes main's registry-driven handleConfigure and layers the dwelling's cross-key
+semantics on top: enabled-without-path and nonexistent-directory writes are still
+rejected after registry type validation, and dwelling activation changes still note
+that they land next session. dwelling.size_warn_gb now accepts 0 (warn on every
+visit) to match the registry's range. Generated artifacts taken from main; rebuild
+follows.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 7:57:06 AM
+
+Commit [c11912c7c8f6c65909d3674c265e61b9d5d92105](https://github.com/StoneCypher/self-expression/commit/c11912c7c8f6c65909d3674c265e61b9d5d92105)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [0f2b67e, 32c17a7]
+
+  * chore: merge origin/main (config surface #30, retention) and rebuild
+  * Generated artifacts (README, CHANGELOG, coverage, dist, docs) regenerated
+by a full green build over the merged sources.
 
 
 
