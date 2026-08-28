@@ -14,6 +14,7 @@
  * @see ./tools.js
  * @see ./chart_tools.js
  * @see ./checklist_tools.js
+ * @see ./share_tools.js
  */
 
 import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,6 +26,7 @@ import type { Store }    from '../channels/store.js';
 import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
 import { registerChecklistTools } from './checklist_tools.js';
+import { registerShareTools } from './share_tools.js';
 
 /** Name advertised to the host during the MCP handshake. */
 export const SERVER_NAME = 'self-expression';
@@ -45,6 +47,7 @@ export function buildServer(store: Store, version: string): McpServer {
   registerTools(server, store, version);
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
+  registerShareTools(server, store, version);
 
   return server;
 

@@ -164,6 +164,49 @@ export function stringValidator(maxLength: number): (raw: string) => Validation 
 }
 
 /**
+ * Build a validator for a small closed-choice key: the value, trimmed and lowercased,
+ * must be exactly one of `choices`.
+ *
+ * Exists for keys whose domain is a handful of words (`share.time_granularity`) —
+ * a free string validator would admit prose into a field other code switches on.
+ *
+ * @param choices the accepted canonical values, already lowercase
+ *
+ * @example
+ *   choiceValidator(['hour', 'day'])(' Hour ')  // => { ok: true, canonical: 'hour' }
+ *   choiceValidator(['hour', 'day'])('minute')  // => { ok: false, expected: "one of 'hour', 'day'" }
+ */
+export function choiceValidator(choices: readonly string[]): (raw: string) => Validation {
+  const expected = `one of ${describeVocabulary(choices)}`;
+  return (raw: string): Validation => {
+    const lowered = raw.trim().toLowerCase();
+    return choices.includes(lowered)
+      ? { ok: true, canonical: lowered }
+      : { ok: false, expected };
+  };
+}
+
+/**
+ * Validate an ISO 8601 UTC timestamp (a trailing `Z`), canonicalized through
+ * `toISOString` so stored values compare lexicographically with entry `ts_utc` values.
+ *
+ * Exists for `share.opted_in_utc`, where a malformed moment must fail loudly at write
+ * time — an unparseable opt-in stamp read tolerantly behaves as *no opt-in at all*,
+ * which would silently disable sharing the user believed was on.
+ *
+ * @example
+ *   validateIsoUtc('2026-08-28T00:00:00Z')  // => { ok: true, canonical: '2026-08-28T00:00:00.000Z' }
+ *   validateIsoUtc('yesterday')             // => { ok: false, expected: 'an ISO 8601 UTC timestamp …' }
+ */
+export function validateIsoUtc(raw: string): Validation {
+  const trimmed = raw.trim(),
+        parsed  = Date.parse(trimmed);
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(trimmed) && !Number.isNaN(parsed)
+    ? { ok: true, canonical: new Date(parsed).toISOString() }
+    : { ok: false, expected: "an ISO 8601 UTC timestamp ending in Z, e.g. '2026-08-28T00:00:00Z'" };
+}
+
+/**
  * Every key this version of the plugin knows about.
  *
  * A key a newer version writes is still stored and preserved (D3) — this registry is
@@ -206,6 +249,15 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
     description: 'dwelling file size, in gigabytes, at which a visit warns the user',
     validate: intValidator(0, 1048576) },
+  { key: 'share.enabled', kind: 'bool', fallback: 'false',
+    description: 'whether public-aggregation export (#31) is available; off by default, and only the exact value true enables — the inverse posture of privacy.*',
+    validate: validateBool },
+  { key: 'share.opted_in_utc', kind: 'string', fallback: null,
+    description: 'the most recent opt-in moment; only rows recorded at or after it are ever exported — stamped automatically when share.enabled is set true, cleared on opt-out, never retroactive',
+    validate: validateIsoUtc },
+  { key: 'share.time_granularity', kind: 'string', fallback: 'hour',
+    description: 'how far exported timestamps are coarsened: hour keeps time-of-day questions answerable, day destroys them for a smaller residual',
+    validate: choiceValidator(['hour', 'day']) },
 ];
 
 /**

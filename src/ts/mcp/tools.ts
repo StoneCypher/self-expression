@@ -31,6 +31,7 @@ import { readConfig, writeConfig, deleteConfig }                              fr
 import { FORMAT_VERSION, configKey, effectiveValue, effectiveConfig }         from '../channels/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
+import { stamp }                                                             from '../channels/time.js';
 import type { Store }     from '../channels/store.js';
 import type { ToolReply } from './chart_tools.js';
 
@@ -231,6 +232,12 @@ export interface ConfigureArgs {
  * - `list` reports the **effective** configuration: every registered key with its
  *   value and source, plus unknown override rows labeled as such.
  *
+ * One key carries an event (issue #31): opting in to public aggregation is a moment,
+ * not a flag. Setting `share.enabled` to `true` stamps `share.opted_in_utc` when no
+ * moment is on record; setting it `false` — or unsetting it — clears the moment, so a
+ * later re-opt-in starts a fresh window and deliberately forfeits everything earlier.
+ * Rows recorded before the most recent opt-in are permanently outside the export.
+ *
  * @example
  *   handleConfigure(store, { op: 'set', key: 'retention.days', value: '90' })
  *   // => { content: [{ type: 'text', text: 'retention.days = 90' }] }
@@ -258,9 +265,11 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
 
   if (args.op === 'unset') {
     const removed = deleteConfig(store, args.key),
-          tail    = def === undefined ? ''
+          shared  = args.key === 'share.enabled' && deleteConfig(store, 'share.opted_in_utc'),
+          tail    = (def === undefined ? ''
                   : def.fallback === null ? '; the key is simply absent now'
-                  : `; code default '${def.fallback}' applies`;
+                  : `; code default '${def.fallback}' applies`)
+                  + (shared ? '; share.opted_in_utc cleared — a later opt-in starts a fresh window' : '');
     return reply(removed
       ? `${args.key} unset${tail}`
       : `${args.key} had no override; nothing to unset${tail}`);
@@ -285,11 +294,28 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
 
   writeConfig(store, args.key, outcome.canonical);
 
+  // Opt-in is an event, not a flag (issue #31): enabling sharing records the moment,
+  // and only rows at or after the *most recent* moment are ever exported. Disabling
+  // clears the moment, so a re-opt-in later starts a fresh window rather than quietly
+  // resurrecting eligibility for the gap — failing toward exporting less.
+  let shareNote = '';
+  if (args.key === 'share.enabled') {
+    if (outcome.canonical === 'true') {
+      if (readConfig(store, 'share.opted_in_utc') === null) {
+        const moment = stamp().utc;
+        writeConfig(store, 'share.opted_in_utc', moment);
+        shareNote = ` — opt-in moment recorded at ${moment}; only rows from now on are eligible, never earlier ones`;
+      }
+    } else if (deleteConfig(store, 'share.opted_in_utc')) {
+      shareNote = ' — opt-in moment cleared; a later re-opt-in starts a fresh window';
+    }
+  }
+
   const restart = args.key === ENABLED_KEY
     ? ' — takes effect at the next server start; the channel enum is baked into the tool schema at startup'
     : '';
 
-  return reply(`${args.key} = ${outcome.canonical}${restart}`);
+  return reply(`${args.key} = ${outcome.canonical}${restart}${shareNote}`);
 
 }
 
