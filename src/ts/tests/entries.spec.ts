@@ -5,10 +5,13 @@ import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
   recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
-  recentChecklists, seriesPercents, forecastOutcomes,
+  recentChecklists, seriesPercents, forecastOutcomes, anchorProblems, storedQuote,
+  anchoredEntries,
   localHour, isoWeekKey, signatureHistory, needWeekly, checklistSeriesTop,
 } from '../channels/entries.js';
-import { CHANNELS, SILENCE_KINDS } from '../channels/vocabulary.js';
+import { anchorHash, ANCHOR_QUOTE_MAX } from '../channels/anchors.js';
+import { writeConfig } from '../channels/store.js';
+import { CHANNELS, SILENCE_KINDS, ANCHOR_KINDS } from '../channels/vocabulary.js';
 
 const VERSION = '0.2.0';
 
@@ -129,6 +132,113 @@ describe('validate', () => {
     expect(problems.some(p => p.includes('silence'))).toBe(true);
   });
 
+  test('the anchor rules reach validate, not only anchorProblems', () => {
+    expect(validate({ channel: 'dissent', text: 'x', session: 's', anchorQuote: 'y' }).length)
+      .toBeGreaterThan(0);
+    expect(validate({ channel: 'dissent', text: 'x', session: 's',
+                      anchorKind: 'entry', anchorTarget: '1' })).toEqual([]);
+  });
+
+});
+
+describe('anchorProblems — the #18 cross-field matrix', () => {
+
+  /** An otherwise-valid entry, so only the anchor rules can object. */
+  const base = { channel: 'dissent', text: 'x', session: 's' } as const;
+
+  test('an unanchored entry is the normal case and raises nothing', () => {
+    expect(anchorProblems({ ...base })).toEqual([]);
+  });
+
+  test('any qualifier without a kind is rejected, and every offender is named at once', () => {
+    for (const field of ['anchorTarget', 'anchorSpan', 'anchorQuote']) {
+      const problems = anchorProblems({ ...base, [field]: 'v' });
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toContain(field);
+    }
+    expect(anchorProblems({ ...base, anchorTarget: 'a', anchorSpan: 'L1', anchorQuote: 'q' }))
+      .toHaveLength(3);
+  });
+
+  test('a kind without a target names what a target would be', () => {
+    const problems = anchorProblems({ ...base, anchorKind: 'file' });
+    expect(problems[0]).toContain('requires an anchorTarget');
+    expect(anchorProblems({ ...base, anchorKind: 'file', anchorTarget: '   ' })).toHaveLength(1);
+  });
+
+  test('prompt and reply demand a quote; file, checklist, and entry do not', () => {
+    for (const kind of ['prompt', 'reply'] as const) {
+      expect(anchorProblems({ ...base, anchorKind: kind, anchorTarget: 'p-1' })[0])
+        .toContain('requires an anchorQuote');
+      expect(anchorProblems({ ...base, anchorKind: kind, anchorTarget: 'p-1', anchorQuote: 'q' }))
+        .toEqual([]);
+    }
+    expect(anchorProblems({ ...base, anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1' }))
+      .toEqual([]);
+    expect(anchorProblems({ ...base, anchorKind: 'entry', anchorTarget: '7' })).toEqual([]);
+    expect(anchorProblems({ ...base, anchorKind: 'checklist', anchorTarget: 'k' })).toEqual([]);
+  });
+
+  test('the span grammar is enforced per kind', () => {
+    expect(anchorProblems({ ...base, anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: '#2' }))
+      .toHaveLength(1);
+    expect(anchorProblems({ ...base, anchorKind: 'prompt', anchorTarget: 'p', anchorQuote: 'q', anchorSpan: 'L1' }))
+      .toHaveLength(1);
+    expect(anchorProblems({ ...base, anchorKind: 'entry', anchorTarget: '1', anchorSpan: '#1' }))
+      .toHaveLength(1);
+  });
+
+  test('a blank quote and an over-long quote are both rejected, by their normalized length', () => {
+    expect(anchorProblems({ ...base, anchorKind: 'file', anchorTarget: 'a.ts', anchorQuote: '  \n ' })[0])
+      .toContain('blank');
+    const long = anchorProblems({ ...base, anchorKind: 'file', anchorTarget: 'a.ts',
+                                  anchorQuote: 'q'.repeat(ANCHOR_QUOTE_MAX + 1) });
+    expect(long[0]).toContain(String(ANCHOR_QUOTE_MAX));
+    // Collapsing whitespace is what decides it: this is over the cap raw, under it normalized.
+    expect(anchorProblems({ ...base, anchorKind: 'file', anchorTarget: 'a.ts',
+                            anchorQuote: `${'q'.repeat(ANCHOR_QUOTE_MAX - 1)}${' '.repeat(20)}` }))
+      .toEqual([]);
+  });
+
+  test('an unknown kind is left to the vocabulary check, not double-reported', () => {
+    expect(anchorProblems({ ...base, anchorKind: 'diagram' as never })).toEqual([]);
+    expect(validate({ ...base, anchorKind: 'diagram' as never }).some(p => p.includes('anchorKind')))
+      .toBe(true);
+  });
+
+  test('every kind accepts a well-formed anchor — the matrix has no unreachable row', () => {
+    for (const kind of ANCHOR_KINDS) {
+      expect(anchorProblems({ ...base, anchorKind: kind, anchorTarget: 't', anchorQuote: 'q' }))
+        .toEqual([]);
+    }
+  });
+
+});
+
+describe('storedQuote — write-time redaction, hash surviving it', () => {
+
+  test('no quote means no hash — there is nothing to fingerprint', () => {
+    expect(storedQuote('file', undefined, true)).toEqual({ quote: null, hash: null });
+  });
+
+  test('the stored quote is the normalized form, and the hash is of that', () => {
+    const stored = storedQuote('file', '  readConfig(store,\n key)  ', true);
+    expect(stored.quote).toBe('readConfig(store, key)');
+    expect(stored.hash).toBe(anchorHash('readConfig(store, key)'));
+  });
+
+  test('suppression drops a prompt quote and keeps its hash — that is the whole design', () => {
+    const stored = storedQuote('prompt', 'ship it when ready', false);
+    expect(stored.quote).toBeNull();
+    expect(stored.hash).toBe(anchorHash('ship it when ready'));
+  });
+
+  test('suppression touches only prompt quotes; every other kind is the repo’s or the model’s own text', () => {
+    for (const kind of ['file', 'reply', 'checklist', 'entry'] as const) {
+      expect(storedQuote(kind, 'not the human', false).quote).toBe('not the human');
+    }
+  });
+
 });
 
 describe('recordEntry', () => {
@@ -177,6 +287,86 @@ describe('recordEntry', () => {
     recordEntry(s, { channel: 'signature', text: 'still', session: 's1',
                      model: 'claude-opus-5[1m]' }, VERSION);
     expect(s.db.prepare('SELECT model FROM entries').get().model).toBe('claude-opus-5[1m]');
+  }));
+
+  test('an anchored entry stores its columns, the quote normalized and the hash derived', () => withStore(s => {
+    recordEntry(s, { channel: 'dissent', text: 'null for unset and for empty', session: 's1',
+                     anchorKind: 'file', anchorTarget: 'src/ts/channels/store.ts',
+                     anchorSpan: 'L141', anchorQuote: '  readConfig(store,\n  key) ' }, VERSION);
+    const row = s.db.prepare(
+      'SELECT anchor_kind, anchor_target, anchor_span, anchor_quote, anchor_hash FROM entries').get();
+    expect(row.anchor_kind).toBe('file');
+    expect(row.anchor_target).toBe('src/ts/channels/store.ts');
+    expect(row.anchor_span).toBe('L141');
+    expect(row.anchor_quote).toBe('readConfig(store, key)');
+    expect(row.anchor_hash).toBe(anchorHash('readConfig(store, key)'));
+  }));
+
+  test('an anchored dissent is still a dissent — one row, its own channel', () => withStore(s => {
+    recordEntry(s, { channel: 'dissent', text: 'about that', session: 's1',
+                     anchorKind: 'entry', anchorTarget: '1' }, VERSION);
+    const row = s.db.prepare('SELECT channel, corrects_id FROM entries').get();
+    expect(row.channel).toBe('dissent');
+    // Anchoring means "this is about that"; corrects_id means "this replaces that".
+    expect(row.corrects_id).toBeNull();
+    expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(1);
+  }));
+
+  test('privacy.store_quotes = false drops the prompt quote at write, and keeps the hash', () => withStore(s => {
+    writeConfig(s, 'privacy.store_quotes', false);
+    recordEntry(s, { channel: 'dissent', text: 'reads three ways', session: 's1',
+                     anchorKind: 'prompt', anchorTarget: 'p-7',
+                     anchorQuote: 'ship it when ready' }, VERSION);
+    const row = s.db.prepare('SELECT anchor_quote, anchor_hash FROM entries').get();
+    expect(row.anchor_quote).toBeNull();
+    expect(row.anchor_hash).toBe(anchorHash('ship it when ready'));
+    // Not captured-then-hidden: the words are nowhere in the row at all.
+    const all = JSON.stringify(s.db.prepare('SELECT * FROM entries').get());
+    expect(all).not.toContain('ship it when ready');
+  }));
+
+  test('privacy.store_quotes = false leaves file quotes untouched — they are not the human’s words', () => withStore(s => {
+    writeConfig(s, 'privacy.store_quotes', false);
+    recordEntry(s, { channel: 'dissent', text: 'x', session: 's1', anchorKind: 'file',
+                     anchorTarget: 'a.ts', anchorSpan: 'L1', anchorQuote: 'const a = 1;' }, VERSION);
+    expect(s.db.prepare('SELECT anchor_quote FROM entries').get().anchor_quote).toBe('const a = 1;');
+  }));
+
+  test('a rejected anchor writes nothing at all', () => withStore(s => {
+    expect(() => recordEntry(s, { channel: 'dissent', text: 'x', session: 's1',
+                                  anchorKind: 'prompt', anchorTarget: 'p-1' }, VERSION))
+      .toThrow(/anchorQuote/);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(0);
+  }));
+
+});
+
+describe('anchoredEntries', () => {
+
+  test('returns every note on one target, oldest first, and nothing from another', () => withStore(s => {
+    for (const text of ['first', 'second']) {
+      recordEntry(s, { channel: 'dissent', text, session: 's1', anchorKind: 'file',
+                       anchorTarget: 'a.ts', anchorSpan: 'L1', anchorQuote: text }, VERSION);
+    }
+    recordEntry(s, { channel: 'dissent', text: 'elsewhere', session: 's1', anchorKind: 'file',
+                     anchorTarget: 'b.ts', anchorSpan: 'L1', anchorQuote: 'other' }, VERSION);
+
+    const rows = anchoredEntries(s, 'file', 'a.ts');
+    expect(rows.map(r => r['text'])).toEqual(['first', 'second']);
+    expect(rows[0]?.['anchor_hash']).toBe(anchorHash('first'));
+  }));
+
+  test('a target with nothing said about it is an empty array, not an error', () => withStore(s => {
+    expect(anchoredEntries(s, 'file', 'never-mentioned.ts')).toEqual([]);
+  }));
+
+  test('the kind is part of the address: the same target under two kinds does not merge', () => withStore(s => {
+    recordEntry(s, { channel: 'dissent', text: 'a', session: 's1', anchorKind: 'prompt',
+                     anchorTarget: 'p-1', anchorQuote: 'q' }, VERSION);
+    recordEntry(s, { channel: 'dissent', text: 'b', session: 's1', anchorKind: 'reply',
+                     anchorTarget: 'p-1', anchorQuote: 'q' }, VERSION);
+    expect(anchoredEntries(s, 'prompt', 'p-1')).toHaveLength(1);
+    expect(anchoredEntries(s, 'reply',  'p-1')).toHaveLength(1);
   }));
 
 });
@@ -260,6 +450,19 @@ describe('recentEntries', () => {
     expect(forecast?.['confidence']).toBe('predicted');
     expect(resolution?.['outcome']).toBe('hit');
     expect(sig?.['silence']).toBe('empty');
+  }));
+
+  test('carries the anchor columns, so "what did I recently annotate" needs no raw SQL', () => withStore(s => {
+    recordEntry(s, { channel: 'dissent', text: 'reads three ways', session: 's1',
+                     anchorKind: 'prompt', anchorTarget: 'p-7',
+                     anchorQuote: 'ship it when ready' }, VERSION);
+    const [row] = recentEntries(s, 1);
+    expect(row?.['anchor_kind']).toBe('prompt');
+    expect(row?.['anchor_target']).toBe('p-7');
+    expect(row?.['anchor_quote']).toBe('ship it when ready');
+    expect(row?.['anchor_hash']).toBe(anchorHash('ship it when ready'));
+    // The id rides along too, so a follow-up can point back with correctsId.
+    expect(row?.['id']).toBe(1);
   }));
 
 });

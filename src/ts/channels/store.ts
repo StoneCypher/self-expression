@@ -18,7 +18,7 @@ import { mkdirSync }      from 'node:fs';
 import { dirname }        from 'node:path';
 import { randomUUID }     from 'node:crypto';
 import { platform }       from 'node:process';
-import { ALL_DDL, SCHEMA_VERSION } from './schema.js';
+import { TABLE_DDL, ALL_INDEX_DDL, SCHEMA_VERSION } from './schema.js';
 import { migrate }        from './migrate.js';
 import { dbPath }         from './paths.js';
 import { stamp }          from './time.js';
@@ -141,12 +141,15 @@ export function allConfig(store: Store): Record<string, string> {
  * because a reinstall is a genuine discontinuity and the data should say so rather than
  * implying a continuity that did not exist.
  *
- * The version handling is ordered deliberately: apply the DDL (a no-op on existing
- * tables), **read** the stored `schema_version`, run {@link migrate} when the database
- * is behind, and only *then* stamp the current version. The previous implementation
- * stamped unconditionally before reading — which would have marked a v1 database as
- * current without migrating it, the moment a v2 existed. A stored version *newer* than
- * this code's is an error, never a downgrade-in-place: the newer schema may hold
+ * The version handling is ordered deliberately: apply the **table** DDL (a no-op on
+ * existing tables), **read** the stored `schema_version`, run {@link migrate} when the
+ * database is behind, apply the **index** DDL, and only *then* stamp the current
+ * version. The previous implementation stamped unconditionally before reading — which
+ * would have marked a v1 database as current without migrating it, the moment a v2
+ * existed. Indices sit after the migration for a related reason: an index over a column
+ * a later version added cannot be created against the older table shape, so applying
+ * them first would turn every upgrade into a hard failure. A stored version *newer*
+ * than this code's is an error, never a downgrade-in-place: the newer schema may hold
  * columns and vocabulary this code would silently mangle.
  *
  * @param path - database file to open; defaults to the resolved data directory
@@ -165,7 +168,7 @@ export function openStore(path: string = dbPath()): Store {
   mkdirSync(dirname(path), { recursive: true });
 
   const db = new DatabaseSync(path);
-  for (const statement of ALL_DDL) { db.exec(statement); }
+  for (const statement of TABLE_DDL) { db.exec(statement); }
 
   const partial: Store = { db, machineId: '', path };
 
@@ -187,6 +190,11 @@ export function openStore(path: string = dbPath()): Store {
   if (stored !== null && stored < SCHEMA_VERSION) {
     migrate(db, stored, SCHEMA_VERSION);
   }
+
+  // Indices come after the migration, never before: an index over a column a later
+  // version added (`idx_entries_anchor`, #18) is an outright error against the old
+  // table shape, whereas `CREATE TABLE IF NOT EXISTS` on an old table is a real no-op.
+  for (const statement of ALL_INDEX_DDL) { db.exec(statement); }
 
   if (readMeta(partial, 'created_utc') === null) {
     writeMeta(partial, 'created_utc', stamp().utc);

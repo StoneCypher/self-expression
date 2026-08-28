@@ -313,21 +313,41 @@ export const MESSAGE_INDEX_DDL: readonly string[] = [
 ];
 
 /**
- * Every statement needed to bring an empty database to the current schema, in order.
+ * Every `CREATE TABLE` the current schema needs, in order — and nothing else.
  *
- * Each is idempotent, so running this against an already-initialised database is a
- * no-op rather than an error.
+ * Kept apart from the indices because the two have different safety on an *old*
+ * database: `CREATE TABLE IF NOT EXISTS` on an existing table is a genuine no-op
+ * whatever shape that table has, while `CREATE INDEX` over a column the old shape
+ * lacks is an outright error. `openStore` therefore applies these before migrating and
+ * {@link ALL_INDEX_DDL} after, so an index over a newly-migrated column is never
+ * attempted against the pre-migration shape.
  *
  * @example
- *   for (const statement of ALL_DDL) { db.exec(statement); }
+ *   for (const statement of TABLE_DDL) { db.exec(statement); }
+ *
+ * @see ./store.js openStore
  */
-export const ALL_DDL: readonly string[] = [
+export const TABLE_DDL: readonly string[] = [
   ENTRIES_DDL,
   TURN_CONTEXT_DDL,
   META_DDL,
   CONFIG_DDL,
   MESSAGES_DDL,
   MESSAGE_READS_DDL,
-  ...INDEX_DDL,
-  ...MESSAGE_INDEX_DDL,
 ];
+
+/** Every index the current schema declares, entries and messagebox together. */
+export const ALL_INDEX_DDL: readonly string[] = [...INDEX_DDL, ...MESSAGE_INDEX_DDL];
+
+/**
+ * Every statement needed to bring an **empty** database to the current schema, in
+ * order: tables, then indices.
+ *
+ * Each is idempotent, so re-running it against a database already at this version is a
+ * no-op. On a database at an *older* version, use {@link TABLE_DDL} and
+ * {@link ALL_INDEX_DDL} around the migration instead — see the note on `TABLE_DDL`.
+ *
+ * @example
+ *   for (const statement of ALL_DDL) { db.exec(statement); }
+ */
+export const ALL_DDL: readonly string[] = [...TABLE_DDL, ...ALL_INDEX_DDL];

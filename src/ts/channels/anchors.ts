@@ -264,7 +264,7 @@ export function spanProblem(kind: AnchorKind, span: string): string | null {
  *
  * @example
  *   locateQuote('ship it when ready. ship it', 'ship it')     // => 0
- *   locateQuote('ship it when ready. ship it', 'ship it', 2)  // => 19
+ *   locateQuote('ship it when ready. ship it', 'ship it', 2)  // => 20
  *   locateQuote('ship it when ready', 'later')                // => -1
  */
 export function locateQuote(text: string, quote: string, ordinal = 1): number {

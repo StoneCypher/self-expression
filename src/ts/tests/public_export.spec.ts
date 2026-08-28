@@ -14,6 +14,7 @@ import { join }                from 'node:path';
 import { openStore, closeStore, writeConfig, readConfig } from '../channels/store.js';
 import type { Store } from '../channels/store.js';
 import { recordEntry } from '../channels/entries.js';
+import { anchorHash }  from '../channels/anchors.js';
 import { ENTRIES_DDL } from '../channels/schema.js';
 import {
   PUBLIC_TREATMENTS, CC_TYPES,
@@ -59,12 +60,12 @@ describe('totality — the allowlist covers the whole schema, forever', () => {
     }
   });
 
-  test('the classification counts match the spec plus the classified v2 columns: 24 verbatim, 11 coarsen, 7 hash, 3 derive, 12 excluded', () => {
+  test('the classification counts match the spec plus the classified v2 and anchor columns: 25 verbatim, 11 coarsen, 8 hash, 3 derive, 15 excluded', () => {
     const counts: Record<string, number> = {};
     for (const treatment of Object.values(PUBLIC_TREATMENTS)) {
       counts[treatment.kind] = (counts[treatment.kind] ?? 0) + 1;
     }
-    expect(counts).toEqual({ verbatim: 24, coarsen: 11, hash: 7, derive: 3, excluded: 12 });
+    expect(counts).toEqual({ verbatim: 25, coarsen: 11, hash: 8, derive: 3, excluded: 15 });
   });
 
   test('the free-text and identifier columns are excluded or blinded, by name', () => {
@@ -75,6 +76,17 @@ describe('totality — the allowlist covers the whole schema, forever', () => {
     for (const column of ['uuid', 'session', 'prompt_id', 'machine_id', 'agent_id', 'series_key', 'corrects_id']) {
       expect(PUBLIC_TREATMENTS[column]?.kind).toBe('hash');
     }
+  });
+
+  test('#18: the anchor kind is structured and exports, the quote and target never do', () => {
+    expect(PUBLIC_TREATMENTS['anchor_kind']?.kind).toBe('verbatim');
+    for (const column of ['anchor_quote', 'anchor_target', 'anchor_span']) {
+      expect(PUBLIC_TREATMENTS[column]?.kind).toBe('excluded');
+    }
+  });
+
+  test("#18: the anchor hash is re-blinded per submission — an unsalted content digest is a global join key", () => {
+    expect(PUBLIC_TREATMENTS['anchor_hash']?.kind).toBe('hash');
   });
 
 });
@@ -362,6 +374,42 @@ describe('the shaped rows', () => {
           doc  = exportPublicRows(s, salt, OPTS),
           edge = doc.rows.find(r => r['corrects_uuid'] !== null);
     expect(edge?.['corrects_uuid']).toBe(saltedHash(salt, target.uuid));
+  }));
+
+  test('#18: an anchored row exports its kind and a blinded hash, and no anchor words at all', () => withStore(s => {
+    optIn(s, '2020-01-01T00:00:00.000Z');
+    recordEntry(s, { channel: 'dissent', text: 'ambiguous', session: 's1',
+                     anchorKind: 'prompt', anchorTarget: 'p-secret-7',
+                     anchorQuote: 'the clients internal codename' }, '0.0.0');
+    const salt = freshSalt(),
+          row  = exportPublicRows(s, salt, OPTS).rows[0] ?? {},
+          keys = Object.keys(row);
+    expect(row['anchor_kind']).toBe('prompt');
+    for (const banned of ['anchor_quote', 'anchor_target', 'anchor_span']) {
+      expect(keys).not.toContain(banned);
+    }
+    expect(JSON.stringify(row)).not.toContain('codename');
+    expect(JSON.stringify(row)).not.toContain('p-secret-7');
+    expect(row['anchor_hash']).toBe(saltedHash(salt, anchorHash('the clients internal codename')));
+  }));
+
+  test('#18: two notes quoting the same thing group together inside one submission', () => withStore(s => {
+    optIn(s, '2020-01-01T00:00:00.000Z');
+    for (const channel of ['dissent', 'confidence'] as const) {
+      recordEntry(s, { channel, text: 'about the same line', session: 's1',
+                       anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1',
+                       anchorQuote: 'const answer = 42;' }, '0.0.0');
+    }
+    const [a, b] = exportPublicRows(s, freshSalt(), OPTS).rows;
+    expect(a?.['anchor_hash']).toBe(b?.['anchor_hash']);
+  }));
+
+  test('#18: an unanchored row exports nulls, not absent keys — the shape is uniform', () => withStore(s => {
+    optIn(s, '2020-01-01T00:00:00.000Z');
+    recordEntry(s, { channel: 'signature', text: 'floating', session: 's1' }, '0.0.0');
+    const row = exportPublicRows(s, freshSalt(), OPTS).rows[0] ?? {};
+    expect(row['anchor_kind']).toBeNull();
+    expect(row['anchor_hash']).toBeNull();
   }));
 
   test('the open product names are capped at 64 characters as an abuse valve', () => withStore(s => {

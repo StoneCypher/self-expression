@@ -237,8 +237,14 @@ export function renderAnchorSegment(note: AnnotationNote, options?: AnnotationOp
 
 }
 
-/** The position column's text for one note: its span, or a resolution mark. */
-function positionText(note: AnnotationNote): string {
+/**
+ * The position column's text for one note: its span, or a resolution mark.
+ *
+ * In `markdown` mode a `file` span becomes the clickable link, rather than the group
+ * header — the line number is the thing a reader actually wants to click, and the
+ * header already names the file once for the whole group.
+ */
+function positionText(note: AnnotationNote, options?: AnnotationOptions): string {
 
   const status = statusOf(note);
 
@@ -249,7 +255,14 @@ function positionText(note: AnnotationNote): string {
     return `${note.resolution?.from ?? '?'}\u{2192}${note.resolution?.span ?? '?'} (moved)`;
   }
 
-  return displaySpan(note) ?? '';
+  const span = displaySpan(note);
+  if (span === undefined) { return ''; }
+
+  const line = note.anchorKind === 'file' && options?.markdown === true
+    ? /(\d+)/.exec(span)?.[1] ?? null
+    : null;
+
+  return line === null ? span : `[${span}](${note.anchorTarget}#L${line})`;
 
 }
 
@@ -279,7 +292,10 @@ function groupNotes(notes: readonly AnnotationNote[], options?: AnnotationOption
             .map((note, index) => ({ note, index }))
             .sort((a, b) => positionOf(a.note) - positionOf(b.note) || a.index - b.index)
             .map(entry => entry.note);
-    return { header: `${ANCHOR_GLYPH} ${renderAnchorTarget(first, options)}`, notes: sorted };
+    // The header names the *target*, never a position or a verdict: the position column
+    // carries both, per note, and a group of ten notes has ten of each.
+    const naked: AnnotationNote = { ...first, anchorSpan: undefined, resolution: undefined };
+    return { header: `${ANCHOR_GLYPH} ${renderAnchorTarget(naked, options)}`, notes: sorted };
   });
 
 }
@@ -294,6 +310,11 @@ function groupNotes(notes: readonly AnnotationNote[], options?: AnnotationOption
  * vertically; groups are separated by a blank line and appear in the order their
  * targets were first named. Each line still records as its own row with its own
  * channel: **the block is presentation, the rows are the record.**
+ *
+ * The header names the target and nothing else — position and resolution belong to
+ * individual notes, and a group of ten has ten of each. Under `markdown` it is
+ * therefore the *position* column that becomes clickable, which is the half a reader
+ * wants to click anyway.
  *
  * The channel is deliberately not drawn. A block that repeated `dissent:` down its
  * left edge would spend the alignment on the least surprising column — what the notes
@@ -339,7 +360,7 @@ export function renderAnnotations(notes: readonly AnnotationNote[], options?: An
 
   return groupNotes(notes, options).map(group => {
 
-    const positions = group.notes.map(positionText),
+    const positions = group.notes.map(note => positionText(note, options)),
           quotes    = group.notes.map(renderQuote),
           posWidth  = Math.max(...positions.map(p => p.length)),
           quoteWidth = Math.max(...quotes.map(q => q.length));

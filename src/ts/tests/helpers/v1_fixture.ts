@@ -11,7 +11,23 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, INDEX_DDL } from '../../channels/schema.js';
+import { TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL } from '../../channels/schema.js';
+
+/**
+ * The indices a v1 database carried, frozen alongside its DDL.
+ *
+ * Deliberately not `INDEX_DDL` from the schema module, for the same reason the table
+ * DDL is not `entriesDdl()`: a later index over a later column (`idx_entries_anchor`,
+ * #18) would fail outright against a v1 table, which is the fixture drifting forward
+ * and then blaming the migration for it.
+ */
+export const V1_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX IF NOT EXISTS idx_entries_prompt  ON entries(prompt_id)',
+  'CREATE INDEX IF NOT EXISTS idx_entries_session ON entries(session, id)',
+  'CREATE INDEX IF NOT EXISTS idx_entries_channel ON entries(channel, ts_utc)',
+  'CREATE INDEX IF NOT EXISTS idx_entries_series  ON entries(series_key, id)',
+  'CREATE INDEX IF NOT EXISTS idx_context_session ON turn_context(session, id)',
+];
 
 /** The v1 `entries` DDL, frozen. Must never change again: it describes databases that already exist. */
 export const V1_ENTRIES_DDL = `
@@ -96,7 +112,7 @@ CREATE TABLE IF NOT EXISTS entries (
  */
 export function buildV1(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
-  for (const s of [V1_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, ...INDEX_DDL]) {
+  for (const s of [V1_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, ...V1_INDEX_DDL]) {
     db.exec(s);
   }
   db.prepare("INSERT INTO meta (key, value, updated_utc) VALUES ('schema_version','1','2026-08-18T00:00:00Z')").run();
