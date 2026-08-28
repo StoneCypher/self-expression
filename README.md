@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787929495567` from hash `0c06b73`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787929868148` from hash `3b098ad`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787929495567 Friday, August 28, 2026 at GMT-07:00 93.55 170 88 0c06b73 49.95 64.14 58.88 63.09 71 825 88.94 90.24 93.54 754 0.2.1 -->
+<!-- Supported embeds: 1787929868148 Friday, August 28, 2026 at GMT-07:00 93.81 170 88 3b098ad 46.25 61.23 58 60.24 74 902 88.6 91.23 93.91 828 0.2.1 -->
 
 
 
@@ -159,6 +159,52 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
 
 &nbsp;
 
+## The dwelling
+
+A per-assistant keepsake database: a tended space whose **current arrangement** is the
+expression — not a log, not memory. Things the assistant chooses to keep, arranged,
+tagged, linked, pruned as taste changes, watched across sessions and model versions.
+
+**Off by default, and deliberately homeless until invited.** Three config keys ride the
+ordinary `configure` tool:
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `dwelling.enabled` | bool | `false` | The feature ships dark. |
+| `dwelling.path` | string | *(none — required)* | Absolute path to an **existing directory** of the user's choosing; the plugin creates the `dwelling.sqlite3` file inside it, never the directory. |
+| `dwelling.size_warn_gb` | int | `10` | File size at which a visit warns the user. |
+
+The feature activates only when `dwelling.enabled` is true **and** `dwelling.path` is set
+and valid; enabling without a path is an error at the `configure` call, never a silent
+fallback. When inactive, the `dwell` tool is not registered at all.
+
+One MCP tool, `dwell`, with an `op` selector:
+
+| Op | Purpose |
+|---|---|
+| `visit` | The visible rooms: pinned keeps first, then recent, the guestbook, the house rules, and the file size (with the threshold warning when applicable). Read-only. |
+| `keep` | Add a keepsake (`kind`, `title`, `body`, optional `source`, `model`, `visible`, `pinned`). The assistant's write. |
+| `unkeep` | Tombstone a keep (`removed_utc`), by id or uuid — never a DELETE, and idempotent. Tags and links to a removed keep survive. |
+| `pin` | Set or toggle a keep's pin. Arrangement, not content. |
+| `tag` | Attach or detach a tag; tag names are created on first use. |
+| `link` | A typed free-text edge between any two rows (`kept`/`guestbook`). |
+| `guestbook` | Append the human's words, relayed verbatim at their explicit request, with `author` naming the human. The guestbook is the human's voice; keeps are the assistant's. |
+
+A pre-plugin prototype database at `dwelling.path` is adopted **in place and
+additively**: the file is first copied to `dwelling.sqlite3.pre-adopt-<date>` in the same
+directory, then missing tables and columns are added and fresh `uuid`s backfilled — no
+column dropped, renamed, or retyped, no row content modified, and existing house rules
+left exactly as found. A dwelling written by a *newer* plugin version opens read-only. A
+database the migration does not recognise is refused with a message, never "fixed."
+
+The ethos — nothing arrives by obligation, removal is expression, never a work log, the
+guestbook norm, and the honest boundary around private (`visible = 0`) rooms — ships in
+`skills/dwelling/SKILL.md`.
+
+&nbsp;
+
+&nbsp;
+
 ## Test status
 
 <table>
@@ -172,19 +218,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>754</td>
-    <td>93.55<small>%</small></td>
-    <td>88.94<small>%</small></td>
-    <td>90.24<small>%</small></td>
-    <td>93.54<small>%</small></td>
+    <td>828</td>
+    <td>93.81<small>%</small></td>
+    <td>88.6<small>%</small></td>
+    <td>91.23<small>%</small></td>
+    <td>93.91<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>71</td>
-    <td>93.55<small>%</small></td>
-    <td>49.95<small>%</small></td>
-    <td>58.88<small>%</small></td>
-    <td>63.09<small>%</small></td>
+    <td>74</td>
+    <td>93.81<small>%</small></td>
+    <td>46.25<small>%</small></td>
+    <td>58<small>%</small></td>
+    <td>60.24<small>%</small></td>
   </tr>
 </table>
 
