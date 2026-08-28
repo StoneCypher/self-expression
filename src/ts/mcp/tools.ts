@@ -100,8 +100,9 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       "instructions contradict each other and you picked one; confidence records how you " +
       'know what you just claimed; unanswerable records that something cannot be resolved ' +
       'with what is available; pattern is an observation about how the collaboration is ' +
-      'going. "Nothing notable" is always a valid signature — the requirement is to look, ' +
-      'not to produce.',
+      'going; checklist logs one render of a status checklist — its identity is seriesKey, ' +
+      'a stable id chosen once, never the display title. "Nothing notable" is always a ' +
+      'valid signature — the requirement is to look, not to produce.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
       text           : z.string().min(1).max(280).describe('the content; terse, honest over flattering'),
@@ -124,6 +125,23 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       model          : z.string().optional().describe('exact model id, including variant markers'),
       cctype         : z.string().optional().describe('conventional-commits type for the work'),
       project        : z.string().optional(),
+      seriesKey      : z.string().min(1).optional().describe(
+        "checklists only: the stable series identifier, chosen once at the checklist's first " +
+        'render and repeated verbatim on every re-render — never the display title, which may ' +
+        'be reworded freely without splitting the series; percent snapshots recorded under one ' +
+        'key form the trend series the sparkline replays'),
+      title          : z.string().optional().describe(
+        'checklists only: the display title as rendered; free to change between renders — ' +
+        'series identity lives in seriesKey, not here'),
+      succ           : z.number().int().min(0).optional().describe(
+        'checklists only: items counted as success in the summary line'),
+      active         : z.number().int().min(0).optional().describe(
+        'checklists only: items counted as active or pending in the summary line'),
+      fail           : z.number().int().min(0).optional().describe(
+        'checklists only: items counted as failure in the summary line'),
+      percent        : z.number().int().min(0).max(100).optional().describe(
+        "checklists only: the summary line's completion percent for this snapshot; requires " +
+        'seriesKey, so the snapshot joins a series instead of being silently orphaned'),
     },
   }, (args) => {
 

@@ -73,6 +73,10 @@ export interface EntryInput {
   readonly confidence?      : ConfidenceGround | undefined;
   readonly divergenceKind?  : DivergenceKind | undefined;
 
+  // Checklist only. `seriesKey` is the series' stable identity (#27): chosen once at
+  // the checklist's first render and repeated verbatim on every re-render, so `title`
+  // — display prose — may be reworded freely without silently forking the percent
+  // history into two series.
   readonly seriesKey?       : string | undefined;
   readonly title?           : string | undefined;
   readonly succ?            : number | undefined;
@@ -103,15 +107,23 @@ const CONSTRAINED: readonly [keyof EntryInput, readonly string[]][] = [
 ];
 
 /**
- * Check every closed field against its vocabulary, returning the problems found.
+ * Check every closed field against its vocabulary — and the checklist series fields
+ * against their contract — returning the problems found.
  *
  * Returns all failures rather than throwing on the first, so a caller supplying two
  * bad values learns about both in one round trip instead of two.
+ *
+ * The checklist rules exist because the series-split failure they guard against is
+ * invisible (#27): a percent snapshot recorded without a `seriesKey` can never be found
+ * by {@link seriesPercents}, so it would silently vanish from the trend rather than
+ * erroring — this makes that loud at write time instead.
  *
  * @example
  *   validate({ channel: 'signature', text: 'x', session: 's' })      // => []
  *   validate({ channel: 'vibes', text: 'x', session: 's' })
  *   // => ["'vibes' is not a valid channel; expected 'signature', 'need', ..."]
+ *   validate({ channel: 'checklist', text: 'x', session: 's', percent: 80 })
+ *   // => ['percent requires a seriesKey — a snapshot recorded without one can never join a trend series']
  */
 export function validate(input: EntryInput): string[] {
 
@@ -128,6 +140,18 @@ export function validate(input: EntryInput): string[] {
 
   if (input.text.trim() === '')    { problems.push('text must not be empty'); }
   if (input.session.trim() === '') { problems.push('session must not be empty'); }
+
+  if (input.seriesKey?.trim() === '') {
+    problems.push('seriesKey must not be blank');
+  }
+
+  if (input.percent !== undefined && input.seriesKey === undefined) {
+    problems.push('percent requires a seriesKey — a snapshot recorded without one can never join a trend series');
+  }
+
+  if (input.percent !== undefined && (input.percent < 0 || input.percent > 100 || !Number.isInteger(input.percent))) {
+    problems.push(`percent must be an integer from 0 to 100; received ${String(input.percent)}`);
+  }
 
   return problems;
 
@@ -148,8 +172,9 @@ function bit(value: boolean | undefined): number | null {
  *   recordEntry(store, { channel: 'need', text: 'merge #21?', session: 's1' })
  *   // => { id: 1, uuid: '…' }
  *
- * @throws {Error} If any closed field is outside its vocabulary, naming every problem
- *                 and the values that would have been accepted.
+ * @throws {Error} If validation fails — a closed field outside its vocabulary, or a
+ *                 checklist series violation (see {@link validate}) — naming every
+ *                 problem and the values that would have been accepted.
  */
 export function recordEntry(
   store         : Store,

@@ -40,6 +40,32 @@ describe('validate', () => {
     expect(validate({ channel: 'idea', text: 'x', session: '  ' })).toContain('session must not be empty');
   });
 
+  test('accepts a checklist snapshot carrying its stable series key', () => {
+    expect(validate({
+      channel: 'checklist', text: '- ✅ done', session: 's',
+      seriesKey: 'release-build', title: 'Release build', percent: 67,
+    })).toEqual([]);
+  });
+
+  test('rejects a blank seriesKey', () => {
+    expect(validate({ channel: 'checklist', text: 'x', session: 's', seriesKey: '  ' }))
+      .toContain('seriesKey must not be blank');
+  });
+
+  test('rejects a percent snapshot without a seriesKey — the invisible orphan (#27)', () => {
+    const problems = validate({ channel: 'checklist', text: 'x', session: 's', percent: 40 });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain('seriesKey');
+  });
+
+  test('rejects a percent outside 0-100 or non-integral', () => {
+    for (const percent of [-1, 101, 33.3]) {
+      const problems = validate({ channel: 'checklist', text: 'x', session: 's',
+                                  seriesKey: 'k', percent });
+      expect(problems.some(p => p.includes('percent must be an integer'))).toBe(true);
+    }
+  });
+
 });
 
 describe('recordEntry', () => {
@@ -175,6 +201,16 @@ describe('seriesPercents', () => {
   test('an unknown series key yields an empty array', () => withStore(s => {
     recordEntry(s, { channel: 'checklist', text: 'a', session: 's1', seriesKey: 'x', percent: 10 }, VERSION);
     expect(seriesPercents(s, 'nonesuch')).toEqual([]);
+  }));
+
+  test('a retitled checklist keeps one unbroken series — the split #27 forbids', () => withStore(s => {
+    recordEntry(s, { channel: 'checklist', text: 'a', session: 's1',
+                     seriesKey: 'atlas', title: 'Project Atlas', percent: 25 }, VERSION);
+    recordEntry(s, { channel: 'checklist', text: 'b', session: 's1',
+                     seriesKey: 'atlas', title: 'Project Atlas — phase 2', percent: 60 }, VERSION);
+    recordEntry(s, { channel: 'checklist', text: 'c', session: 's1',
+                     seriesKey: 'atlas', title: 'Project Altas — phase 2', percent: 80 }, VERSION);
+    expect(seriesPercents(s, 'atlas')).toEqual([25, 60, 80]);
   }));
 
 });

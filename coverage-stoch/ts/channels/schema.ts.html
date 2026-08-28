@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/9</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -292,7 +292,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -308,7 +308,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">46x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -320,7 +320,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -398,7 +398,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -417,7 +417,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -429,7 +429,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -437,7 +437,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -454,7 +454,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -491,7 +491,7 @@ import {
  * Stored once in `meta`, not on every row: it changes only at upgrade, so per-row
  * storage would be pure duplication of a value that is identical everywhere.
  */
-export const SCHEMA_VERSION = <span class="cstat-no" title="statement not covered" >1;</span>
+export const SCHEMA_VERSION = 1;
 &nbsp;
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -506,8 +506,8 @@ export const SCHEMA_VERSION = <span class="cstat-no" title="statement not covere
  *   check('delta', DELTAS)
  *   // =&gt; "CHECK (delta IS NULL OR delta IN ('up','down','steady'))"
  */
-export function <span class="fstat-no" title="function not covered" >check(c</span>olumn: string, vocabulary: readonly string[]): string {
-<span class="cstat-no" title="statement not covered" >  return `CHECK (${column} IS NULL OR ${column} IN (${vocabulary.<span class="fstat-no" title="function not covered" >map(v</span> =&gt; <span class="cstat-no" title="statement not covered" >`'${v}'`)</span>.join(',')}))`;</span>
+export function check(column: string, vocabulary: readonly string[]): string {
+  return `CHECK (${column} IS NULL OR ${column} IN (${vocabulary.map(v =&gt; `'${v}'`).join(',')}))`;
 }
 &nbsp;
 /**
@@ -519,7 +519,7 @@ export function <span class="fstat-no" title="function not covered" >check(c</sp
  * rule is a style preference.
  */
 // eslint-disable-next-line @typescript-eslint/no-inferrable-types
-export const ENTRIES_DDL: string = <span class="cstat-no" title="statement not covered" >`</span>
+export const ENTRIES_DDL: string = `
 CREATE TABLE IF NOT EXISTS entries (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   uuid            TEXT    NOT NULL UNIQUE,
@@ -597,7 +597,7 @@ CREATE TABLE IF NOT EXISTS entries (
  * inspection and so concurrent sessions do not overwrite each other.
  */
 // eslint-disable-next-line @typescript-eslint/no-inferrable-types
-export const TURN_CONTEXT_DDL: string = <span class="cstat-no" title="statement not covered" >`</span>
+export const TURN_CONTEXT_DDL: string = `
 CREATE TABLE IF NOT EXISTS turn_context (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   ts_utc          TEXT    NOT NULL,
@@ -616,7 +616,7 @@ CREATE TABLE IF NOT EXISTS turn_context (
 )`;
 &nbsp;
 /** System state. Not user-editable; changes at install and upgrade only. */
-export const META_DDL = <span class="cstat-no" title="statement not covered" >`</span>
+export const META_DDL = `
 CREATE TABLE IF NOT EXISTS meta (
   key         TEXT PRIMARY KEY,
   value       TEXT NOT NULL,
@@ -628,7 +628,7 @@ CREATE TABLE IF NOT EXISTS meta (
  * here is a valid and fully working state. Seeding defaults would mean a later change
  * to a default could never reach an existing install.
  */
-export const CONFIG_DDL = <span class="cstat-no" title="statement not covered" >`</span>
+export const CONFIG_DDL = `
 CREATE TABLE IF NOT EXISTS config (
   key         TEXT PRIMARY KEY,
   value       TEXT NOT NULL,
@@ -636,7 +636,7 @@ CREATE TABLE IF NOT EXISTS config (
 )`;
 &nbsp;
 /** Indices covering the queries the gates and the analyses actually run. */
-export const INDEX_DDL: readonly string[] = <span class="cstat-no" title="statement not covered" >[</span>
+export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_prompt  ON entries(prompt_id)',
   'CREATE INDEX IF NOT EXISTS idx_entries_session ON entries(session, id)',
   'CREATE INDEX IF NOT EXISTS idx_entries_channel ON entries(channel, ts_utc)',
@@ -653,7 +653,7 @@ export const INDEX_DDL: readonly string[] = <span class="cstat-no" title="statem
  * @example
  *   for (const statement of ALL_DDL) { db.exec(statement); }
  */
-export const ALL_DDL: readonly string[] = <span class="cstat-no" title="statement not covered" >[</span>
+export const ALL_DDL: readonly string[] = [
   ENTRIES_DDL,
   TURN_CONTEXT_DDL,
   META_DDL,
@@ -667,7 +667,7 @@ export const ALL_DDL: readonly string[] = <span class="cstat-no" title="statemen
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T06:23:04.317Z
+                at 2026-08-28T06:53:11.555Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

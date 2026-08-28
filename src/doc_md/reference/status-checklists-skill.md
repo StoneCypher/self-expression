@@ -93,7 +93,7 @@ When showing the same checklist again later, the reader diffs the renders by eye
 - Keep item order and wording stable; a marker advances in place (🔜 → 🔨 → ✅). Lines do not move or rephrase between renders.
 - Insert newly discovered items at their natural pipeline position, not appended at the end.
 - Never drop completed or failed items mid-run; they are the history. (A checklist restarted for a genuinely new run may start fresh.)
-- Each render is a snapshot: log it (see Tooling), and once two or more snapshots of the same title exist, the summary line may carry the trend sparkline built from the logged percent series.
+- Each render is a snapshot: log it under the checklist's stable series key (see Tooling), and once two or more snapshots of the same series exist, the summary line may carry the trend sparkline built from the logged percent series. The series key is chosen once at the checklist's first render and repeated verbatim on every re-render; the display title is free to change between renders without splitting the series.
 
 ## Tooling
 
@@ -104,7 +104,7 @@ Two companion scripts live in this skill directory. Invoke each as a single-line
   It re-derives the counts, percent, bar, and icon lists from the items themselves (vocabulary and buckets read live from markers.md) and reports each check as ok/FAIL, exiting 1 on any FAIL.
 - **Logging** — after posting a checklist, log the render: write `{"title":"...","project":"...","session":"...","block":"<fenced-block content>"}` to `<scratchpad>/checklist-payload.json`, then
   `node C:/Users/john/.claude/skills/status-checklists/log-checklist.mjs --file <that path>`
-  History ops: `{"op":"series","title":"..."}` prints the percent series for building the trend sparkline (add `"project"` to disambiguate colliding titles); `{"op":"tail","n":10}` recent rows; `{"op":"stats"}` size check. The title is the series key — keep it stable across re-renders or the series splits.
+  History ops: `{"op":"series","title":"..."}` prints the percent series for building the trend sparkline (add `"project"` to disambiguate colliding titles); `{"op":"tail","n":10}` recent rows; `{"op":"stats"}` size check. Beware: the legacy script keys the series on the **title**, so under it a renamed checklist silently forks its history. The MCP replacement (this plugin's `express` tool, channel `checklist`) fixes this with an explicit `seriesKey` — a stable id chosen once at the checklist's first render and carried verbatim across re-renders — leaving the title free to change without consequence (#27). When logging through the legacy script, keep the title stable or the series splits.
 
 ## Common Mistakes
 
