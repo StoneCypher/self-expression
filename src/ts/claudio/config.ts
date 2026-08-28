@@ -118,8 +118,8 @@ export function audioConfig(
 
   const configured = intOr(readConfig(store, AUDIO_CEILING_KEY), DEFAULT_CEILING, 0, 100);
 
-  const envRaw     = env[CEILING_ENV_VAR],
-        envParsed  = envRaw === undefined ? NaN : Number(envRaw.trim()),
+  const envRaw     = env[CEILING_ENV_VAR]?.trim(),
+        envParsed  = envRaw === undefined || envRaw === '' ? NaN : Number(envRaw),
         envCeiling = Number.isInteger(envParsed) && envParsed >= 0 && envParsed <= 100 ? envParsed : 100;
 
   return {

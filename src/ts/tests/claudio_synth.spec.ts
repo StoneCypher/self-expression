@@ -39,11 +39,13 @@ describe('renderMotif', () => {
 
   test('every sample stays inside [-1, 1] — no spec can emit a clipped file', () => {
     for (const spec of Object.values(MOTIF_SPECS)) {
-      const samples = renderMotif(spec);
-      for (const s of samples) {
-        expect(s).toBeGreaterThanOrEqual(-1);
-        expect(s).toBeLessThanOrEqual(1);
+      let low = 0, high = 0;
+      for (const s of renderMotif(spec)) {
+        if (s < low)  { low  = s; }
+        if (s > high) { high = s; }
       }
+      expect(low).toBeGreaterThanOrEqual(-1);
+      expect(high).toBeLessThanOrEqual(1);
     }
   });
 

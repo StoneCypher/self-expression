@@ -40,13 +40,15 @@ import type { Leitmotif }                   from './vocabulary.js';
 /**
  * The shape every claudio tool replies with.
  *
- * A type alias rather than an interface on purpose: the MCP SDK's result type
- * carries an index signature, and only object-literal type aliases satisfy it
- * implicitly.
+ * Carries `[x: string]: unknown` alongside `content` because the SDK's own
+ * `CallToolResult` type does; without it an interface does not structurally satisfy
+ * the `registerTool` callback's return type — the same shape as `chart_tools.ts`'s
+ * `ToolReply`.
  */
-export type AudioToolReply = {
-  readonly content: { readonly type: 'text'; readonly text: string }[];
-};
+export interface AudioToolReply {
+  [x: string]: unknown;
+  content: { type: 'text'; text: string }[];
+}
 
 /** Per-process session state; `session-open`'s at-most-once rule lives here. */
 export interface AudioSession {
@@ -161,7 +163,7 @@ export async function handleStrike(
   } catch (error) {
     return refuse(ledger, version, ask, config.ceiling,
       `unplayable waveform for '${args.leitmotif}' at ${wavPath}: ` +
-      `${error instanceof Error ? error.message : String(error)}`, now);
+      (error instanceof Error ? error.message : String(error)), now);
   }
 
   if (durationMs > MAX_WAV_MS) {

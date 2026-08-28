@@ -22,7 +22,14 @@ export const AUDIO_SCHEMA_VERSION = 1;
 const kinds  = STRIKE_KINDS.map(k => `'${k}'`).join(','),
       motifs = LEITMOTIFS.map(m => `'${m}'`).join(',');
 
-/** The strike ledger: one row per attempt, played or refused. */
+/**
+ * The strike ledger: one row per attempt, played or refused.
+ *
+ * The explicit annotation is required by `isolatedDeclarations` and simultaneously
+ * flagged by eslint's `no-inferrable-types`, which does not know about that
+ * constraint; the compiler wins, exactly as in `channels/schema.ts`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
 export const STRIKES_DDL: string = `
   CREATE TABLE IF NOT EXISTS strikes (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,

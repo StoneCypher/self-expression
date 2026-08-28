@@ -91,7 +91,7 @@ describe('scaleWavGain', () => {
     expect(view.getInt16(46, true)).toBe(1000);
     expect(view.getInt16(48, true)).toBe(-1000);
     expect(view.getInt16(50, true)).toBe(32767);
-    expect(view.getInt16(52, true)).toBe(-32768);
+    expect(view.getInt16(52, true)).toBe(-32767);   // the encoder clamps at -1, which lands on -32767
   });
 
   test('factor 0.5 halves samples, rounding', () => {

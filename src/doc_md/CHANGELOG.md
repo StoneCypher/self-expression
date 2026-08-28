@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-56 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+61 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -22,15 +22,15 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:28:10 AM
+## [Untagged] - Aug 28, 2026 11:39:43 AM
 
-Commit [5b357c4204cd3d058a481e9789e0bc9dbe977c76](https://github.com/StoneCypher/self-expression/commit/5b357c4204cd3d058a481e9789e0bc9dbe977c76)
+Commit [cb24f7619f8c7fa04859771316bfccd13fbfbf32](https://github.com/StoneCypher/self-expression/commit/cb24f7619f8c7fa04859771316bfccd13fbfbf32)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [f0d20db, 52dc11c]
+Merges [b5ca98a, 4be9711]
 
-  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_compression_20
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_addressivity_41
   * # Conflicts:
 #       CHANGELOG.long.md
 #       CHANGELOG.md
@@ -41,6 +41,7 @@ Merges [f0d20db, 52dc11c]
 #       coverage-stoch/ts/channels/context.ts.html
 #       coverage-stoch/ts/channels/entries.ts.html
 #       coverage-stoch/ts/channels/index.html
+#       coverage-stoch/ts/channels/migrate.ts.html
 #       coverage-stoch/ts/channels/paths.ts.html
 #       coverage-stoch/ts/channels/privacy.ts.html
 #       coverage-stoch/ts/channels/retention.ts.html
@@ -61,10 +62,17 @@ Merges [f0d20db, 52dc11c]
 #       coverage-stoch/ts/charts/verify.ts.html
 #       coverage-stoch/ts/cli.ts.html
 #       coverage-stoch/ts/cli_commands.ts.html
+#       coverage-stoch/ts/dwelling/config.ts.html
+#       coverage-stoch/ts/dwelling/index.html
+#       coverage-stoch/ts/dwelling/ops.ts.html
+#       coverage-stoch/ts/dwelling/paths.ts.html
+#       coverage-stoch/ts/dwelling/schema.ts.html
+#       coverage-stoch/ts/dwelling/store.ts.html
 #       coverage-stoch/ts/index.html
 #       coverage-stoch/ts/index.ts.html
 #       coverage-stoch/ts/mcp/chart_tools.ts.html
 #       coverage-stoch/ts/mcp/checklist_tools.ts.html
+#       coverage-stoch/ts/mcp/dwell_tool.ts.html
 #       coverage-stoch/ts/mcp/hooks.ts.html
 #       coverage-stoch/ts/mcp/index.html
 #       coverage-stoch/ts/mcp/server.ts.html
@@ -77,16 +85,17 @@ Merges [f0d20db, 52dc11c]
 #       coverage-stoch/ts/raster/panels.ts.html
 #       coverage-stoch/ts/raster/surface.ts.html
 #       coverage-stoch/ts/stub.ts.html
-#       coverage-typedoc/coverage-typedoc.json
-#       dist/index.cjs
+#       coverage-stoch/ts/tests/helpers/index.html
+#       coverage-stoch/ts/tests/helpers/v1_fixture.ts.html
 #       dist/index.cjs.map
-#       dist/index.d.cts
-#       dist/index.iife.js
 #       dist/index.iife.js.map
-#       dist/index.mjs
 #       dist/index.mjs.map
 #       src/doc_md/CHANGELOG.long.md
 #       src/doc_md/CHANGELOG.md
+#       src/doc_md/plugin-layout.md
+#       src/ts/mcp/server.ts
+#       src/ts/tests/config.spec.ts
+#       src/ts/tests/config.stoch.ts
 
 
 
@@ -95,13 +104,55 @@ Merges [f0d20db, 52dc11c]
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:26:30 AM
+## [Untagged] - Aug 28, 2026 11:36:18 AM
 
-Commit [0b43f5d93b9d68df313063fab394568dd5d6d514](https://github.com/StoneCypher/self-expression/commit/0b43f5d93b9d68df313063fab394568dd5d6d514)
+Commit [b5ca98a4afcaf4cc502257f7c5d42afbed33b7f5](https://github.com/StoneCypher/self-expression/commit/b5ca98a4afcaf4cc502257f7c5d42afbed33b7f5)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: addressivity — audience-tagged messagebox facility
+  * Implements the 2026-08-27 addressivity design (its own facility, never a
+rendered channel): messages live in the store, not the transcript.
+  * - AUDIENCES vocabulary (self/agents/user/record) in the vocabulary → zod
+  → SQL CHECK pattern; an invalid audience is unnameable
+- messages table plus append-only message_reads receipts; unread is a
+  computed predicate (no receipt from this reader, not expired); expiry
+  excludes from delivery and never deletes
+- SCHEMA_VERSION 2→3 as a purely additive MigrationStep on the #42 chain
+- channels/messages.ts: postMessage / readMessages / unreadCounts with
+  session-fenced self, box-fenced agents (receipt key agent_id falling
+  back to session), user mail never receipted by the model, record never
+  unread; 2000-char cap; replyTo must exist
+- MCP tools post_message / read_messages, identity adopted from
+  turn_context as express does; messages.enabled is a per-call kill
+  switch; reading agents requires a box
+- hooks: config-gated Mailbox count line on UserPromptSubmit
+  (messages.notify), SessionStart handler injecting unread self notes on
+  compact/resume and receipting them (messages.enabled alone);
+  SessionStart registered in hooks.claude.json
+- self-expression messages CLI subcommand — the user's own door; --ack
+  writes the human's receipts, user audience only
+- retention: messages pruned by age, receipts only by orphanhood
+- config keys messages.enabled / messages.notify in CONFIG_KEYS
+- unit + stochastic tests (frozen v2 fixture; migration losslessness;
+  at-most-once delivery, fencing, append-only invariants); README,
+  plugin-layout, SKILL.md addressivity section
+  * Closes #41
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:30:21 AM
+
+Commit [1edcfc78ab272f0f28cdc11919f8f28aa22b15ad](https://github.com/StoneCypher/self-expression/commit/1edcfc78ab272f0f28cdc11919f8f28aa22b15ad)
 
 Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
-  * deploy: 52dc11c05b0f94f58c056c6bda336fd9d2ed85b2
+  * deploy: 4be9711a4faa0c18972a439447199475dda9dbbb
 
 
 
@@ -110,30 +161,16 @@ Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:26:22 AM
+## [Untagged] - Aug 28, 2026 11:28:57 AM
 
-Commit [f0d20db767648f2876aaadd721c7966f66850547](https://github.com/StoneCypher/self-expression/commit/f0d20db767648f2876aaadd721c7966f66850547)
+Commit [4be9711a4faa0c18972a439447199475dda9dbbb](https://github.com/StoneCypher/self-expression/commit/4be9711a4faa0c18972a439447199475dda9dbbb)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat: treat compression as the mechanic, not lists — digest core, profiles, render_digest, verifyDigest
-  * Full build green (exit 0): tsc, eslint, unit (745), stochastic (78 incl.
-the new six-invariant properties and the 500-run byte-identity oracle),
-typedoc, rollup, attw all pass. Regenerated artifacts (dist, README,
-changelogs, coverage) restored by the green build are included here.
-  * Implements src/superpowers/spec/2026-08-27-compression-mechanic-design.md:
-  * - charts/digest.ts: profile-independent renderDigest extracted from
-  checklist.ts, plus leadUnitIndex (lead-line argmax), overallBucket,
-  and nestDigest (nesting by digest substitution)
-- charts/profiles.ts: checklist/findings/options/diff/results as data
-- charts/checklist.ts: now the checklist-profile instantiation,
-  byte-identical output, existing suites unmodified as the gate
-- charts/verify.ts: verifyDigest generalizes the validator (noun-inferred
-  profile, checklist delegation, shared icon-section checks)
-- mcp/chart_tools.ts: render_digest tool beside render_checklist_summary
-- docs: markers.md profile bucket membership, skill summary-line pointer,
-  base_README Charts/Checklists sections
-  * Refs #20
+Merges [384486c, 29484e2]
+
+  * Merge pull request #70 from StoneCypher/feat_26-08-28_structured-aggregation_31
+  * feat: public aggregation carries structured fields only, never free text (#31)
 
 
 
@@ -142,16 +179,13 @@ changelogs, coverage) restored by the green build are included here.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:25:10 AM
+## [Untagged] - Aug 28, 2026 11:27:04 AM
 
-Commit [9c218dcf7f97ce4eaed8c803cff2a573aeec11e2](https://github.com/StoneCypher/self-expression/commit/9c218dcf7f97ce4eaed8c803cff2a573aeec11e2)
+Commit [29484e2ad36d069d9444658c3932f948cf649e92](https://github.com/StoneCypher/self-expression/commit/29484e2ad36d069d9444658c3932f948cf649e92)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * wip: checkpoint before token exhaustion
-  * Addressivity (#41) mid-implementation. Build NOT yet run — source
-compiles unverified, tests not yet written. See PR body for the
-full handoff: what is done, what remains, exact next steps.
+  * chore: rebuild artifacts on the merged tree (build green, exit 0)
 
 
 
@@ -160,18 +194,15 @@ full handoff: what is done, what remains, exact next steps.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:25:09 AM
+## [Untagged] - Aug 28, 2026 11:26:51 AM
 
-Commit [601b81fc0f4a04f29400afe6cec2e5b60cf64843](https://github.com/StoneCypher/self-expression/commit/601b81fc0f4a04f29400afe6cec2e5b60cf64843)
+Commit [c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800](https://github.com/StoneCypher/self-expression/commit/c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * wip: checkpoint before token exhaustion
-  * Claudio facility (#44) core in place: vocabulary, wav, synth, config,
-schema, ledger, gate, player, tools, server, cli entry, registry keys,
-build wiring, vendored assets. tsc compiles clean; unit/stoch tests
-partially written (wav+synth specs done); full build NOT yet run.
-  * Refs #44
+Merges [601b81f, 384486c]
+
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_voluntary-audio_44
 
 
 
@@ -180,16 +211,30 @@ partially written (wav+synth specs done); full build NOT yet run.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:25:09 AM
+## [Untagged] - Aug 28, 2026 11:25:17 AM
 
-Commit [52dc11c05b0f94f58c056c6bda336fd9d2ed85b2](https://github.com/StoneCypher/self-expression/commit/52dc11c05b0f94f58c056c6bda336fd9d2ed85b2)
+Commit [db54ef9cc4453057d85c92bf104ba578e7b23b10](https://github.com/StoneCypher/self-expression/commit/db54ef9cc4453057d85c92bf104ba578e7b23b10)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [560ac8c, 60c2f90]
+Merges [676e7ad, 384486c]
 
-  * Merge pull request #69 from StoneCypher/feat_26-08-28_diagrams_19
-  * feat: diagrams as a distinct mechanic from charts (#19)
+  * chore: merge origin/main (#19 diagrams, #20 digest); union tool registrations, keep 60s stoch timeouts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:23:21 AM
+
+Commit [a34324c4ca73bb3983f19062c2cadccccd6cc564](https://github.com/StoneCypher/self-expression/commit/a34324c4ca73bb3983f19062c2cadccccd6cc564)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 384486ce866b48bc68390bde01963c10a3a7ff7c
 
 
 
@@ -198,26 +243,13 @@ Merges [560ac8c, 60c2f90]
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:25:01 AM
+## [Untagged] - Aug 28, 2026 11:22:33 AM
 
-Commit [e48135372643e10f96debad804157904a83705f3](https://github.com/StoneCypher/self-expression/commit/e48135372643e10f96debad804157904a83705f3)
+Commit [e6126629f4edd8c45dbc4aa1fa42f31776c7508c](https://github.com/StoneCypher/self-expression/commit/e6126629f4edd8c45dbc4aa1fa42f31776c7508c)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * wip: checkpoint before token exhaustion — compression mechanic (#20) implemented, final full-build rerun pending
-  * Implements the compression-mechanic spec: charts/digest.ts core extracted
-from checklist.ts (byte-identical checklist output), charts/profiles.ts
-profile data (checklist/findings/options/diff/results), render_digest MCP
-tool, generalized verifyDigest validator, lead-line argmax + overallBucket
-+ nestDigest composition helpers, six invariants as fast-check properties,
-docs (markers.md profile buckets, skill pointer, base_README).
-  * Build-verification state, honestly: tsc clean; eslint clean; all targeted
-spec suites green (116 tests) incl. unmodified checklist gate; stochastic
-suites green (19 props incl. byte-identity oracle, 500 runs); first full
-build failed ONLY on pre-existing src/ts/tests/config.stoch.ts 5s timeout
-(unrelated, passes standalone in 4.2s); full-build rerun was in progress
-at checkpoint time.
-  * Refs #20
+  * wip: post-checkpoint test work rescued after agent hit session rate limit mid-write
 
 
 
@@ -226,65 +258,13 @@ at checkpoint time.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 8:24:44 AM
+## [Untagged] - Aug 28, 2026 11:22:15 AM
 
-Commit [676e7ad8596d436935d4c4d430e7746933f8f1d4](https://github.com/StoneCypher/self-expression/commit/676e7ad8596d436935d4c4d430e7746933f8f1d4)
+Commit [384486ce866b48bc68390bde01963c10a3a7ff7c](https://github.com/StoneCypher/self-expression/commit/384486ce866b48bc68390bde01963c10a3a7ff7c)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * wip: checkpoint before token exhaustion — regenerated artifacts after the #42 merge rebuild
-  * Build-verification state, honestly: the full build completed green (exit 0)
-immediately before this commit — 910 unit and 83 stochastic tests passing,
-eslint clean, attw clean — on top of the second origin/main merge (#42 channel
-extensions, schema v2). This commit is that rebuild's regenerated artifacts
-(dist, coverage, CHANGELOGs, README) plus nothing else; all source work was
-already committed in 956114f and earlier.
+Merges [52dc11c, 1c6d59b]
 
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:23:30 AM
-
-Commit [60c2f907bdf463aeb46dd4f25ac318c867e7022f](https://github.com/StoneCypher/self-expression/commit/60c2f907bdf463aeb46dd4f25ac318c867e7022f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [6bfe771, 560ac8c]
-
-  * chore: merge origin/main (channel extensions #42) and rebuild
-  * Integrations:
-- src/doc_md/plugin-layout.md: tree keeps the migrations note beside the
-  charts/diagrams contract split
-- src/ts/tests/config.stoch.ts: took main's convergent 30s widening of
-  the ints property and extended the identical widening to the other
-  three store-backed properties, which flaked the same way under
-  concurrent sibling builds
-  * Generated artifacts regenerated by the full build on the merged tree.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:22:29 AM
-
-Commit [956114ffee795694f7efedcf7f02dcf3823ae8a8](https://github.com/StoneCypher/self-expression/commit/956114ffee795694f7efedcf7f02dcf3823ae8a8)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [056a094, 560ac8c]
-
-  * chore: merge origin/main (#42 channel extensions); classify the three v2 columns
-  * Schema v2's totality drift is exactly what the #31 allowlist exists to catch:
-outcome and silence are CHECK-backed closed vocabularies and classify verbatim
-per the spec's stated rule; resolve_by is write-validated to a local date but
-carries no CHECK, so it stays excluded — conservative until a reviewer promotes
-it to an export-validated date. config.spec/config.stoch hand-merged (the #42
-convention keys alongside the #31 share keys; the wider of the two timeout
-choices kept). Generated artifacts taken from main pending the rebuild.
+  * Merge pull request #73 from StoneCypher/feat_26-08-28_compression_20
+  * feat: treat compression as the mechanic, not lists — digest core, profiles, render_digest, verifyDigest (#20)
