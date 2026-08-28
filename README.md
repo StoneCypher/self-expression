@@ -1,14 +1,31 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Wednesday, August 19, 2026 at GMT-07:00 `1787182276522` from hash `5335a98`.
+> Version 0.2.1 was built on Thursday, August 27, 2026 at GMT-07:00 `1787887366484` from hash `b6136b9`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787182276522 Wednesday, August 19, 2026 at GMT-07:00 62.05 N/A N/A 5335a98 4.1 6.71 6.34 7.47 7 150 76.49 57.14 62.14 143 0.2.1 -->
+<!-- Supported embeds: 1787887366484 Thursday, August 27, 2026 at GMT-07:00 85.18 71 87 b6136b9 26.3 39.13 35.58 38.41 40 471 86.61 79.75 85.71 431 0.2.1 -->
 
 
 
+&nbsp;
 
+## Charts
+
+Six grouped MCP tools render compact ASCII/emoji visuals inline in text, each taking a `form`
+field selecting which of its renderers to use:
+
+| Tool | Forms | Purpose |
+|---|---|---|
+| `render_series` | `sparkline` \| `braille` \| `winloss` | One data series as a compact trend strip: a block-ramp sparkline, a denser braille microplot, or a categorical win/loss strip. |
+| `render_bar` | `progress` \| `bullet` \| `diverging` \| `stacked` \| `range` \| `boxwhisker` | A single value, or a small stat set, as a fixed-width bar: plain progress, a bulleted target graph, a diverging over/under bar, a stacked success/active/failure bar, a min-max range slider, or a box-and-whisker five-number summary. |
+| `render_rows` | `comparison` \| `tilegrid` | Several values side by side against one shared scale: a multi-row bar/dot comparison, or a tile-grid map of shaded, colored, or custom-glyphed cells. |
+| `render_timeline` | `rail` \| `colored` \| `dependency` \| `fsl` | An ordered sequence of stages: a centered monochrome rail, a colored rail (needed for a failed stage), an inline dependency-chain pipeline, or a one-line FSL-style state-machine description. |
+| `render_glyph` | `trend` \| `stars` \| `retry` \| `weather` | One small inline glyph: a trend-direction tag, a star rating, a bounded-retry health bar, or a single weather glyph summarizing overall health. |
+| `render_checklist_summary` | *(no form — one renderer)* | The full status-checklist summary line: count section, percent, progress bar, optional trend sparkline, and the sorted per-marker icon list. |
+
+Every renderer behind these tools is also exported directly from the library
+(`self-expression`'s `src/ts/charts/index.ts`), for use outside MCP.
 
 &nbsp;
 
@@ -27,19 +44,19 @@ TODO Put the project description here, please.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>143</td>
-    <td>62.05<small>%</small></td>
-    <td>76.49<small>%</small></td>
-    <td>57.14<small>%</small></td>
-    <td>62.14<small>%</small></td>
+    <td>431</td>
+    <td>85.18<small>%</small></td>
+    <td>86.61<small>%</small></td>
+    <td>79.75<small>%</small></td>
+    <td>85.71<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>7</td>
-    <td>62.05<small>%</small></td>
-    <td>4.1<small>%</small></td>
-    <td>6.34<small>%</small></td>
-    <td>7.47<small>%</small></td>
+    <td>40</td>
+    <td>85.18<small>%</small></td>
+    <td>26.3<small>%</small></td>
+    <td>35.58<small>%</small></td>
+    <td>38.41<small>%</small></td>
   </tr>
 </table>
 
@@ -47,12 +64,12 @@ TODO Put the project description here, please.
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>N/A<small>%</small></th>
+    <th>87<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>N/A</td>
-    <td>N/A<small>%</small></td>
+    <td>71</td>
+    <td>87<small>%</small></td>
   </tr>
 </table>
 

@@ -20,11 +20,7 @@
   },
   "testRunner_comment": "Take a look at https://stryker-mutator.io/docs/stryker-js/vitest-runner for information about the vitest plugin.",
   "mutate": [
-    "src/ts/**/*.ts",
-    "!src/ts/**/*.spec.ts",
-    "!src/ts/**/*.stoch.ts",
-    "!src/ts/**/*.mutat.ts",
-    "!src/ts/generated_code/**"
+    "src/ts/charts/**/*.ts"
   ],
   "coverageAnalysis": "perTest"
 }

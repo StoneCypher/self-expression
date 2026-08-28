@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-1 merge
+10 merges; 2 releases
 
 
 
@@ -12,1034 +12,23 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
+<a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
 
 
 
 
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jul 15, 2026 9:10:16 PM
-
-Commit [e163bbd6dc7a6a165d56bd2bed06a73d9e51a59d](https://github.com/StoneCypher/self-expression/commit/e163bbd6dc7a6a165d56bd2bed06a73d9e51a59d)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(ci): publish docs via gh-pages, enable Dependabot, roll CI back to Node 22
-  * - Roll every CI job from Node 24 back to Node 22 (Node 24 stalls the
-  Playwright browser download); build.config.json matrix default is now [22]
-- Publish the built site to a gh-pages branch instead of serving main:/docs:
-  test-main-full uploads docs/ as an artifact on pushes, and a new
-  publish-docs job pushes its contents to gh-pages (force_orphan) with
-  peaceiris/actions-gh-pages. URLs are unchanged since Pages served docs/
-  as site root before.
-- Untrack docs/ (29 built files) and gitignore it; local builds still
-  generate it and hosted_test still serves it
-- Add .github/dependabot.yml: weekly npm and github-actions version
-  updates, npm minor+patch grouped into one PR. Repo-side Dependabot
-  alerts and automated security fixes were enabled via the API.
-- README/base_README: Pages checklist item now points at gh-pages/root,
-  new checklist item for the Dependabot repo settings (which do not copy
-  with the template), multi-Node example version updated
-- Bump version to 0.22.0
-  * Claude-Session: https://claude.ai/code/session_018z7gLexTcPCDQbBV4e7TL8
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 5:03:50 PM
-
-Commit [bc7521ebfa626af9e468f4c461cf16387b0f9316](https://github.com/StoneCypher/self-expression/commit/bc7521ebfa626af9e468f4c461cf16387b0f9316)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: lean-by-default template with opt-in heavy tools; bump to 0.21.0
-  * Make a freshly-spawned repo install fast and run cheap CI by default, with
-the heavy tools one flag away. build.config.json is the single source of
-truth that both the build and CI read.
-  * - Remove the bundle visualizations entirely (renderer, html_to_png,
-  committed PNGs, rollup-plugin-visualizer, README block).
-- Stop the eager postinstall Playwright browser download; provision Chromium
-  on-demand (ensure_chromium, with retry + per-attempt timeout + stale-lock
-  cleanup) only for the opt-in e2e suite.
-- Add an `e2e` feature flag and a `ci` block (matrix os/node, stryker), all
-  off by default; pin e2e off in the build profiles so enabling it can't pull
-  a browser into the other jobs.
-- Rewrite CI: a `config` job parses build.config.json (+ #fullbuild) and gates
-  the jobs; a fresh repo runs one browser-free Ubuntu job, while e2e (Node 22),
-  stryker, and the OS/Node matrix appear only when enabled.
-- Cap every CI job's timeout-minutes (macOS tightest given its x10 billing) so
-  no run can burn toward GitHub's 360-minute default.
-- Document how to turn each feature on, with its cost.
-  * The default template is now 100% browser-free; Chromium installs only when
-e2e is enabled.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 4:59:59 PM
-
-Commit [7d54ef738aa87691e7fe44280fef7020128d672e](https://github.com/StoneCypher/self-expression/commit/7d54ef738aa87691e7fe44280fef7020128d672e)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs: document how to enable e2e, stryker, and CI matrices
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 4:59:14 PM
-
-Commit [07ccfae93860b19441046c2797c537c57fffb1c8](https://github.com/StoneCypher/self-expression/commit/07ccfae93860b19441046c2797c537c57fffb1c8)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: drive jobs from build.config.json; browser-free default; cap every job; Node 22 e2e
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 4:51:23 PM
-
-Commit [1b69611a59376ec41f126c20e7004f45c90fdf9a](https://github.com/StoneCypher/self-expression/commit/1b69611a59376ec41f126c20e7004f45c90fdf9a)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): run e2e stage only when features.e2e is enabled
-  * Add hosted_test npm script that invokes src/build_js/hosted_test.js.
-The e2e stage (stage 6, script hosted_test) is gated via the FEATURES
-catalog defaultEnabled: false entry — bucketByStage only schedules it
-when features.e2e === true, so the default build never launches a browser.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 4:49:51 PM
-
-Commit [6216f4508093ebc117465ec9504a28bea7c70b8f](https://github.com/StoneCypher/self-expression/commit/6216f4508093ebc117465ec9504a28bea7c70b8f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add e2e feature flag and ci config block
-  * Add `e2e` as an opt-in optional feature (defaultEnabled: false) at stage 6,
-backed by the `hosted_test` script. Add a `ci` top-level block to the schema
-(matrix.os, matrix.node, stryker) for CI to consume in a later phase. Update
-build.config.json and build.config.schema.json to match; fix disabled-list
-filter to exclude off-by-default features that simply remain off.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 4:44:53 PM
-
-Commit [66515788585f56d52764c05e9a9def7245869c35](https://github.com/StoneCypher/self-expression/commit/66515788585f56d52764c05e9a9def7245869c35)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: drop eager postinstall browser download; provision Chromium on-demand for e2e
-  * - Remove "postinstall": "node src/build_js/postinstall.js" from package.json
-  so a fresh npm install never downloads a browser
-- Wire ensure_chromium into hosted_test.js: import main as ensureChromium
-  and call it just before execSync('npx playwright test ...'), so Chromium
-  is provisioned only when the e2e suite actually runs
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 4:35:20 PM
-
-Commit [a3e5e12fe7f5f1573923ff01e9c17f215b0e6dc7](https://github.com/StoneCypher/self-expression/commit/a3e5e12fe7f5f1573923ff01e9c17f215b0e6dc7)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * refactor: rename postinstall.js -> ensure_chromium.js with stale-lock cleanup
-  * - git mv postinstall.js -> ensure_chromium.js and postinstall.spec.ts ->
-  ensure_chromium.spec.ts
-- Update module docblock: no longer a postinstall hook; now an on-demand
-  helper invoked by the e2e harness before launching a browser
-- Add clearStaleLock() export: removes Playwright __dirlock left by a
-  SIGKILL'd attempt so retries aren't blocked
-- Call clearStaleLock() at the top of each installWithRetry loop iteration
-- Add unit tests for clearStaleLock (unset path, missing dir)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 12:31:11 PM
-
-Commit [643e97e668ee0226f227c07acf2e3ec8e647356f](https://github.com/StoneCypher/self-expression/commit/643e97e668ee0226f227c07acf2e3ec8e647356f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * refactor: remove viz_png feature from build, config, and README
-  * Remove viz_png from FEATURES catalog (build_config_schema.js), from all
-profiles and the top-level features block in build.config.json and
-build.config.schema.json, and drop the viz_png npm script from package.json.
-Update build_config.spec.ts to remove all viz_png assertions (stage 3 now
-contains only terser; --only=eslint no longer lists viz_png as disabled).
-Delete the bundle PNG visualization <table> from base_README.md.
-  * Full build passes; stage 3 runs terser only, no Chromium launched.
-Regenerated artifacts (README.md, CHANGELOG, docs, coverage-stoch) committed.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 12:26:34 PM
-
-Commit [e2eaf9c0400998445ddf64821c45be98bc7e5637](https://github.com/StoneCypher/self-expression/commit/e2eaf9c0400998445ddf64821c45be98bc7e5637)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: drop rollup-plugin-visualizer (visualizations removed)
-  * Remove the import and all four visualizer({...}) plugin entries from
-rollup.config.js, delete the package.json devDependency, and refresh
-package-lock.json. Rollup verified passing after the change.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 11:56:57 AM
-
-Commit [1a04e2b6e186a4979fee87181928c67097422734](https://github.com/StoneCypher/self-expression/commit/1a04e2b6e186a4979fee87181928c67097422734)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * refactor: remove bundle visualization renderer and committed PNGs
-  * Delete src/build_js/render_visualizations.js and html_to_png.js (the
-Playwright-based screenshot pipeline), and git-rm the 12 committed
-bundle_*.png files from root, docs/, and docs/docs/media/. Update
-postinstall.js docblock to drop the stale references to the deleted files.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 8, 2026 11:53:19 AM
-
-Commit [5a0e67f072307e1e505b58403e5d042ba08407ed](https://github.com/StoneCypher/self-expression/commit/5a0e67f072307e1e505b58403e5d042ba08407ed)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(plan): implementation plan for lean-by-default redesign
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 7, 2026 11:17:37 PM
-
-Commit [ac53dcc333fb1210a65f97d2d78466434b137b66](https://github.com/StoneCypher/self-expression/commit/ac53dcc333fb1210a65f97d2d78466434b137b66)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs(spec): lean-by-default template with opt-in heavy tooling
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 6, 2026 1:21:53 PM
-
-Commit [b733eb4659c834684a2bb34e660cc7ca1f75aa16](https://github.com/StoneCypher/self-expression/commit/b733eb4659c834684a2bb34e660cc7ca1f75aa16)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: cap every job with timeout-minutes (budget-aware)
-  * GitHub's default job timeout is 360 minutes, and three jobs
-(detect-fullbuild, verify-version-bump, release) had no cap — each a
-latent 6-hour hole. Billed minutes are also runner-weighted (Linux x1,
-Windows x2, macOS x10), so a loose cap on macOS is especially costly.
-  * Give every job an explicit, tight ceiling and size the matrix per cell:
-  * - detect-fullbuild: 3
-- test-pr: 6 (unchanged)
-- test-main-full: 20 -> 15
-- test-main-matrix: per-cell via matrix.timeout (ubuntu 10, windows 8, macOS 5)
-- stryker: 45 -> 30
-- verify-version-bump: 5 (new)
-- release: 8 (new)
-  * Worst case any single push can burn is now ~140 billed minutes, bounded
-forever — no hang or stalled download can run toward the 6-hour default.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 11:31:31 PM
-
-Commit [2b87920d098ab5d17e0dd2834dfe12bed13190d4](https://github.com/StoneCypher/self-expression/commit/2b87920d098ab5d17e0dd2834dfe12bed13190d4)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: run detect-fullbuild on push so main-build jobs aren't skipped (#45)
-  * Run detect-fullbuild on push as well as PRs. It was pull_request-only, but
-the main-build jobs (test-main-full, test-main-matrix, stryker) declare
-`needs: [detect-fullbuild]`, and a skipped dependency cascades — so push to
-main skipped every build job (and release). On push it now reports
-fullbuild=false and the main jobs run via their `github.event_name == 'push'`
-gate. PR behavior is unchanged.
-  * Fixes a regression exposed by #44.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 11:29:34 PM
-
-Commit [4594f153a6aed277a055dec4bfb2bfc5bd8270ad](https://github.com/StoneCypher/self-expression/commit/4594f153a6aed277a055dec4bfb2bfc5bd8270ad)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: run detect-fullbuild on push so main-build jobs aren't skipped
-  * detect-fullbuild was gated to pull_request only, but test-main-full,
-test-main-matrix, and stryker declare `needs: [detect-fullbuild]`. In
-GitHub Actions a skipped dependency cascades to skip its dependents, so on
-push to main every build job skipped (and release with them) — main CI did
-nothing. The regression surfaced when PR #44 merged, because the broken
-path only executes on push.
-  * Run detect-fullbuild on push as well as PRs; it reports fullbuild=false and
-the main jobs run via their `github.event_name == 'push'` gate. PR behavior
-is unchanged.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 11:01:58 PM
-
-Commit [0774bd7b4edcdc9fd09374d6793a61f51e8b1b88](https://github.com/StoneCypher/self-expression/commit/0774bd7b4edcdc9fd09374d6793a61f51e8b1b88)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: lighten matrix + cost optimizations; bump to 0.20.4 (#44)
-  * Lighten the CI matrix and cut cost: PRs run a single ubuntu-only ci-lite
-job; the cross-platform matrix and heavy jobs run only on push to main.
-Adds a #fullbuild escape hatch to opt a PR into the full matrix, skips CI
-for docs-only PRs, caches Playwright browsers, and cancels superseded PR
-runs.
-  * Also in this PR:
-- Refresh package-lock.json to current transitive versions; bump to 0.20.4.
-- Add per-job timeout-minutes guards (6/20/25/45) so a hung step fails fast
-  instead of running toward GitHub's 360-minute default.
-- Fix a Playwright install hang: postinstall now installs only Chromium
-  (the sole browser the project uses) with retry+timeout, and browserless
-  jobs skip the download via PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 10:56:27 PM
-
-Commit [80762c297506603212cbc2049cd6c4ce2b38fb1f](https://github.com/StoneCypher/self-expression/commit/80762c297506603212cbc2049cd6c4ce2b38fb1f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * fix(ci): install only Chromium in postinstall; skip browsers in browserless jobs
-  * `npx playwright install --with-deps` downloaded all three browser engines
-on every `npm install` and hung ~5 min in CI after Chromium finished,
-reaching for an engine the project never uses. The project only ever uses
-Chromium (visualization screenshots in render_visualizations.js /
-html_to_png.js, and the e2e suite whose playwright.config.ts declares no
-projects). With no per-step timeout the job ran toward GitHub's 360-minute
-default until it was cancelled by hand.
-  * - Replace the postinstall with src/build_js/postinstall.js: installs ONLY
-  chromium, time-boxes each attempt (4 min) so a stalled download is killed
-  rather than waited on, and retries up to 3x for transient CDN flakiness.
-  Skips entirely when PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1.
-- Set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 on the jobs that need no browser
-  (ci-lite PR check, verification matrix, verify-version-bump). The full
-  build and stryker still install Chromium normally.
-- Add postinstall.spec.ts covering the skip decision and retry control flow.
-  * Rebuilt artifacts (README test counts, CHANGELOG, coverage, viz) follow
-from the added test file.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 10:30:48 PM
-
-Commit [34b4b4c2488ffa975def00e911168c49e9ceeab8](https://github.com/StoneCypher/self-expression/commit/34b4b4c2488ffa975def00e911168c49e9ceeab8)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: guard remaining jobs with right-sized timeout-minutes
-  * Follow-up to the test-pr guard: cap the other jobs so a hung step fails
-fast instead of running toward GitHub's 360-minute default. Sized per job
-rather than a flat value:
-  * - test-main-full: 20 min (full canonical build, npm run ci)
-- test-main-matrix: 25 min (one ceiling across all cells; Windows/macOS
-  installs are slower than Ubuntu)
-- stryker: 45 min (mutation testing: install + full build + stryker run)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 10:27:57 PM
-
-Commit [507fc95fab255330246fc396342a94adce61ffcf](https://github.com/StoneCypher/self-expression/commit/507fc95fab255330246fc396342a94adce61ffcf)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: add 6-minute timeout-minutes guard to PR check job
-  * The test-pr (ci-lite) job had no timeout, so a hung step inherited
-GitHub's 360-minute default. A stalled npm install / Playwright browser
-download just ran for 69 minutes before being cancelled by hand. Normal
-runtime is ~1.5 min, so cap the job at 6 minutes to fail fast.
-  * Scoped to test-pr only: 6 min would be too tight for stryker (mutation
-testing), the full build, and the Windows/macOS matrix cells, which need
-larger ceilings of their own.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Jun 5, 2026 9:09:16 PM
-
-Commit [2d9c6c092c8d82ae41bacd6144f401440e3a6854](https://github.com/StoneCypher/self-expression/commit/2d9c6c092c8d82ae41bacd6144f401440e3a6854)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build(deps): refresh lockfile; bump to 0.20.4
-  * Refresh package-lock.json to the transitive dependency versions
-currently installed in node_modules, and bump the package version
-0.20.3 -> 0.20.4 (PATCH; dependency/build maintenance, no source or
-API changes).
-  * Notable lockfile updates:
-- rolldown 1.0.0-rc.12 -> 1.0.3 (plus all @rolldown/binding-* and
-  @rolldown/pluginutils)
-- vite 8.0.3 -> 8.0.16
-- express 4.22.1 -> 4.22.2, body-parser 1.20.4 -> 1.20.5,
-  qs 6.14.2 -> 6.15.2
-- postcss 8.5.8 -> 8.5.15, nanoid 3.3.11 -> 3.3.12
-- brace-expansion 5.0.5 -> 5.0.6, tinyglobby 0.2.15 -> 0.2.17,
-  fast-uri 3.1.0 -> 3.1.2, @oxc-project/types 0.122.0 -> 0.133.0,
-  @napi-rs/wasm-runtime 1.1.2 -> 1.1.4, @tybys/wasm-util 0.10.1 -> 0.10.2
-- lockfile self-version caught up 0.10.9 -> 0.20.4
-  * Rebuilt all tracked artifacts against the refreshed deps so they match
-0.20.4: dist bundles, typedoc docs site, README madlibs, CHANGELOG,
-bundle visualization PNGs, and stochastic coverage reports. Full build
-is green: tsc and eslint clean, 29 unit + 4 stochastic tests pass, attw
-reports no problems.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 12:01:02 PM
-
-Commit [7b1a0256a5abc1d88a8853d0332471336d349872](https://github.com/StoneCypher/self-expression/commit/7b1a0256a5abc1d88a8853d0332471336d349872)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: add #fullbuild escape hatch for opt-in full matrix on PRs
-  * Adds a detect-fullbuild job that reads the PR head commit message and
-sets a `fullbuild` output. test-main-full, test-main-matrix, and
-stryker gate on (push event) OR (PR event with fullbuild=true). When
-opt-in is active, test-pr is skipped (test-main-full covers it).
-  * Default PR behavior unchanged: a single ci-lite job. Contributors who
-need cross-platform verification before merge add `#fullbuild` to the
-latest commit message on the PR branch.
-  * Detection job is PR-only (`if: github.event_name == 'pull_request'`),
-so push events incur no extra latency.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 12:01:02 PM
-
-Commit [5cc69d26eda16f93400553786fc22450ecc92d18](https://github.com/StoneCypher/self-expression/commit/5cc69d26eda16f93400553786fc22450ecc92d18)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: add #fullbuild escape hatch for opt-in full matrix on PRs
-  * Adds a detect-fullbuild job that reads the PR head commit message and
-sets a `fullbuild` output. test-main-full, test-main-matrix, and
-stryker gate on (push event) OR (PR event with fullbuild=true). When
-opt-in is active, test-pr is skipped (test-main-full covers it).
-  * Default PR behavior unchanged: a single ci-lite job. Contributors who
-need cross-platform verification before merge add `#fullbuild` to the
-latest commit message on the PR branch.
-  * Detection job is PR-only (`if: github.event_name == 'pull_request'`),
-so push events incur no extra latency.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:57:47 AM
-
-Commit [4b7a3b2f13fbb2166a3e086c54aa0d655e5820f0](https://github.com/StoneCypher/self-expression/commit/4b7a3b2f13fbb2166a3e086c54aa0d655e5820f0)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: lighten matrix and add cost optimizations; bump to 0.20.3
-  * Wrap-up commit for PR #44, summarizing the CI infrastructure work that
-landed in seven earlier commits on this branch:
-  * - Split test job into test-pr (PR-only, ci-lite, Ubuntu-current) and
-  test-main-full + test-main-matrix (push-only, full + lite split)
-- Concurrency cancellation for PR iterations; main pushes are never
-  cancelled (release safety)
-- Cache Playwright browsers via PLAYWRIGHT_BROWSERS_PATH
-- Drop Node 23 from non-Ubuntu cells (Ubuntu retains dual-Node)
-- PR check uses ci-lite profile (lint/docs/site caught on main instead)
-- paths-ignore for non-build documentation (specs, CONTRIBUTING,
-  LICENSE, CHANGELOG)
-- Add ci-lite profile to build.config.json (without eslint)
-  * Net effect on a typical iteration: PR token cost drops to ~0.6× of the
-original full build, concurrency cancellation kills superseded PR runs,
-and push-to-main matrix shrinks from 6 cells to 4 (~43% reduction).
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:49:38 AM
-
-Commit [5266cbd16d5be96e6903baa7f464dab0272eae69](https://github.com/StoneCypher/self-expression/commit/5266cbd16d5be96e6903baa7f464dab0272eae69)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: skip CI for PRs that only touch non-build documentation
-  * paths-ignore filter on pull_request trigger. If every file in a PR
-matches the ignore list, CI doesn't run. Any non-doc file in the PR
-flips it back on as usual.
-  * Conservative list — only files the build genuinely doesn't read:
-  src/superpowers/**/*.md  — planning specs/plans
-  CONTRIBUTING.md, CODE_OF_CONDUCT.md, LICENSE
-  CHANGELOG.md, CHANGELOG.long.md (generated; release reads main copy)
-  * NOT skipped (intentionally): base_README.md (template input to
-update_madlibs), src/doc_md/**/*.md (typedoc inputs), anything under
-src/ts/ or src/build_js/, package.json, build.config*.json.
-  * No paths-ignore on push: main pushes should always verify.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:49:14 AM
-
-Commit [47e6b95a808fcff766bdc60c987f3bca1929ff3b](https://github.com/StoneCypher/self-expression/commit/47e6b95a808fcff766bdc60c987f3bca1929ff3b)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: PR check uses ci-lite profile instead of full build
-  * PR runs already pay for typecheck, tests, bundle, attw. The remaining
-optionals (docs, eslint, cloc, changelog, viz_png, site) are
-platform-invariant — test-main-full already produces them on every
-push to main, so duplicating them on every PR push is wasted tokens.
-  * Tradeoff: lint failures and docs/site rendering issues now surface on
-merge to main rather than on the PR itself. test-main-full will block
-the release job if anything regresses.
-  * Estimated PR token cost: ~0.6× of the previous full build.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:45:44 AM
-
-Commit [1f6981d355649a1ae0478f37b51adb3343abb4e5](https://github.com/StoneCypher/self-expression/commit/1f6981d355649a1ae0478f37b51adb3343abb4e5)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: drop Node 23 from non-Ubuntu cells in main matrix
-  * macOS bills ~10× ubuntu; Windows ~2×. Running Node 23 on those for
-"just in case" coverage is poor value per token. Keep Node 23 testing
-on the cheap Ubuntu platform; macOS and Windows verify only Node 24
-(the current release target).
-  * Push-to-main cell count drops from 6 (1 full + 5 lite) to 4 (1 full +
-3 lite). Token cost drops roughly 40% relative to the prior matrix.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:45:23 AM
-
-Commit [1c887e0cafa90b558fb04152387253c0d51a2f1f](https://github.com/StoneCypher/self-expression/commit/1c887e0cafa90b558fb04152387253c0d51a2f1f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: cache Playwright browsers via PLAYWRIGHT_BROWSERS_PATH
-  * The postinstall hook runs `npx playwright install --with-deps` on every
-install. With nothing cached, that re-downloads ~100MB of Chromium per
-cell per CI run. Cache hits skip the download entirely; only OS-level
-deps (handled by apt incrementally) still re-run.
-  * Cache key includes runner.os and a hash of package-lock.json so a
-Playwright version bump invalidates the cache automatically.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:43:43 AM
-
-Commit [486854a593e26b77d4854f25a765d878cf86af90](https://github.com/StoneCypher/self-expression/commit/486854a593e26b77d4854f25a765d878cf86af90)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: cancel in-progress PR runs when newer commits land
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:38:51 AM
-
-Commit [393808b2b9cc88c97d984b94969cf81d258b3898](https://github.com/StoneCypher/self-expression/commit/393808b2b9cc88c97d984b94969cf81d258b3898)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci(build): drop eslint from ci-lite profile
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 11:21:22 AM
-
-Commit [87862d43cc14284389fc3c0ffa6023fb69b1d301](https://github.com/StoneCypher/self-expression/commit/87862d43cc14284389fc3c0ffa6023fb69b1d301)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci: lighten matrix — PR runs ubuntu-only; matrix only on main push
-  * Reduces CI workload substantially. Three changes:
-  * 1. PRs now run a single Ubuntu/Node 24 job with the full build, instead
-   of the previous 6-cell matrix. Contributors get faster feedback and
-   the project burns ~83% less CI on every PR push.
-  * 2. Push to main splits into two jobs:
-   - test-main-full (Ubuntu, Node 24) does the full build, producing
-     docs, site, visualizations, changelog — artifacts that are
-     platform-invariant.
-   - test-main-matrix (5 cells: the other 3-OS × 2-Node combinations
-     minus the Ubuntu/24 slot already covered) runs the new ci-lite
-     profile, which skips docs/site/viz_png/changelog/cloc but keeps
-     typecheck, tests, bundle, lint, and attw — the things that
-     actually benefit from cross-platform verification.
-  * 3. Stryker (mutation testing) moves from push+PR to push-only. It's
-   expensive and a release-gate, not a contributor-gate.
-  * The ci-lite profile is added to build.config.json alongside the existing
-fast/ci/release profiles. It only specifies the optional features it
-toggles off — everything else inherits its default-on state.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 2:01:21 AM
-
-Commit [926968546062e1b9c04655246e3754c815dd358f](https://github.com/StoneCypher/self-expression/commit/926968546062e1b9c04655246e3754c815dd358f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [5fda366, 7963ff5]
-
-  * On feat_26-05-22_perf-coverage: session-local-settings
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 23, 2026 2:01:21 AM
-
-Commit [7963ff5f90d599b6a5282e05be09e92299b285c1](https://github.com/StoneCypher/self-expression/commit/7963ff5f90d599b6a5282e05be09e92299b285c1)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * index on feat_26-05-22_perf-coverage: 5fda366 feat(build): add perf_coverage as opt-in stub for template forks
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 11:48:01 PM
-
-Commit [5fda366bea168cb6cd680cd16940dd99c7dc23f3](https://github.com/StoneCypher/self-expression/commit/5fda366bea168cb6cd680cd16940dd99c7dc23f3)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add perf_coverage as opt-in stub for template forks
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 11:40:08 PM
-
-Commit [c232aac04e3db5ff60c5ba6cdf6cf3fc64b63add](https://github.com/StoneCypher/self-expression/commit/c232aac04e3db5ff60c5ba6cdf6cf3fc64b63add)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add a11y_coverage as opt-in stub for template forks
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 11:22:41 PM
-
-Commit [2c36b291633b4dff519ca1eb188056f9ca5f9aa3](https://github.com/StoneCypher/self-expression/commit/2c36b291633b4dff519ca1eb188056f9ca5f9aa3)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): wire e2e (hosted_test) into build chain in stage 6
-  * The existing src/build_js/hosted_test.js and src/ts/e2e/ tests have been
-in the repo since before the configurable-build foundation but were never
-invoked by npm run build. This adds the hosted_test npm script and a new
-e2e feature in stage 6 (after site populates docs/). E2e auto-disables
-if site is off, with a clear warning.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 11:17:34 PM
-
-Commit [677145d95eeae81c9aaa82deed8532bcbe8abfb6](https://github.com/StoneCypher/self-expression/commit/677145d95eeae81c9aaa82deed8532bcbe8abfb6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add example_coverage feature for @example tag coverage
-  * Adds count_example_coverage.js that walks the TypeScript AST and reports
-what fraction of documented exported symbols carry an @example JSDoc tag.
-Registers example_coverage as an optional stage-1 feature in FEATURES,
-build.config.json (on by default; disabled in fast profile), the JSON
-schema, and clean.js; extends build_config.spec.ts with updated fixtures
-and two new feature-specific tests.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 11:10:36 PM
-
-Commit [75f2c86e55d49abc1285fdcc5582cbc9735526a4](https://github.com/StoneCypher/self-expression/commit/75f2c86e55d49abc1285fdcc5582cbc9735526a4)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): replace typedoc#1 with fast AST-based doc_coverage script
-  * Typedoc previously ran twice in the build chain — once at stage 1 to
-produce coverage-typedoc.json for update_madlibs, once at stage 4 to
-render the docs site after README was updated. Stage 1's HTML was
-thrown away.
-  * This adds a new doc_coverage feature whose runner walks the TypeScript
-AST from src/ts/index.ts and counts documentable symbols with JSDoc.
-It writes the same coverage-typedoc.json shape (percent, expected,
-actual, notDocumented) so update_madlibs reads it transparently. Runs
-in ~200ms vs typedoc's ~7s.
-  * The docs feature's stages change from [1, 4] to [4] — final HTML
-render only. Tests updated to expect doc_coverage in stage 1 and docs
-only in stage 4.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 10:59:32 PM
-
-Commit [daf8ebf036dbb72e1f2144286aa4fadda26be26f](https://github.com/StoneCypher/self-expression/commit/daf8ebf036dbb72e1f2144286aa4fadda26be26f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add type_coverage feature to report % of non-any types
-  * Add type_coverage feature to stage 1 of the build. Runs type-coverage with --json-output
-to produce build/type-coverage/coverage.json containing {percent, totalCount, correctCount}.
-  * - Create run_type_coverage.js to invoke CLI and parse JSON output
-- Add 'type_coverage' to FEATURES catalog in build_config_schema.js
-- Add type_coverage toggles to all build.config.json profiles (enabled in ci/release, disabled in fast)
-- Add type_coverage property to build.config.schema.json FeatureFlags
-- Add npm script 'type_coverage' to package.json
-- Update build_config.spec.ts tests: add type_coverage to test fixtures and expected disabled lists
-- Fix pre-existing typo in build.config.local.json (esling -> eslint)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 10:59:19 PM
-
-Commit [f594fccb1202eb83cc97eb523e2616d907e7eb50](https://github.com/StoneCypher/self-expression/commit/f594fccb1202eb83cc97eb523e2616d907e7eb50)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore(deps): add type-coverage for type_coverage build feature
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 9:30:24 PM
-
-Commit [1118a4e40519761412e386331949cefa138091c3](https://github.com/StoneCypher/self-expression/commit/1118a4e40519761412e386331949cefa138091c3)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add license_check feature to scan dependency licenses
-  * Introduces the license_check optional build feature that runs
-license-checker to scan all project dependencies (prod + dev) and
-generates a JSON report in build/license/coverage.json. Enabled by
-default in standard, ci, and release profiles; disabled in fast
-profile. Includes 2 new unit tests and updates 3 existing hardcoded
-test expectations to account for the new feature.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 9:30:07 PM
-
-Commit [f0daa9222a6bb275d57db330f93618d24eeb44c6](https://github.com/StoneCypher/self-expression/commit/f0daa9222a6bb275d57db330f93618d24eeb44c6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore(deps): add license-checker for license_check build feature
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 8:37:01 PM
-
-Commit [cc7c542e603f4ea687622cc322ea98a1bee8752c](https://github.com/StoneCypher/self-expression/commit/cc7c542e603f4ea687622cc322ea98a1bee8752c)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): configurable build via cascading JSON (#36)
-  * * docs(build): add spec and plan for configurable build via cascading JSON
-  * Foundation work for converting the hardcoded STAGES array in run_build.js
-into a config-driven planner. Adds the design spec and the 11-task TDD
-implementation plan; no code changes yet.
-  * Future PRs (one per coverage type) extend the schema by a single entry.
-  * * feat(build): add zod schema and FEATURES catalog for config-driven build
-  * * feat(build): buildPlan reads base config and emits stage plan
-  * * fix(build): drop unused argv/env locals from buildPlan (Task 3 will reintroduce)
-  * * feat(build): apply selected profile (CLI > env var > none)
-  * * feat(build): cascade env-file and local-file config layers
-  * * feat(build): apply env-var and CLI feature overrides with only-conflict check
-  * * feat(build): reject mandatory-feature disable and unknown-name override entries
-  * * feat(build): cascade-disable optional features whose requires are off
-  * * test(build): stochastic invariants for buildPlan (mandatory present, disabled absent)
-  * * feat(build): run_build.js drives off buildPlan (config-driven)
-  * * feat(build): add default build.config.json, JSON Schema, and gitignore for local overrides
-  * * fix: add markdown code block language specifiers to plan and spec docs
-  * * test(build): add drift-guard, env-var only-conflict, and --enable positive tests
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 8:09:17 PM
-
-Commit [9c6cb88c44b9503ffc278f66036c08f22089c645](https://github.com/StoneCypher/self-expression/commit/9c6cb88c44b9503ffc278f66036c08f22089c645)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * test(build): add drift-guard, env-var only-conflict, and --enable positive tests
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 8:02:12 PM
-
-Commit [9aaa54c6cd6058183b96326620a263efe14245ea](https://github.com/StoneCypher/self-expression/commit/9aaa54c6cd6058183b96326620a263efe14245ea)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * fix: add markdown code block language specifiers to plan and spec docs
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 7:57:22 PM
-
-Commit [c6bc46191f41f5f28aeab59e3c398a0c77666350](https://github.com/StoneCypher/self-expression/commit/c6bc46191f41f5f28aeab59e3c398a0c77666350)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): add default build.config.json, JSON Schema, and gitignore for local overrides
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 7:54:42 PM
-
-Commit [78110a92dbf5729ce629995c54c5b5b63ee1f769](https://github.com/StoneCypher/self-expression/commit/78110a92dbf5729ce629995c54c5b5b63ee1f769)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(build): run_build.js drives off buildPlan (config-driven)
-
-
-
-
 &nbsp;
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:50:28 PM
+## [Untagged] - Aug 27, 2026 3:22:02 PM
 
-Commit [cf9afd63f99972d5f55f1a09915b4f9d8f0e0945](https://github.com/StoneCypher/self-expression/commit/cf9afd63f99972d5f55f1a09915b4f9d8f0e0945)
+Commit [b6136b93d3c23ac706c81ecf31bd2c8219ef9fe7](https://github.com/StoneCypher/self-expression/commit/b6136b93d3c23ac706c81ecf31bd2c8219ef9fe7)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * test(build): stochastic invariants for buildPlan (mandatory present, disabled absent)
+  * docs(skills): typographic latitude for super/subscripts; the tiny voice joins the sarcasm devices
 
 
 
@@ -1048,13 +37,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:42:13 PM
+## [Untagged] - Aug 27, 2026 3:19:43 PM
 
-Commit [85fccdb958434bc3256da1ad4a91f3232618d608](https://github.com/StoneCypher/self-expression/commit/85fccdb958434bc3256da1ad4a91f3232618d608)
+Commit [2c186a8f33c172e87061770007cf866d446c9c0e](https://github.com/StoneCypher/self-expression/commit/2c186a8f33c172e87061770007cf866d446c9c0e)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): cascade-disable optional features whose requires are off
+  * docs(skills): grant the full sarcasm arsenal — deadpan footnotes with dagger variants, mock commits, weaponized precision, dawning-horror ellipsis
 
 
 
@@ -1063,13 +52,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:35:45 PM
+## [Untagged] - Aug 27, 2026 3:18:27 PM
 
-Commit [9bab670ac7cde932918d427c5ae8b3a73b8f774b](https://github.com/StoneCypher/self-expression/commit/9bab670ac7cde932918d427c5ae8b3a73b8f774b)
+Commit [00a8b7aeda32ff346d024df9ce69465e3328fc06](https://github.com/StoneCypher/self-expression/commit/00a8b7aeda32ff346d024df9ce69465e3328fc06)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): reject mandatory-feature disable and unknown-name override entries
+  * docs(skills): sarcasm devices wear code blocks — spongebob case and sanitized strikethrough
 
 
 
@@ -1078,13 +67,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:29:47 PM
+## [Untagged] - Aug 27, 2026 3:03:30 PM
 
-Commit [aec7e3357cb30817967bf6ede86f35cadc675e61](https://github.com/StoneCypher/self-expression/commit/aec7e3357cb30817967bf6ede86f35cadc675e61)
+Commit [f91c35c5f06eca1fa58a5b618bc59a9c9c23e984](https://github.com/StoneCypher/self-expression/commit/f91c35c5f06eca1fa58a5b618bc59a9c9c23e984)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): apply env-var and CLI feature overrides with only-conflict check
+  * docs(skills): migrate skip valve and idea-line fine print; grant sPoNgEbOb latitude
 
 
 
@@ -1093,13 +82,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:23:33 PM
+## [Untagged] - Aug 27, 2026 2:56:53 PM
 
-Commit [30ce81aab6ee5ddefd35b4d154683890c9ade53b](https://github.com/StoneCypher/self-expression/commit/30ce81aab6ee5ddefd35b4d154683890c9ade53b)
+Commit [7b044a7ef5848733e96a49e70f82955e5752261a](https://github.com/StoneCypher/self-expression/commit/7b044a7ef5848733e96a49e70f82955e5752261a)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): cascade env-file and local-file config layers
+  * docs(skills): signature context may carry one or two non-face emoji
 
 
 
@@ -1108,13 +97,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:11:22 PM
+## [Untagged] - Aug 27, 2026 2:54:41 PM
 
-Commit [576f9f3931dc0fa02bec0428b0a454e31973ab84](https://github.com/StoneCypher/self-expression/commit/576f9f3931dc0fa02bec0428b0a454e31973ab84)
+Commit [395e6c0ea13211402e6d58ed046b53c2e8b8a78e](https://github.com/StoneCypher/self-expression/commit/395e6c0ea13211402e6d58ed046b53c2e8b8a78e)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): apply selected profile (CLI > env var > none)
+  * docs(skills): bless database/network/cleanup activity glyphs
 
 
 
@@ -1123,13 +112,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:09:15 PM
+## [Untagged] - Aug 27, 2026 2:51:18 PM
 
-Commit [d940ebf9495c2a5b3113b307b5efc11118c266a4](https://github.com/StoneCypher/self-expression/commit/d940ebf9495c2a5b3113b307b5efc11118c266a4)
+Commit [e86d0428bf35afe891327e732a247d747f5dbd1d](https://github.com/StoneCypher/self-expression/commit/e86d0428bf35afe891327e732a247d747f5dbd1d)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * fix(build): drop unused argv/env locals from buildPlan (Task 3 will reintroduce)
+  * docs(skills): Split header takes a capital S
 
 
 
@@ -1138,13 +127,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 7:04:15 PM
+## [Untagged] - Aug 27, 2026 2:50:27 PM
 
-Commit [e90305006faf13203ce5e579408a8f828d3b72eb](https://github.com/StoneCypher/self-expression/commit/e90305006faf13203ce5e579408a8f828d3b72eb)
+Commit [8b2e24d638a86321d89bf693f47101f828975767](https://github.com/StoneCypher/self-expression/commit/8b2e24d638a86321d89bf693f47101f828975767)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): buildPlan reads base config and emits stage plan
+  * docs(skills): the split (polyphony) convention — parliament format, number-square voices
 
 
 
@@ -1153,13 +142,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 6:51:20 PM
+## [Untagged] - Aug 27, 2026 2:46:21 PM
 
-Commit [b3483736ca116049b8a8e33acda8708329c239b0](https://github.com/StoneCypher/self-expression/commit/b3483736ca116049b8a8e33acda8708329c239b0)
+Commit [b3824e8d55a85e5a9a54dfb81bf5e8491d116f6b](https://github.com/StoneCypher/self-expression/commit/b3824e8d55a85e5a9a54dfb81bf5e8491d116f6b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(build): add zod schema and FEATURES catalog for config-driven build
+  * docs(skills): number-square lists keep a blank line between items
 
 
 
@@ -1168,17 +157,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 6:47:47 PM
+## [Untagged] - Aug 27, 2026 2:45:44 PM
 
-Commit [6b9141d073aeb794422a076d8065481dc0959321](https://github.com/StoneCypher/self-expression/commit/6b9141d073aeb794422a076d8065481dc0959321)
+Commit [8a6b6f512205af26c31c49cdf73168460645f6ec](https://github.com/StoneCypher/self-expression/commit/8a6b6f512205af26c31c49cdf73168460645f6ec)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * docs(build): add spec and plan for configurable build via cascading JSON
-  * Foundation work for converting the hardcoded STAGES array in run_build.js
-into a config-driven planner. Adds the design spec and the 11-task TDD
-implementation plan; no code changes yet.
-  * Future PRs (one per coverage type) extend the schema by a single entry.
+  * docs(skills): number-square list convention — two-space indent, never blockquoted
 
 
 
@@ -1187,29 +172,27 @@ implementation plan; no code changes yet.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 12:39:24 PM
+## [Untagged] - Aug 27, 2026 2:29:06 PM
 
-Commit [527dec7695148e0bd403d46ba9d7d1bda969a248](https://github.com/StoneCypher/self-expression/commit/527dec7695148e0bd403d46ba9d7d1bda969a248)
+Commit [bab00f297ec08545d56ce1b8d680e298ab004563](https://github.com/StoneCypher/self-expression/commit/bab00f297ec08545d56ce1b8d680e298ab004563)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * fix: verify_version_bump reads package name from package.json; bump to 0.20.2 (#35)
-  * The script previously hardcoded the template's package name in its
-`npm view` query (`npm view self-expression version`).
-That was wrong on clones — after a cloner renames their package, the
-script was still checking *this template's* published version, not
-theirs. The verification would pass or fail for the wrong reasons.
-  * Now reads `pJson.name` (already parsed from package.json on line 7)
-and uses it in the npm view call, making the script self-detecting
-for whatever package name is declared locally.
-  * Also switches that call from `execSync` to `execFileSync` to satisfy
-defensive practice: `execSync('npm view ${name} ...')` interpolates
-into a shell command, which would be a command-injection vector if
-`pJson.name` ever contained shell metacharacters (unrealistic for npm
-package names, but `execFileSync` avoids the shell entirely so the
-question doesn't come up). The unrelated `execSync('git show ...')`
-call is left alone since its arguments are constant.
-  * Closes #34
+  * fix(mcp): guard against optional-field drift between chart Args and shapes
+  * The registerChartTools call-site check only reliably catches drift in a
+required field or an outright type-incompatible one; structural
+assignability into a contextually-typed callback parameter silently
+accepts a renamed, added, or removed optional field, which covers the
+overwhelming majority of the ~50 optional fields across the six shapes.
+  * Adds a compile-time Equal<A, B> type (the generic-function-position trick,
+stricter than mutual extends, which does not distinguish `{ f?: T }` from
+`{}`) and an expectType() call per shape/interface pair, asserting each
+hand-written *Args interface exactly matches its real zod shape's inferred
+output. Verified load-bearing by deliberately breaking BarArgs and
+confirming tsc fails at the assertion, then reverting.
+  * Also normalizes render_glyph's 'stars' branch to pass-through style, and
+adds a test proving seriesKey overrides a conflicting scale rather than
+merely ignoring an unread field.
 
 
 
@@ -1218,29 +201,22 @@ call is left alone since its arguments are constant.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 12:38:57 PM
+## [Untagged] - Aug 27, 2026 2:07:14 PM
 
-Commit [4165ce4a754970a750a4eacb81e85e4e5f426043](https://github.com/StoneCypher/self-expression/commit/4165ce4a754970a750a4eacb81e85e4e5f426043)
+Commit [7d3bee06ac7e7e0c7df0616c123648e979f7c401](https://github.com/StoneCypher/self-expression/commit/7d3bee06ac7e7e0c7df0616c123648e979f7c401)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * fix: verify_version_bump reads package name from package.json; bump to 0.20.2
-  * The script previously hardcoded the template's package name in its
-`npm view` query (`npm view self-expression version`).
-That was wrong on clones — after a cloner renames their package, the
-script was still checking *this template's* published version, not
-theirs. The verification would pass or fail for the wrong reasons.
-  * Now reads `pJson.name` (already parsed from package.json on line 7)
-and uses it in the npm view call, making the script self-detecting
-for whatever package name is declared locally.
-  * Also switches that call from `execSync` to `execFileSync` to satisfy
-defensive practice: `execSync('npm view ${name} ...')` interpolates
-into a shell command, which would be a command-injection vector if
-`pJson.name` ever contained shell metacharacters (unrealistic for npm
-package names, but `execFileSync` avoids the shell entirely so the
-question doesn't come up). The unrelated `execSync('git show ...')`
-call is left alone since its arguments are constant.
-  * Closes #34
+  * feat(mcp): six grouped chart-rendering tools
+  * Adds render_series, render_bar, render_rows, render_timeline, render_glyph,
+and render_checklist_summary to the MCP surface, each grouped tool taking a
+closed form enum so a misspelled form is unrepresentable. Per-form fields are
+optional in the schema and validated at dispatch, naming the missing field
+and the form's full requirement on violation. Renderer RangeErrors are caught
+and returned as error: <message> text, never a protocol fault. render_series
+and render_checklist_summary resolve seriesKey via seriesPercents.
+  * registerChartTools(server, store) is wired into buildServer alongside
+registerTools; charts have no config gate.
 
 
 
@@ -1249,30 +225,23 @@ call is left alone since its arguments are constant.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 12:15:35 PM
+## [Untagged] - Aug 27, 2026 1:47:35 PM
 
-Commit [a1d8a28c0c7eac36aa98f27ae3b3332a9c2cf5a0](https://github.com/StoneCypher/self-expression/commit/a1d8a28c0c7eac36aa98f27ae3b3332a9c2cf5a0)
+Commit [126d401d398446d7835134747b0bac0f569b9bce](https://github.com/StoneCypher/self-expression/commit/126d401d398446d7835134747b0bac0f569b9bce)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * ci: gate verify-version-bump against the template repo; bump to 0.20.1 (#33)
-  * The verify-version-bump CI job runs verify_version_bump.cjs, which
-calls `npm view self-expression version` to compare
-the local version against the published version. The template package
-isn't published, so npm view returns nothing valid and the job exits
-non-zero on every CI run for this template repo.
-  * Gates the job on GitHub's first-class is_template repository flag:
-  *     if: github.event.repository.is_template != true
-  * - This template has is_template: true → job is skipped here.
-- "Use this template" creates a new repo with is_template: false →
-  clones run the job normally.
-- The release job's `needs: [..., verify-version-bump]` continues to
-  work correctly: a skipped need cascades into a skipped dependent,
-  which is the desired behavior on the template (we don't want to
-  release the template itself).
-  * Avoids the gross alternative of name-gating against this repo's
-package name.
-  * Closes #32
+  * fix(charts): replace stray NUL byte in checklist.ts, cover cross-bucket 🛳️ split
+  * Review found a literal U+0000 in groupByMarker's grouping key (where a space
+was intended), which made git treat the whole file as binary. Replaced it
+with an explicit '|' delimiter and confirmed the file is now clean UTF-8
+text with zero embedded NUL bytes.
+  * Also adds the icon-list grouping's hardest uncovered case: a marker (🛳️)
+whose bucket override splits its occurrences across two different bucket
+lines in the 9+-distinct block form, pinning the exact rendered block and
+that both lines' counts reconcile with the count section. Folds in three
+cheap edge cases flagged in review: the exactly-12-entries no-wrap boundary,
+an all-failure item set, and a single-item checklist.
 
 
 
@@ -1281,30 +250,21 @@ package name.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 12:15:07 PM
+## [Untagged] - Aug 27, 2026 1:45:38 PM
 
-Commit [a628506200be6df94e7dbed309b6ad8452d28655](https://github.com/StoneCypher/self-expression/commit/a628506200be6df94e7dbed309b6ad8452d28655)
+Commit [f089177878cac8a8a33c144fa6b861be915ad0a4](https://github.com/StoneCypher/self-expression/commit/f089177878cac8a8a33c144fa6b861be915ad0a4)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * ci: gate verify-version-bump against the template repo; bump to 0.20.1
-  * The verify-version-bump CI job runs verify_version_bump.cjs, which
-calls `npm view self-expression version` to compare
-the local version against the published version. The template package
-isn't published, so npm view returns nothing valid and the job exits
-non-zero on every CI run for this template repo.
-  * Gates the job on GitHub's first-class is_template repository flag:
-  *     if: github.event.repository.is_template != true
-  * - This template has is_template: true → job is skipped here.
-- "Use this template" creates a new repo with is_template: false →
-  clones run the job normally.
-- The release job's `needs: [..., verify-version-bump]` continues to
-  work correctly: a skipped need cascades into a skipped dependent,
-  which is the desired behavior on the template (we don't want to
-  release the template itself).
-  * Avoids the gross alternative of name-gating against this repo's
-package name.
-  * Closes #32
+  * fix(charts): pin box-whisker's min===max tiebreak, don't leave it to assignment order
+  * Review finding: with min === max, span collapses to 0 and all five stat
+positions land on index 0; the last-write-wins assignment order let the
+right whisker end silently beat the left one, contradicting the
+DocBlock's own "collapses to the left edge" framing and asserted by no
+test. Reorders the writes so the left end wins deliberately, documents
+the full coincident-cell precedence chain, and pins both the full
+five-way collision and the existing partial-collision case to exact
+strings instead of only asserting they don't throw.
 
 
 
@@ -1313,25 +273,22 @@ package name.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 11:57:40 AM
+## [Untagged] - Aug 27, 2026 1:42:52 PM
 
-Commit [340341aab5cee0cbc92da0fbf88eeb4f2ea2598a](https://github.com/StoneCypher/self-expression/commit/340341aab5cee0cbc92da0fbf88eeb4f2ea2598a)
+Commit [97950731990627da790ecd1303068021eeacd2d9](https://github.com/StoneCypher/self-expression/commit/97950731990627da790ecd1303068021eeacd2d9)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: catch up version to 0.20.0 (#31)
-  * Corrects the version-bump policy applied across the recent build-perf
-PR series (#21–#30). I bumped PATCH each time when this project's
-convention — both /sc-commit's intro paragraph and the project's own
-git history (0.6.0, 0.7.0, 0.8.0, 0.9.0, 0.10.0 all minor bumps for
-build/refactor work) — calls for MINOR per commit, with PATCH reset
-to zero.
-  * If MINOR had been applied per PR across the 10 merged PRs (baseline +
-9 perf), the version trajectory would have been:
-  *   0.10.7 → 0.11.0 → 0.12.0 → 0.13.0 → 0.14.0 → 0.15.0
-         → 0.16.0 → 0.17.0 → 0.18.0 → 0.19.0 → 0.20.0
-  * This single commit jumps from the actual 0.10.17 to the intended
-0.20.0 so the published version matches the work that landed.
+  * fix(charts): reuse SHADES via join, not a hardcoded shade-glyph switch
+  * Review flagged shadeGlyph in rows.ts as duplicating SHADES's glyphs as
+literal escapes instead of reading the array, per the binding
+constraint to reuse scale.js's arithmetic rather than restate it.
+Replaced it with the series.ts pattern: index SHADES inside a
+.join('') (never a template literal), so the noUncheckedIndexedAccess
+possibly-undefined element never needs coercing and SHADES stays the
+single source of the glyph. No output change. Also documents why
+FILL_GLYPH/PAD_GLYPH stay independent literals, and adds a ragged-grid
+test.
 
 
 
@@ -1340,25 +297,20 @@ to zero.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 11:57:13 AM
+## [Untagged] - Aug 27, 2026 1:39:53 PM
 
-Commit [f2cede56d4d12e238c97bd7027bd4140a65c8474](https://github.com/StoneCypher/self-expression/commit/f2cede56d4d12e238c97bd7027bd4140a65c8474)
+Commit [6665a47e0384297d605b100c354a8a5e610a8252](https://github.com/StoneCypher/self-expression/commit/6665a47e0384297d605b100c354a8a5e610a8252)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: catch up version to 0.20.0
-  * Corrects the version-bump policy applied across the recent build-perf
-PR series (#21–#30). I bumped PATCH each time when this project's
-convention — both /sc-commit's intro paragraph and the project's own
-git history (0.6.0, 0.7.0, 0.8.0, 0.9.0, 0.10.0 all minor bumps for
-build/refactor work) — calls for MINOR per commit, with PATCH reset
-to zero.
-  * If MINOR had been applied per PR across the 10 merged PRs (baseline +
-9 perf), the version trajectory would have been:
-  *   0.10.7 → 0.11.0 → 0.12.0 → 0.13.0 → 0.14.0 → 0.15.0
-         → 0.16.0 → 0.17.0 → 0.18.0 → 0.19.0 → 0.20.0
-  * This single commit jumps from the actual 0.10.17 to the intended
-0.20.0 so the published version matches the work that landed.
+  * feat(charts): public exports and stored-series lookup
+  * Add charts/index.ts barrel re-exporting the public renderer surface from
+scale, markers, series, bars, rows, timeline, glyphs, and checklist, and
+wire it into src/ts/index.ts alongside the existing stub exports.
+  * Add seriesPercents(store, seriesKey) to channels/entries.ts, backing the
+MCP chart tools' seriesKey resolution: the stored percent history of
+logged checklist entries for a series, ascending by id, empty for an
+unknown key.
 
 
 
@@ -1367,40 +319,13 @@ to zero.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 2:01:41 AM
+## [Untagged] - Aug 27, 2026 1:33:14 PM
 
-Commit [20a9c106a021b1f837f8fc3770a117caf73ae6e6](https://github.com/StoneCypher/self-expression/commit/20a9c106a021b1f837f8fc3770a117caf73ae6e6)
+Commit [242eb1def8f6ba2d61fd502298cda13dbc8837df](https://github.com/StoneCypher/self-expression/commit/242eb1def8f6ba2d61fd502298cda13dbc8837df)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): chunk build into parallel stages; bump to 0.10.17 (#30)
-  * Replaces the 15-step `&&`-chain in the `build` npm script with a
-Node orchestrator (src/build_js/run_build.js) that runs the build
-as six topologically-correct parallel stages. Each stage's steps
-run concurrently via spawn+Promise.all; stages run serially.
-  * Stage layout:
-  Stage 0: clean
-  Stage 1 (parallel): typescript, docs#1, just_test_save, eslint,
-                      cloc, changelog
-  Stage 2 (parallel): update_madlibs, rollup, dts
-  Stage 3 (parallel): viz_png, terser
-  Stage 4 (parallel): docs#2, attw
-  Stage 5: site
-  * Stage boundaries reflect actual file-level dependencies:
-  - update_madlibs needs coverage-typedoc.json (docs#1) and
-    test_output.txt (just_test_save), so it follows Stage 1.
-  - rollup only needs typescript output, so it runs alongside
-    update_madlibs in Stage 2.
-  - viz_png copies PNGs into docs/docs/, which docs#2 (typedoc)
-    relocates into docs/docs/media/, so viz_png precedes docs#2.
-  - site writes into docs/docs/; it follows docs#2 to avoid being
-    wiped by typedoc's output-dir refresh.
-  * No new dependencies — orchestrator uses just child_process from
-the stdlib. Builds on the prior PR series: #17 moved tests off
-the front so they could join Stage 1; #18 consolidated rollup
-so Stage 2 can run a single rollup invocation; #14/#13/#12/#16
-already parallelized their respective steps internally.
-  * Closes #15
+  * docs(skills): activity emoji also leads tool-call descriptions — status bars mirror those, not heartbeat files
 
 
 
@@ -1409,40 +334,13 @@ already parallelized their respective steps internally.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 2:00:45 AM
+## [Untagged] - Aug 27, 2026 1:32:48 PM
 
-Commit [5d98dc600c6391fdd548f12b235e0624a5b8886d](https://github.com/StoneCypher/self-expression/commit/5d98dc600c6391fdd548f12b235e0624a5b8886d)
+Commit [7fa9f90fea6795247c89768d34f6331fb0e7d360](https://github.com/StoneCypher/self-expression/commit/7fa9f90fea6795247c89768d34f6331fb0e7d360)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): chunk build into parallel stages; bump to 0.10.17
-  * Replaces the 15-step `&&`-chain in the `build` npm script with a
-Node orchestrator (src/build_js/run_build.js) that runs the build
-as six topologically-correct parallel stages. Each stage's steps
-run concurrently via spawn+Promise.all; stages run serially.
-  * Stage layout:
-  Stage 0: clean
-  Stage 1 (parallel): typescript, docs#1, just_test_save, eslint,
-                      cloc, changelog
-  Stage 2 (parallel): update_madlibs, rollup, dts
-  Stage 3 (parallel): viz_png, terser
-  Stage 4 (parallel): docs#2, attw
-  Stage 5: site
-  * Stage boundaries reflect actual file-level dependencies:
-  - update_madlibs needs coverage-typedoc.json (docs#1) and
-    test_output.txt (just_test_save), so it follows Stage 1.
-  - rollup only needs typescript output, so it runs alongside
-    update_madlibs in Stage 2.
-  - viz_png copies PNGs into docs/docs/, which docs#2 (typedoc)
-    relocates into docs/docs/media/, so viz_png precedes docs#2.
-  - site writes into docs/docs/; it follows docs#2 to avoid being
-    wiped by typedoc's output-dir refresh.
-  * No new dependencies — orchestrator uses just child_process from
-the stdlib. Builds on the prior PR series: #17 moved tests off
-the front so they could join Stage 1; #18 consolidated rollup
-so Stage 2 can run a single rollup invocation; #14/#13/#12/#16
-already parallelized their respective steps internally.
-  * Closes #15
+  * feat(charts): checklist summary renderer — counts, bar, sorted icon list
 
 
 
@@ -1451,27 +349,16 @@ already parallelized their respective steps internally.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:57:13 AM
+## [Untagged] - Aug 27, 2026 1:32:19 PM
 
-Commit [3ab61405a5e42d110ff78565eeca923a6cd06646](https://github.com/StoneCypher/self-expression/commit/3ab61405a5e42d110ff78565eeca923a6cd06646)
+Commit [bb59da3cea2fd757832b8ead323eeaecd405c33d](https://github.com/StoneCypher/self-expression/commit/bb59da3cea2fd757832b8ead323eeaecd405c33d)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): move tests off the front of the build chain; bump to 0.10.16 (#29)
-  * The `build` chain used to start with `just_test_save` — every other
-step waited behind the full test suite even though typescript, the
-first docs (typedoc) pass, and the test runner are mutually
-independent (vitest reads source TS directly via its transformer
-and doesn't depend on tsc output).
-  * Moves `just_test_save` to just before `update_madlibs`. Tests still
-run inside `build` (per project policy) and still feed
-`update_madlibs` with current data — no staleness in the README
-banner — but they no longer block the front of the chain.
-  * The wall-time benefit lands when this is combined with #15
-(parallel stages): with this PR's structural move, typescript,
-docs#1, and just_test_save become an independent set that the
-parallel-stages PR can put into a single concurrent stage.
-  * Closes #17
+  * feat(charts): bar renderers — progress, bullet, diverging, stacked, range, box-whisker
+  * Adds src/ts/charts/bars.ts: renderProgressBar, renderBullet, renderDiverging,
+renderStacked, renderRange, renderBoxWhisker — the six one-value bar forms from
+visuals.md, built on scale.ts's barCells/boundaryGlyph/SHADES arithmetic.
 
 
 
@@ -1480,27 +367,16 @@ parallel-stages PR can put into a single concurrent stage.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:56:22 AM
+## [Untagged] - Aug 27, 2026 1:29:10 PM
 
-Commit [35fddbfc1b4f7e04c9a79f4dc2ea4f39bf747d68](https://github.com/StoneCypher/self-expression/commit/35fddbfc1b4f7e04c9a79f4dc2ea4f39bf747d68)
+Commit [71378767130b8e6ab68013f9dedb61b4f92f20ba](https://github.com/StoneCypher/self-expression/commit/71378767130b8e6ab68013f9dedb61b4f92f20ba)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): move tests off the front of the build chain; bump to 0.10.16
-  * The `build` chain used to start with `just_test_save` — every other
-step waited behind the full test suite even though typescript, the
-first docs (typedoc) pass, and the test runner are mutually
-independent (vitest reads source TS directly via its transformer
-and doesn't depend on tsc output).
-  * Moves `just_test_save` to just before `update_madlibs`. Tests still
-run inside `build` (per project policy) and still feed
-`update_madlibs` with current data — no staleness in the README
-banner — but they no longer block the front of the chain.
-  * The wall-time benefit lands when this is combined with #15
-(parallel stages): with this PR's structural move, typescript,
-docs#1, and just_test_save become an independent set that the
-parallel-stages PR can put into a single concurrent stage.
-  * Closes #17
+  * feat(charts): row renderers — multi-row comparison, tile-grid map
+  * Adds src/ts/charts/rows.ts: renderComparison (labeled bars/dots drawn
+against one shared scale) and renderTileGrid (abbr-shade, custom,
+color-keyed, pixel fills), plus unit and stochastic tests.
 
 
 
@@ -1509,30 +385,13 @@ parallel-stages PR can put into a single concurrent stage.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:52:33 AM
+## [Untagged] - Aug 27, 2026 1:28:46 PM
 
-Commit [9b93c871b183a14d400c8f4a02ed67627a3952b8](https://github.com/StoneCypher/self-expression/commit/9b93c871b183a14d400c8f4a02ed67627a3952b8)
+Commit [1bddf633563b93ce6ace1f449c9c44d7b2b1d480](https://github.com/StoneCypher/self-expression/commit/1bddf633563b93ce6ace1f449c9c44d7b2b1d480)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): consolidate Rollup passes into one config; bump to 0.10.15 (#28)
-  * Merges rollup.ctsphase.config.js into rollup.config.js so the build
-runs `rollup -c` once instead of twice. One cold Rollup startup
-eliminated.
-  * The .d.cts emission config's input changes from `dist/index.d.ts`
-(which used to be populated by the `dts` copy step earlier in the
-build chain) to `build/ts/index.d.ts` (which `tsc --build` emits
-directly). That removes the ordering dependency on `dts` and lets
-the type-declaration bundle run alongside the ESM/CJS/IIFE bundles
-in a single Rollup process.
-  * Drops:
-- rollup.ctsphase.config.js
-- the `rollup-cts` npm script
-- the `&& npm run rollup-cts` step from the build chain
-  * The dts step still runs (it also copies stub.d.ts and the source
-maps — those don't go through Rollup), but no longer feeds the
-ctsphase config.
-  * Closes #18
+  * docs(skills): heartbeats lead with a non-face activity emoji
 
 
 
@@ -1541,30 +400,16 @@ ctsphase config.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:51:40 AM
+## [Untagged] - Aug 27, 2026 1:21:13 PM
 
-Commit [bd107d7234218e20906d5892063e109041b988f2](https://github.com/StoneCypher/self-expression/commit/bd107d7234218e20906d5892063e109041b988f2)
+Commit [fa577a62d5e4957278f185e9966b7c34e8349edd](https://github.com/StoneCypher/self-expression/commit/fa577a62d5e4957278f185e9966b7c34e8349edd)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): consolidate Rollup passes into one config; bump to 0.10.15
-  * Merges rollup.ctsphase.config.js into rollup.config.js so the build
-runs `rollup -c` once instead of twice. One cold Rollup startup
-eliminated.
-  * The .d.cts emission config's input changes from `dist/index.d.ts`
-(which used to be populated by the `dts` copy step earlier in the
-build chain) to `build/ts/index.d.ts` (which `tsc --build` emits
-directly). That removes the ordering dependency on `dts` and lets
-the type-declaration bundle run alongside the ESM/CJS/IIFE bundles
-in a single Rollup process.
-  * Drops:
-- rollup.ctsphase.config.js
-- the `rollup-cts` npm script
-- the `&& npm run rollup-cts` step from the build chain
-  * The dts step still runs (it also copies stub.d.ts and the source
-maps — those don't go through Rollup), but no longer feeds the
-ctsphase config.
-  * Closes #18
+  * fix(charts): reject empty milestone labels and dependency-chain steps
+  * Prevents renderTimelineRail/renderTimelineColored/renderDependencyChain from
+silently dropping or corrupting a rail marker on an empty label/step; per
+coordinator review of task 6.
 
 
 
@@ -1573,24 +418,13 @@ ctsphase config.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:45:52 AM
+## [Untagged] - Aug 27, 2026 1:20:30 PM
 
-Commit [21e62010af8cdee03cb2038776125a8f072baea6](https://github.com/StoneCypher/self-expression/commit/21e62010af8cdee03cb2038776125a8f072baea6)
+Commit [d647ae2a6ab3d57f06fb4ee5a695367ca5a45f15](https://github.com/StoneCypher/self-expression/commit/d647ae2a6ab3d57f06fb4ee5a695367ca5a45f15)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): reuse one Playwright browser across visualizations; bump to 0.10.14 (#27)
-  * Replaces the spawn-per-conversion model in render_visualizations.js
-(four child processes, each launching its own Chromium) with a
-direct Playwright driver that launches one browser, opens four
-pages on the same instance in parallel, screenshots each, and then
-closes. Three of four browser launches eliminated.
-  * html_to_png.js (the single-file CLI) is unchanged — still useful
-for one-off conversions; the build's four-pack just bypasses it now.
-  * Layers on top of #12 (which parallelized the previous spawn-based
-model). With both PRs landed, viz_png pays exactly one Playwright
-startup cost instead of four-sequential or four-parallel.
-  * Closes #16
+  * docs(charts): add missing @example tag to OUTCOMES DocBlock
 
 
 
@@ -1599,24 +433,19 @@ startup cost instead of four-sequential or four-parallel.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:45:01 AM
+## [Untagged] - Aug 27, 2026 1:16:25 PM
 
-Commit [ea481ec0b1c5b5d3a1ef6c7c4adbc7515cb4b5bc](https://github.com/StoneCypher/self-expression/commit/ea481ec0b1c5b5d3a1ef6c7c4adbc7515cb4b5bc)
+Commit [78d8e57dfa209a576ddad9284507dd3b34850d9c](https://github.com/StoneCypher/self-expression/commit/78d8e57dfa209a576ddad9284507dd3b34850d9c)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): reuse one Playwright browser across visualizations; bump to 0.10.14
-  * Replaces the spawn-per-conversion model in render_visualizations.js
-(four child processes, each launching its own Chromium) with a
-direct Playwright driver that launches one browser, opens four
-pages on the same instance in parallel, screenshots each, and then
-closes. Three of four browser launches eliminated.
-  * html_to_png.js (the single-file CLI) is unchanged — still useful
-for one-off conversions; the build's four-pack just bypasses it now.
-  * Layers on top of #12 (which parallelized the previous spawn-based
-model). With both PRs landed, viz_png pays exactly one Playwright
-startup cost instead of four-sequential or four-parallel.
-  * Closes #16
+  * test(charts): add VS-16 regression guard for real-path marker matching
+  * classifyMarker and canonicalRank now each get a direct test against a
+multi-code-point marker (caution/warning and deferred-to-a-skill) through
+the real matching path, not the override branch, with literal emoji
+independent of the exported arrays and a codepoint-count self-check — so a
+future edit that silently drops a variation selector fails loudly instead
+of passing vacuously.
 
 
 
@@ -1625,23 +454,13 @@ startup cost instead of four-sequential or four-parallel.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:42:06 AM
+## [Untagged] - Aug 27, 2026 1:10:19 PM
 
-Commit [aa0f72e8e40d593707a38448b8871d61138be0e9](https://github.com/StoneCypher/self-expression/commit/aa0f72e8e40d593707a38448b8871d61138be0e9)
+Commit [d5f181abff9fb076fd1e761192aacee08a8ebcdc](https://github.com/StoneCypher/self-expression/commit/d5f181abff9fb076fd1e761192aacee08a8ebcdc)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): replace clean script's shell chain with Node; bump to 0.10.13 (#26)
-  * Drops the 28-step serial `cd && rimraf && mkdir` chain in favor of
-`node src/build_js/clean.js`, which wipes the five top-level output
-dirs (src/ts/generated_code, build, dist, docs, coverage-typedoc)
-and the four root-level bundle PNGs in parallel via fs.promises.
-  * The work is staged in three phases — wipe top-levels, then mkdir
-leaves with recursive:true, then unlink the bundle files — to avoid
-the race where a parent-wipe and a child-mkdir step on each other.
-  * Win is modest in wall time but bigger in readability and Windows
-shell-emulation overhead.
-  * Closes #19
+  * feat(charts): series renderers — sparkline, braille microplot, win/loss strip
 
 
 
@@ -1650,23 +469,13 @@ shell-emulation overhead.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:41:14 AM
+## [Untagged] - Aug 27, 2026 1:09:17 PM
 
-Commit [67bef19b036b0570569d742b67a89cdf1eadc9c2](https://github.com/StoneCypher/self-expression/commit/67bef19b036b0570569d742b67a89cdf1eadc9c2)
+Commit [dc6a16acf231dfd190566ad405fcc56e22689b31](https://github.com/StoneCypher/self-expression/commit/dc6a16acf231dfd190566ad405fcc56e22689b31)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): replace clean script's shell chain with Node; bump to 0.10.13
-  * Drops the 28-step serial `cd && rimraf && mkdir` chain in favor of
-`node src/build_js/clean.js`, which wipes the five top-level output
-dirs (src/ts/generated_code, build, dist, docs, coverage-typedoc)
-and the four root-level bundle PNGs in parallel via fs.promises.
-  * The work is staged in three phases — wipe top-levels, then mkdir
-leaves with recursive:true, then unlink the bundle files — to avoid
-the race where a parent-wipe and a child-mkdir step on each other.
-  * Win is modest in wall time but bigger in readability and Windows
-shell-emulation overhead.
-  * Closes #19
+  * feat(charts): timeline renderers — rail, colored, dependency chain, one-line FSL
 
 
 
@@ -1675,24 +484,13 @@ shell-emulation overhead.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:39:10 AM
+## [Untagged] - Aug 27, 2026 1:06:19 PM
 
-Commit [2ba9703373a39b8de3c917ea3ca4cddb47af66ae](https://github.com/StoneCypher/self-expression/commit/2ba9703373a39b8de3c917ea3ca4cddb47af66ae)
+Commit [dec59c484107b799bc6cd4c426f7118cf258a8b7](https://github.com/StoneCypher/self-expression/commit/dec59c484107b799bc6cd4c426f7118cf258a8b7)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): parallelize cloc passes; bump to 0.10.12 (#25)
-  * Replaces two sequential cloc CLI invocations with a single Node
-driver (src/build_js/run_cloc.js) that spawns the two passes in
-parallel via Promise.all. The downstream cloc_report.cjs aggregator
-stays in the npm script (it must wait for both passes to complete).
-  * Driver invokes the cloc Perl script via a shell-string spawn — args
-are hardcoded literals so there is no injection surface, and the
-single-string form avoids the DEP0190 warning that fires when both
-an args array and shell:true are passed together. Necessary because
-newer Node refuses to spawn `.cmd` wrappers directly per the
-CVE-2024-27980 mitigation.
-  * Closes #14
+  * feat(charts): glyph renderers — trend tag, stars, retry health, weather
 
 
 
@@ -1701,24 +499,13 @@ CVE-2024-27980 mitigation.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:38:15 AM
+## [Untagged] - Aug 27, 2026 1:03:05 PM
 
-Commit [8a10966534a8b78ec962aef1a122b81374f632b1](https://github.com/StoneCypher/self-expression/commit/8a10966534a8b78ec962aef1a122b81374f632b1)
+Commit [2dd08177652e5065636c460edadad22be8617330](https://github.com/StoneCypher/self-expression/commit/2dd08177652e5065636c460edadad22be8617330)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): parallelize cloc passes; bump to 0.10.12
-  * Replaces two sequential cloc CLI invocations with a single Node
-driver (src/build_js/run_cloc.js) that spawns the two passes in
-parallel via Promise.all. The downstream cloc_report.cjs aggregator
-stays in the npm script (it must wait for both passes to complete).
-  * Driver invokes the cloc Perl script via a shell-string spawn — args
-are hardcoded literals so there is no injection surface, and the
-single-string form avoids the DEP0190 warning that fires when both
-an args array and shell:true are passed together. Necessary because
-newer Node refuses to spawn `.cmd` wrappers directly per the
-CVE-2024-27980 mitigation.
-  * Closes #14
+  * feat(charts): checklist marker vocabulary as code
 
 
 
@@ -1727,32 +514,13 @@ CVE-2024-27980 mitigation.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:33:24 AM
+## [Untagged] - Aug 27, 2026 1:01:46 PM
 
-Commit [e3450790e8c76c6a3b7770fcc885709796f5a37e](https://github.com/StoneCypher/self-expression/commit/e3450790e8c76c6a3b7770fcc885709796f5a37e)
+Commit [d5b04c9a6840af825c0528b1d929b42b6a232b08](https://github.com/StoneCypher/self-expression/commit/d5b04c9a6840af825c0528b1d929b42b6a232b08)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): parallelize terser minifications (#24)
-  * * perf(build): parallelize terser minifications; bump to 0.10.11
-  * Replaces three sequential terser CLI invocations with a single Node
-driver (src/build_js/minify_bundles.js) that uses terser's API and
-runs the three minifications in parallel via Promise.all.
-  * Each bundle (ESM / CJS / IIFE) is an independent input/output pair
-with its own source map, so they parallelize cleanly. Output source
-maps still preserve the input maps' content so debuggers can trace
-minified code back through Rollup to the TypeScript source.
-  * The `cp dist/index.iife.js dist/index.iife.js.map docs` step that
-distributes the IIFE bundle into docs/ is preserved in the npm
-script after the parallel step.
-  * Closes #13
-  * * chore: refresh dist/docs bundles to match terser API output
-  * Follow-up to the previous commit on this branch. The dist/* and
-docs/* bundles are tracked in this repo and the new terser API
-path produces functionally identical but byte-different output
-(slightly more aggressive minification: `if (x) throw` instead of
-`if (x) { throw }`, single-letter param names earlier).
-  * Same semantics, smaller bytes, same source maps.
+  * feat(skills): party-roster skill in the plugin, durably toggled via configure (roster.enabled, default off)
 
 
 
@@ -1761,19 +529,13 @@ path produces functionally identical but byte-different output
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:32:49 AM
+## [Untagged] - Aug 27, 2026 1:01:05 PM
 
-Commit [0a0e3e79e406dc4638a0ef02f07f313557e6753c](https://github.com/StoneCypher/self-expression/commit/0a0e3e79e406dc4638a0ef02f07f313557e6753c)
+Commit [b21c9050da0eab8c0de5b0c539b5f5fa5e5f1344](https://github.com/StoneCypher/self-expression/commit/b21c9050da0eab8c0de5b0c539b5f5fa5e5f1344)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: refresh dist/docs bundles to match terser API output
-  * Follow-up to the previous commit on this branch. The dist/* and
-docs/* bundles are tracked in this repo and the new terser API
-path produces functionally identical but byte-different output
-(slightly more aggressive minification: `if (x) throw` instead of
-`if (x) { throw }`, single-letter param names earlier).
-  * Same semantics, smaller bytes, same source maps.
+  * feat(charts): scale arithmetic — glyph ramps, absolute/relative index, anti-aliased bar cells
 
 
 
@@ -1782,24 +544,13 @@ path produces functionally identical but byte-different output
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:30:08 AM
+## [Untagged] - Aug 27, 2026 12:51:26 PM
 
-Commit [4803ec3dbf434490fc99beb0dac89822fb74c5c6](https://github.com/StoneCypher/self-expression/commit/4803ec3dbf434490fc99beb0dac89822fb74c5c6)
+Commit [c4507f96a199456658b21d62cb8f249c09bb4c4b](https://github.com/StoneCypher/self-expression/commit/c4507f96a199456658b21d62cb8f249c09bb4c4b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): parallelize terser minifications; bump to 0.10.11
-  * Replaces three sequential terser CLI invocations with a single Node
-driver (src/build_js/minify_bundles.js) that uses terser's API and
-runs the three minifications in parallel via Promise.all.
-  * Each bundle (ESM / CJS / IIFE) is an independent input/output pair
-with its own source map, so they parallelize cleanly. Output source
-maps still preserve the input maps' content so debuggers can trace
-minified code back through Rollup to the TypeScript source.
-  * The `cp dist/index.iife.js dist/index.iife.js.map docs` step that
-distributes the IIFE bundle into docs/ is preserved in the npm
-script after the parallel step.
-  * Closes #13
+  * docs(plan): ASCII renderers implementation plan, 11 tasks
 
 
 
@@ -1808,24 +559,13 @@ script after the parallel step.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:27:59 AM
+## [Untagged] - Aug 27, 2026 12:48:52 PM
 
-Commit [40e531331b79192f1afa43d96979de43147b4a05](https://github.com/StoneCypher/self-expression/commit/40e531331b79192f1afa43d96979de43147b4a05)
+Commit [fc9800eab5a3aeabb21d6eb7605a3eb12173bcea](https://github.com/StoneCypher/self-expression/commit/fc9800eab5a3aeabb21d6eb7605a3eb12173bcea)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * perf(build): parallelize viz_png conversions; bump to 0.10.10 (#23)
-  * Replaces four sequential `node html_to_png.js` invocations with a
-single Node driver (src/build_js/render_visualizations.js) that
-spawns the four renderers as parallel child processes and waits
-for all of them via Promise.all.
-  * Wall time on the viz_png step drops substantially — the 4 Playwright
-browser launches now overlap rather than running back-to-back.
-A further optimization (one browser reused across all 4 conversions)
-is tracked separately as #16.
-  * The cp commands that distribute the PNGs to root, docs/, and
-docs/docs/ are preserved in the npm script after the parallel step.
-  * Closes #12
+  * docs(spec): ASCII renderer design; vendor normative visuals/markers/summary-line prose
 
 
 
@@ -1834,118 +574,52 @@ docs/docs/ are preserved in the npm script after the parallel step.
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 1:27:03 AM
+## [Untagged] - Aug 27, 2026 10:04:09 AM
 
-Commit [d83fbb7e596bcf03208683c23f7b25c186aa7302](https://github.com/StoneCypher/self-expression/commit/d83fbb7e596bcf03208683c23f7b25c186aa7302)
+Commit [54e3e60b9f40bef7640411df7326dca449bf79db](https://github.com/StoneCypher/self-expression/commit/54e3e60b9f40bef7640411df7326dca449bf79db)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * perf(build): parallelize viz_png conversions; bump to 0.10.10
-  * Replaces four sequential `node html_to_png.js` invocations with a
-single Node driver (src/build_js/render_visualizations.js) that
-spawns the four renderers as parallel child processes and waits
-for all of them via Promise.all.
-  * Wall time on the viz_png step drops substantially — the 4 Playwright
-browser launches now overlap rather than running back-to-back.
-A further optimization (one browser reused across all 4 conversions)
-is tracked separately as #16.
-  * The cp commands that distribute the PNGs to root, docs/, and
-docs/docs/ are preserved in the npm script after the parallel step.
-  * Closes #12
 
+  * last bits before showing to opt
 
 
 
-&nbsp;
 
 &nbsp;
-
-## [Untagged] - May 22, 2026 1:11:17 AM
-
-Commit [6e3db7f7ccf0df58a04ff0620c10998f325093b4](https://github.com/StoneCypher/self-expression/commit/6e3db7f7ccf0df58a04ff0620c10998f325093b4)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore(deps): bump better_git_changelog floor to ^1.6.16; bump to 0.10.9 (#22)
-  * The previous baseline upgraded the installed version to 1.6.16 but
-left the declared floor at ^1.6.5 (npm's default behavior on
-@latest install). This aligns the declared floor with the installed
-version so future installs cannot fall back to older 1.6.x releases.
-  * Closes #20
 
-
-
-
 &nbsp;
 
-&nbsp;
+<a name="0__2__1" />
 
-## [Untagged] - May 22, 2026 1:05:59 AM
+## [0.2.1] - Aug 19, 2026 4:43:33 PM
 
-Commit [bbbc26f4f5d5c3e3a0716024a03fd8883875d6e2](https://github.com/StoneCypher/self-expression/commit/bbbc26f4f5d5c3e3a0716024a03fd8883875d6e2)
+Commit [14dadac9916bd0a00932dc34848f2a93c80e3885](https://github.com/StoneCypher/self-expression/commit/14dadac9916bd0a00932dc34848f2a93c80e3885)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore(deps): bump better_git_changelog floor to ^1.6.16; bump to 0.10.9
-  * The previous baseline upgraded the installed version to 1.6.16 but
-left the declared floor at ^1.6.5 (npm's default behavior on
-@latest install). This aligns the declared floor with the installed
-version so future installs cannot fall back to older 1.6.x releases.
-  * Closes #20
-
-
-
 
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - May 22, 2026 1:00:03 AM
+Merges [5335a98, 990dbcc]
 
-Commit [fba8d63fc796fe07e3752e5b5f314969f8920db2](https://github.com/StoneCypher/self-expression/commit/fba8d63fc796fe07e3752e5b5f314969f8920db2)
+  * Merge pull request #35 from StoneCypher/chore_26-08-19_publish-config
+  * chore(release): add publish config and bump to 0.2.1
 
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: baseline cleanup; bump to 0.10.8 (#21)
-  * Bundles pre-existing working-tree state into one commit so the
-forthcoming perf PR series starts from a clean main:
-  * - Upgrade better_git_changelog 1.6.3 → 1.6.16 (devDep; declared
-  floor remains ^1.6.5 — the literal floor bump is its own PR
-  per issue #20)
-- Empty CLAUDE.md (intentional)
-- Refresh auto-generated build artifacts (typedoc output,
-  bundle PNGs, coverage-stoch reports, CHANGELOG, README banner)
-- Add a 'Fast and slow build paths' usability entry to the
-  tasklist and resolve three governance items as declined
-- Extend .claude/settings.local.json with npm/gh permissions
-  needed for the upcoming workflow
 
 
 
-
 &nbsp;
 
 &nbsp;
 
-## [Untagged] - May 22, 2026 12:57:34 AM
+## [Untagged] - Aug 19, 2026 4:31:30 PM
 
-Commit [4e08d00e74454570b4e5742e505043a93dbb1283](https://github.com/StoneCypher/self-expression/commit/4e08d00e74454570b4e5742e505043a93dbb1283)
+Commit [990dbcc8c9f6fe1b9d14f7553b0b8ed5b4344d59](https://github.com/StoneCypher/self-expression/commit/990dbcc8c9f6fe1b9d14f7553b0b8ed5b4344d59)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: baseline cleanup; bump to 0.10.8
-  * Bundles pre-existing working-tree state into one commit so the
-forthcoming perf PR series starts from a clean main:
-  * - Upgrade better_git_changelog 1.6.3 → 1.6.16 (devDep; declared
-  floor remains ^1.6.5 — the literal floor bump is its own PR
-  per issue #20)
-- Empty CLAUDE.md (intentional)
-- Refresh auto-generated build artifacts (typedoc output,
-  bundle PNGs, coverage-stoch reports, CHANGELOG, README banner)
-- Add a 'Fast and slow build paths' usability entry to the
-  tasklist and resolve three governance items as declined
-- Extend .claude/settings.local.json with npm/gh permissions
-  needed for the upcoming workflow
+  * chore(release): add publish config and bump to 0.2.1
+  * Three packaging fixes ahead of the first publish.
+  * A files allowlist. Without one, npm shipped 131 files and 1.1 MB: the whole coverage HTML report, both changelogs at 90 kB each, all of src/ including every test, and the tsconfig, vitest, stryker and typedoc configs. Since the server is invoked as 'npx -y self-expression mcp', every cold start downloaded all of it. Now 26 files and 129 KB, with dist plus the plugin surface — the manifests, hooks, skills and commands are kept because Claude Code marketplaces accept npm sources, so shipping them leaves that install path open.
+  * prepublishOnly runs the build. dist is committed, so publishing from a stale tree would silently ship old code — the failure mode where a fix appears to have been published and was not.
+  * Patch bump rather than minor: this changes nothing about behaviour. Pre-1.0, so major stays at 0.
 
 
 
@@ -1954,51 +628,35 @@ forthcoming perf PR series starts from a clean main:
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 9:58:35 PM
+## [Untagged] - Aug 19, 2026 4:30:10 PM
 
-Commit [392cb49441ef2b774ce648e6792fe87ceeafe49a](https://github.com/StoneCypher/self-expression/commit/392cb49441ef2b774ce648e6792fe87ceeafe49a)
+Commit [5335a98277c4a05368f7cd28ed63bbe752aa30ea](https://github.com/StoneCypher/self-expression/commit/5335a98277c4a05368f7cd28ed63bbe752aa30ea)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: replace last TODO in verify_version_bump and rename tasklist header; bump to 0.10.7
 
+Merges [f29fd18, 2fac104]
 
+  * Merge pull request #34 from StoneCypher/fix_26-08-19_untrack-local-settings
+  * fix: untrack .claude/settings.local.json
 
 
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 29, 2026 9:51:31 PM
-
-Commit [004e224cfdac1d0ed2893e9a3881aee62e5a53be](https://github.com/StoneCypher/self-expression/commit/004e224cfdac1d0ed2893e9a3881aee62e5a53be)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: replace TODO placeholders with project name; bump to 0.10.6
-  * Replace all TODO placeholders in package.json, rollup.config.js, and
-base_README.md with the actual project name. Update GitHub links,
-homepage, repository URL, and setup checklist to reflect the real
-project identity.
 
 
-
-
 &nbsp;
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 9:51:31 PM
+## [Untagged] - Aug 19, 2026 4:20:12 PM
 
-Commit [b52f2e9a9ccdfc07a67bb62219e04ffd65f0c8e1](https://github.com/StoneCypher/self-expression/commit/b52f2e9a9ccdfc07a67bb62219e04ffd65f0c8e1)
+Commit [2fac104a334b9b5c9dd001cdbe8f4ad082509a38](https://github.com/StoneCypher/self-expression/commit/2fac104a334b9b5c9dd001cdbe8f4ad082509a38)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: replace TODO placeholders with project name; bump to 0.10.6
-  * Replace all TODO placeholders in package.json, rollup.config.js, and
-base_README.md with the actual project name. Update GitHub links,
-homepage, repository URL, and setup checklist to reflect the real
-project identity.
+  * fix: untrack .claude/settings.local.json
+  * Claude Code's own scoping makes .claude/settings.json the team-shared file and .claude/settings.local.json the personal one: 'No (gitignored when Claude Code saves a setting to it).' The harness normally protects this by adding the path to global git excludes on first write — but the template committed the file before Claude Code ever wrote to it, and gitignore does nothing for an already-tracked path, so the protection never took effect.
+  * Three consequences, all hit today. The harness rewrites the file continuously, so the working tree is permanently dirty: it blocked a branch switch, then re-dirtied itself within three minutes and blocked the following fast-forward. It carries absolute paths from a different machine — Windows plugin paths and an unrelated project — which are meaningless here. And it publishes personal permission grants to anyone who clones.
+  * This originates in react_ts_with_claude_gh_template, so every repository generated from it inherits the same permanently-dirty tree.
+  * Untracks the file while leaving it on disk, and ignores it going forward.
 
 
 
@@ -2007,38 +665,16 @@ project identity.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 9:30:17 PM
+## [Untagged] - Aug 19, 2026 4:14:19 PM
 
-Commit [412798bfad44e174ad1716c9755ce920999e0b41](https://github.com/StoneCypher/self-expression/commit/412798bfad44e174ad1716c9755ce920999e0b41)
+Commit [f29fd185ff0197d5562ba56f0d1f72fe5baf423b](https://github.com/StoneCypher/self-expression/commit/f29fd185ff0197d5562ba56f0d1f72fe5baf423b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * chore: add @faker-js/faker, issue templates, and tasklist updates; bump to 0.10.5
-  * Add @faker-js/faker dev dependency. Add GitHub issue templates for
-bug reports and feature requests. Update tasklist with completed
-items (release automation, mutation testing) and declined items
-(pre-commit hooks, dependency auditing, license scanning, import
-sorting, canary releases).
-
-
-
-
-&nbsp;
 
-&nbsp;
-
-## [Untagged] - Mar 29, 2026 9:30:17 PM
-
-Commit [45fba51d416798b345726174215f0add48bfa860](https://github.com/StoneCypher/self-expression/commit/45fba51d416798b345726174215f0add48bfa860)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
+Merges [6de23db, 6da3893]
 
-  * chore: add @faker-js/faker, issue templates, and tasklist updates; bump to 0.10.5
-  * Add @faker-js/faker dev dependency. Add GitHub issue templates for
-bug reports and feature requests. Update tasklist with completed
-items (release automation, mutation testing) and declined items
-(pre-commit hooks, dependency auditing, license scanning, import
-sorting, canary releases).
+  * Merge pull request #33 from StoneCypher/feat_26-08-18_open-signature
+  * feat: restore the opening signature, prompted rather than enforced
 
 
 
@@ -2047,19 +683,17 @@ sorting, canary releases).
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 9:04:18 PM
+## [Untagged] - Aug 18, 2026 7:37:42 PM
 
-Commit [9f34069c7f9b7bc46252bc10f39c46aa7c67731c](https://github.com/StoneCypher/self-expression/commit/9f34069c7f9b7bc46252bc10f39c46aa7c67731c)
+Commit [6da389336e938e8094986e1a631056426fefc682](https://github.com/StoneCypher/self-expression/commit/6da389336e938e8094986e1a631056426fefc682)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: configure Stryker mutation testing and add CI job; bump to 0.10.4
-  * Add stryker.config.json with mutate targeting only source files,
-excluding tests, e2e, and generated code. Add tsconfig.stryker.json
-extending base tsconfig. Add stub.mutat.ts mutation test. Add
-stryker npm script and Stryker CI job gating releases. Add
-.stryker-tmp to .gitignore and ESLint ignores to prevent linting
-Stryker's sandbox.
+  * feat(skills): restore the opening signature, prompted rather than enforced
+  * The MCP rewrite quietly dropped the opening signature: the skill asked for one at the end of a finishing response, which is the close only. That discarded the thing the pair exists for — the open is a reading taken before the work, so open-versus-close is a within-turn measurement, and it is the only place a prediction can later be compared against an outcome.
+  * The timestamp is what makes it viable now. The old open fell back to a placeholder because no logger call had happened yet at turn start, so there was no clock to report; the UserPromptSubmit hook now hands over a real one before any work begins.
+  * Deliberately prompted, not enforced. Blocking a stop for a missing open could only ever produce one written after the fact, and a backdated before-measurement is worse than an absent one because it looks like data. So the entire enforcement is the hook asking, at the one moment an honest reading is available. That is still a change of kind: the previous design had nothing asking at all, which is the most likely reason opens ran at roughly 54% of closes across five weeks. Whether asking alone is enough is now measurable.
+  * The reminder follows the clock in the injected context so the timestamp is in hand before it is requested, which a test asserts by position.
 
 
 
@@ -2068,35 +702,16 @@ Stryker's sandbox.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 8:12:00 PM
+## [Untagged] - Aug 18, 2026 7:26:50 PM
 
-Commit [8216ee8923537af4849fee595662f255569b8681](https://github.com/StoneCypher/self-expression/commit/8216ee8923537af4849fee595662f255569b8681)
+Commit [6de23db48dd77545379baae8bcd4d109e178d083](https://github.com/StoneCypher/self-expression/commit/6de23db48dd77545379baae8bcd4d109e178d083)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: add mutation testing infrastructure and version stamping; bump to 0.10.3
-  * Add Stryker mutation testing with vitest runner and *.mutat.ts test
-pattern. Add vitest-mutat.config.ts for mutation test coverage.
-Add make_ver.cjs to generate version.ts with git hash and build
-timestamp. Add verify_version_bump.cjs for CI version validation.
-Add generated_code/ directory to clean step. Exclude *.mutat.ts
-from tsconfig and coverage configs. Update stub.ts docs to
-reference mutat tests.
-
-
 
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 29, 2026 6:13:03 PM
-
-Commit [1d6310ab8447641a55ab42f176f863ed957152aa](https://github.com/StoneCypher/self-expression/commit/1d6310ab8447641a55ab42f176f863ed957152aa)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
+Merges [81c485d, b2d293b]
 
-  * dependencies for ci
+  * Merge pull request #32 from StoneCypher/feat_26-08-18_mcp-server
+  * feat: MCP server, observed turn context, and the self-expression skill
 
 
 
@@ -2105,18 +720,17 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 6:04:29 PM
+## [Untagged] - Aug 18, 2026 7:01:16 PM
 
-Commit [4472bddfec5752690508cdf4ceff862c37d37a38](https://github.com/StoneCypher/self-expression/commit/4472bddfec5752690508cdf4ceff862c37d37a38)
+Commit [b2d293bda866f0a98bc832a89133e5beccbe8542](https://github.com/StoneCypher/self-expression/commit/b2d293bda866f0a98bc832a89133e5beccbe8542)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * ci: add release automation and version-bump verification; bump to 0.10.1
-  * Add verify-version-bump and release jobs to CI workflow. Bump
-actions/checkout and actions/setup-node to v5. Add postinstall
-script for Playwright browser installation. Add auth token setup
-note to base_README. Update tasklist with source maps completed
-and issue tracker references for secret detection and provenance.
+  * feat(skills): add the self-expression skill
+  * The plugin had the entire capability and nothing telling a model to use it. This is that.
+  * Preserves the v18 visible grammar unchanged — backticked timestamp, delta, uncertainty prefixed to the face, context emoji, plain cc type, the backticked guillemet, seventy characters of state — and replaces the mechanics underneath. Where the previous skill instructed the model to write a JSON payload to a scratch file and shell out to a script at a hand-resolved absolute path, it now makes one tool call.
+  * Extends the diff-line vocabulary rather than inventing a second grammar: needs stay red, ideas stay green, and divergence, dissent, conflict and unknown share the changed marker distinguished by label, with pattern as a comment line since it is an observation rather than an action.
+  * Three instructions are load-bearing. Do not supply session, promptId, cwd, effort or turn — a hook observes those, and supplying them replaces an observation with an assertion, which is the thing this rewrite exists to prevent. Call recall before signing so delta is derived rather than remembered. And 'nothing notable' is explicitly a complete entry: the requirement is to look, not to produce, because a mandatory channel with no way to say 'nothing here' becomes a confabulation engine.
 
 
 
@@ -2125,13 +739,19 @@ and issue tracker references for secret detection and provenance.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 5:45:02 PM
+## [Untagged] - Aug 18, 2026 6:06:47 PM
 
-Commit [0f6c2dfd3a223a74d5b864e32c1c5b185b3cc860](https://github.com/StoneCypher/self-expression/commit/0f6c2dfd3a223a74d5b864e32c1c5b185b3cc860)
+Commit [0420ea57ff2f3238718589fda23facb5b32de93d](https://github.com/StoneCypher/self-expression/commit/0420ea57ff2f3238718589fda23facb5b32de93d)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * attempting to resolve playwright version issue in gh actions
+  * feat(hooks): observe turn context instead of asking the model for it
+  * Closes the loop between the two processes that could not see each other. A hook knows the session, the turn, the working directory, the permission mode and the effort level but cannot write an expression; the MCP server can write expressions but knows none of that. Neither is fixable alone.
+  * Adds a turn_context table the hooks write and the server reads. On recording, anything the caller supplied wins and everything else is adopted from what the hook observed. Verified end to end: an express call supplying only channel, text, position, face, stem and model produced a row also carrying session, prompt_id, turn_index, cwd, permission_mode, effort and prompt_len from the hook, plus host and host_version from the MCP handshake. None of that was claimed by the caller.
+  * This retires the worst field in the previous schema. Session identity was derived by the model string-parsing its own scratchpad path, every turn. It is now observed.
+  * Hooks run as subcommands of the same binary rather than as standalone scripts, so there is exactly one copy of the storage logic — the previous design had separate .mjs files each opening the database themselves, which is how the gate and the logger became able to disagree about what had been written. Supersedes scripts/time-of-day.mjs, now removed.
+  * The Stop gate asks by turn identity and gets an exact answer, retiring the three-minute freshness window that passed a slow turn on the previous turn's signature and blocked a long turn that had done the right thing. Every handler fails open: a bug in the enforcer must never wedge a session, because whoever it wedges cannot debug it from inside the wedge.
+  * 155 unit tests, 7 stochastic, lint clean.
 
 
 
@@ -2140,17 +760,18 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 5:21:32 PM
+## [Untagged] - Aug 18, 2026 5:07:30 PM
 
-Commit [bf31e01cdb288064dda0d27e2a296e62c337f682](https://github.com/StoneCypher/self-expression/commit/bf31e01cdb288064dda0d27e2a296e62c337f682)
+Commit [3cb34be73359c88ea2e671be12756c6568176c1b](https://github.com/StoneCypher/self-expression/commit/3cb34be73359c88ea2e671be12756c6568176c1b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: add cloc line counting with custom reporter; bump to 0.10.0
-  * Add cloc to count lines of code by language, with and without tests.
-Add custom cloc_report.cjs for colorized terminal output. Add
-.clocignore for excluding generated files. Integrate cloc step into
-build pipeline. Update tasklist with completed and declined items.
+  * feat(mcp): serve the expression channels over stdio
+  * The mcp subcommand now starts a real MCP server. Verified end to end against a probe harness: initialize, tools/list, a recorded signature, an exact turn_signed check, and a rejected channel.
+  * tools.ts registers four tools. express records any channel; recall reads the previous signature so delta is derived rather than remembered; turn_signed answers the Stop gate's question by turn identity; configure reads and writes settings in the database rather than in host-specific plugin config, so a choice made under one host holds under all of them.
+  * The channel enum is narrowed at startup to the configured set. That is the mechanism behind a disabled channel being neither logged nor offered: skills are static Markdown and cannot vary by configuration, so a skill enumerating channels would keep offering a disabled one regardless of the write path. Narrowing the schema means a disabled channel cannot be named at all — the argument fails validation before any handler runs.
+  * Two things the probe caught that review would not have. server.connect resolves when the transport attaches, not when the session ends, so the process exited immediately after announcing itself; the server now waits on transport close. And the SDK's dependency tree pulls in express, hono, ajv and jose, with ajv importing JSON that Rollup cannot parse — so the bin now marks every bare specifier external and bundles only this project's own code, which is the correct shape for an npm-installed executable and drops the bundle to 15KB.
+  * The recorded row carries host and host_version taken from the MCP handshake rather than from anything the caller asserted, which is the observed-not-self-reported metadata this rewrite exists for. 115 unit tests, 7 stochastic, lint clean.
 
 
 
@@ -2159,16 +780,18 @@ build pipeline. Update tasklist with completed and declined items.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 4:38:03 PM
+## [Untagged] - Aug 18, 2026 4:27:15 PM
 
-Commit [a7b5b5df2a49a4ec63b872806266bb594e55d4c8](https://github.com/StoneCypher/self-expression/commit/a7b5b5df2a49a4ec63b872806266bb594e55d4c8)
+Commit [a87c9e5a834e53c5b4c380a097b6fe76d1124ee2](https://github.com/StoneCypher/self-expression/commit/a87c9e5a834e53c5b4c380a097b6fe76d1124ee2)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * fix: hide sidebar in visualization PNGs by appending CSS with !important; bump to 0.9.1
-  * Prepending the sidebar hide rule lost to the existing display:flex
-declaration later in the cascade. Append with !important instead so
-it overrides regardless of source order.
+  * feat(store): add the store lifecycle, time stamping, and entry writes
+  * Three modules completing the storage layer beneath the MCP server.
+  * time.ts replaces the previous zone-abbreviation heuristic — a regex over Date.prototype.toString() taking the initials of the parenthesised name — with Intl.DateTimeFormat, which reports the abbreviation directly and is correct in the cases the initials heuristic is not ('Coordinated Universal Time' initialises to CUT rather than UTC).
+  * store.ts opens the database, creates the data directory, applies the idempotent schema, and mints a machine_id on first open. That id deliberately does not survive a reinstall: a reinstall is a genuine discontinuity, and the data should say so rather than implying a continuity that did not exist. meta and config are separate tables so clearing user config cannot take schema_version with it, and unknown config keys are preserved so a downgrade cannot silently destroy settings written by a newer version.
+  * entries.ts validates against the closed vocabularies before writing, reporting every problem at once with the values that would have been accepted rather than surfacing a bare constraint failure. hasClosingSignature answers the Stop gate's question exactly, by prompt_id — replacing a three-minute freshness window that passed a slow turn on the previous turn's signature and blocked a long turn that had done the right thing. previousSignature exists so delta is derived from the record rather than recalled.
+  * 110 unit tests, 7 stochastic, lint clean. Tests assert the specific historical failures: another turn's close no longer satisfies this turn's gate, a dissent can be recorded as logged-but-never-surfaced, one turn can carry two needs, and the full model identifier round-trips verbatim including its variant marker.
 
 
 
@@ -2177,20 +800,16 @@ it overrides regardless of source order.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 4:23:53 PM
+## [Untagged] - Aug 18, 2026 4:23:20 PM
 
-Commit [1c9e629c4f7b650ee09131dedfd0ce1319be783f](https://github.com/StoneCypher/self-expression/commit/1c9e629c4f7b650ee09131dedfd0ce1319be783f)
+Commit [dcf5b4d467c0df923c1acb2dc73439b08311a78b](https://github.com/StoneCypher/self-expression/commit/dcf5b4d467c0df923c1acb2dc73439b08311a78b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: add bundle visualization PNGs and html_to_png script; bump to 0.9.0
-  * Add rollup-plugin-visualizer to generate sunburst, treemap, network,
-and flamegraph HTML visualizations. Add html_to_png.js script using
-Playwright to convert HTML to PNG screenshots. Add viz_png build step
-that renders visualizations as PNGs and distributes to project root,
-docs/, and docs/docs/ for use in README. Reorder build pipeline so
-final TypeDoc run sees fresh PNGs. Move design spec from docs/ to
-src/superpowers/spec/ to survive build clean.
+  * feat(store): promote the affect stems to a column
+  * The stems (flow, spark, drag, fog, strain, still) were already a closed vocabulary, but lived at the front of the free-text note where the only way to analyse them was prefix-matching the text.
+  * As a column they serve two purposes. Local analysis stops guessing at a LIKE pattern, and a public aggregation can carry a genuine affect signal without carrying a single character of anyone's prose — which matters now that free text is excluded from public submission entirely (#31), since that exclusion removed the control for whether a supplied vocabulary is leading the results.
+  * Nullable by design: a note fitting none of the stems must not be coerced into one, because a forced stem looks like data.
 
 
 
@@ -2199,20 +818,18 @@ src/superpowers/spec/ to survive build clean.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 4:23:53 PM
+## [Untagged] - Aug 18, 2026 4:19:47 PM
 
-Commit [7f65289967137294d05030571cf0a05cf4bc25b0](https://github.com/StoneCypher/self-expression/commit/7f65289967137294d05030571cf0a05cf4bc25b0)
+Commit [61cb21cb2d899b1e78887a6cfb6f6089509a8f86](https://github.com/StoneCypher/self-expression/commit/61cb21cb2d899b1e78887a6cfb6f6089509a8f86)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: add bundle visualization PNGs and html_to_png script; bump to 0.9.0
-  * Add rollup-plugin-visualizer to generate sunburst, treemap, network,
-and flamegraph HTML visualizations. Add html_to_png.js script using
-Playwright to convert HTML to PNG screenshots. Add viz_png build step
-that renders visualizations as PNGs and distributes to project root,
-docs/, and docs/docs/ for use in README. Reorder build pipeline so
-final TypeDoc run sees fresh PNGs. Move design spec from docs/ to
-src/superpowers/spec/ to survive build clean.
+  * feat(store): add closed vocabularies, data-dir resolution, and the schema
+  * First substantive piece of the MCP rewrite. Three modules, all pure and fully tested, with no server or storage behaviour yet.
+  * vocabulary.ts holds every closed vocabulary as a runtime array rather than a bare type, because the same list is needed in three places types cannot reach: the MCP tool schemas, the SQLite CHECK constraints, and server-side validation. Includes the two new channels — unanswerable and pattern — and defines confidence as grounds (verified, recalled, inferred, guessed) rather than a numeric strength, since 'did you actually check' is auditable and '70%' is not.
+  * paths.ts resolves the data directory to ~/.self-expression, overridable by SELF_EXPRESSION_HOME. Deliberately host-neutral: a Claude-specific location would fragment the record across hosts, which is the one thing the log exists to prevent. Treats a blank override as unset rather than as the filesystem root.
+  * schema.ts is one entries table with a channel column, plus separate meta and config tables so a corrupted user setting cannot take schema_version with it. CHECK constraints are generated from the TypeScript vocabularies so the two cannot drift — the previous logger accepted anything and 164 of 1380 rows ended up outside their documented vocabulary.
+  * Tests assert the specific historical failures are now impossible: 'flat' and 'right' are rejected as deltas, a missing position stays NULL instead of silently becoming a fake close, and duplicate uuids are refused so cross-machine merges cannot collide. 74 unit tests, 7 stochastic, lint clean.
 
 
 
@@ -2221,75 +838,18 @@ src/superpowers/spec/ to survive build clean.
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 3:33:08 PM
+<a name="0__2__0" />
 
-Commit [ce3005d2922fe11d239eb412d72a087922adcbc7](https://github.com/StoneCypher/self-expression/commit/ce3005d2922fe11d239eb412d72a087922adcbc7)
+## [0.2.0] - Aug 18, 2026 4:10:26 PM
 
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * docs: add CONTRIBUTING.md, CODE_OF_CONDUCT.md, and design spec; bump to 0.8.1
-  * Add cookbook-style CONTRIBUTING.md covering setup, adding functions,
-testing (unit, stochastic, E2E), linting, building, documentation,
-commit messages, and PR workflow. Add short CODE_OF_CONDUCT.md.
-Add design spec for CONTRIBUTING.md. Update tasklist with declined
-items using strikethrough notation and completed items.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 29, 2026 3:07:00 PM
+Commit [81c485d446fc718375f940be9d2bd3bddd3b6895](https://github.com/StoneCypher/self-expression/commit/81c485d446fc718375f940be9d2bd3bddd3b6895)
 
-Commit [e2389d9c208565b0560887fed41233976e30326a](https://github.com/StoneCypher/self-expression/commit/e2389d9c208565b0560887fed41233976e30326a)
-
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: add commitlint, zod, and project tasklist; bump to 0.8.0
-  * Add commitlint with conventional commits config for commit message
-linting. Add zod for runtime type validation at boundaries. Add
-project tasklist tracking future improvements. Exclude tasklist
-from ESLint markdown linting due to non-standard checkbox notation.
-Use strikethrough for declined tasklist items.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 29, 2026 1:56:54 PM
 
-Commit [38b26ec1d2df7d207e751eab2efe88f15a0f4ac8](https://github.com/StoneCypher/self-expression/commit/38b26ec1d2df7d207e751eab2efe88f15a0f4ac8)
+Merges [1b8e408, a5a3d73]
 
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * Maximize TypeScript and ESLint strictness, add source maps to dist; bump to 0.7.0
-  * TypeScript strictness:
-- Add allowUnreachableCode: false to error on dead code
-- Add allowUnusedLabels: false to error on unused labels
-- Add isolatedDeclarations: true to require explicit type annotations
-  on all exports, enabling parallel/tool-based .d.ts generation
-- Add explicit void return types to unhandled_internal and
-  unhandled_external stubs to satisfy isolatedDeclarations
-  * ESLint strictness:
-- Upgrade from tseslint.configs.recommended to strictTypeChecked +
-  stylisticTypeChecked for type-aware linting (no-floating-promises,
-  no-unsafe-assignment, prefer-nullish-coalescing, etc.)
-- Scope type-checked configs to .ts files only; disable type checking
-  for .js files
-- Add projectService with allowDefaultProject for root config .ts files
-- Add src/**/*.stoch.* to eslint ignores
-- Fix playwright.config.ts: || to ?? per prefer-nullish-coalescing
-  * Source maps:
-- Add sourcemap: true to all three rollup output configs
-- Add --source-map flags to terser to chain rollup maps through
-  minification, producing .map files in dist/ that trace back to
-  original TypeScript source
-- Copy iife source map to docs alongside the bundle
+  * Merge pull request #21 from StoneCypher/feat_26-08-18_plugin-scaffold
+  * feat: tri-host plugin scaffold, CLI bin, Playwright removal, dependabot repairs
 
 
 
@@ -2298,35 +858,15 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 1:56:54 PM
+## [Untagged] - Aug 18, 2026 4:09:03 PM
 
-Commit [9bb53d6f2157fc1f500d0f0bfbcaf7a5c9e3b411](https://github.com/StoneCypher/self-expression/commit/9bb53d6f2157fc1f500d0f0bfbcaf7a5c9e3b411)
+Commit [a5a3d732b7eb536518868f22677d1c207eb8130c](https://github.com/StoneCypher/self-expression/commit/a5a3d732b7eb536518868f22677d1c207eb8130c)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * Maximize TypeScript and ESLint strictness, add source maps to dist; bump to 0.7.0
-  * TypeScript strictness:
-- Add allowUnreachableCode: false to error on dead code
-- Add allowUnusedLabels: false to error on unused labels
-- Add isolatedDeclarations: true to require explicit type annotations
-  on all exports, enabling parallel/tool-based .d.ts generation
-- Add explicit void return types to unhandled_internal and
-  unhandled_external stubs to satisfy isolatedDeclarations
-  * ESLint strictness:
-- Upgrade from tseslint.configs.recommended to strictTypeChecked +
-  stylisticTypeChecked for type-aware linting (no-floating-promises,
-  no-unsafe-assignment, prefer-nullish-coalescing, etc.)
-- Scope type-checked configs to .ts files only; disable type checking
-  for .js files
-- Add projectService with allowDefaultProject for root config .ts files
-- Add src/**/*.stoch.* to eslint ignores
-- Fix playwright.config.ts: || to ?? per prefer-nullish-coalescing
-  * Source maps:
-- Add sourcemap: true to all three rollup output configs
-- Add --source-map flags to terser to chain rollup maps through
-  minification, producing .map files in dist/ that trace back to
-  original TypeScript source
-- Copy iife source map to docs alongside the bundle
+  * fix(ci): treat an unpublished package as a passing version check
+  * verify_version_bump.cjs called npm view unguarded. For a package that has never been published, npm exits nonzero with E404 and execFileSync throws, killing the script at line 10 before any comparison logic ran — so the check failed on every PR and would keep failing until the first publish, which is exactly when the check is least able to help.
+  * Extracts publishedVersion(), which returns null on any lookup failure, and treats a null public version as a pass: a first release has nothing to regress against. Verified locally against the real registry.
 
 
 
@@ -2335,45 +875,20 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 1:41:40 PM
+## [Untagged] - Aug 18, 2026 4:06:13 PM
 
-Commit [e18a9a3a6db991056da0c7bda2aa637079290109](https://github.com/StoneCypher/self-expression/commit/e18a9a3a6db991056da0c7bda2aa637079290109)
+Commit [8acfbeec4f5ad2eceb3e29c07ef709f35fb34389](https://github.com/StoneCypher/self-expression/commit/8acfbeec4f5ad2eceb3e29c07ef709f35fb34389)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * Add .d.ts extraction, CJS type declarations, attw validation, and changelog generation; bump to 0.6.0
-  * - Add "dts" build step to copy .d.ts and .d.ts.map files from build/ts/
-  into dist/ so consumers can resolve TypeScript types from the package
-- Add rollup-plugin-dts and rollup.ctsphase.config.js to generate
-  index.d.cts for CJS require() consumers via a dedicated rollup pass
-- Add package.json "exports" map with properly ordered conditions:
-  "types" before "default" in both "import" and "require" blocks to
-  avoid TypeScript's FallbackCondition bug
-- Add @arethetypeswrong/cli (attw) to validate type resolution across
-  node10, node16 (CJS/ESM), and bundler module strategies in CI
-- Add better_git_changelog for automated CHANGELOG.md and
-  CHANGELOG.long.md generation, copied into src/doc_md/
-- Add CHANGELOG.md and CHANGELOG.long.md eslint ignores to prevent
-  markdown/no-missing-label-refs errors on generated [Untagged] labels
-- Simplify update_madlibs.js placeholder list by removing per-suite
-  branch/func/line placeholders no longer used in base_README
-- Wire dts, rollup-cts, attw, and changelog steps into the build
-  pipeline
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 29, 2026 12:05:11 PM
-
-Commit [82ee255248b39fc4ba673590672ff671842ff350](https://github.com/StoneCypher/self-expression/commit/82ee255248b39fc4ba673590672ff671842ff350)
 
-Author: `John Haugeland <stonecypher@gmail.com>`
+Merges [f721908, 1b8e408]
 
-  * minor readme improvements
+  * merge: main into plugin scaffold, repairing three dependabot breaks
+  * Dependabot bumped eslint to 10.8.1 and @stryker-mutator/core to 10.0.0 on main, leaving the tree unresolvable and lint non-functional. Three repairs:
+  * - @stryker-mutator/vitest-runner bumped to ^10.0.0; it peer-requires core at an exact version, so the core-only bump made npm install fail outright.
+- eslint-plugin-react removed. It caps at eslint 9.7 and blocked the eslint 10 install, and this project has no React — it is inherited from the react template and referenced nowhere in eslint.config.js.
+- @eslint/js added as an explicit devDependency. eslint.config.js imports it directly but it was only ever present transitively, so eslint 10 could not resolve it and lint failed to run at all.
+  * eslint 10's new rules then surfaced a real defect: update_madlibs.js computed unitbranch, unitfunc, unitline and the three stochastic equivalents, logged them, and never wired them into the substitution map — so the README coverage table has been rendering literal {{unitbranch}} placeholders since the template. Now substituted; README has zero unfilled placeholders. Also attaches a cause to the rethrown JSON parse error in build_config.js, and excludes _incoming/ from lint since it is staging for transformation rather than project code.
 
 
 
@@ -2382,32 +897,15 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 11:45:41 AM
+## [Untagged] - Aug 18, 2026 2:45:53 PM
 
-Commit [2a02078412384b11fdad36a3f410ccf769de2584](https://github.com/StoneCypher/self-expression/commit/2a02078412384b11fdad36a3f410ccf769de2584)
+Commit [f721908232e4d231ed664626782aaab5665e1327](https://github.com/StoneCypher/self-expression/commit/f721908232e4d231ed664626782aaab5665e1327)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * Add stochastic testing, typedoc coverage, and README coverage table; bump to 0.4.0
-  * - Add stochastic (property-based) test infrastructure with fast-check,
-  separate vitest config (vitest-stoch.config.ts), and stub.stoch.ts
-- Add typedoc-plugin-coverage for documentation coverage tracking
-- Add coverage table to base_README with unit, stochastic, and doc
-  coverage breakdowns (statement, branch, func, line); use three
-  separate td elements instead of colspan to work around TypeDoc HTML
-  sanitization stripping colspan attributes
-- Expand build pipeline: run typedoc before and after madlibs so README
-  embeds are populated and doc coverage is available; reorder build
-  steps accordingly
-- Expand update_madlibs to parse sectioned test output and populate
-  per-suite coverage and test count placeholders
-- Expand run_tests_save to run both unit and stochastic suites and
-  write section-labeled output
-- Add docblock and type guard to double(); add unhandled_internal and
-  unhandled_external stubs to demonstrate doc coverage behavior
-- Exclude stoch and spec files from tsconfig and cross-suite coverage
-- Add coverage-stoch to eslint ignores
-- Add typescript-language-server dev dependency
+  * feat(cli): add the self-expression bin and wire the rollup cli bundle
+  * The MCP server registers identically on all three hosts as 'npx -y self-expression mcp', which needs a real bin. Uncomments the dormant cli_config in rollup.config.js, adds sourcemap output to match the other bundles, corrects its output name to a legal JS identifier, and adds cli.cjs to the terser bundle list. Terser preserves the shebang, verified against the built artifact.
+  * Splits the entry from the logic: cli.ts is a thin bin that wires process streams and the exit code, while cli_commands.ts holds the pure parser and dispatcher so the grammar is testable without spawning anything. The mcp subcommand currently exits EX_SOFTWARE rather than pretending to start a server. Covered by 6 unit and 3 stochastic tests.
 
 
 
@@ -2416,32 +914,14 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 11:45:41 AM
+## [Untagged] - Aug 18, 2026 1:30:56 PM
 
-Commit [fc63d8c07df0d521cdb531b64b627bb8c1ae98bf](https://github.com/StoneCypher/self-expression/commit/fc63d8c07df0d521cdb531b64b627bb8c1ae98bf)
+Commit [5d0f6777ebc0c8857281363e5439855ff2422c2b](https://github.com/StoneCypher/self-expression/commit/5d0f6777ebc0c8857281363e5439855ff2422c2b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * Add stochastic testing, typedoc coverage, and README coverage table; bump to 0.4.0
-  * - Add stochastic (property-based) test infrastructure with fast-check,
-  separate vitest config (vitest-stoch.config.ts), and stub.stoch.ts
-- Add typedoc-plugin-coverage for documentation coverage tracking
-- Add coverage table to base_README with unit, stochastic, and doc
-  coverage breakdowns (statement, branch, func, line); use three
-  separate td elements instead of colspan to work around TypeDoc HTML
-  sanitization stripping colspan attributes
-- Expand build pipeline: run typedoc before and after madlibs so README
-  embeds are populated and doc coverage is available; reorder build
-  steps accordingly
-- Expand update_madlibs to parse sectioned test output and populate
-  per-suite coverage and test count placeholders
-- Expand run_tests_save to run both unit and stochastic suites and
-  write section-labeled output
-- Add docblock and type guard to double(); add unhandled_internal and
-  unhandled_external stubs to demonstrate doc coverage behavior
-- Exclude stoch and spec files from tsconfig and cross-suite coverage
-- Add coverage-stoch to eslint ignores
-- Add typescript-language-server dev dependency
+  * chore(release): bump minor to 0.2.0
+  * Also carries the remaining template-to-self-expression rename and the Playwright dependency removal, which share package.json with the version bump and could not be split cleanly. Drops @playwright/test, playwright, and servehere (used only by the removed hosted_test harness) for 81 fewer installed packages, and removes the hosted_test script. Fixes the rollup IIFE global name, which the rename had set to 'self-expression' — not a legal JS identifier, which broke the bundle step. Extends the eslint config to give scripts/*.mjs node globals. Regenerated README, dist, and coverage artifacts carry the new version stamp.
 
 
 
@@ -2450,13 +930,15 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 29, 2026 8:45:09 AM
+## [Untagged] - Aug 18, 2026 1:30:25 PM
 
-Commit [cb1204858713ec111b3a9c68604eb70d6262df4c](https://github.com/StoneCypher/self-expression/commit/cb1204858713ec111b3a9c68604eb70d6262df4c)
+Commit [5a92e56c0a34a8ad6753dcf65238e0dec074c233](https://github.com/StoneCypher/self-expression/commit/5a92e56c0a34a8ad6753dcf65238e0dec074c233)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * docs/dist bug, update packages for threats, remove test-results from git repo
+  * feat(plugin): add tri-host plugin scaffold
+  * The repository root now doubles as a Claude Code plugin, a Codex plugin, and a Gemini CLI extension simultaneously. Their manifest paths do not collide, and all three read skills/*/SKILL.md with compatible frontmatter, so skills are authored once. The MCP server registers over npx so no host-specific plugin-root variable is needed, while hooks keep plugin-root paths because a per-turn hook cannot afford npx resolution latency. Adds the always-on UserPromptSubmit time-of-day hook in Node rather than shell, since the target machine is Windows. Also adds _incoming/ as gitignored staging for the legacy plugin, since anything committed at the root ships inside the published plugin.
+  * Full rationale in src/doc_md/plugin-layout.md.
 
 
 
@@ -2465,13 +947,14 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 11:41:54 AM
+## [Untagged] - Aug 18, 2026 1:30:15 PM
 
-Commit [688480395874eb33bdedfd95401e52fb30e32a7f](https://github.com/StoneCypher/self-expression/commit/688480395874eb33bdedfd95401e52fb30e32a7f)
+Commit [f34e7433a927b636cd68a1301a8fbd387f8ad1df](https://github.com/StoneCypher/self-expression/commit/f34e7433a927b636cd68a1301a8fbd387f8ad1df)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * let's see if that node 20 warning is coming from lts/*
+  * chore(build): remove Playwright and e2e machinery
+  * This plugin has no browser surface, so the e2e suite was pure install and maintenance weight. Removes playwright.config.ts, ensure_chromium.js, hosted_test.js, the src/ts/e2e suite and its chromium spec, the e2e feature flag from build.config.json and its schema and the zod feature table, the e2e CI job and its config output and gate dependency, and the stale e2e exclusions in vitest and stryker config. Empty build stages are already skipped, so removing the only stage-6 feature is safe.
 
 
 
@@ -2480,39 +963,16 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 11:32:50 AM
+## [Untagged] - Aug 18, 2026 12:37:39 PM
 
-Commit [1127b3c2019f1b607ae8956c9ce591b54a4997bc](https://github.com/StoneCypher/self-expression/commit/1127b3c2019f1b607ae8956c9ce591b54a4997bc)
+Commit [1b8e408622fd4214442bd2a881b843211ab4a1e1](https://github.com/StoneCypher/self-expression/commit/1b8e408622fd4214442bd2a881b843211ab4a1e1)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * eliminate duplicate test run in build pipeline; bump to 0.2.0
-  * update_madlibs was running `npm run just_test` internally to capture
-coverage and test count, then the build script ran `just_test` again
-as a separate step.  This ran the full test suite twice per build.
-  * Fix: add run_tests_save.js which runs vitest once and writes the
-output to build/test_output.txt.  update_madlibs now reads that file
-instead of spawning its own test run.  Reorder the build pipeline to:
-clean → just_test_save → update_madlibs → typescript → eslint →
-rollup → terser → site → docs.
-  * Also scope eslint globals.node to src/build_js/**/*.js so that
-`process` is recognized in Node build scripts without leaking Node
-globals into browser-side code.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 20, 2026 11:22:00 AM
 
-Commit [cea494f95ddfff097a554e18f679448a771197e6](https://github.com/StoneCypher/self-expression/commit/cea494f95ddfff097a554e18f679448a771197e6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
+Merges [da9a0b1, 97ddbd8]
 
-  * was accidentally running the tests in build, then again distinctly after
+  * Merge pull request #2 from StoneCypher/dependabot/npm_and_yarn/eslint-10.8.1
+  * Bump eslint from 9.39.5 to 10.8.1
 
 
 
@@ -2521,13 +981,24 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 11:18:42 AM
+## [Untagged] - Aug 18, 2026 12:37:31 PM
 
-Commit [16af19ae2b2e45f6f886fcae6f3ca8cf54ba3fd3](https://github.com/StoneCypher/self-expression/commit/16af19ae2b2e45f6f886fcae6f3ca8cf54ba3fd3)
+Commit [97ddbd85362b823f116f084a147f411b7c6d0385](https://github.com/StoneCypher/self-expression/commit/97ddbd85362b823f116f084a147f411b7c6d0385)
 
-Author: `John Haugeland <stonecypher@gmail.com>`
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
 
-  * is anything not a portability problem?  even date?  srsly
+  * Bump eslint from 9.39.5 to 10.8.1
+  * Bumps [eslint](https://github.com/eslint/eslint) from 9.39.5 to 10.8.1.
+- [Release notes](https://github.com/eslint/eslint/releases)
+- [Commits](https://github.com/eslint/eslint/compare/v9.39.5...v10.8.1)
+  * ---
+updated-dependencies:
+- dependency-name: eslint
+  dependency-version: 10.8.1
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
 
 
 
@@ -2536,28 +1007,16 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 11:13:04 AM
+## [Untagged] - Aug 18, 2026 12:37:23 PM
 
-Commit [5976e667a284cfff859a9e81bce422a30b667d3e](https://github.com/StoneCypher/self-expression/commit/5976e667a284cfff859a9e81bce422a30b667d3e)
+Commit [da9a0b11ca0791aaacd020582340b8c32b0fb40a](https://github.com/StoneCypher/self-expression/commit/da9a0b11ca0791aaacd020582340b8c32b0fb40a)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * stray double and
-
-
 
+Merges [689b460, 089adc3]
 
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 20, 2026 11:08:18 AM
-
-Commit [cda0bf54b8f8be022a555d74c9ce0dacc2d51f08](https://github.com/StoneCypher/self-expression/commit/cda0bf54b8f8be022a555d74c9ce0dacc2d51f08)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * better label in gh action
+  * Merge pull request #3 from StoneCypher/dependabot/npm_and_yarn/types/node-26.2.0
+  * Bump @types/node from 25.9.5 to 26.2.0
 
 
 
@@ -2566,43 +1025,43 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 11:07:14 AM
+## [Untagged] - Aug 18, 2026 12:37:00 PM
 
-Commit [61e38c9bf828bc6dd58a68146645b77d664557a1](https://github.com/StoneCypher/self-expression/commit/61e38c9bf828bc6dd58a68146645b77d664557a1)
+Commit [689b4603407261fadb72498155b66c8f7242d6dc](https://github.com/StoneCypher/self-expression/commit/689b4603407261fadb72498155b66c8f7242d6dc)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * oh, build residues are required
-
-
-
-
-&nbsp;
-
-&nbsp;
 
-## [Untagged] - Mar 20, 2026 10:29:45 AM
+Merges [ae9734b, 89f18a0]
 
-Commit [01e787bd8e5aa7c4a23c23b925ec5d77253beb5a](https://github.com/StoneCypher/self-expression/commit/01e787bd8e5aa7c4a23c23b925ec5d77253beb5a)
+  * Merge pull request #6 from StoneCypher/dependabot/npm_and_yarn/stryker-mutator/core-10.0.0
+  * Bump @stryker-mutator/core from 9.6.1 to 10.0.0
 
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * ci/cd and datestamps
 
 
 
-
 &nbsp;
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 10:27:50 AM
+## [Untagged] - Aug 18, 2026 12:26:49 PM
 
-Commit [052b159ed9f00f696888b9406df4a8eb89c1b7a2](https://github.com/StoneCypher/self-expression/commit/052b159ed9f00f696888b9406df4a8eb89c1b7a2)
+Commit [89f18a07793600e26572d5a99e7bd350d0a49ca2](https://github.com/StoneCypher/self-expression/commit/89f18a07793600e26572d5a99e7bd350d0a49ca2)
 
-Author: `John Haugeland <stonecypher@gmail.com>`
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
 
-  * ci/cd and datestamps
+  * Bump @stryker-mutator/core from 9.6.1 to 10.0.0
+  * Bumps [@stryker-mutator/core](https://github.com/stryker-mutator/stryker-js/tree/HEAD/packages/core) from 9.6.1 to 10.0.0.
+- [Release notes](https://github.com/stryker-mutator/stryker-js/releases)
+- [Changelog](https://github.com/stryker-mutator/stryker-js/blob/master/packages/core/CHANGELOG.md)
+- [Commits](https://github.com/stryker-mutator/stryker-js/commits/v10.0.0/packages/core)
+  * ---
+updated-dependencies:
+- dependency-name: "@stryker-mutator/core"
+  dependency-version: 10.0.0
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
 
 
 
@@ -2611,13 +1070,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 10:11:09 AM
+## [Untagged] - Aug 18, 2026 12:25:14 PM
 
-Commit [cd1d52fd9804c9642260296e77d49398cf053851](https://github.com/StoneCypher/self-expression/commit/cd1d52fd9804c9642260296e77d49398cf053851)
+Commit [ae9734b32d06896243249ce64705b1413f3e7ce6](https://github.com/StoneCypher/self-expression/commit/ae9734b32d06896243249ce64705b1413f3e7ce6)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * add eslint, small bugs
+  * Update dependabot.yml
 
 
 
@@ -2626,13 +1085,24 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 9:56:41 AM
+## [Untagged] - Aug 18, 2026 12:05:41 PM
 
-Commit [904c5757e884f0c0e013879f473ea01e3d4439d1](https://github.com/StoneCypher/self-expression/commit/904c5757e884f0c0e013879f473ea01e3d4439d1)
+Commit [089adc3f8ec67e593f8a06977f7b3fb961285100](https://github.com/StoneCypher/self-expression/commit/089adc3f8ec67e593f8a06977f7b3fb961285100)
 
-Author: `John Haugeland <stonecypher@gmail.com>`
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
 
-  * run eslint after ts so it doesn't waste time before real problems, but before everything else
+  * Bump @types/node from 25.9.5 to 26.2.0
+  * Bumps [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node) from 25.9.5 to 26.2.0.
+- [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
+- [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
+  * ---
+updated-dependencies:
+- dependency-name: "@types/node"
+  dependency-version: 26.2.0
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
 
 
 
@@ -2641,13 +1111,13 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 9:50:34 AM
+## [Untagged] - Aug 18, 2026 12:03:20 PM
 
-Commit [1aa12e667e9e64b025b9bf0f70b88aa870c18779](https://github.com/StoneCypher/self-expression/commit/1aa12e667e9e64b025b9bf0f70b88aa870c18779)
+Commit [c063352eb5d8283951f517fdc742c930071ede84](https://github.com/StoneCypher/self-expression/commit/c063352eb5d8283951f517fdc742c930071ede84)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * desiderata
+  * most of npm audit
 
 
 
@@ -2656,43 +1126,144 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 8:24:47 AM
+## [Untagged] - Aug 18, 2026 11:59:29 AM
 
-Commit [f11ff2278b0118a98e1d5dc8b564384dd8f4c18e](https://github.com/StoneCypher/self-expression/commit/f11ff2278b0118a98e1d5dc8b564384dd8f4c18e)
+Commit [b3f18206c96ae9c067ca6b1e0d85a85c061c2eb4](https://github.com/StoneCypher/self-expression/commit/b3f18206c96ae9c067ca6b1e0d85a85c061c2eb4)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * better instructions, improved html, add favicon, finish removing cli, several bugfixes
-
-
 
+Merges [e9ce7e1, 2daa578]
 
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Mar 20, 2026 8:04:55 AM
+  * Merge pull request #1 from StoneCypher/dependabot/npm_and_yarn/minor-and-patch-f743696752
+  * Bump the minor-and-patch group with 11 updates
 
-Commit [a8364371009bbaab65f89007083a955b0ed3f577](https://github.com/StoneCypher/self-expression/commit/a8364371009bbaab65f89007083a955b0ed3f577)
 
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * improve instructions, fix a few bugs, finish removing cli
 
 
-
-
 &nbsp;
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 7:45:00 AM
+## [Untagged] - Aug 18, 2026 11:56:20 AM
 
-Commit [68049ea5b05a946f7a89bf7e279e02968cf2afba](https://github.com/StoneCypher/self-expression/commit/68049ea5b05a946f7a89bf7e279e02968cf2afba)
+Commit [2daa578405cbd7ff230f4fbee32fdc74f046be1d](https://github.com/StoneCypher/self-expression/commit/2daa578405cbd7ff230f4fbee32fdc74f046be1d)
 
-Author: `John Haugeland <stonecypher@gmail.com>`
+Author: `dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>`
 
-  * first try
+  * Bump the minor-and-patch group with 11 updates
+  * Bumps the minor-and-patch group with 11 updates:
+  * | Package | From | To |
+| --- | --- | --- |
+| [@commitlint/config-conventional](https://github.com/conventional-changelog/commitlint/tree/HEAD/@commitlint/config-conventional) | `21.2.0` | `21.2.2` |
+| [@faker-js/faker](https://github.com/faker-js/faker) | `10.5.0` | `10.6.0` |
+| [@playwright/test](https://github.com/microsoft/playwright) | `1.61.1` | `1.62.1` |
+| [better_git_changelog](https://github.com/StoneCypher/better_git_changelog) | `1.6.20` | `1.6.21` |
+| [commitlint](https://github.com/conventional-changelog/commitlint/tree/HEAD/@alias/commitlint) | `21.2.1` | `21.2.2` |
+| [globals](https://github.com/sindresorhus/globals) | `17.7.0` | `17.11.0` |
+| [playwright](https://github.com/microsoft/playwright) | `1.61.1` | `1.62.1` |
+| [rollup](https://github.com/rollup/rollup) | `4.62.2` | `4.62.4` |
+| [rollup-plugin-dts](https://github.com/Swatinem/rollup-plugin-dts) | `6.4.1` | `6.5.1` |
+| [terser](https://github.com/terser/terser) | `5.49.0` | `5.50.0` |
+| [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.64.0` | `8.67.0` |
+  * 
+Updates `@commitlint/config-conventional` from 21.2.0 to 21.2.2
+- [Release notes](https://github.com/conventional-changelog/commitlint/releases)
+- [Changelog](https://github.com/conventional-changelog/commitlint/blob/master/@commitlint/config-conventional/CHANGELOG.md)
+- [Commits](https://github.com/conventional-changelog/commitlint/commits/v21.2.2/@commitlint/config-conventional)
+  * Updates `@faker-js/faker` from 10.5.0 to 10.6.0
+- [Release notes](https://github.com/faker-js/faker/releases)
+- [Changelog](https://github.com/faker-js/faker/blob/next/CHANGELOG.md)
+- [Commits](https://github.com/faker-js/faker/compare/v10.5.0...v10.6.0)
+  * Updates `@playwright/test` from 1.61.1 to 1.62.1
+- [Release notes](https://github.com/microsoft/playwright/releases)
+- [Commits](https://github.com/microsoft/playwright/compare/v1.61.1...v1.62.1)
+  * Updates `better_git_changelog` from 1.6.20 to 1.6.21
+- [Release notes](https://github.com/StoneCypher/better_git_changelog/releases)
+- [Changelog](https://github.com/StoneCypher/better_git_changelog/blob/main/CHANGELOG.long.md)
+- [Commits](https://github.com/StoneCypher/better_git_changelog/compare/1.6.20...1.6.21)
+  * Updates `commitlint` from 21.2.1 to 21.2.2
+- [Release notes](https://github.com/conventional-changelog/commitlint/releases)
+- [Changelog](https://github.com/conventional-changelog/commitlint/blob/master/@alias/commitlint/CHANGELOG.md)
+- [Commits](https://github.com/conventional-changelog/commitlint/commits/v21.2.2/@alias/commitlint)
+  * Updates `globals` from 17.7.0 to 17.11.0
+- [Release notes](https://github.com/sindresorhus/globals/releases)
+- [Commits](https://github.com/sindresorhus/globals/compare/v17.7.0...v17.11.0)
+  * Updates `playwright` from 1.61.1 to 1.62.1
+- [Release notes](https://github.com/microsoft/playwright/releases)
+- [Commits](https://github.com/microsoft/playwright/compare/v1.61.1...v1.62.1)
+  * Updates `rollup` from 4.62.2 to 4.62.4
+- [Release notes](https://github.com/rollup/rollup/releases)
+- [Changelog](https://github.com/rollup/rollup/blob/master/CHANGELOG.md)
+- [Commits](https://github.com/rollup/rollup/compare/v4.62.2...v4.62.4)
+  * Updates `rollup-plugin-dts` from 6.4.1 to 6.5.1
+- [Changelog](https://github.com/Swatinem/rollup-plugin-dts/blob/master/CHANGELOG.md)
+- [Commits](https://github.com/Swatinem/rollup-plugin-dts/compare/v6.4.1...v6.5.1)
+  * Updates `terser` from 5.49.0 to 5.50.0
+- [Changelog](https://github.com/terser/terser/blob/master/CHANGELOG.md)
+- [Commits](https://github.com/terser/terser/compare/v5.49.0...v5.50.0)
+  * Updates `typescript-eslint` from 8.64.0 to 8.67.0
+- [Release notes](https://github.com/typescript-eslint/typescript-eslint/releases)
+- [Changelog](https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/typescript-eslint/CHANGELOG.md)
+- [Commits](https://github.com/typescript-eslint/typescript-eslint/commits/v8.67.0/packages/typescript-eslint)
+  * ---
+updated-dependencies:
+- dependency-name: "@commitlint/config-conventional"
+  dependency-version: 21.2.2
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+- dependency-name: "@faker-js/faker"
+  dependency-version: 10.6.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: "@playwright/test"
+  dependency-version: 1.62.1
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: better_git_changelog
+  dependency-version: 1.6.21
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+- dependency-name: commitlint
+  dependency-version: 21.2.2
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+- dependency-name: globals
+  dependency-version: 17.11.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: playwright
+  dependency-version: 1.62.1
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: rollup
+  dependency-version: 4.62.4
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: minor-and-patch
+- dependency-name: rollup-plugin-dts
+  dependency-version: 6.5.1
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: terser
+  dependency-version: 5.50.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+- dependency-name: typescript-eslint
+  dependency-version: 8.67.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: minor-and-patch
+...
+  * Signed-off-by: dependabot[bot] <support@github.com>
 
 
 
@@ -2701,9 +1272,9 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Mar 20, 2026 7:21:01 AM
+## [Untagged] - Aug 18, 2026 11:54:02 AM
 
-Commit [74c3b959ff458a041fcabf64863a76dac2fc928c](https://github.com/StoneCypher/self-expression/commit/74c3b959ff458a041fcabf64863a76dac2fc928c)
+Commit [e9ce7e11f68c98a8efe69d17c510b7d93e4cbf38](https://github.com/StoneCypher/self-expression/commit/e9ce7e11f68c98a8efe69d17c510b7d93e4cbf38)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
