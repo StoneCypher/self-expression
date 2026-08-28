@@ -92,6 +92,27 @@ export function writeConfig(store: Store, key: string, value: ConfigValue): void
 }
 
 /**
+ * Delete one config override, so the code default applies again — including a future
+ * changed default.
+ *
+ * Without this, a user who once set a value could never return to tracking the
+ * default; they could only pin the current one by hand (issue #30, D4). Deleting a key
+ * with no override is a successful no-op, and deleting an unknown key removes any row
+ * present — it may have been written by a newer version the user is walking back.
+ *
+ * @returns whether an override row was actually removed
+ *
+ * @example
+ *   writeConfig(store, 'retention.days', 90);
+ *   deleteConfig(store, 'retention.days')  // => true; the code default applies again
+ *   deleteConfig(store, 'retention.days')  // => false; nothing left to remove
+ */
+export function deleteConfig(store: Store, key: string): boolean {
+  const result = store.db.prepare('DELETE FROM config WHERE key = ?').run(key);
+  return Number(result.changes) > 0;
+}
+
+/**
  * Every config override currently set, as a plain object.
  *
  * Unknown keys are returned rather than filtered. A newer version of the plugin may
