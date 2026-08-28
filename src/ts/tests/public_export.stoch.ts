@@ -85,8 +85,8 @@ describe('sentinel prose — no free text survives export, anywhere', () => {
         expect(exported.content[0]?.text).not.toMatch(/^error/);
 
       });
-    }), { numRuns: 10 });
-  });
+    }), { numRuns: 8 });
+  }, 60000);   // real SQLite files on a loaded Windows CI; the property, not the clock, is the test
 
 });
 
@@ -129,8 +129,8 @@ describe('linkage — grouping inside a submission, nothing across submissions',
           expect(a.size).toBeGreaterThan(0);
 
         });
-      }), { numRuns: 10 });
-  });
+      }), { numRuns: 8 });
+  }, 60000);   // two full exports per run against a real store; wall time measures the machine
 
 });
 

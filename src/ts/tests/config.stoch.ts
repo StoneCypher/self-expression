@@ -53,7 +53,7 @@ describe('canonicalization is a fixed point', () => {
 
         }));
     });
-  });
+  }, 60000);   // real SQLite on a loaded Windows CI; the property, not the clock, is the test
 
   it('lists: any non-empty subsequence of the channels, however spaced, canonicalizes stably', () => {
     fc.assert(fc.property(
@@ -110,7 +110,7 @@ describe('invalid values never write', () => {
 
         }));
     });
-  });
+  }, 60000);   // real SQLite on a loaded Windows CI
 
   it('arbitrary non-boolean strings are rejected for every bool key', () => {
     withStore(s => {
@@ -127,7 +127,7 @@ describe('invalid values never write', () => {
 
         }));
     });
-  });
+  }, 60000);   // real SQLite on a loaded Windows CI
 
   it('a stored garbage row never leaks through the tolerant accessor', () => {
     withStore(s => {
@@ -138,6 +138,6 @@ describe('invalid values never write', () => {
           expect(effectiveValue(s, 'retention.days')).toBe('0');
         }));
     });
-  });
+  }, 60000);   // real SQLite on a loaded Windows CI
 
 });
