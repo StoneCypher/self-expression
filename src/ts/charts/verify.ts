@@ -31,16 +31,26 @@
  * Not checked (documented limitations, inherited from the original): ship-to-targets
  * destination syntax and the optional visuals.
  *
+ * Since issue #20 this module also carries {@link verifyDigest}, the generalization of
+ * the same re-derivation to every digest profile in `profiles.ts` — the profile is
+ * inferred from the digest line's noun, a checklist digest delegates to
+ * {@link verifyChecklist} unchanged, and the icon-list layout checks are shared
+ * between the two via one parameterized helper rather than duplicated.
+ *
  * Pure: no I/O, no clock, no randomness.
  *
  * @see ./markers.ts
  * @see ./scale.ts
  * @see ./checklist.ts
+ * @see ./digest.ts
+ * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 
 import { CANONICAL_ORDER, SUCCESS_MARKERS, FAILURE_MARKERS, classifyMarker, canonicalRank } from './markers.js';
 import { barCells } from './scale.js';
+import { profileForNoun } from './profiles.js';
+import type { DigestProfile } from './profiles.js';
 
 const seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
 
@@ -170,6 +180,142 @@ function expectedBar(percent: number): string {
   return percent > 100 ? '█'.repeat(10) : barCells(percent);
 }
 
+/** The `check(cond, okMsg, failMsg)` accumulator both validators thread through their checks. */
+type CheckFn = (cond: boolean, okMsg: string, failMsg: string) => void;
+
+/** What {@link checkIconSections} needs from its calling validator. */
+interface IconSectionInput {
+  /** The extracted block's lines. */
+  readonly lines        : readonly string[];
+  /** Index of the summary/digest line within `lines`. */
+  readonly summaryIndex : number;
+  /** The remainder of the summary/digest line after its fixed head (trend and/or inline icons). */
+  readonly rest         : string;
+  /** Actual per-marker counts tallied from the body's items. */
+  readonly counts       : ReadonlyMap<string, number>;
+  /** Which bucket id a marker reports to, `'flex'` meaning any bucket is acceptable. */
+  readonly bucketFor    : (marker: string) => string;
+  /** The profile's bucket ids in canonical order, for the block-structure checks. */
+  readonly bucketOrder  : readonly string[];
+  /**
+   * What the 8-entry inline/block placement rule counts: `'markers'` (distinct marker
+   * glyphs — the checklist validator's original reading, preserved verbatim) or
+   * `'entries'` (distinct `(marker, bucket)` icon entries — exactly what the digest
+   * renderer counts, which differs whenever one marker splits across buckets, as the
+   * diff profile's change kinds routinely do).
+   */
+  readonly placement    : 'markers' | 'entries';
+  /** The calling validator's check accumulator. */
+  readonly check        : CheckFn;
+  /** The calling validator's failure list, for the few checks with no pass line. */
+  readonly failures     : string[];
+}
+
+/**
+ * The icon-list section checks shared by {@link verifyChecklist} and
+ * {@link verifyDigest}: entry parse, the 12-entry line cap, the count-desc/canonical
+ * sort, the 8-entry inline/block placement rule, bucket-homogeneous block lines in the
+ * profile's bucket order, blank separation exactly when a bucket wrapped, and the
+ * cross-check of every stated entry against the body's actual marker counts.
+ *
+ * Extracted verbatim from the original `verifyChecklist` (issue #20) with the bucket
+ * classification and bucket order as parameters — the layout rules themselves are
+ * profile-independent, exactly as `digest.ts` renders them.
+ */
+function checkIconSections(input: IconSectionInput): void {
+
+  const { lines, summaryIndex, rest, counts, bucketFor, bucketOrder, placement, check, failures } = input;
+
+  // Icon entries: inline remainder (minus any trend sparkline) plus icon lines
+  // below, grouped by blank-line separation for the structure checks.
+  const stated = new Map<string, number>();
+  const inline = rest.replace(/\s{2}trend [▁▂▃▄▅▆▇█]+/u, '').trim();
+  const inlineEntries = inline === '' ? null : parseIconLine(inline);
+  if (inline !== '' && inlineEntries === null) {
+    failures.push(`FAIL: malformed inline icon entries: ${inline}`);
+  }
+
+  const groups: IconLine[][] = [];
+  let current: IconLine[] = [];
+  for (const line of lines.slice(summaryIndex + 1)) {
+    const entries = parseIconLine(line);
+    if (entries !== null) { current.push({ line: line.trim(), entries }); }
+    else if (current.length > 0) { groups.push(current); current = []; }
+  }
+  if (current.length > 0) { groups.push(current); }
+
+  const allLines: IconLine[] = [
+    ...(inlineEntries !== null ? [{ line: inline, entries: inlineEntries }] : []),
+    ...groups.flat(),
+  ];
+  for (const { line, entries } of allLines) {
+    check(entries.length <= 12,
+      'icon line within 12 entries',
+      `icon line has ${String(entries.length)} entries (max 12): ${line.slice(0, 40)}`);
+    const sorted = entries.every(([mk, n], i) => {
+      if (i === 0) { return true; }
+      const [pmk, pn] = entries[i - 1] ?? ['', 0];
+      if (pn !== n) { return pn > n; }
+      return canonicalRank(pmk) <= canonicalRank(mk);
+    });
+    check(sorted,
+      `icon line sorted (count desc, canonical tiebreak): ${line.slice(0, 30)}`,
+      `icon line order wrong (count desc, then canonical order): ${line}`);
+    for (const [mk, n] of entries) { stated.set(mk, (stated.get(mk) ?? 0) + n); }
+  }
+
+  if (stated.size === 0) {
+    failures.push('FAIL: no per-marker icon entries found');
+  } else {
+    const placed = placement === 'markers'
+      ? stated.size
+      : allLines.reduce((n, { entries }) => n + entries.length, 0);
+    const what = placement === 'markers' ? 'markers' : 'entries';
+    check(placed <= 8 ? (groups.length === 0) : (inlineEntries === null && groups.length > 0),
+      `${String(placed)} distinct ${what} placed ${placed <= 8 ? 'inline' : 'in the block below'}`,
+      placed <= 8
+        ? `${String(placed)} distinct ${what} (≤8) must be inline on the summary line, not a block below`
+        : `${String(placed)} distinct ${what} (≥9) must move to a block below the bar, not inline`);
+
+    // Block structure: each line one bucket, buckets in order, blank separation
+    // exactly when some bucket wrapped past one line.
+    const lineBuckets = groups.map(group => group.map(({ line, entries }) => {
+      const concrete = [...new Set(entries.map(([mk]) => bucketFor(mk)))].filter(b => b !== 'flex');
+      check(concrete.length <= 1,
+        `icon line bucket-homogeneous: ${line.slice(0, 30)}`,
+        `icon line mixes buckets (${concrete.join('+')}): ${line}`);
+      return concrete[0] ?? 'flex';
+    }));
+    const flatBuckets = lineBuckets.flat().filter(b => b !== 'flex');
+    const inOrder = flatBuckets.every((b, i) =>
+      i === 0 || bucketOrder.indexOf(flatBuckets[i - 1] ?? '') <= bucketOrder.indexOf(b));
+    if (groups.length > 0) {
+      check(inOrder,
+        `bucket lines in ${bucketOrder.join(' → ')} order`,
+        `bucket lines out of order: ${flatBuckets.join(', ')}`);
+    }
+    const wrapped = flatBuckets.some((b, i) => i > 0 && flatBuckets[i - 1] === b);
+    if (groups.length > 0) {
+      check(
+        wrapped ? lineBuckets.every(g => new Set(g.filter(b => b !== 'flex')).size <= 1)
+                : groups.length === 1,
+        wrapped ? 'wrapped buckets blank-separated' : 'unwrapped bucket lines adjacent',
+        wrapped ? 'a bucket wrapped, so every bucket group must be blank-separated'
+                : 'no bucket wrapped, so bucket lines must sit adjacent with no blank lines');
+    }
+
+    for (const [mk, n] of counts) {
+      check(stated.get(mk) === n,
+        `icon ${mk} ${String(n)}`,
+        `icon ${mk}: stated ${String(stated.get(mk) ?? 'missing')}, actual ${String(n)}`);
+    }
+    for (const mk of stated.keys()) {
+      if (!counts.has(mk)) { failures.push(`FAIL: icon ${mk} listed but no such item exists`); }
+    }
+  }
+
+}
+
 /** What {@link verifyChecklist} found. */
 export interface ChecklistVerification {
   /** `true` exactly when no check failed. */
@@ -274,90 +420,13 @@ export function verifyChecklist(text: string): ChecklistVerification {
       `bar matches ${String(P)}%`,
       `bar ${bar} stated, ${expectedBar(P)} expected for ${String(P)}%`);
 
-    // Icon entries: inline remainder (minus any trend sparkline) plus icon lines
-    // below, grouped by blank-line separation for the structure checks.
-    const stated = new Map<string, number>();
-    const inline = rest.replace(/\s{2}trend [▁▂▃▄▅▆▇█]+/u, '').trim();
-    const inlineEntries = inline === '' ? null : parseIconLine(inline);
-    if (inline !== '' && inlineEntries === null) {
-      failures.push(`FAIL: malformed inline icon entries: ${inline}`);
-    }
-
-    const groups: IconLine[][] = [];
-    let current: IconLine[] = [];
-    for (const line of lines.slice(summaryIndex + 1)) {
-      const entries = parseIconLine(line);
-      if (entries !== null) { current.push({ line: line.trim(), entries }); }
-      else if (current.length > 0) { groups.push(current); current = []; }
-    }
-    if (current.length > 0) { groups.push(current); }
-
-    const allLines: IconLine[] = [
-      ...(inlineEntries !== null ? [{ line: inline, entries: inlineEntries }] : []),
-      ...groups.flat(),
-    ];
-    for (const { line, entries } of allLines) {
-      check(entries.length <= 12,
-        'icon line within 12 entries',
-        `icon line has ${String(entries.length)} entries (max 12): ${line.slice(0, 40)}`);
-      const sorted = entries.every(([mk, n], i) => {
-        if (i === 0) { return true; }
-        const [pmk, pn] = entries[i - 1] ?? ['', 0];
-        if (pn !== n) { return pn > n; }
-        return canonicalRank(pmk) <= canonicalRank(mk);
-      });
-      check(sorted,
-        `icon line sorted (count desc, canonical tiebreak): ${line.slice(0, 30)}`,
-        `icon line order wrong (count desc, then canonical order): ${line}`);
-      for (const [mk, n] of entries) { stated.set(mk, (stated.get(mk) ?? 0) + n); }
-    }
-
-    if (stated.size === 0) {
-      failures.push('FAIL: no per-marker icon entries found');
-    } else {
-      check(stated.size <= 8 ? (groups.length === 0) : (inlineEntries === null && groups.length > 0),
-        `${String(stated.size)} distinct markers placed ${stated.size <= 8 ? 'inline' : 'in the block below'}`,
-        stated.size <= 8
-          ? `${String(stated.size)} distinct markers (≤8) must be inline on the summary line, not a block below`
-          : `${String(stated.size)} distinct markers (≥9) must move to a block below the bar, not inline`);
-
-      // Block structure: each line one bucket, buckets in order, blank separation
-      // exactly when some bucket wrapped past one line.
-      const ORDER = ['success', 'active', 'failure'];
-      const lineBuckets = groups.map(group => group.map(({ line, entries }) => {
-        const concrete = [...new Set(entries.map(([mk]) => bucketOf(mk)))].filter(b => b !== 'flex');
-        check(concrete.length <= 1,
-          `icon line bucket-homogeneous: ${line.slice(0, 30)}`,
-          `icon line mixes buckets (${concrete.join('+')}): ${line}`);
-        return concrete[0] ?? 'flex';
-      }));
-      const flatBuckets = lineBuckets.flat().filter(b => b !== 'flex');
-      const inOrder = flatBuckets.every((b, i) =>
-        i === 0 || ORDER.indexOf(flatBuckets[i - 1] ?? '') <= ORDER.indexOf(b));
-      if (groups.length > 0) {
-        check(inOrder,
-          'bucket lines in success → active → failure order',
-          `bucket lines out of order: ${flatBuckets.join(', ')}`);
-      }
-      const wrapped = flatBuckets.some((b, i) => i > 0 && flatBuckets[i - 1] === b);
-      if (groups.length > 0) {
-        check(
-          wrapped ? lineBuckets.every(g => new Set(g.filter(b => b !== 'flex')).size <= 1)
-                  : groups.length === 1,
-          wrapped ? 'wrapped buckets blank-separated' : 'unwrapped bucket lines adjacent',
-          wrapped ? 'a bucket wrapped, so every bucket group must be blank-separated'
-                  : 'no bucket wrapped, so bucket lines must sit adjacent with no blank lines');
-      }
-
-      for (const [mk, n] of counts) {
-        check(stated.get(mk) === n,
-          `icon ${mk} ${String(n)}`,
-          `icon ${mk}: stated ${String(stated.get(mk) ?? 'missing')}, actual ${String(n)}`);
-      }
-      for (const mk of stated.keys()) {
-        if (!counts.has(mk)) { failures.push(`FAIL: icon ${mk} listed but no such item exists`); }
-      }
-    }
+    checkIconSections({
+      lines, summaryIndex, rest, counts,
+      bucketFor    : bucketOf,
+      bucketOrder  : ['success', 'active', 'failure'],
+      placement    : 'markers',
+      check, failures,
+    });
   }
 
   const verdict = failures.length === 0
@@ -365,6 +434,199 @@ export function verifyChecklist(text: string): ChecklistVerification {
     : `${String(failures.length)} check(s) FAILED (${String(passes.length)} passed)`;
 
   const report = [`ok: ${String(nItems)} items parsed`, ...failures, verdict].join('\n');
+
+  return { ok: failures.length === 0, itemCount: nItems, passes, failures, report };
+
+}
+
+// The digest head of any profile: the counts joined by '/', the profile noun, an
+// optional scalar `(P%) <10-cell bar>`, an optional `+N −M` line-count tail, then
+// whatever trails it (a trend sparkline and/or the inline icon list).
+const DIGEST_HEAD_RE = /^((?:\d+\/)+\d+) ([a-z]+)(?: \((\d+)%\) ([█▓▒░]{10}))?( \+\d+ −\d+)?(.*)$/u;
+
+/**
+ * The bucket a marker reports to under `profile`, for the generalized validator:
+ * `'flex'` when the profile classifies by something other than the marker (every
+ * bucket's marker list empty — the diff profile's change kinds, which a rendered body
+ * does not carry), otherwise the first bucket whose marker list contains the marker,
+ * falling back to the profile's residual.
+ */
+function profileBucketOf(marker: string, profile: DigestProfile): string {
+  if (profile.buckets.every(b => b.markers.length === 0)) { return 'flex'; }
+  for (const bucket of profile.buckets) {
+    if (bucket.markers.includes(marker)) { return bucket.id; }
+  }
+  return profile.residual;
+}
+
+/**
+ * Validates a rendered compressed-artifact digest of **any** profile against the
+ * general digest grammar, reporting every mismatch rather than stopping at the first —
+ * the generalization of {@link verifyChecklist} the compression-mechanic spec calls
+ * for (issue #20).
+ *
+ * The profile is inferred from the digest line's noun, per the fixed-grammar rule that
+ * the noun cues the profile (`items` → checklist, `findings`, `options`, `files`,
+ * `hits` — see `profiles.ts`). A checklist digest delegates wholesale to
+ * {@link verifyChecklist}, so the two validators can never disagree about the
+ * deepest-developed profile. For other profiles the checks re-derive what is derivable
+ * from the body: marker vocabulary, indentation, the count partition (recomputed from
+ * the body's markers for marker-classified profiles; sum-only for the diff profile,
+ * whose change kinds a rendered body does not carry), the scalar percent and bar
+ * exactly when the profile declares a scalar axis (a fabricated percent on a
+ * scalar-less profile is a FAIL), the `+N −M` tail exactly when the profile declares
+ * one, and the full set of icon-list layout rules shared with the checklist validator.
+ *
+ * `text` may be a bare block or a Markdown document containing one fenced block —
+ * see {@link extractChecklistBlock}.
+ *
+ * @param text the rendered artifact, digest line included
+ * @returns every check's outcome plus the formatted report, in the same shape
+ *   {@link verifyChecklist} returns
+ *
+ * @example
+ *   verifyDigest('- ❗ auth bypass\n- ⚠️ slow query\n\n1/1/0 findings  ❗ 1  ⚠️ 1')
+ *   // => { ok: true, itemCount: 2, report: 'ok: 2 findings parsed\nok: all checks passed', … }
+ *
+ * @example
+ *   verifyDigest('- 🔍 a\n- 🔍 b\n\n2/0/0 hits (100%) ██████████  🔍 2')
+ *   // => { ok: false, … }  — the results profile has no scalar axis; the percent is fabricated
+ *
+ * @see verifyChecklist
+ * @see ./profiles.ts
+ * @see ./digest.ts
+ */
+export function verifyDigest(text: string): ChecklistVerification {
+
+  const lines = extractChecklistBlock(text);
+
+  // Find the digest line and infer its profile from the noun.
+  interface FoundDigest { readonly match: RegExpExecArray; readonly index: number; readonly profile: DigestProfile; }
+  let found: FoundDigest | null = null;
+  for (const [i, line] of lines.entries()) {
+    const m = DIGEST_HEAD_RE.exec(line);
+    if (m === null) { continue; }
+    const candidate = profileForNoun(m[2] ?? '');
+    if (candidate !== undefined) { found = { match: m, index: i, profile: candidate }; break; }
+  }
+
+  if (found === null) {
+    const failures = ['FAIL: no digest line found (expected `<counts> <noun> …` with a known profile noun)'];
+    const nItems = lines.filter(line => /^ *- .+$/.test(line)).length;
+    const report = [
+      `ok: ${String(nItems)} units parsed`,
+      ...failures,
+      '1 check(s) FAILED (0 passed)',
+    ].join('\n');
+    return { ok: false, itemCount: nItems, passes: [], failures, report };
+  }
+
+  const { match: digest, index: digestIndex, profile } = found;
+
+  if (profile.name === 'checklist') { return verifyChecklist(text); }
+
+  const passes:   string[] = [];
+  const failures: string[] = [];
+  const check = (cond: boolean, okMsg: string, failMsg: string): void => {
+    if (cond) { passes.push(`ok: ${okMsg}`); }
+    else      { failures.push(`FAIL: ${failMsg}`); }
+  };
+
+  // Body pass: same item grammar as the checklist validator — one `- <marker> <text>`
+  // line per unit at 0/2/4 indentation, markers drawn from the shared vocabulary.
+  const counts = new Map<string, number>();
+  const expected = new Map<string, number>(profile.buckets.map(b => [b.id, 0]));
+  let nItems = 0;
+
+  for (const line of lines) {
+    const m = /^( *)- (.+)$/.exec(line);
+    if (m === null) { continue; }
+    const indent = m[1] ?? '';
+    const body   = m[2] ?? '';
+    nItems += 1;
+    check([0, 2, 4].includes(indent.length),
+      `indent ${String(indent.length)} valid: ${body.slice(0, 30)}`,
+      `bad indent ${String(indent.length)} (must be 0/2/4): ${body.slice(0, 60)}`);
+    const marker = firstGrapheme(body);
+    check(VOCABULARY.has(marker),
+      `marker ${marker} known`,
+      `unknown marker ${marker} on: ${body.slice(0, 60)}`);
+    counts.set(marker, (counts.get(marker) ?? 0) + 1);
+    const bucket = profileBucketOf(marker, profile);
+    if (bucket !== 'flex') { expected.set(bucket, (expected.get(bucket) ?? 0) + 1); }
+  }
+
+  const stated  = (digest[1] ?? '').split('/').map(Number);
+  const percent = digest[3];
+  const bar     = digest[4];
+  const tail    = digest[5];
+  const rest    = digest[6] ?? '';
+
+  check(stated.length === profile.buckets.length,
+    `count section has ${String(profile.buckets.length)} buckets (${profile.name} profile)`,
+    `count section has ${String(stated.length)} numbers; the ${profile.name} profile partitions into ${String(profile.buckets.length)} buckets`);
+
+  const sum = stated.reduce((a, b) => a + b, 0);
+  check(sum === nItems,
+    `count section ${stated.join('/')} sums to ${String(nItems)} ${profile.noun}`,
+    `count section ${stated.join('/')} sums to ${String(sum)}, but ${String(nItems)} ${profile.noun} were parsed`);
+
+  // Partition: recomputable from the markers alone for marker-classified profiles;
+  // a bucket-by-kind profile (diff) exposes only the sum to a text-level re-derivation.
+  if (profile.buckets.every(b => b.markers.length === 0)) {
+    passes.push(`ok: partition accepted (${profile.name} buckets classify by unit kind, not marker)`);
+  } else if (stated.length === profile.buckets.length) {
+    for (const [i, bucket] of profile.buckets.entries()) {
+      check(stated[i] === expected.get(bucket.id),
+        `bucket '${bucket.id}' ${String(stated[i])} matches`,
+        `bucket '${bucket.id}': stated ${String(stated[i])}, computed ${String(expected.get(bucket.id))} from markers`);
+    }
+  }
+
+  if (profile.scalar !== undefined) {
+    const scalarIndex = profile.buckets.findIndex(b => b.id === profile.scalar);
+    const scalarCount = stated[scalarIndex] ?? 0;
+    if (percent === undefined || bar === undefined) {
+      failures.push(`FAIL: the ${profile.name} profile has a scalar axis; expected \`(<P>%) <10-cell bar>\` after the noun`);
+    } else {
+      const P    = Number(percent);
+      const expP = nItems === 0 ? Number.NaN : Math.round((100 * scalarCount) / nItems);
+      check(P === expP, `percent ${String(P)}% matches`, `percent ${String(P)}% stated, ${String(expP)}% computed`);
+      check(bar === expectedBar(P),
+        `bar matches ${String(P)}%`,
+        `bar ${bar} stated, ${expectedBar(P)} expected for ${String(P)}%`);
+    }
+  } else {
+    check(percent === undefined && bar === undefined,
+      `no scalar axis, none rendered (${profile.name} profile)`,
+      `the ${profile.name} profile has no scalar axis; a percent/bar must not be fabricated`);
+  }
+
+  if (profile.plusMinus === true) {
+    check(tail !== undefined,
+      'line-count tail present',
+      `the ${profile.name} profile carries a \`+N −M\` line-count tail after the noun; none found`);
+  } else {
+    check(tail === undefined,
+      `no line-count tail, none rendered (${profile.name} profile)`,
+      `the ${profile.name} profile does not carry a \`+N −M\` tail`);
+  }
+
+  checkIconSections({
+    lines,
+    summaryIndex : digestIndex,
+    rest, counts,
+    bucketFor    : (marker) => profileBucketOf(marker, profile),
+    bucketOrder  : profile.buckets.map(b => b.id),
+    placement    : 'entries',
+    check, failures,
+  });
+
+  const verdict = failures.length === 0
+    ? 'ok: all checks passed'
+    : `${String(failures.length)} check(s) FAILED (${String(passes.length)} passed)`;
+
+  const report = [`ok: ${String(nItems)} ${profile.noun} parsed`, ...failures, verdict].join('\n');
 
   return { ok: failures.length === 0, itemCount: nItems, passes, failures, report };
 

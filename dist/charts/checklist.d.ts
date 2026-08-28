@@ -6,15 +6,19 @@
  * derived from a checklist's items — and every one of those rules has an edge (the
  * 0.17/0.5/0.83 anti-aliasing boundary, the count-desc-then-canonical-order sort, the
  * 8-vs-9 inline/block split, the 12-entry wrap) that a hand-drawn checklist has
- * historically gotten wrong by eye. This module is the single place that arithmetic
- * lives, composed entirely from the already-pinned primitives in `scale.ts`,
- * `markers.ts`, and `series.ts` rather than re-deriving any of it. Pure: no I/O, no
- * clock, no randomness.
+ * historically gotten wrong by eye.
  *
+ * Since issue #20 reframed the summary line as the checklist **profile** of the
+ * general digest grammar, the machinery lives in `digest.ts` and this module is the
+ * checklist-profile instantiation: same signature, byte-identical output (the
+ * exact-string and stochastic suites are the proof), with the arithmetic composed from
+ * the already-pinned primitives in `scale.ts`, `markers.ts`, and `series.ts` rather
+ * than re-deriving any of it. Pure: no I/O, no clock, no randomness.
+ *
+ * @see ./digest.ts
+ * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./scale.ts
  * @see ./markers.ts
- * @see ./series.ts
  */
 import type { Bucket } from './markers.js';
 /**
@@ -22,8 +26,8 @@ import type { Bucket } from './markers.js';
  * it renders with, and — only for a marker like `🛳️` whose bucket the glyph alone can't
  * carry — which bucket it counts toward.
  *
- * `bucket` is passed straight through to {@link classifyMarker}'s `override` parameter,
- * so it wins outright over the marker's own classification whenever supplied.
+ * `bucket` wins outright over the marker's own classification whenever supplied,
+ * exactly as `classifyMarker`'s `override` parameter always has.
  */
 export interface ChecklistItem {
     marker: string;
@@ -40,13 +44,13 @@ export interface SummaryOptions {
  * short, or split into a success/active+pending/failure block below the bar when it
  * isn't.
  *
- * The icon list moves from inline to the block form once it holds more than
- * {@link INLINE_ENTRY_LIMIT} distinct `(marker, bucket)` entries. In the block form, a
- * bucket line wraps onto additional lines past {@link MAX_ENTRIES_PER_LINE} entries;
- * when *any* bucket line wrapped this way, every bucket's block (success, then
- * active+pending, then failure — empty buckets omitted) is separated from the next by a
- * blank line, matching this skill's own `check-checklist.mjs` validator. When nothing
- * wrapped, the bucket blocks sit flush against one another with no blank line between.
+ * This is `renderDigest` with the checklist profile plugged in (issue #20): the icon
+ * list moves from inline to the block form past 8 distinct `(marker, bucket)` entries,
+ * bucket lines wrap past 12 entries, and every bucket's block (success, then
+ * active+pending, then failure — empty buckets omitted) is blank-separated exactly
+ * when any bucket line wrapped, matching this skill's own `check-checklist.mjs`
+ * validator. Callers should not need to know the framing changed: the signature and
+ * the rendered bytes are exactly what they were before the extraction.
  *
  * @param items   every checklist item at every nesting level, one entry each; must be
  *   non-empty — a summary line has nothing to summarize otherwise
@@ -79,8 +83,8 @@ export interface SummaryOptions {
  *
  * @throws {RangeError} when `items` is empty.
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./scale.ts
- * @see ./markers.ts
+ * @see ./digest.ts renderDigest
+ * @see ./profiles.ts CHECKLIST_PROFILE
  */
 export declare function renderChecklistSummary(items: readonly ChecklistItem[], options?: SummaryOptions): string;
 //# sourceMappingURL=checklist.d.ts.map
