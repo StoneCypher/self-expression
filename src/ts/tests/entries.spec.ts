@@ -4,7 +4,8 @@ import { join }                from 'node:path';
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
-  recordEntry, validate, hasClosingSignature, previousSignature, recentEntries, seriesPercents,
+  recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
+  recentChecklists, seriesPercents,
 } from '../channels/entries.js';
 
 const VERSION = '0.2.0';
@@ -158,6 +159,29 @@ describe('recentEntries', () => {
       recordEntry(s, { channel: 'idea', text: t, session: 's1' }, VERSION);
     }
     expect(recentEntries(s, 2)).toHaveLength(2);
+  }));
+
+});
+
+describe('recentChecklists', () => {
+
+  test('returns only checklist rows, newest last, with the checklist columns', () => withStore(s => {
+    recordEntry(s, { channel: 'checklist', text: 'block a', session: 's1',
+                     title: 'alpha', seriesKey: 'a', succ: 1, active: 1, fail: 0, percent: 50 }, VERSION);
+    recordEntry(s, { channel: 'idea', text: 'not a checklist', session: 's1' }, VERSION);
+    recordEntry(s, { channel: 'checklist', text: 'block b', session: 's1',
+                     title: 'beta', seriesKey: 'b', succ: 2, active: 0, fail: 0, percent: 100 }, VERSION);
+    const rows = recentChecklists(s, 10);
+    expect(rows.map(r => r['title'])).toEqual(['alpha', 'beta']);
+    expect(rows.map(r => r['series_key'])).toEqual(['a', 'b']);
+    expect(rows.map(r => r['percent'])).toEqual([50, 100]);
+  }));
+
+  test('honours the limit, keeping the most recent rows', () => withStore(s => {
+    for (const [title, percent] of [['a', 10], ['b', 20], ['c', 30]] as const) {
+      recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', title, seriesKey: title, percent }, VERSION);
+    }
+    expect(recentChecklists(s, 2).map(r => r['title'])).toEqual(['b', 'c']);
   }));
 
 });

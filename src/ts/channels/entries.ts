@@ -270,6 +270,33 @@ export function recentEntries(store: Store, limit = 10): Record<string, unknown>
 }
 
 /**
+ * The most recent checklist rows, newest last — the checklist analogue of
+ * {@link recentEntries}, carrying the checklist-specific columns that read omits.
+ *
+ * Backs the `recall_checklists` tool, replacing the old `log-checklist.mjs` `tail`
+ * op: the same recency window, but with `series_key` visible so a caller can see
+ * which series a row actually fed rather than assuming the title was the key.
+ *
+ * @param limit how many rows to return, most recent first before the reversal
+ * @returns each row's timestamps, identity, and summary numbers, oldest first
+ *
+ * @example
+ *   recentChecklists(store, 3)
+ *   // => [{ ts_local: '9:14 am PDT', title: 'Project Atlas', percent: 31, … }, …]
+ *
+ * @see recentEntries
+ * @see seriesPercents
+ */
+export function recentChecklists(store: Store, limit = 10): Record<string, unknown>[] {
+  const rows = store.db.prepare(
+    `SELECT ts_local, tz, project, session, title, series_key, succ, active, fail, percent
+       FROM entries
+      WHERE channel = 'checklist'
+      ORDER BY id DESC LIMIT ?`).all(limit);
+  return rows.reverse();
+}
+
+/**
  * The stored percent history for one checklist series, oldest first.
  *
  * Backs the chart tools' `seriesKey` resolution: a caller names a series it previously

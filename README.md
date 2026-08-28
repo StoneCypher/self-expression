@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Thursday, August 27, 2026 at GMT-07:00 `1787896241392` from hash `e532289`.
+> Version 0.2.1 was built on Thursday, August 27, 2026 at GMT-07:00 `1787898901340` from hash `e0465f6`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787896241392 Thursday, August 27, 2026 at GMT-07:00 85.11 71 87 e532289 25.98 38.99 35.36 38.25 40 479 85.64 79.87 85.63 439 0.2.1 -->
+<!-- Supported embeds: 1787898901340 Thursday, August 27, 2026 at GMT-07:00 87.07 85 84 e0465f6 32.2 45.09 38.26 43.78 43 521 85.96 81.63 87.34 478 0.2.1 -->
 
 
 
@@ -31,6 +31,25 @@ Every renderer behind these tools is also exported directly from the library
 
 &nbsp;
 
+## Checklists
+
+Three MCP tools replace the old skill's Bash-plus-scratch-file checklist loggers
+(`log-checklist.mjs` / `check-checklist.mjs`), one tool call each instead of a
+scratchpad write plus a script invocation:
+
+| Tool | Purpose |
+|---|---|
+| `log_checklist` | Record one rendered checklist block. The `S/A/F items (P%)` summary is parsed out of the block (a block without one is rejected), and the reply carries the series' full percent history so the next trend sparkline is computed from the record rather than remembered. `seriesKey` defaults to the title; supply a stable one so a title edit cannot fork the series. |
+| `recall_checklists` | Read back recent checklist rows and, given a `seriesKey`, that series' chronological percent history — the old `tail` and `series` ops as one tool. |
+| `check_checklist` | Validate a rendered checklist mechanically: marker vocabulary, indentation, bucket partition (🛳️ may count as success or active), percent, the 10-cell anti-aliased bar, and the icon-list sort/wrap/placement rules. One `FAIL:` line per broken rule. |
+
+The validator behind `check_checklist` is exported as `verifyChecklist` (with
+`extractChecklistBlock` and `parseSummaryCounts`) from the same charts barrel.
+
+&nbsp;
+
+&nbsp;
+
 ## Test status
 
 <table>
@@ -44,19 +63,19 @@ Every renderer behind these tools is also exported directly from the library
   </tr>
   <tr>
     <th>Unit</th>
-    <td>439</td>
-    <td>85.11<small>%</small></td>
-    <td>85.64<small>%</small></td>
-    <td>79.87<small>%</small></td>
-    <td>85.63<small>%</small></td>
+    <td>478</td>
+    <td>87.07<small>%</small></td>
+    <td>85.96<small>%</small></td>
+    <td>81.63<small>%</small></td>
+    <td>87.34<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>40</td>
-    <td>85.11<small>%</small></td>
-    <td>25.98<small>%</small></td>
-    <td>35.36<small>%</small></td>
-    <td>38.25<small>%</small></td>
+    <td>43</td>
+    <td>87.07<small>%</small></td>
+    <td>32.2<small>%</small></td>
+    <td>38.26<small>%</small></td>
+    <td>43.78<small>%</small></td>
   </tr>
 </table>
 
@@ -64,12 +83,12 @@ Every renderer behind these tools is also exported directly from the library
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>87<small>%</small></th>
+    <th>84<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>71</td>
-    <td>87<small>%</small></td>
+    <td>85</td>
+    <td>84<small>%</small></td>
   </tr>
 </table>
 
