@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787928986288` from hash `0f2b67e`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787930725721` from hash `e481353`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787928986288 Friday, August 28, 2026 at GMT-07:00 93.38 170 88 0f2b67e 49.4 63.81 57.87 62.77 69 757 88.73 89.74 93.36 688 0.2.1 -->
+<!-- Supported embeds: 1787930725721 Friday, August 28, 2026 at GMT-07:00 93.06 208 88 e481353 50.87 65.2 59.21 64.01 78 823 87.88 89.14 93.02 745 0.2.1 -->
 
 
 
@@ -58,8 +58,8 @@ an ambiguous value records rather than silently suppressing.
 
 ## Charts
 
-Six grouped MCP tools render compact ASCII/emoji visuals inline in text, each taking a `form`
-field selecting which of its renderers to use:
+Seven grouped MCP tools render compact ASCII/emoji visuals inline in text, most taking a `form`
+field selecting which of their renderers to use:
 
 | Tool | Forms | Purpose |
 |---|---|---|
@@ -68,7 +68,17 @@ field selecting which of its renderers to use:
 | `render_rows` | `comparison` \| `tilegrid` | Several values side by side against one shared scale: a multi-row bar/dot comparison, or a tile-grid map of shaded, colored, or custom-glyphed cells. |
 | `render_timeline` | `rail` \| `colored` \| `dependency` \| `fsl` | An ordered sequence of stages: a centered monochrome rail, a colored rail (needed for a failed stage), an inline dependency-chain pipeline, or a one-line FSL-style state-machine description. |
 | `render_glyph` | `trend` \| `stars` \| `retry` \| `weather` | One small inline glyph: a trend-direction tag, a star rating, a bounded-retry health bar, or a single weather glyph summarizing overall health. |
-| `render_checklist_summary` | *(no form — one renderer)* | The full status-checklist summary line: count section, percent, progress bar, optional trend sparkline, and the sorted per-marker icon list. |
+| `render_digest` | profile: `checklist` \| `findings` \| `options` \| `diff` \| `results` | The general compressed-artifact digest line (issue #20): per-profile bucket counts and unit noun, a scalar percent + bar when the profile has a completion axis, a `+N −M` line-count tail for diffs, an optional trend sparkline, and the sorted per-marker icon list. |
+| `render_checklist_summary` | *(no form — one renderer)* | The full status-checklist summary line: count section, percent, progress bar, optional trend sparkline, and the sorted per-marker icon list — exactly `render_digest` with the checklist profile plugged in. |
+
+The digest machinery treats **compression as the mechanic, not lists**: a body of
+comparable units plus a digest derived from it, satisfying six invariants
+(derivability, partition, substitutability, fixed shape, conservation, identity
+stability). Profiles are data (`src/ts/charts/profiles.ts`), the renderer is
+`renderDigest` (`src/ts/charts/digest.ts`), and the companions `leadUnitIndex`
+(the lead line's argmax — the one digest element keeping a single unit's identity),
+`overallBucket`, and `nestDigest` (nesting by digest substitution: a child artifact
+counts as one unit in its parent, bucketed by its overall state) are exported with it.
 
 Every renderer behind these tools is also exported directly from the library
 (`self-expression`'s `src/ts/charts/index.ts`), for use outside MCP.
@@ -113,7 +123,13 @@ scratchpad write plus a script invocation:
 | `check_checklist` | Validate a rendered checklist mechanically: marker vocabulary, indentation, bucket partition (🛳️ may count as success or active), percent, the 10-cell anti-aliased bar, and the icon-list sort/wrap/placement rules. One `FAIL:` line per broken rule. |
 
 The validator behind `check_checklist` is exported as `verifyChecklist` (with
-`extractChecklistBlock` and `parseSummaryCounts`) from the same charts barrel.
+`extractChecklistBlock` and `parseSummaryCounts`) from the same charts barrel. Its
+generalization `verifyDigest` re-derives a digest of **any** profile — the profile is
+inferred from the digest line's noun (`items` → checklist, `findings`, `options`,
+`files`, `hits`), a checklist digest delegates to `verifyChecklist` unchanged, a
+percent on a profile with no scalar axis is flagged as fabricated, and the diff
+profile's kind-classified partition is checked by sum (change kinds are not derivable
+from a rendered body's markers).
 
 &nbsp;
 
@@ -132,19 +148,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>688</td>
-    <td>93.38<small>%</small></td>
-    <td>88.73<small>%</small></td>
-    <td>89.74<small>%</small></td>
-    <td>93.36<small>%</small></td>
+    <td>745</td>
+    <td>93.06<small>%</small></td>
+    <td>87.88<small>%</small></td>
+    <td>89.14<small>%</small></td>
+    <td>93.02<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>69</td>
-    <td>93.38<small>%</small></td>
-    <td>49.4<small>%</small></td>
-    <td>57.87<small>%</small></td>
-    <td>62.77<small>%</small></td>
+    <td>78</td>
+    <td>93.06<small>%</small></td>
+    <td>50.87<small>%</small></td>
+    <td>59.21<small>%</small></td>
+    <td>64.01<small>%</small></td>
   </tr>
 </table>
 
@@ -156,7 +172,7 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>170</td>
+    <td>208</td>
     <td>88<small>%</small></td>
   </tr>
 </table>
