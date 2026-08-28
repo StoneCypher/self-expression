@@ -38,6 +38,43 @@ import type { Store }                   from './store.js';
  */
 export const FORMAT_VERSION = '1';
 
+/**
+ * The text length every channel ships with, in characters (issue #76).
+ *
+ * Replaces two disagreeing numbers: the flat `.max(280)` the `express` schema carried
+ * for all twelve channels, and the `≤70 characters` the skill taught for one of them.
+ * 200 is the ceiling; the skill still recommends roughly 70, because a signature that
+ * stops being a glance has stopped doing its job — a raised ceiling is headroom for the
+ * occasional line that needs it, never an invitation to fill it.
+ */
+export const DEFAULT_CHANNEL_MAX_CHARS = 200;
+
+/**
+ * The largest value any `channels.<name>.max_chars` key may be set to, and therefore
+ * the hard ceiling baked into `express`'s static zod schema.
+ *
+ * 2000 because that is already this project's answer to "how long may one recorded
+ * utterance be" — {@link ../channels/messages.js MESSAGE_TEXT_MAX} caps a messagebox
+ * message at exactly that, and having `express` and `post_message` agree means one
+ * number to remember rather than two. The schema cannot read config (it is built once,
+ * at registration, before any store read is meaningful), so it carries this bound and
+ * the real per-channel check runs in the handler.
+ *
+ * @see MIN_CHANNEL_MAX_CHARS
+ * @see channelMaxChars
+ */
+export const MAX_TEXT_CEILING = 2000;
+
+/**
+ * The smallest value any `channels.<name>.max_chars` key may be set to.
+ *
+ * One, not zero: a limit of zero would make a channel unwritable, which is a channel
+ * disable arrived at through the wrong door — `channels.enabled` is that door, and it
+ * removes the channel from the tool schema so no attention is spent on it. A limit of
+ * zero would instead let the model keep trying and keep being rejected.
+ */
+export const MIN_CHANNEL_MAX_CHARS = 1;
+
 /** The value shapes a registered key can take. */
 export type ConfigKind = 'bool' | 'int' | 'list' | 'string';
 
@@ -208,6 +245,29 @@ export function validateIsoUtc(raw: string): Validation {
 }
 
 /**
+ * The registry key naming one channel's maximum text length.
+ *
+ * Twelve flat keys rather than one map-valued key, deliberately (issue #76): a map
+ * would need its own parser, its own error vocabulary, and a `configure set` grammar
+ * nothing else in the surface uses, and `configure list` would print it as one opaque
+ * blob instead of twelve inspectable lines. Twelve entries cost a wider table and
+ * nothing else — `set`, `unset`, `get`, and the effective listing all work with no
+ * special-casing at all.
+ *
+ * @param channel the channel name; a member of `CHANNELS` in practice, though the
+ *                function is total so callers need not narrow first
+ * @returns the config key, which is stable public surface — users type it
+ *
+ * @example
+ *   channelMaxCharsKey('signature')  // => 'channels.signature.max_chars'
+ *
+ * @see channelMaxChars
+ */
+export function channelMaxCharsKey(channel: string): string {
+  return `channels.${channel}.max_chars`;
+}
+
+/**
  * Every key this version of the plugin knows about.
  *
  * A key a newer version writes is still stored and preserved (D3) — this registry is
@@ -217,12 +277,21 @@ export function validateIsoUtc(raw: string): Validation {
  * defaults. The `audio.*` keys belong to issue #44's claudio facility on the same
  * terms: the keys ride this registry and the shared `config` table (no second
  * mechanism), while the claudio server reads them through its own tolerant reader
- * in `../claudio/config.ts`.
+ * in `../claudio/config.ts`. The `channels.<name>.max_chars` family belongs to issue
+ * #76 and is generated from `CHANNELS`, so a channel added to the vocabulary arrives
+ * with its length key already registered rather than silently unbounded.
  */
 export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
     description: 'which expression channels the express tool offers; baked into the tool schema at server startup',
     validate: validateChannelList },
+  ...CHANNELS.map((channel): ConfigKeyDef => ({
+    key: channelMaxCharsKey(channel), kind: 'int', fallback: String(DEFAULT_CHANNEL_MAX_CHARS),
+    description:
+      `longest text, in characters, express accepts on the '${channel}' channel (#76); ` +
+      'a ceiling rather than a target, checked in the handler and governing writes only — ' +
+      'rows already stored longer than a lowered limit are never touched',
+    validate: intValidator(MIN_CHANNEL_MAX_CHARS, MAX_TEXT_CEILING) })),
   { key: 'gate.signature', kind: 'bool', fallback: 'true',
     description: 'whether the Stop gate blocks a turn that never signed off',
     validate: validateBool },
@@ -349,6 +418,48 @@ export function effectiveValue(store: Store, key: string): string | null {
   }
 
   return def.fallback;
+
+}
+
+/**
+ * The text length in force for one channel, in characters.
+ *
+ * Reads through {@link effectiveValue}, so a hand-edited or out-of-range row behaves as
+ * unset and yields {@link DEFAULT_CHANNEL_MAX_CHARS} rather than a limit nobody chose.
+ * An unregistered channel name — which the closed `channel` enum makes unreachable
+ * through the tool — also lands on the default rather than throwing.
+ *
+ * **Normative rule, binding on every future reader and prune: this limit governs
+ * writes, and only writes.** A row already stored at 300 characters stays exactly as it
+ * is when the limit is later lowered to 80: not truncated, not flagged, not excluded
+ * from a read, not a candidate for deletion, and not excluded from an export. Retention
+ * (`retention.days`) deletes by age and nothing else, and no query helper may treat an
+ * over-long stored row as invalid. A limit says what may be written from now on; it is
+ * never a retroactive judgment on what was already said.
+ *
+ * @param store   the open store to resolve against
+ * @param channel which channel's limit to read
+ * @returns the limit in characters, always within
+ *          `[MIN_CHANNEL_MAX_CHARS, MAX_TEXT_CEILING]`
+ *
+ * @example
+ *   channelMaxChars(store, 'taste')      // => 200 on a fresh install
+ *   writeConfig(store, 'channels.taste.max_chars', '320');
+ *   channelMaxChars(store, 'taste')      // => 320
+ *   channelMaxChars(store, 'signature')  // => 200 — one key, one channel
+ *
+ * @see channelMaxCharsKey
+ */
+export function channelMaxChars(store: Store, channel: string): number {
+
+  const raw    = effectiveValue(store, channelMaxCharsKey(channel)),
+        parsed = raw === null ? Number.NaN : Number(raw);
+
+  return Number.isInteger(parsed)
+      && parsed >= MIN_CHANNEL_MAX_CHARS
+      && parsed <= MAX_TEXT_CEILING
+    ? parsed
+    : DEFAULT_CHANNEL_MAX_CHARS;
 
 }
 

@@ -30,7 +30,10 @@ import type {
 } from '../channels/vocabulary.js';
 import { recordEntry, recentEntries, previousSignature, hasClosingSignature } from '../channels/entries.js';
 import { readConfig, writeConfig, deleteConfig }                              from '../channels/store.js';
-import { FORMAT_VERSION, configKey, effectiveValue, effectiveConfig }         from '../channels/config.js';
+import {
+  FORMAT_VERSION, MAX_TEXT_CEILING, configKey, channelMaxChars, channelMaxCharsKey,
+  effectiveValue, effectiveConfig,
+} from '../channels/config.js';
 import { rejectDwellingWrite, dwellingChangeNotice }                          from '../dwelling/config.js';
 import { latestContext }                                                     from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
@@ -173,21 +176,33 @@ export interface ExpressArgs {
  * @param args          the validated tool arguments
  * @param client        what the MCP handshake reported about the host, if anything
  *
- * An `outcome` is additionally checked against the store (the half of forecast
- * validation `entries.validate` cannot do alone, #42): its `correctsId` must name an
- * existing row whose confidence is `'predicted'`, or the rejection names the target's
- * actual ground.
+ * Two checks live here rather than in the schema, because neither is expressible in a
+ * shape built once at registration:
+ *
+ * - **Text length** is per-channel and user-configurable (issue #76), so the static
+ *   zod bound can only be {@link MAX_TEXT_CEILING} — the largest value any key may be
+ *   set to. The configured limit is checked here, and the rejection names the channel,
+ *   its limit, the length received, and the key that changes it. The check governs
+ *   writes only: rows already stored longer than a later-lowered limit are untouched
+ *   and stay fully readable (see {@link channelMaxChars}).
+ * - An **`outcome`** is checked against the store (the half of forecast validation
+ *   `entries.validate` cannot do alone, #42): its `correctsId` must name an existing
+ *   row whose confidence is `'predicted'`, or the rejection names the target's actual
+ *   ground.
  *
  * @example
  *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
  *   // => { content: [{ type: 'text', text: 'recorded #1 …' }] }
  *
+ * @throws {Error} If the text is longer than the channel's configured limit, naming the
+ *                 channel, the limit, and the length received.
  * @throws {Error} If entry validation fails — a closed field outside its vocabulary,
  *                 a cross-field forecast violation, or an outcome whose target is not
  *                 a `predicted` row — naming every problem and the values that would
  *                 have been accepted.
  *
  * @see ../channels/entries.js recordEntry
+ * @see ../channels/config.js channelMaxChars
  */
 export function handleExpress(
   store         : Store,
@@ -195,6 +210,19 @@ export function handleExpress(
   args          : ExpressArgs,
   client?       : ClientIdentity,
 ): ToolReply {
+
+  // The per-channel length check (issue #76). It lives here rather than in the schema
+  // because the schema is built once at registration and cannot read config; the schema
+  // carries only MAX_TEXT_CEILING, the largest value any key may be set to. Rejection —
+  // not truncation, not a warning — because every other vocabulary in this plugin
+  // rejects, and a silently shortened line is a lie about what was said.
+  const limit = channelMaxChars(store, args.channel);
+  if (args.text.length > limit) {
+    throw new Error(
+      `cannot record entry:\n  - text is ${String(args.text.length)} characters; the ` +
+      `'${args.channel}' channel allows at most ${String(limit)} ` +
+      `(configure set ${channelMaxCharsKey(args.channel)} <n> to change it)`);
+  }
 
   if (args.outcome !== undefined && args.correctsId !== undefined) {
     const target = store.db.prepare('SELECT confidence FROM entries WHERE id = ?').get(args.correctsId);
@@ -415,7 +443,10 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'valid signature — the requirement is to look, not to produce.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
-      text           : z.string().min(1).max(280).describe('the content; terse, honest over flattering'),
+      text           : z.string().min(1).max(MAX_TEXT_CEILING).describe(
+        'the content; terse, honest over flattering. The real limit is per-channel and ' +
+        'user-configurable (channels.<name>.max_chars, default 200) and is checked when ' +
+        'the entry is recorded; this schema bound is only the hard ceiling no limit may exceed'),
       session        : z.string().optional().describe(
         'usually omit — the hook supplies it, and an observed session beats a claimed one'),
       promptId       : z.string().optional().describe('turn identifier; groups a turn'),

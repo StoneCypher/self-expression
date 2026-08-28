@@ -17,7 +17,8 @@
 import { recordContext, latestContext, turnCount } from '../channels/context.js';
 import { hasClosingSignature }                     from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
-import { effectiveValue }                          from '../channels/config.js';
+import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
+import { CHANNELS }                                from '../channels/vocabulary.js';
 import { unreadCounts, readMessages }              from '../channels/messages.js';
 import type { Store }                              from '../channels/store.js';
 import { clockTime, zoneAbbreviation }             from '../channels/time.js';
@@ -122,6 +123,64 @@ export function conventionFlags(store: Store): string {
 }
 
 /**
+ * The context line's channel-length segment, e.g. `lengths: 200 all` or
+ * `lengths: 200 except signature:70 taste:400`.
+ *
+ * The same transport problem the conventions flags exist for, one step further: the
+ * skill is static Markdown and cannot read `channels.<name>.max_chars` (issue #76), so
+ * the turn-start hook carries the configured ceilings on the line it already injects,
+ * beside {@link conventionFlags}, rather than inventing a second mechanism. The skill
+ * then teaches its recommended length as a constant and takes its **ceiling** from
+ * here — which is the whole point: the recommendation is editorial and stable, the
+ * ceiling is the user's and must never be hardcoded into a file they cannot configure.
+ *
+ * Rendered against a base rather than as twelve pairs, because the mailbox line's
+ * lesson applies: every turn pays for this, so the common case must be nearly free. The
+ * base is whichever limit the most channels share — so an install that moved every
+ * channel to the same number renders as compactly as an unconfigured one — and only
+ * genuine deviations are named. Ties go to the earliest channel in `CHANNELS`, so the
+ * rendering is deterministic.
+ *
+ * Reports every channel, including ones `channels.enabled` has switched off: a disabled
+ * channel cannot be named through the tool at all, so its limit costs nothing to state
+ * and saves this function from duplicating the enabled-set logic.
+ *
+ * @param store the open store to resolve limits against
+ * @returns the segment text, without trailing punctuation
+ *
+ * @example
+ *   channelLengths(store)   // => 'lengths: 200 all' on a fresh install
+ *   writeConfig(store, 'channels.signature.max_chars', '70');
+ *   channelLengths(store)   // => 'lengths: 200 except signature:70'
+ *
+ * @see conventionFlags
+ * @see ../channels/config.js channelMaxChars
+ * @see onUserPromptSubmit
+ */
+export function channelLengths(store: Store): string {
+
+  const limits = CHANNELS.map(channel => ({ channel, limit: channelMaxChars(store, channel) })),
+        tally  = new Map<number, number>();
+
+  for (const { limit } of limits) { tally.set(limit, (tally.get(limit) ?? 0) + 1); }
+
+  let base  = DEFAULT_CHANNEL_MAX_CHARS,
+      most  = 0;
+
+  for (const [limit, count] of tally) {
+    if (count > most) { base = limit; most = count; }
+  }
+
+  const exceptions = limits.filter(entry => entry.limit !== base);
+
+  return exceptions.length === 0
+    ? `lengths: ${String(base)} all`
+    : `lengths: ${String(base)} except ` +
+      exceptions.map(entry => `${entry.channel}:${String(entry.limit)}`).join(' ');
+
+}
+
+/**
  * The context line's mailbox segment, e.g.
  * `Mailbox: 2 unread for you, 1 for your human partner (self-expression read_messages).`
  * — or `null` when there is nothing to report.
@@ -204,7 +263,11 @@ export const OPEN_REMINDER_CLOCKLESS =
  * pure-prose skill conventions. It fails open separately: a flags error still delivers
  * the clock and the reminder, just without flags.
  *
- * After the flags comes the messagebox count line ({@link mailboxLine}, issue #41),
+ * The channel-length segment ({@link channelLengths}, issue #76) follows the flags on
+ * that same transport, carrying the configured per-channel text ceilings to a skill
+ * that cannot read config. It fails open on its own terms too.
+ *
+ * After the lengths comes the messagebox count line ({@link mailboxLine}, issue #41),
  * present only when something is actually unread and both `messages.*` keys allow it.
  * It fails open separately too: a mailbox error costs the count line and nothing else.
  *
@@ -243,12 +306,18 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: the clock and reminder still get delivered */ }
   }
 
+  let lengths = '';
+  if (store !== null) {
+    try { lengths = ` ${channelLengths(store)}.`; }
+    catch { /* fail open: the clock, flags, and reminder still get delivered */ }
+  }
+
   let mail = '';
   if (store !== null) {
     try {
       const line = mailboxLine(store, payload.session_id, now);
       if (line !== null) { mail = ` ${line}`; }
-    } catch { /* fail open: the clock, flags, and reminder still get delivered */ }
+    } catch { /* fail open: the clock, flags, lengths, and reminder still get delivered */ }
   }
 
   // `time.hook` suppresses the clock sentence, and only that (issue #30, D9): the
@@ -263,7 +332,8 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: keep the clock */ }
   }
 
-  const head     = clock ? `${describeMoment(now)}${flags}${mail}` : `${flags}${mail}`.trimStart(),
+  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${mail}`
+                         : `${flags}${lengths}${mail}`.trimStart(),
         reminder = clock ? OPEN_REMINDER : OPEN_REMINDER_CLOCKLESS;
 
   return {
