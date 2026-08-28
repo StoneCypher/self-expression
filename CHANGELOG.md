@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-67 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+69 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -14,6 +14,135 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:56:04 PM
+
+Commit [66da9d12a8c7b155fa3c06491e459e3a8b44dd20](https://github.com/StoneCypher/self-expression/commit/66da9d12a8c7b155fa3c06491e459e3a8b44dd20)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [cbd6324, 8fc723d]
+
+  * merge: origin/main into anchoring — annotate honours the #76 per-channel length budget
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:51:05 PM
+
+Commit [cbd63246ad55f3cd6fdc60a54d1b974e548c2b9d](https://github.com/StoneCypher/self-expression/commit/cbd63246ad55f3cd6fdc60a54d1b974e548c2b9d)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: anchoring — commentary bound to a location instead of floating in prose
+  * Implements the anchoring design: an expression entry can carry a machine-readable
+pointer to the thing it is about, plus the rendering that makes it read as
+attached and the resolution rules for when the target moves or vanishes.
+  * Five addressable kinds (file, prompt, reply, checklist, entry) as a new closed
+vocabulary, and five nullable qualifier columns on entries — anchor_kind (CHECK-
+constrained), anchor_target, anchor_span, anchor_quote, anchor_hash — in the
+typed-silence pattern rather than a separate table or a new channel, because an
+anchored dissent is still a dissent. One new index, idx_entries_anchor.
+  * Schema version 4. The v3 to v4 step is a table rebuild, since anchor_kind's CHECK
+cannot be added in place; the recipe v1 to v2 already used is extracted as one
+shared rebuildEntries that both steps call.
+  * channels/anchors.ts adds normalization, the SHA-256 fingerprint, span grammar, and
+the pure read-time resolvers behind the fresh to moved to orphaned ladder.
+Resolution is computed and never stored, and matching is exact-normalized only:
+two identical candidates degrade to orphaned rather than guess, because a note
+pinned to the wrong line is worse than an orphan, and an orphan degrades to
+today's floating-prose behavior rather than below it.
+  * charts/annotations.ts adds renderAnnotations for the grouped block and
+renderAnchorSegment for a single anchored line, following the house renderer
+contract, with verdicts passed in so the renderers stay pure.
+  * express grows four optional anchor arguments with the hash derived server-side and
+a prompt anchor adopting the observed turn; the new annotate tool takes 1 to 25
+notes, all-or-nothing in one transaction, and returns the canonical block.
+recall widens to carry the anchor columns.
+  * privacy.store_quotes joins the config registry: a prompt quote is dropped at write
+while anchor_hash still records, so drift detection and public aggregation carry
+no words. anchor_kind exports verbatim, anchor_hash re-blinded under the
+per-submission salt, and target, span, and quote never export.
+  * Two incidental fixes the change forced: openStore now applies indices after
+migrating rather than before, since an index over a newly-migrated column cannot
+be created against the old table shape; and the v1/v2 fixtures freeze their own
+index list rather than importing the live one, which would drift forward with the
+schema.
+  * Closes #18
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:36:59 PM
+
+Commit [6c6110910ba623636a2cd62ed29bd8c9b23cea09](https://github.com/StoneCypher/self-expression/commit/6c6110910ba623636a2cd62ed29bd8c9b23cea09)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 8fc723d70cc1372df3cb2f894f592dd261ed126e
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:36:16 PM
+
+Commit [d7424964c5cacd9802105c89f3fe50ee893d366b](https://github.com/StoneCypher/self-expression/commit/d7424964c5cacd9802105c89f3fe50ee893d366b)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: anchoring tests — resolver, renderer, migration, tools, stochastic
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:35:42 PM
+
+Commit [8fc723d70cc1372df3cb2f894f592dd261ed126e](https://github.com/StoneCypher/self-expression/commit/8fc723d70cc1372df3cb2f894f592dd261ed126e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [28b41be, feef2ea]
+
+  * Merge pull request #77 from StoneCypher/feat_26-08-28_channel-text-lengths_76
+  * feat: per-channel text length, user-configurable, defaults raised to 200
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:34:38 PM
+
+Commit [feef2ea14fed5ec07a5b8102a88461779f2c3826](https://github.com/StoneCypher/self-expression/commit/feef2ea14fed5ec07a5b8102a88461779f2c3826)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: rebuild generated artifacts after merging origin/main (#40 onboarding)
 
 
 
@@ -193,118 +322,3 @@ Commit [5bd164c9de2ffa0b900a5be93121ea0eff01c582](https://github.com/StoneCypher
 Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
   * deploy: 28b41beeb9d286b682743b88b3ffccd27378550f
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:19:38 PM
-
-Commit [28b41beeb9d286b682743b88b3ffccd27378550f](https://github.com/StoneCypher/self-expression/commit/28b41beeb9d286b682743b88b3ffccd27378550f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [8964990, 56ef191]
-
-  * Merge pull request #74 from StoneCypher/feat_26-08-28_onboarding_40
-  * feat: first-run onboarding questionnaire — registry, ledger, onboard MCP tool (#40)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:19:28 PM
-
-Commit [5622fef56c1aac7d1852ccfceed0199606d50eee](https://github.com/StoneCypher/self-expression/commit/5622fef56c1aac7d1852ccfceed0199606d50eee)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: anchoring core — vocabulary, anchors module, schema v4, entries, renderer, tools
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:16:39 PM
-
-Commit [56ef1919339382232049109bce14452fef649dc0](https://github.com/StoneCypher/self-expression/commit/56ef1919339382232049109bce14452fef649dc0)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: regenerate artifacts after the claudio merge
-  * README.md, CHANGELOG*, and coverage-stoch/ rebuilt from the merged tree.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:13:47 PM
-
-Commit [a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d](https://github.com/StoneCypher/self-expression/commit/a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [6d38073, 8964990]
-
-  * chore: merge origin/main (#44 claudio audio facility)
-  * Source conflict was the CONFIG_KEYS pin test: unioned so it lists the eleven
-audio.* keys and onboarding.answered. Generated artifacts (CHANGELOG*, README.md,
-coverage-stoch/) took main's side; the rebuild regenerates them.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:11:21 PM
-
-Commit [6d38073c8391fc7d1052a68514bcaa81710c1b92](https://github.com/StoneCypher/self-expression/commit/6d38073c8391fc7d1052a68514bcaa81710c1b92)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: first-run onboarding — question registry, ledger, and the onboard tool
-  * Records the design in the plugin-layout doc and closes out the #40 work: the
-questionnaire is a code-resident registry with a per-question ledger
-(onboarding.answered), deliberately no completion boolean, surfaced through the
-MCP handshake instructions string rather than a hook so it reaches every host.
-  * Also unions the CONFIG_KEYS pin test with the new onboarding.answered key and
-drops an unnecessary template expression in the dwelling-enable reply.
-  * Closes #40
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:11:21 PM
-
-Commit [d90c4a0a1ab2e79c1360bd8fade6b4027e3b5575](https://github.com/StoneCypher/self-expression/commit/d90c4a0a1ab2e79c1360bd8fade6b4027e3b5575)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * @
-feat: first-run onboarding — question registry, ledger, and the onboard tool
-  * Records the design in the plugin-layout doc and closes out the #40 work: the
-questionnaire is a code-resident registry with a per-question ledger
-(onboarding.answered), deliberately no completion boolean, surfaced through the
-MCP handshake instructions string rather than a hook so it reaches every host.
-  * Also unions the CONFIG_KEYS pin test with the new onboarding.answered key and
-drops an unnecessary template expression in the dwelling-enable reply.
-  * Closes #40
-@

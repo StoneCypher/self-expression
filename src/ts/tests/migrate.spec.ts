@@ -4,11 +4,13 @@ import { join }   from 'node:path';
 
 import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js';
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
-import { migrate, MIGRATIONS, V1_ENTRY_COLUMNS }      from '../channels/migrate.js';
+import { migrate, MIGRATIONS, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS } from '../channels/migrate.js';
 import { SCHEMA_VERSION, INDEX_DDL, MESSAGE_INDEX_DDL } from '../channels/schema.js';
 import { postMessage, readMessages }                  from '../channels/messages.js';
+import { anchoredEntries }                            from '../channels/entries.js';
 import { buildV1, insertV1 }                          from './helpers/v1_fixture.js';
 import { buildV2, insertV2 }                          from './helpers/v2_fixture.js';
+import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -154,14 +156,18 @@ describe('openStore on a v2 database (#41)', () => {
           v2  = buildV2(path);
     insertV2(v2, 'u1', 'signature', { position: 'close', stem: 'still', silence: 'empty' });
     insertV2(v2, 'u2', 'taste');
-    const before = JSON.parse(JSON.stringify(
-      v2.prepare('SELECT * FROM entries ORDER BY id').all())) as unknown;
+    // Named columns, not SELECT *: v2's entries columns are exactly V3_ENTRY_COLUMNS
+    // (v2→v3 added tables, not columns), and the later v3→v4 step legitimately widens
+    // the row — this asserts nothing v2 held has changed, not that nothing was added.
+    const columns = V3_ENTRY_COLUMNS.join(', '),
+          before  = JSON.parse(JSON.stringify(
+            v2.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
     v2.close();
 
     const s = openStore(path);
     expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
     const after = JSON.parse(JSON.stringify(
-      s.db.prepare('SELECT * FROM entries ORDER BY id').all())) as unknown;
+      s.db.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
     expect(after).toEqual(before);
 
     // The whole point: the messagebox works through the normal path post-migration.
@@ -190,6 +196,138 @@ describe('openStore on a v2 database (#41)', () => {
     expect(readMeta(b, 'schema_version')).toBe(String(SCHEMA_VERSION));
     expect(b.db.prepare('SELECT COUNT(*) n FROM messages').get().n).toBe(1);
     closeStore(b); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
+describe('openStore on a v3 database (#18)', () => {
+
+  test('the fixture really is v3: no anchor columns at all, but the v3 vocabulary writes', () => {
+    const dir = tmp(), db = buildV3(join(dir, 'log.sqlite3'));
+    insertV3(db, 'u-pred', 'confidence', { confidence: 'predicted', resolve_by: '2026-08-30' });
+    expect(() => insertV3(db, 'u-anchor', 'dissent', { anchor_kind: 'file' })).toThrow();
+    const columns = db.prepare("SELECT name FROM pragma_table_info('entries')")
+                      .all().map(r => String(r.name));
+    expect(columns).not.toContain('anchor_kind');
+    expect(columns).toContain('silence');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('migrates: rows survive byte-for-byte, anchor columns arrive NULL, version stamped', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v3  = buildV3(path);
+    insertV3(v3, 'u1', 'signature', { position: 'close', stem: 'still', silence: 'empty' });
+    insertV3(v3, 'u2', 'taste');
+    insertV3(v3, 'u3', 'checklist', { series_key: 'atlas', percent: 40 });
+    const columns = V3_ENTRY_COLUMNS.join(', '),
+          before  = JSON.parse(JSON.stringify(
+            v3.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
+    v3.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    const after = JSON.parse(JSON.stringify(
+      s.db.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
+    expect(after).toEqual(before);
+
+    for (const row of s.db.prepare('SELECT * FROM entries').all()) {
+      expect(row).toHaveProperty('anchor_kind',   null);
+      expect(row).toHaveProperty('anchor_target', null);
+      expect(row).toHaveProperty('anchor_span',   null);
+      expect(row).toHaveProperty('anchor_quote',  null);
+      expect(row).toHaveProperty('anchor_hash',   null);
+    }
+
+    // The whole point: an anchored write the v3 CHECKs could not even name now succeeds.
+    recordEntry(s, { channel: 'dissent', text: 'null for unset and for empty', session: 's1',
+                     anchorKind: 'file', anchorTarget: 'src/ts/channels/store.ts',
+                     anchorSpan: 'L141', anchorQuote: 'readConfig(store, key)' }, VERSION);
+    expect(anchoredEntries(s, 'file', 'src/ts/channels/store.ts')).toHaveLength(1);
+
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('preserves ids across the rebuild, so the corrects_id chain stays valid', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v3  = buildV3(path);
+    insertV3(v3, 'u1', 'confidence', { confidence: 'guessed' });
+    insertV3(v3, 'u2', 'confidence', { corrects_id: 1 });
+    v3.close();
+
+    const s    = openStore(path),
+          rows = s.db.prepare('SELECT id, uuid, corrects_id FROM entries ORDER BY id').all();
+    expect(rows[0]?.id).toBe(1);
+    expect(rows[1]?.corrects_id).toBe(1);
+    expect(recordEntry(s, { channel: 'idea', text: 'x', session: 's1' }, VERSION).id).toBe(3);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates idx_entries_anchor, which a v3 database could not have held', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV3(path).close();
+    const s   = openStore(path),
+          idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+                    .all().map(r => r.name as string);
+    expect(idx).toContain('idx_entries_anchor');
+    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('the messagebox survives the entries rebuild untouched', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v3  = buildV3(path);
+    v3.prepare(
+      `INSERT INTO messages (uuid, ts_utc, ts_local, tz, session, machine_id, audience, text, plugin_version)
+       VALUES ('m-1','2026-08-28T00:00:00Z','9:14 am PDT','PDT','s1','m1','self','pre-migration','0.2.1')`).run();
+    v3.close();
+    const s = openStore(path);
+    expect(readMessages(s, { reader: 'model', session: 's1' }, {})).toHaveLength(1);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('meta identity survives migration: created_utc and machine_id are untouched', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV3(path).close();
+    const s = openStore(path);
+    expect(readMeta(s, 'created_utc')).toBe('2026-08-28T00:00:00Z');
+    expect(s.machineId).toBe('33333333-4444-5555-6666-777777777777');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('reopening after migration is idempotent — a no-op, not a second rebuild', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV3(path).close();
+    const a = openStore(path);
+    recordEntry(a, { channel: 'dissent', text: 'x', session: 's1',
+                     anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1' }, VERSION);
+    closeStore(a);
+    const b = openStore(path);
+    expect(readMeta(b, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    expect(b.db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(1);
+    closeStore(b); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
+describe('a v1 database walks the whole chain', () => {
+
+  test('1 → 4 in one open: old rows intact, anchors and messagebox both usable', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v1  = buildV1(path);
+    insertV1(v1, 'u1', 'signature', { position: 'close', stem: 'still' });
+    v1.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe('4');
+    expect(s.db.prepare('SELECT uuid FROM entries').get().uuid).toBe('u1');
+
+    const written = recordEntry(s, { channel: 'taste', text: 'reads like it was always true', session: 's1' }, VERSION);
+    recordEntry(s, { channel: 'dissent', text: 'about that', session: 's1',
+                     anchorKind: 'entry', anchorTarget: String(written.id) }, VERSION);
+    postMessage(s, { audience: 'record', text: 'for posterity', session: 's1' }, VERSION);
+
+    expect(anchoredEntries(s, 'entry', String(written.id))).toHaveLength(1);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
 });
@@ -246,6 +384,19 @@ describe('migrate', () => {
                      .all().map(r => String(r.name));
     expect([...V1_ENTRY_COLUMNS].sort()).toEqual([...actual].sort());
     db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('V3_ENTRY_COLUMNS names exactly the v3 columns, in a set sense', () => {
+    const dir = tmp(), db = buildV3(join(dir, 'log.sqlite3'));
+    const actual = db.prepare("SELECT name FROM pragma_table_info('entries')")
+                     .all().map(r => String(r.name));
+    expect([...V3_ENTRY_COLUMNS].sort()).toEqual([...actual].sort());
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('V3_ENTRY_COLUMNS is V1 plus exactly the three #42 columns', () => {
+    expect(V3_ENTRY_COLUMNS.filter(c => !V1_ENTRY_COLUMNS.includes(c)))
+      .toEqual(['resolve_by', 'outcome', 'silence']);
   });
 
 });

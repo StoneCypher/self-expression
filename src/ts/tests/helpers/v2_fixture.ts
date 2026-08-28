@@ -12,7 +12,8 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, INDEX_DDL } from '../../channels/schema.js';
+import { TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL } from '../../channels/schema.js';
+import { V1_INDEX_DDL } from './v1_fixture.js';
 
 /** The v2 `entries` DDL, frozen. Must never change again: it describes databases that already exist. */
 export const V2_ENTRIES_DDL = `
@@ -100,7 +101,9 @@ CREATE TABLE IF NOT EXISTS entries (
  */
 export function buildV2(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
-  for (const s of [V2_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, ...INDEX_DDL]) {
+  // v2 and v1 carried the same indices — `idx_entries_anchor` arrives only at v4 — so
+  // the frozen v1 list is exactly right here, and reusing it says so.
+  for (const s of [V2_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, ...V1_INDEX_DDL]) {
     db.exec(s);
   }
   db.prepare("INSERT INTO meta (key, value, updated_utc) VALUES ('schema_version','2','2026-08-27T00:00:00Z')").run();

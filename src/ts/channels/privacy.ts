@@ -19,6 +19,17 @@ export interface PrivacyFlags {
   readonly storeCwd       : boolean;
   /** Record the prompt's length. Off when `privacy.store_prompt_len` is `'false'`. */
   readonly storePromptLen : boolean;
+  /**
+   * Record the verbatim `anchor_quote` of a `prompt`-kind anchor — the human's own
+   * words, the most sensitive field this plugin holds. Off when
+   * `privacy.store_quotes` is `'false'`, in which case the quote is dropped at write
+   * while `anchor_hash` still records: sixteen hex characters of a one-way digest
+   * carry drift detection and same-target grouping without carrying language.
+   *
+   * `file`, `reply`, `checklist`, and `entry` quotes are the model's or the repo's own
+   * text and record regardless — this flag is about the human's words specifically.
+   */
+  readonly storeQuotes    : boolean;
 }
 
 /**
@@ -31,13 +42,16 @@ export interface PrivacyFlags {
  * switch should take effect only when unambiguously set.
  *
  * @example
- *   privacyFlags(store)                              // => { storeCwd: true, storePromptLen: true }
+ *   privacyFlags(store)
+ *   // => { storeCwd: true, storePromptLen: true, storeQuotes: true }
  *   writeConfig(store, 'privacy.store_cwd', false);
- *   privacyFlags(store)                              // => { storeCwd: false, storePromptLen: true }
+ *   privacyFlags(store)
+ *   // => { storeCwd: false, storePromptLen: true, storeQuotes: true }
  */
 export function privacyFlags(store: Store): PrivacyFlags {
   return {
     storeCwd       : readConfig(store, 'privacy.store_cwd')        !== 'false',
     storePromptLen : readConfig(store, 'privacy.store_prompt_len') !== 'false',
+    storeQuotes    : readConfig(store, 'privacy.store_quotes')     !== 'false',
   };
 }

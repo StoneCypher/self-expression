@@ -14,23 +14,29 @@ function withStore<T>(fn: (s: Store) => T): T {
 describe('privacyFlags', () => {
 
   test('defaults to recording everything when unconfigured', () => withStore(s => {
-    expect(privacyFlags(s)).toEqual({ storeCwd: true, storePromptLen: true });
+    expect(privacyFlags(s)).toEqual({ storeCwd: true, storePromptLen: true, storeQuotes: true });
   }));
 
   test("privacy.store_cwd = false suppresses the path fields only", () => withStore(s => {
     writeConfig(s, 'privacy.store_cwd', false);
-    expect(privacyFlags(s)).toEqual({ storeCwd: false, storePromptLen: true });
+    expect(privacyFlags(s)).toEqual({ storeCwd: false, storePromptLen: true, storeQuotes: true });
   }));
 
   test("privacy.store_prompt_len = false suppresses the length only", () => withStore(s => {
     writeConfig(s, 'privacy.store_prompt_len', false);
-    expect(privacyFlags(s)).toEqual({ storeCwd: true, storePromptLen: false });
+    expect(privacyFlags(s)).toEqual({ storeCwd: true, storePromptLen: false, storeQuotes: true });
   }));
 
-  test('both can be suppressed at once', () => withStore(s => {
+  test("privacy.store_quotes = false suppresses the anchor quote only", () => withStore(s => {
+    writeConfig(s, 'privacy.store_quotes', false);
+    expect(privacyFlags(s)).toEqual({ storeCwd: true, storePromptLen: true, storeQuotes: false });
+  }));
+
+  test('all three can be suppressed at once', () => withStore(s => {
     writeConfig(s, 'privacy.store_cwd', false);
     writeConfig(s, 'privacy.store_prompt_len', false);
-    expect(privacyFlags(s)).toEqual({ storeCwd: false, storePromptLen: false });
+    writeConfig(s, 'privacy.store_quotes', false);
+    expect(privacyFlags(s)).toEqual({ storeCwd: false, storePromptLen: false, storeQuotes: false });
   }));
 
   test("only the exact string 'false' suppresses; anything else records", () => withStore(s => {
@@ -38,6 +44,8 @@ describe('privacyFlags', () => {
     expect(privacyFlags(s).storeCwd).toBe(true);
     writeConfig(s, 'privacy.store_cwd', 'no');
     expect(privacyFlags(s).storeCwd).toBe(true);
+    writeConfig(s, 'privacy.store_quotes', 'FALSE');
+    expect(privacyFlags(s).storeQuotes).toBe(true);
   }));
 
 });

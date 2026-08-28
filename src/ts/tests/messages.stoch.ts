@@ -23,6 +23,7 @@ import { openStore, closeStore, readMeta } from '../channels/store.js';
 import { postMessage, readMessages, unreadCounts } from '../channels/messages.js';
 import type { Reader }                     from '../channels/messages.js';
 import { SCHEMA_VERSION }                  from '../channels/schema.js';
+import { V3_ENTRY_COLUMNS }                from '../channels/migrate.js';
 import { buildV2, insertV2 }               from './helpers/v2_fixture.js';
 
 const VERSION = '0.0.0-stoch';
@@ -58,6 +59,14 @@ describe('v2→v3 migration — stochastic losslessness', () => {
         const dir  = mkdtempSync(join(tmpdir(), `se-msg-migrate-${String(run)}-`)),
               path = join(dir, 'log.sqlite3');
 
+        // Named columns, never SELECT *: a v2 entries table holds exactly
+        // V3_ENTRY_COLUMNS (v2→v3 added tables, not columns), and a later step may
+        // legitimately widen the row — #18's anchor columns did. The property is that
+        // nothing v2 held changed, not that nothing was ever added.
+        const columns = V3_ENTRY_COLUMNS.join(', ');
+
+        let store = null as ReturnType<typeof openStore> | null;
+
         try {
           const v2 = buildV2(path);
           for (const [index, row] of rows.entries()) {
@@ -67,22 +76,24 @@ describe('v2→v3 migration — stochastic losslessness', () => {
             insertV2(v2, `u-${String(index)}`, row.channel, extras);
           }
           const before = JSON.parse(JSON.stringify(
-            v2.prepare('SELECT * FROM entries ORDER BY id').all())) as unknown;
+            v2.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
           v2.close();
 
-          const s     = openStore(path),
-                after = JSON.parse(JSON.stringify(
-                  s.db.prepare('SELECT * FROM entries ORDER BY id').all())) as unknown;
+          store = openStore(path);
+          const after = JSON.parse(JSON.stringify(
+            store.db.prepare(`SELECT ${columns} FROM entries ORDER BY id`).all())) as unknown;
 
           expect(after).toEqual(before);
-          expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+          expect(readMeta(store, 'schema_version')).toBe(String(SCHEMA_VERSION));
 
           // The messagebox works through the normal path post-migration.
-          postMessage(s, { audience: 'self', text: 'post-migration note', session: 's1' }, VERSION);
-          expect(readMessages(s, { reader: 'model', session: 's1' }, {})).toHaveLength(1);
-
-          closeStore(s);
+          postMessage(store, { audience: 'self', text: 'post-migration note', session: 's1' }, VERSION);
+          expect(readMessages(store, { reader: 'model', session: 's1' }, {})).toHaveLength(1);
         } finally {
+          // Close before removing, on every path. Windows refuses to unlink a file an
+          // open sqlite handle still holds, so a cleanup that skipped this would raise
+          // EBUSY and bury whichever assertion actually failed.
+          if (store !== null) { closeStore(store); }
           rmSync(dir, { recursive: true, force: true });
         }
 

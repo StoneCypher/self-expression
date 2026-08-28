@@ -1,14 +1,14 @@
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
   isMember, describeVocabulary,
 } from '../channels/vocabulary.js';
 
 const ALL: readonly (readonly string[])[] = [
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
-  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
+  FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
 ];
 
 describe('vocabularies', () => {
@@ -77,6 +77,17 @@ describe('vocabularies', () => {
     expect(isMember(DIVERGENCE_KINDS, 'faded')).toBe(true);
     expect(isMember(CHANNELS, 'load')).toBe(true);
     expect(isMember(CHANNELS, 'taste')).toBe(true);
+  });
+
+  test('the #18 anchor kinds pin their exact contents — the five addressable things', () => {
+    expect(ANCHOR_KINDS).toEqual(['file', 'prompt', 'reply', 'checklist', 'entry']);
+  });
+
+  test('an anchor kind is not a channel, and vice versa — attachment is a qualifier', () => {
+    expect(isMember(CHANNELS, 'file')).toBe(false);
+    expect(isMember(CHANNELS, 'entry')).toBe(false);
+    expect(isMember(ANCHOR_KINDS, 'dissent')).toBe(false);
+    expect(isMember(ANCHOR_KINDS, 'annotation')).toBe(false);
   });
 
   test('outcomes are outcomes, not silences, and vice versa', () => {

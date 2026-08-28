@@ -3,10 +3,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
 import {
-  ALL_DDL, INDEX_DDL, MESSAGE_INDEX_DDL, SCHEMA_VERSION, check, entriesDdl,
+  ALL_DDL, TABLE_DDL, ALL_INDEX_DDL, INDEX_DDL, MESSAGE_INDEX_DDL,
+  SCHEMA_VERSION, check, entriesDdl,
 } from '../channels/schema.js';
 import {
-  CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES,
+  CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
 } from '../channels/vocabulary.js';
 
 /** A throwaway on-disk database; node:sqlite has no shared in-memory mode across handles. */
@@ -154,6 +155,50 @@ describe('schema', () => {
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
+  test('carries the five anchor columns, nullable — an unanchored entry is the normal case', () => {
+    const { db, dir } = freshDb();
+    db.prepare(`INSERT INTO entries (${REQUIRED}) VALUES (${VALUES})`).run('signature');
+    const row = db.prepare(
+      'SELECT anchor_kind, anchor_target, anchor_span, anchor_quote, anchor_hash FROM entries').get();
+    expect(row.anchor_kind).toBeNull();
+    expect(row.anchor_target).toBeNull();
+    expect(row.anchor_span).toBeNull();
+    expect(row.anchor_quote).toBeNull();
+    expect(row.anchor_hash).toBeNull();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('accepts every anchor kind and rejects one outside the vocabulary', () => {
+    const { db, dir } = freshDb();
+    for (const [i, kind] of ANCHOR_KINDS.entries()) {
+      db.prepare(`INSERT INTO entries (uuid, ts_utc, ts_local, tz, session, channel, text, plugin_version, anchor_kind, anchor_target)
+                  VALUES (?, '2026-08-28T00:00:00Z', '9:14 am PDT', 'PDT', 's1', 'dissent', 'x', '0.2.1', ?, 't')`)
+        .run(`a-${String(i)}`, kind);
+    }
+    expect(() => db.prepare(
+      `INSERT INTO entries (${REQUIRED}, anchor_kind) VALUES (${VALUES}, 'diagram')`).run('dissent'))
+      .toThrow();
+    expect(db.prepare('SELECT COUNT(*) n FROM entries').get().n).toBe(ANCHOR_KINDS.length);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('anchoring is a qualifier, not a table or a channel — the row is still one entries row', () => {
+    const { db, dir } = freshDb();
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
+                     .all().map(r => r.name as string);
+    expect(tables).not.toContain('anchors');
+    expect(CHANNELS as readonly string[]).not.toContain('annotation');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates idx_entries_anchor, the index anchoring exists to use', () => {
+    const { db, dir } = freshDb();
+    const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+                  .all().map(r => r.name as string);
+    expect(idx).toContain('idx_entries_anchor');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
   test('creates the messagebox tables (#41)', () => {
     const { db, dir } = freshDb();
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
@@ -218,8 +263,30 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 3 — the #41 messagebox shape', () => {
-    expect(SCHEMA_VERSION).toBe(3);
+  test('is 4 — the #18 anchoring shape', () => {
+    expect(SCHEMA_VERSION).toBe(4);
+  });
+
+});
+
+describe('the DDL split', () => {
+
+  test('ALL_DDL is exactly the tables followed by the indices', () => {
+    expect(ALL_DDL).toEqual([...TABLE_DDL, ...ALL_INDEX_DDL]);
+  });
+
+  test('no table statement creates an index, and no index statement creates a table', () => {
+    for (const statement of TABLE_DDL)     { expect(statement).toContain('CREATE TABLE'); }
+    for (const statement of ALL_INDEX_DDL) { expect(statement).toContain('CREATE INDEX'); }
+  });
+
+  test('applying the tables alone is enough for an insert — indices are never load-bearing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'se-schema-split-')),
+          db  = new DatabaseSync(join(dir, 'log.sqlite3'));
+    for (const statement of TABLE_DDL) { db.exec(statement); }
+    expect(() => db.prepare(`INSERT INTO entries (${REQUIRED}) VALUES (${VALUES})`).run('signature'))
+      .not.toThrow();
+    db.close(); rmSync(dir, { recursive: true, force: true });
   });
 
 });

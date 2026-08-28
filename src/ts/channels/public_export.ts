@@ -95,6 +95,9 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   permission_mode : { kind: 'excluded', note: 'host-defined open string; promotable to verbatim if it ever gains a closed vocabulary' },
   turn_index      : { kind: 'excluded', note: 'fine-grained session-structure fingerprint; hashed prompt_id already groups turns' },
   resolve_by      : { kind: 'excluded', note: 'forecast deadline (#42): write-validated to a local date but carrying no CHECK; conservative until reviewed — promotable to an export-validated date' },
+  anchor_target   : { kind: 'excluded', note: 'anchor target (#18): a repo path, a raw prompt id, or a user-chosen series key — the same leak as cwd, project, and series_key in one open column' },
+  anchor_span     : { kind: 'excluded', note: 'anchor position (#18): a fine-grained join key against the target it accompanies, and answers no aggregate question on its own' },
+  anchor_quote    : { kind: 'excluded', note: 'anchor quote (#18): free text, and on a prompt anchor the human\'s own words — the most sensitive field the schema holds' },
 
   // ── verbatim: closed vocabularies and safe scalars ─────────────────────────────
   channel         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary' },
@@ -108,6 +111,7 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   stem            : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary; the public affect signal' },
   outcome         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#42 forecast resolution)' },
   silence         : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#42 typed silence)' },
+  anchor_kind     : { kind: 'verbatim', note: 'CHECK-constrained closed vocabulary (#18 anchoring); "what fraction of dissents are anchored, onto what kinds" needs no words to answer' },
   uncertain       : { kind: 'verbatim', note: 'boolean' },
   visible         : { kind: 'verbatim', note: 'boolean' },
   nudged          : { kind: 'verbatim', note: 'boolean' },
@@ -143,6 +147,7 @@ export const PUBLIC_TREATMENTS: Readonly<Record<string, Treatment>> = {
   agent_id        : { kind: 'hash', note: 'groups a subagent\'s rows; also derives the is_subagent boolean' },
   corrects_id     : { kind: 'hash', of: 'target_uuid', note: 'exported as corrects_uuid: the salted hash of the target row\'s uuid, keeping the correction edge inside the submission' },
   series_key      : { kind: 'hash', note: 'the key is a user-chosen name; the hash keeps series grouping without the name' },
+  anchor_hash     : { kind: 'hash', note: 'already a one-way digest of the quote, and re-hashed under the submission salt anyway: an unsalted content digest is a global join key — two people quoting the same public line would link across submissions. Same-target grouping survives inside one submission, which is all aggregation needs' },
 
   // ── derive: a safe field computed from unsafe ones ─────────────────────────────
   ts_local        : { kind: 'derive', outputs: ['local_period', 'local_dow'], note: 'six-hour band and weekday/weekend; the raw local time and its zone never leave' },

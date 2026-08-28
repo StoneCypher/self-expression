@@ -10,8 +10,10 @@
  * on existing ones, the exact environment-dependent bug a migration step prevents.
  *
  * The machinery is deliberately reusable rather than a one-off: each version step is a
- * `MigrationStep`, and {@link migrate} walks whatever chain exists. Later schema work
- * (#41, #16, #18) adds steps to {@link MIGRATIONS} rather than new mechanisms.
+ * `MigrationStep`, {@link migrate} walks whatever chain exists, and the rebuild recipe
+ * itself is one shared function two steps already call. #41 and #18 both added their
+ * steps to {@link MIGRATIONS} rather than new mechanisms; later schema work does the
+ * same.
  *
  * @see ./schema.js
  * @see ./store.js
@@ -46,6 +48,20 @@ export const V1_ENTRY_COLUMNS: readonly string[] = [
   'plugin_version', 'format_version',
 ];
 
+/**
+ * The `entries` columns exactly as schema v3 declared them, in v3 order.
+ *
+ * v1's list plus the three #42 additions — v2→v3 was purely additive and touched no
+ * `entries` column. Named explicitly on both sides of the v3→v4 rebuild's
+ * `INSERT … SELECT`, for the same anti-shear reason as {@link V1_ENTRY_COLUMNS}, and
+ * frozen for the same reason: it describes databases that already exist.
+ */
+export const V3_ENTRY_COLUMNS: readonly string[] = [
+  ...V1_ENTRY_COLUMNS.slice(0, V1_ENTRY_COLUMNS.indexOf('series_key')),
+  'resolve_by', 'outcome', 'silence',
+  ...V1_ENTRY_COLUMNS.slice(V1_ENTRY_COLUMNS.indexOf('series_key')),
+];
+
 /** One version step: how to carry a database from `from` to `to`. */
 export interface MigrationStep {
   /** The stored schema version this step starts from. */
@@ -57,33 +73,43 @@ export interface MigrationStep {
 }
 
 /**
- * The v1→v2 step: rebuild `entries` so the widened `CHECK`s and the new nullable
- * `resolve_by`, `outcome`, and `silence` columns exist (#42).
+ * The SQLite table-rebuild recipe, shared by every step that has to widen a baked
+ * `CHECK`: build the new-shape table under a scratch name, copy the old shape's columns
+ * across by explicit name on both sides, drop, rename, recreate the indices the drop
+ * took with it.
  *
- * One transaction: build `entries_v2` from the current DDL, copy every v1 column
- * (including `id`, so the `corrects_id` chain stays valid; the new columns default
- * NULL), drop the old table, rename, recreate the indices the drop took with it.
+ * Foreign-key enforcement is switched off around the transaction — the standard SQLite
+ * recipe, and required here because `corrects_id` self-references `entries`: with
+ * enforcement on, dropping the old table trips the copied rows' references. `PRAGMA
+ * foreign_key_check` runs before commit so a genuinely broken chain still fails loudly,
+ * and enforcement is restored on every exit path.
  *
- * Foreign-key enforcement is switched off around the transaction — the standard
- * SQLite rebuild recipe, and required here because `corrects_id` self-references
- * `entries`: with enforcement on, dropping the old table trips the copied rows'
- * references. `PRAGMA foreign_key_check` runs before commit so a genuinely broken
- * chain still fails loudly, and enforcement is restored on every exit path.
+ * Extracted rather than repeated because it is now run by two steps and will be run by
+ * every future vocabulary growth: one recipe means the second rebuild cannot quietly
+ * differ from the first.
  *
- * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so
- *                 a failed migration leaves the v1 database exactly as it was.
+ * @param db      the database being migrated
+ * @param scratch the temporary table name to build into; must not already exist
+ * @param columns the *old* shape's columns, in the old shape's order — new columns are
+ *                simply absent from both sides of the copy and arrive NULL
+ *
+ * @example
+ *   rebuildEntries(db, 'entries_v2', V1_ENTRY_COLUMNS);
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed migration leaves the database exactly as it was.
  */
-function migrateV1toV2(db: DatabaseSync): void {
+function rebuildEntries(db: DatabaseSync, scratch: string, columns: readonly string[]): void {
 
-  const columns = V1_ENTRY_COLUMNS.join(', ');
+  const named = columns.join(', ');
 
   db.exec('PRAGMA foreign_keys = OFF');   // a no-op inside a transaction, so set before BEGIN
   db.exec('BEGIN');
   try {
-    db.exec(entriesDdl('entries_v2'));
-    db.exec(`INSERT INTO entries_v2 (${columns}) SELECT ${columns} FROM entries`);
+    db.exec(entriesDdl(scratch));
+    db.exec(`INSERT INTO ${scratch} (${named}) SELECT ${named} FROM entries`);
     db.exec('DROP TABLE entries');
-    db.exec('ALTER TABLE entries_v2 RENAME TO entries');
+    db.exec(`ALTER TABLE ${scratch} RENAME TO entries`);
     for (const statement of INDEX_DDL) { db.exec(statement); }
     const broken = db.prepare('PRAGMA foreign_key_check').all();
     if (broken.length > 0) {
@@ -97,6 +123,22 @@ function migrateV1toV2(db: DatabaseSync): void {
     db.exec('PRAGMA foreign_keys = ON');
   }
 
+}
+
+/**
+ * The v1→v2 step: rebuild `entries` so the widened `CHECK`s and the new nullable
+ * `resolve_by`, `outcome`, and `silence` columns exist (#42).
+ *
+ * Every v1 column is copied, `id` included, so the `corrects_id` chain stays valid; the
+ * new columns arrive NULL.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so
+ *                 a failed migration leaves the v1 database exactly as it was.
+ *
+ * @see rebuildEntries
+ */
+function migrateV1toV2(db: DatabaseSync): void {
+  rebuildEntries(db, 'entries_v2', V1_ENTRY_COLUMNS);
 }
 
 /**
@@ -127,12 +169,31 @@ function migrateV2toV3(db: DatabaseSync): void {
 }
 
 /**
+ * The v3→v4 step: rebuild `entries` so the five nullable anchor columns and the
+ * `anchor_kind` `CHECK` exist (#18).
+ *
+ * Additive in data terms — every v3 row keeps every v3 value and the anchor columns
+ * arrive NULL, which is exactly "not anchored" — but the new `CHECK` cannot be added in
+ * place, so this is a rebuild rather than five `ALTER TABLE`s. `idx_entries_anchor`
+ * comes back with the rest of {@link INDEX_DDL} inside the rebuild.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v3 database exactly as it was.
+ *
+ * @see rebuildEntries
+ */
+function migrateV3toV4(db: DatabaseSync): void {
+  rebuildEntries(db, 'entries_v4', V3_ENTRY_COLUMNS);
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
 export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 1, to: 2, apply: migrateV1toV2 },
   { from: 2, to: 3, apply: migrateV2toV3 },
+  { from: 3, to: 4, apply: migrateV3toV4 },
 ];
 
 /**

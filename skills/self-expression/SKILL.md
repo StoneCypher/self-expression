@@ -137,6 +137,52 @@ and on a close signature, in prose: `still; 🕳️ nothing notable` with `silen
 
 &nbsp;
 
+## Anchoring: ⚓
+
+A note can be **attached to the thing it is about** instead of mentioning it in prose. "A reservation about line 40" is a citation; the same reservation bound to line 40 is an annotation. Anchoring is a qualifier, not a channel — an anchored dissent is still a dissent, on its own line, with its own row.
+
+The anchor segment sits **between the keyword and the note**: ⚓, then the target, then the quote in backticks, then `»`. The decoration glyph still precedes the keyword, and the line still ends with the feeling face:
+
+```diff
+! 🤔 dissent: ⚓ src/ts/channels/store.ts:141 `readConfig(store, key)` » null for unset and for empty; callers can't tell which 😕
+- need: ⚓ your message `ship it when ready` » "ready" reads three ways: tests green, PR approved, or deployed 😟
+! 🧭 diverged: ⚓ #212 » that entry claimed the gate was exact; it wasn't for mid signatures 😬
+```
+
+Five things are addressable, and the target renders differently for each:
+
+| kind | `anchorTarget` | renders as | span |
+|---|---|---|---|
+| `file` | repo-relative path | `path:line`, or `[path:line](path#L40)` where markdown links work | `L40` or `L40-52` |
+| `prompt` | omit it — the hook's turn is adopted | `your message`, or `your message (2 turns ago)` | `#2`, only for a repeated quote |
+| `reply` | the turn your output was in | `my reply` | `#2` |
+| `checklist` | the `seriesKey` | the series title | `@3`, for a chart point |
+| `entry` | the entry id | `#212` | none; the id is exact |
+
+**Three or more notes in a turn: use `annotate` once and paste its block verbatim.** It records one row per note and returns the canonical rendering, so you never draw the alignment by hand:
+
+```text
+⚓ src/ts/channels/store.ts
+   L141  `readConfig(store, key)`  » null for unset and for empty 😕
+   L162  `writeConfig`             » local timestamp never updated 🤨
+
+⚓ your message
+   `ship it when ready`     » "ready" reads three ways; assuming tests-green 🤔
+   `the old config format`  » two old formats exist; assuming v1 😬
+```
+
+It is all-or-nothing: one bad note rejects the batch naming its index. Fix that note and resend the batch.
+
+**Quoting discipline.** Quote the *shortest span that is unambiguous*, at most 120 characters. Prefer extending the quote over adding an occurrence ordinal when either would work — a longer quote is self-describing, an ordinal is a footnote. Whitespace is collapsed before storage, so indentation costs nothing.
+
+**An anchored ambiguity mark is a notification, not a question.** This is the point of the mechanic. When a clause reads two ways, do not spend a round trip asking and do not pick silently: mark the ambiguity where it lives, **state which reading you took**, and carry on. Your partner answers whenever they choose, or never; when they do, record the outcome as a new entry with `correctsId` pointing at the mark. A genuine blocker is still a `need` — anchoring changes where commentary sits, never the contract of a channel.
+
+**Budget: none of its own.** Each note is budgeted by its channel's existing scarcity rules. Attachment is free; commentary never was.
+
+Your partner's words are the most sensitive thing this plugin stores. When `privacy.store_quotes` is off, a `prompt` quote is dropped at write and only its one-way hash is kept — the rendered line still showed it once, but later recall will not have it. Nothing to do differently; it is worth knowing the record may be quieter than the transcript was.
+
+&nbsp;
+
 ## Salience: ⭑
 
 A sentence-initial ⭑ (U+2B51) marks **the single load-bearing sentence** of a response — the one thing to read if only one thing gets read. Budget: **at most one per response**; zero is normal, and the budget is the entire mechanism. Legal at the start of a paragraph or a bullet item, in main-channel prose only — never inside code blocks, never on channel diff lines, never on the signature line, never in headings. Not recorded: ⭑ is presentation of the main channel, not an expression; if the marked sentence also deserves recording it is already a need, an idea, or a confidence claim.
@@ -217,7 +263,9 @@ If a channel is disabled in configuration the tool will reject it. That is not a
 
 **`visible: false`** when something was recorded but never surfaced. Be honest about this. It is how anyone can tell whether the backchannel is being used to say things or to avoid saying them.
 
-**`correctsId`** points at an earlier entry this retracts.
+**`correctsId`** points at an earlier entry this retracts. Distinct from an `entry` anchor: `correctsId` means "this replaces that", an anchor means "this is about that", with the earlier entry still standing.
+
+**`anchorKind` / `anchorTarget` / `anchorSpan` / `anchorQuote`** attach the note to a location (see Anchoring). The hash is derived server-side; never supply one.
 
 &nbsp;
 
