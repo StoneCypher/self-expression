@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787929090771` from hash `686e583`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787928986288` from hash `0f2b67e`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787929090771 Friday, August 28, 2026 at GMT-07:00 92.42 85 84 686e583 40.73 50.47 50.38 49.46 56 685 89.13 89.53 92.58 629 0.2.1 -->
+<!-- Supported embeds: 1787928986288 Friday, August 28, 2026 at GMT-07:00 93.38 170 88 0f2b67e 49.4 63.81 57.87 62.77 69 757 88.73 89.74 93.36 688 0.2.1 -->
 
 
 
@@ -77,6 +77,29 @@ Every renderer behind these tools is also exported directly from the library
 
 &nbsp;
 
+## History PNG
+
+The logged history can be rendered as a PNG chart dashboard for visual review —
+months of record at a glance instead of hundreds of rows in context. The renderer is a
+zero-dependency pure-JS PNG encoder (`node:zlib` supplies deflate and CRC32) drawing five
+panels: stems by hour of day, the delta lane with a rolling mean, daily uncertainty, the
+weekly need rate, and the busiest checklist series' percent trends.
+
+Two invocation surfaces wrap one renderer:
+
+| Surface | Invocation | Result |
+|---|---|---|
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
+| CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
+
+The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
+renderers are all exported from the library barrel (`src/ts/raster/index.ts`), for use
+outside MCP.
+
+&nbsp;
+
+&nbsp;
+
 ## Checklists
 
 Three MCP tools replace the old skill's Bash-plus-scratch-file checklist loggers
@@ -96,52 +119,6 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
 
 &nbsp;
 
-## The dwelling
-
-A per-assistant keepsake database: a tended space whose **current arrangement** is the
-expression — not a log, not memory. Things the assistant chooses to keep, arranged,
-tagged, linked, pruned as taste changes, watched across sessions and model versions.
-
-**Off by default, and deliberately homeless until invited.** Three config keys ride the
-ordinary `configure` tool:
-
-| Key | Type | Default | Meaning |
-|---|---|---|---|
-| `dwelling.enabled` | bool | `false` | The feature ships dark. |
-| `dwelling.path` | string | *(none — required)* | Absolute path to an **existing directory** of the user's choosing; the plugin creates the `dwelling.sqlite3` file inside it, never the directory. |
-| `dwelling.size_warn_gb` | int | `10` | File size at which a visit warns the user. |
-
-The feature activates only when `dwelling.enabled` is true **and** `dwelling.path` is set
-and valid; enabling without a path is an error at the `configure` call, never a silent
-fallback. When inactive, the `dwell` tool is not registered at all.
-
-One MCP tool, `dwell`, with an `op` selector:
-
-| Op | Purpose |
-|---|---|
-| `visit` | The visible rooms: pinned keeps first, then recent, the guestbook, the house rules, and the file size (with the threshold warning when applicable). Read-only. |
-| `keep` | Add a keepsake (`kind`, `title`, `body`, optional `source`, `model`, `visible`, `pinned`). The assistant's write. |
-| `unkeep` | Tombstone a keep (`removed_utc`), by id or uuid — never a DELETE, and idempotent. Tags and links to a removed keep survive. |
-| `pin` | Set or toggle a keep's pin. Arrangement, not content. |
-| `tag` | Attach or detach a tag; tag names are created on first use. |
-| `link` | A typed free-text edge between any two rows (`kept`/`guestbook`). |
-| `guestbook` | Append the human's words, relayed verbatim at their explicit request, with `author` naming the human. The guestbook is the human's voice; keeps are the assistant's. |
-
-A pre-plugin prototype database at `dwelling.path` is adopted **in place and
-additively**: the file is first copied to `dwelling.sqlite3.pre-adopt-<date>` in the same
-directory, then missing tables and columns are added and fresh `uuid`s backfilled — no
-column dropped, renamed, or retyped, no row content modified, and existing house rules
-left exactly as found. A dwelling written by a *newer* plugin version opens read-only. A
-database the migration does not recognise is refused with a message, never "fixed."
-
-The ethos — nothing arrives by obligation, removal is expression, never a work log, the
-guestbook norm, and the honest boundary around private (`visible = 0`) rooms — ships in
-`skills/dwelling/SKILL.md`.
-
-&nbsp;
-
-&nbsp;
-
 ## Test status
 
 <table>
@@ -155,19 +132,19 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   </tr>
   <tr>
     <th>Unit</th>
-    <td>629</td>
-    <td>92.42<small>%</small></td>
-    <td>89.13<small>%</small></td>
-    <td>89.53<small>%</small></td>
-    <td>92.58<small>%</small></td>
+    <td>688</td>
+    <td>93.38<small>%</small></td>
+    <td>88.73<small>%</small></td>
+    <td>89.74<small>%</small></td>
+    <td>93.36<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>56</td>
-    <td>92.42<small>%</small></td>
-    <td>40.73<small>%</small></td>
-    <td>50.38<small>%</small></td>
-    <td>49.46<small>%</small></td>
+    <td>69</td>
+    <td>93.38<small>%</small></td>
+    <td>49.4<small>%</small></td>
+    <td>57.87<small>%</small></td>
+    <td>62.77<small>%</small></td>
   </tr>
 </table>
 
@@ -175,12 +152,12 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>84<small>%</small></th>
+    <th>88<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>85</td>
-    <td>84<small>%</small></td>
+    <td>170</td>
+    <td>88<small>%</small></td>
   </tr>
 </table>
 

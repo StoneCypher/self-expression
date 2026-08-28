@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-42 merges; 2 releases
+40 merges; 2 releases
 
 
 
@@ -14,48 +14,6 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 7:57:09 AM
-
-Commit [686e583b8a82a715d4ba74bee6aa6eac8cdef0b3](https://github.com/StoneCypher/self-expression/commit/686e583b8a82a715d4ba74bee6aa6eac8cdef0b3)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [1d3a320, 32c17a7]
-
-  * chore: merge origin/main (#30 config surface) — dwelling keys ride the registry
-  * Takes main's registry-driven handleConfigure and layers the dwelling's cross-key
-semantics on top: enabled-without-path and nonexistent-directory writes are still
-rejected after registry type validation, and dwelling activation changes still note
-that they land next session. dwelling.size_warn_gb now accepts 0 (warn on every
-visit) to match the registry's range. Generated artifacts taken from main; rebuild
-follows.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 7:57:06 AM
-
-Commit [c11912c7c8f6c65909d3674c265e61b9d5d92105](https://github.com/StoneCypher/self-expression/commit/c11912c7c8f6c65909d3674c265e61b9d5d92105)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [0f2b67e, 32c17a7]
-
-  * chore: merge origin/main (config surface #30, retention) and rebuild
-  * Generated artifacts (README, CHANGELOG, coverage, dist, docs) regenerated
-by a full green build over the merged sources.
 
 
 

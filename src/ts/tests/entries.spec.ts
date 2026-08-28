@@ -6,6 +6,7 @@ import type { Store }            from '../channels/store.js';
 import {
   recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
   recentChecklists, seriesPercents,
+  localHour, isoWeekKey, signatureHistory, needWeekly, checklistSeriesTop,
 } from '../channels/entries.js';
 
 const VERSION = '0.2.0';
@@ -235,6 +236,140 @@ describe('seriesPercents', () => {
     recordEntry(s, { channel: 'checklist', text: 'c', session: 's1',
                      seriesKey: 'atlas', title: 'Project Altas — phase 2', percent: 80 }, VERSION);
     expect(seriesPercents(s, 'atlas')).toEqual([25, 60, 80]);
+  }));
+
+});
+
+describe('localHour', () => {
+
+  test.each([
+    ['9:14 am PDT', 9], ['12:03 am PDT', 0], ['12:00 pm CET', 12],
+    ['1:00 pm PDT', 13], ['11:59 pm UTC', 23],
+  ] as const)("recovers the hour out of '%s'", (rendered, hour) => {
+    expect(localHour(rendered)).toBe(hour);
+  });
+
+  test.each(['whenever', '', '25:00 am PDT', '0:30 am PDT', 'about 9ish'])(
+    "returns null for unrecoverable '%s' rather than guessing", (rendered) => {
+      expect(localHour(rendered)).toBeNull();
+    });
+
+});
+
+describe('isoWeekKey', () => {
+
+  test('labels a mid-year instant with its ISO week', () => {
+    expect(isoWeekKey(new Date('2026-08-27T21:00:00Z'))).toBe('2026-W35');
+  });
+
+  test('a new-year instant can belong to the previous ISO week-year', () => {
+    expect(isoWeekKey(new Date('2027-01-01T00:00:00Z'))).toBe('2026-W53');
+  });
+
+  test('Monday starts the week: Sunday and the following Monday differ', () => {
+    expect(isoWeekKey(new Date('2026-08-23T12:00:00Z')))     // a Sunday
+      .not.toBe(isoWeekKey(new Date('2026-08-24T12:00:00Z')));  // the Monday after
+  });
+
+});
+
+const WHEN = new Date('2026-08-27T21:15:04.000Z');
+
+describe('signatureHistory', () => {
+
+  test('returns signature rows only, ascending, with the panel shape', () => withStore(s => {
+    recordEntry(s, { channel: 'signature', text: 'a', session: 's1', stem: 'flow', delta: 'up', project: 'atlas' }, VERSION, WHEN);
+    recordEntry(s, { channel: 'need',      text: 'not a signature', session: 's1' }, VERSION, WHEN);
+    recordEntry(s, { channel: 'signature', text: 'b', session: 's1', uncertain: true }, VERSION, WHEN);
+
+    const rows = signatureHistory(s, '2026-08-01T00:00:00.000Z');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.stem).toBe('flow');
+    expect(rows[0]?.delta).toBe('up');
+    expect(rows[0]?.project).toBe('atlas');
+    expect(rows[0]?.uncertain).toBe(false);
+    expect(rows[1]?.stem).toBeNull();
+    expect(rows[1]?.uncertain).toBe(true);
+    expect((rows[0]?.id ?? 0) < (rows[1]?.id ?? 0)).toBe(true);
+  }));
+
+  test('the recovered local hour matches the stored local rendering', () => withStore(s => {
+    recordEntry(s, { channel: 'signature', text: 'a', session: 's1' }, VERSION, WHEN);
+    const [row] = signatureHistory(s, '2026-08-01T00:00:00.000Z');
+    // The stored ts_local depends on the test machine's zone; the recovered hour
+    // must agree with re-parsing that same stored text.
+    expect(row?.hourLocal).toBe(localHour(String(
+      s.db.prepare('SELECT ts_local FROM entries LIMIT 1').get()?.['ts_local'])));
+    expect(row?.hourLocal).toBeGreaterThanOrEqual(0);
+    expect(row?.hourLocal).toBeLessThanOrEqual(23);
+  }));
+
+  test('rows before the window are excluded', () => withStore(s => {
+    recordEntry(s, { channel: 'signature', text: 'old', session: 's1' }, VERSION, new Date('2026-01-01T00:00:00Z'));
+    recordEntry(s, { channel: 'signature', text: 'new', session: 's1' }, VERSION, WHEN);
+    expect(signatureHistory(s, '2026-08-01T00:00:00.000Z')).toHaveLength(1);
+  }));
+
+});
+
+describe('needWeekly', () => {
+
+  test('counts distinct prompts as turns and need rows as needs, per ISO week', () => withStore(s => {
+    // Two signatures in one prompt: one turn, not two.
+    recordEntry(s, { channel: 'signature', text: 'open',  session: 's1', promptId: 'p1' }, VERSION, WHEN);
+    recordEntry(s, { channel: 'signature', text: 'close', session: 's1', promptId: 'p1' }, VERSION, WHEN);
+    recordEntry(s, { channel: 'signature', text: 'open',  session: 's1', promptId: 'p2' }, VERSION, WHEN);
+    recordEntry(s, { channel: 'need',      text: 'merge?', session: 's1', promptId: 'p1' }, VERSION, WHEN);
+
+    expect(needWeekly(s, '2026-08-01T00:00:00.000Z')).toEqual([
+      { week: '2026-W35', turns: 2, needs: 1 },
+    ]);
+  }));
+
+  test('weeks sort ascending and needs without signatures still form a week', () => withStore(s => {
+    recordEntry(s, { channel: 'need', text: 'early', session: 's1' }, VERSION, new Date('2026-08-10T12:00:00Z'));
+    recordEntry(s, { channel: 'signature', text: 'late', session: 's1', promptId: 'p9' }, VERSION, WHEN);
+
+    expect(needWeekly(s, '2026-08-01T00:00:00.000Z')).toEqual([
+      { week: '2026-W33', turns: 0, needs: 1 },
+      { week: '2026-W35', turns: 1, needs: 0 },
+    ]);
+  }));
+
+  test('an empty store yields no weeks rather than zero-filled ones', () => withStore(s => {
+    expect(needWeekly(s, '2026-08-01T00:00:00.000Z')).toEqual([]);
+  }));
+
+});
+
+describe('checklistSeriesTop', () => {
+
+  test('returns the busiest series first, each with its in-range history in order', () => withStore(s => {
+    for (const percent of [10, 20, 30]) {
+      recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', seriesKey: 'busy', percent }, VERSION, WHEN);
+    }
+    recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', seriesKey: 'quiet', percent: 99 }, VERSION, WHEN);
+
+    expect(checklistSeriesTop(s, '2026-08-01T00:00:00.000Z', 5)).toEqual([
+      { seriesKey: 'busy',  percents: [10, 20, 30] },
+      { seriesKey: 'quiet', percents: [99] },
+    ]);
+  }));
+
+  test('honours n, dropping the quietest series', () => withStore(s => {
+    for (const percent of [10, 20]) {
+      recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', seriesKey: 'busy', percent }, VERSION, WHEN);
+    }
+    recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', seriesKey: 'quiet', percent: 99 }, VERSION, WHEN);
+    expect(checklistSeriesTop(s, '2026-08-01T00:00:00.000Z', 1).map(row => row.seriesKey)).toEqual(['busy']);
+  }));
+
+  test('out-of-range snapshots count for neither ranking nor history', () => withStore(s => {
+    recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', seriesKey: 'a', percent: 10 }, VERSION, new Date('2026-01-01T00:00:00Z'));
+    recordEntry(s, { channel: 'checklist', text: 'x', session: 's1', seriesKey: 'a', percent: 50 }, VERSION, WHEN);
+    expect(checklistSeriesTop(s, '2026-08-01T00:00:00.000Z', 5)).toEqual([
+      { seriesKey: 'a', percents: [50] },
+    ]);
   }));
 
 });
