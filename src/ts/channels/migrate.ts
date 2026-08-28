@@ -18,7 +18,10 @@
  */
 
 import type { DatabaseSync } from 'node:sqlite';
-import { entriesDdl, INDEX_DDL } from './schema.js';
+import {
+  entriesDdl, INDEX_DDL,
+  MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
+} from './schema.js';
 
 /**
  * The `entries` columns exactly as schema v1 declared them, in v1 order.
@@ -97,11 +100,39 @@ function migrateV1toV2(db: DatabaseSync): void {
 }
 
 /**
+ * The v2→v3 step: create the messagebox tables and their indices (#41).
+ *
+ * Purely additive — no existing table changes shape and no rows move — so the step is
+ * simply the new DDL, wrapped in one transaction for the all-or-nothing contract every
+ * `MigrationStep` promises. Each statement is `IF NOT EXISTS`-idempotent, which also
+ * makes this safe when `openStore` has already applied `ALL_DDL` before walking the
+ * chain (its normal order of operations).
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so
+ *                 a failed step leaves the v2 database exactly as it was.
+ */
+function migrateV2toV3(db: DatabaseSync): void {
+
+  db.exec('BEGIN');
+  try {
+    db.exec(MESSAGES_DDL);
+    db.exec(MESSAGE_READS_DDL);
+    for (const statement of MESSAGE_INDEX_DDL) { db.exec(statement); }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
 export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 1, to: 2, apply: migrateV1toV2 },
+  { from: 2, to: 3, apply: migrateV2toV3 },
 ];
 
 /**

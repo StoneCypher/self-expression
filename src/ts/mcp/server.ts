@@ -25,6 +25,7 @@ import type { Store }    from '../channels/store.js';
 import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
 import { registerChecklistTools } from './checklist_tools.js';
+import { registerMessageTools } from './message_tools.js';
 import { maybeOpenDwelling, registerDwellTool } from './dwell_tool.js';
 import { closeDwelling } from '../dwelling/store.js';
 import type { DwellingStore } from '../dwelling/store.js';
@@ -56,6 +57,7 @@ export function buildServer(store: Store, version: string, dwelling?: DwellingSt
   registerTools(server, store, version);
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
+  registerMessageTools(server, store, version);
 
   const house = dwelling === undefined ? maybeOpenDwelling(store) : dwelling;
   if (house !== null) { registerDwellTool(server, store, house); }
@@ -91,10 +93,11 @@ export async function startStdio(version: string, dbFile?: string): Promise<void
   // a note on stderr, which is the diagnostics channel here.
   try {
     const pruned = pruneExpired(store);
-    if (pruned.entries > 0 || pruned.turnContext > 0) {
+    if (pruned.entries > 0 || pruned.turnContext > 0 || pruned.messages > 0) {
       process.stderr.write(
-        `${SERVER_NAME}: retention pruned ${String(pruned.entries)} entries and ` +
-        `${String(pruned.turnContext)} turn-context rows\n`);
+        `${SERVER_NAME}: retention pruned ${String(pruned.entries)} entries, ` +
+        `${String(pruned.turnContext)} turn-context rows, ${String(pruned.messages)} messages, ` +
+        `and ${String(pruned.messageReads)} orphaned receipts\n`);
     }
   } catch (error) {
     process.stderr.write(`${SERVER_NAME}: retention pruning failed, continuing: ${String(error)}\n`);
