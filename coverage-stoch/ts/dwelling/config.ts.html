@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">10.52% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/38</span>
+                <span class='fraction'>4/38</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">11.42% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/35</span>
+                <span class='fraction'>4/35</span>
             </div>
         
             
@@ -250,16 +250,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -419,16 +419,16 @@ import type { Store }                          from '../channels/store.js';
 import { directoryExists, validateDwellingDir } from './paths.js';
 &nbsp;
 /** Config key: whether the dwelling is enabled at all. The feature ships dark. */
-export const DWELLING_ENABLED_KEY = <span class="cstat-no" title="statement not covered" >'dwelling.enabled';</span>
+export const DWELLING_ENABLED_KEY = 'dwelling.enabled';
 &nbsp;
 /** Config key: absolute path to the dwelling's directory. Required; no default. */
-export const DWELLING_PATH_KEY = <span class="cstat-no" title="statement not covered" >'dwelling.path';</span>
+export const DWELLING_PATH_KEY = 'dwelling.path';
 &nbsp;
 /** Config key: file size in whole gigabytes at which a visit warns the user. */
-export const DWELLING_SIZE_WARN_KEY = <span class="cstat-no" title="statement not covered" >'dwelling.size_warn_gb';</span>
+export const DWELLING_SIZE_WARN_KEY = 'dwelling.size_warn_gb';
 &nbsp;
 /** Default for `dwelling.size_warn_gb` — a threshold to notice failure, not plan for it. */
-export const DEFAULT_SIZE_WARN_GB = <span class="cstat-no" title="statement not covered" >10;</span>
+export const DEFAULT_SIZE_WARN_GB = 10;
 &nbsp;
 /** The dwelling configuration as read from overrides plus code defaults. */
 export interface DwellingConfig {
@@ -456,7 +456,7 @@ export function <span class="fstat-no" title="function not covered" >dwellingCon
         rawGb   = <span class="cstat-no" title="statement not covered" >readConfig(store, DWELLING_SIZE_WARN_KEY),</span>
         parsed  = <span class="cstat-no" title="statement not covered" >rawGb === null ? NaN : Number(rawGb);</span>
 &nbsp;
-  const sizeWarnGb = <span class="cstat-no" title="statement not covered" >Number.isInteger(parsed) &amp;&amp; parsed &gt; 0 ? parsed : DEFAULT_SIZE_WARN_GB;</span>
+  const sizeWarnGb = <span class="cstat-no" title="statement not covered" >Number.isInteger(parsed) &amp;&amp; parsed &gt;= 0 ? parsed : DEFAULT_SIZE_WARN_GB;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return { enabled, path, sizeWarnGb };</span>
 &nbsp;
@@ -540,8 +540,8 @@ export function <span class="fstat-no" title="function not covered" >rejectDwell
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  if (key === DWELLING_SIZE_WARN_KEY) {</span>
     const parsed = <span class="cstat-no" title="statement not covered" >Number(value);</span>
-<span class="cstat-no" title="statement not covered" >    if (!Number.isInteger(parsed) || parsed &lt;= 0) {</span>
-<span class="cstat-no" title="statement not covered" >      return `error: dwelling.size_warn_gb accepts a positive integer number of gigabytes; got '${value}'`;</span>
+<span class="cstat-no" title="statement not covered" >    if (!Number.isInteger(parsed) || parsed &lt; 0) {</span>
+<span class="cstat-no" title="statement not covered" >      return `error: dwelling.size_warn_gb accepts a non-negative integer number of gigabytes (0 warns on every visit); got '${value}'`;</span>
     }
 <span class="cstat-no" title="statement not covered" >    return null;</span>
   }
@@ -577,7 +577,7 @@ export function <span class="fstat-no" title="function not covered" >dwellingCha
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T14:50:56.797Z
+                at 2026-08-28T14:58:08.701Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
