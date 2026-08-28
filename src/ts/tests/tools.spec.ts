@@ -6,8 +6,11 @@ import { openStore, closeStore, writeConfig, readConfig } from '../channels/stor
 import type { Store } from '../channels/store.js';
 import { recordContext }  from '../channels/context.js';
 import { FORMAT_VERSION, CONFIG_KEYS } from '../channels/config.js';
-import { CHANNELS }       from '../channels/vocabulary.js';
-import { handleConfigure, handleExpress, enabledChannels, ENABLED_KEY } from '../mcp/tools.js';
+import { CHANNELS, CONFIDENCE_GROUNDS } from '../channels/vocabulary.js';
+import {
+  handleConfigure, handleExpress, enabledChannels, enabledConfidenceGrounds,
+  ENABLED_KEY, FORECAST_KEY,
+} from '../mcp/tools.js';
 import { handleLogChecklist } from '../mcp/checklist_tools.js';
 import { renderChecklistSummary } from '../charts/checklist.js';
 
@@ -23,6 +26,12 @@ function withStore<T>(fn: (s: Store) => T): T {
 function text(reply: { content: { type: 'text'; text: string }[] }): string {
   const [first] = reply.content;
   return first === undefined ? '' : first.text;
+}
+
+/** The id a `recorded #N …` reply names, for reading the row back. */
+function recordedId(reply: { content: { type: 'text'; text: string }[] }): number {
+  const match = /^recorded #(\d+) /.exec(text(reply));
+  return match === null ? 0 : Number(match[1]);
 }
 
 describe('handleConfigure set — D2, validated and canonicalized', () => {
@@ -134,6 +143,17 @@ describe('handleConfigure list — D4, effective configuration', () => {
     expect(unknown).toMatchObject({ value: 'true', source: 'override', known: false });
   }));
 
+  test('the #42 prose-convention and forecast keys are registered with the spec defaults', () => withStore(s => {
+    const parsed = JSON.parse(text(handleConfigure(s, { op: 'list' }))) as
+      { key: string; value: string | null; source: string }[];
+    const by = (key: string): { value: string | null } | undefined => parsed.find(e => e.key === key);
+    expect(by('forecast.enabled')).toMatchObject({ value: 'true',  source: 'default' });
+    expect(by('salience.enabled')).toMatchObject({ value: 'true',  source: 'default' });
+    expect(by('revision.enabled')).toMatchObject({ value: 'false', source: 'default' });
+    expect(by('gifts.enabled')).toMatchObject({ value: 'false', source: 'default' });
+    expect(by('roster.enabled')).toMatchObject({ value: 'false', source: 'default' });
+  }));
+
 });
 
 describe('handleExpress — D7, declarative format stamping', () => {
@@ -177,6 +197,129 @@ describe('log_checklist rows carry the same stamp — a checklist row is an entr
     handleLogChecklist(s, VERSION, { block, title: 'T', seriesKey: 'k' });
     const rows = s.db.prepare('SELECT format_version FROM entries ORDER BY id').all();
     expect(rows.map(r => r['format_version'])).toEqual([FORMAT_VERSION, 'study-2']);
+  }));
+
+});
+
+describe('enabledChannels — #42 growth', () => {
+
+  test('defaults to every channel, including load and taste', () => withStore(s => {
+    expect(enabledChannels(s)).toEqual(CHANNELS);
+  }));
+
+  test('an override narrows to the named channels', () => withStore(s => {
+    writeConfig(s, ENABLED_KEY, 'signature, need, taste');
+    expect(enabledChannels(s)).toEqual(['signature', 'need', 'taste']);
+  }));
+
+});
+
+describe('enabledConfidenceGrounds — #42, forecast baking', () => {
+
+  test('defaults to every ground, including predicted — forecast is on by default', () => withStore(s => {
+    expect(enabledConfidenceGrounds(s)).toEqual(CONFIDENCE_GROUNDS);
+  }));
+
+  test('an effective false bakes predicted out of the enum entirely', () => withStore(s => {
+    handleConfigure(s, { op: 'set', key: FORECAST_KEY, value: 'FALSE' });   // canonicalizes to 'false'
+    const grounds = enabledConfidenceGrounds(s);
+    expect(grounds).toEqual(['verified', 'recalled', 'inferred', 'guessed']);
+    expect(grounds).not.toContain('predicted');
+  }));
+
+  test('an invalid stored value behaves as unset — the default (on) applies (D5)', () => withStore(s => {
+    for (const value of ['off', 'no', '0', 'sometimes']) {
+      writeConfig(s, FORECAST_KEY, value);   // bypasses set validation, as a hand edit would
+      expect(enabledConfidenceGrounds(s)).toEqual(CONFIDENCE_GROUNDS);
+    }
+  }));
+
+});
+
+describe('handleExpress — #42 forecasts', () => {
+
+  test('records a forecast with its resolve-by date', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'the stryker run passes untouched',
+      confidence: 'predicted', resolveBy: '2026-08-30',
+    }));
+    const row = s.db.prepare('SELECT confidence, resolve_by FROM entries WHERE id = ?').get(id);
+    expect(row?.['confidence']).toBe('predicted');
+    expect(row?.['resolve_by']).toBe('2026-08-30');
+  }));
+
+  test('records a resolution pointing back at the forecast', () => withStore(s => {
+    const forecast = recordedId(handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'lands by friday', confidence: 'predicted',
+    }));
+    const resolution = recordedId(handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'merged clean, no review comments',
+      correctsId: forecast, outcome: 'hit',
+    }));
+    const row = s.db.prepare('SELECT corrects_id, outcome FROM entries WHERE id = ?').get(resolution);
+    expect(row?.['corrects_id']).toBe(forecast);
+    expect(row?.['outcome']).toBe('hit');
+  }));
+
+  test("a resolution whose target is not a forecast is rejected, naming the target's actual ground", () => withStore(s => {
+    const plain = recordedId(handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'checked it', confidence: 'verified',
+    }));
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'resolved?', correctsId: plain, outcome: 'hit',
+    })).toThrow(/'verified'/);
+  }));
+
+  test('a resolution whose target has no ground at all is rejected too', () => withStore(s => {
+    const idea = recordedId(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'resolved?', correctsId: idea, outcome: 'miss',
+    })).toThrow(/unset/);
+  }));
+
+  test('a resolution pointing at a nonexistent row is rejected, and nothing is written', () => withStore(s => {
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'resolved?', correctsId: 999, outcome: 'void',
+    })).toThrow(/does not exist/);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get()?.['n']).toBe(0);
+  }));
+
+});
+
+describe('handleExpress — #42 new channels and silence', () => {
+
+  test('records a taste line', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, {
+      channel: 'taste', text: 'this fix is a load-bearing kludge and we both know it',
+    }));
+    expect(s.db.prepare('SELECT channel FROM entries WHERE id = ?').get(id)?.['channel']).toBe('taste');
+  }));
+
+  test('records a load line', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, {
+      channel: 'load', text: 'context 72% full, 3 agents in flight, tool calls sluggish',
+    }));
+    expect(s.db.prepare('SELECT channel FROM entries WHERE id = ?').get(id)?.['channel']).toBe('load');
+  }));
+
+  test('records a typed silence on a signature close', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, {
+      channel: 'signature', text: 'still; nothing notable', position: 'close', silence: 'empty',
+    }));
+    expect(s.db.prepare('SELECT silence FROM entries WHERE id = ?').get(id)?.['silence']).toBe('empty');
+  }));
+
+  test('marks no-hook when no context was ever observed', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, { channel: 'idea', text: 'x' }));
+    expect(s.db.prepare('SELECT session FROM entries WHERE id = ?').get(id)?.['session']).toBe('no-hook');
+  }));
+
+  test('the client identity lands as host and host_version', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, { channel: 'idea', text: 'x' },
+                                        { name: 'claude-code', version: '2.0.1' }));
+    const row = s.db.prepare('SELECT host, host_version FROM entries WHERE id = ?').get(id);
+    expect(row?.['host']).toBe('claude-code');
+    expect(row?.['host_version']).toBe('2.0.1');
   }));
 
 });

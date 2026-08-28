@@ -1,12 +1,14 @@
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
+  FORECAST_OUTCOMES, SILENCE_KINDS,
   isMember, describeVocabulary,
 } from '../channels/vocabulary.js';
 
 const ALL: readonly (readonly string[])[] = [
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
+  FORECAST_OUTCOMES, SILENCE_KINDS,
 ];
 
 describe('vocabularies', () => {
@@ -45,6 +47,32 @@ describe('vocabularies', () => {
   test('unverified and assumed are distinct divergence kinds', () => {
     expect(isMember(DIVERGENCE_KINDS, 'unverified')).toBe(true);
     expect(isMember(DIVERGENCE_KINDS, 'assumed')).toBe(true);
+  });
+
+  test('the #42 channel extensions pin the grown vocabularies exactly', () => {
+    expect(CHANNELS).toEqual([
+      'signature', 'need', 'idea', 'divergence', 'dissent', 'conflict',
+      'confidence', 'unanswerable', 'pattern', 'checklist', 'load', 'taste',
+    ]);
+    expect(CONFIDENCE_GROUNDS).toEqual(['verified', 'recalled', 'inferred', 'guessed', 'predicted']);
+    expect(DIVERGENCE_KINDS).toEqual(['unverified', 'assumed', 'misread', 'overstated', 'stale', 'faded']);
+  });
+
+  test('the two new vocabularies pin their exact contents', () => {
+    expect(FORECAST_OUTCOMES).toEqual(['hit', 'miss', 'void']);
+    expect(SILENCE_KINDS).toEqual(['empty', 'unlooked', 'held', 'depth']);
+  });
+
+  test('predicted is a confidence ground, faded a divergence kind, load and taste channels', () => {
+    expect(isMember(CONFIDENCE_GROUNDS, 'predicted')).toBe(true);
+    expect(isMember(DIVERGENCE_KINDS, 'faded')).toBe(true);
+    expect(isMember(CHANNELS, 'load')).toBe(true);
+    expect(isMember(CHANNELS, 'taste')).toBe(true);
+  });
+
+  test('outcomes are outcomes, not silences, and vice versa', () => {
+    expect(isMember(FORECAST_OUTCOMES, 'empty')).toBe(false);
+    expect(isMember(SILENCE_KINDS, 'void')).toBe(false);
   });
 
 });

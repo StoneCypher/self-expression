@@ -19,6 +19,7 @@ import { dirname }        from 'node:path';
 import { randomUUID }     from 'node:crypto';
 import { platform }       from 'node:process';
 import { ALL_DDL, SCHEMA_VERSION } from './schema.js';
+import { migrate }        from './migrate.js';
 import { dbPath }         from './paths.js';
 import { stamp }          from './time.js';
 
@@ -140,14 +141,24 @@ export function allConfig(store: Store): Record<string, string> {
  * because a reinstall is a genuine discontinuity and the data should say so rather than
  * implying a continuity that did not exist.
  *
+ * The version handling is ordered deliberately: apply the DDL (a no-op on existing
+ * tables), **read** the stored `schema_version`, run {@link migrate} when the database
+ * is behind, and only *then* stamp the current version. The previous implementation
+ * stamped unconditionally before reading — which would have marked a v1 database as
+ * current without migrating it, the moment a v2 existed. A stored version *newer* than
+ * this code's is an error, never a downgrade-in-place: the newer schema may hold
+ * columns and vocabulary this code would silently mangle.
+ *
  * @param path - database file to open; defaults to the resolved data directory
  *
  * @example
  *   const store = openStore('/tmp/x/log.sqlite3');
- *   readMeta(store, 'schema_version');  // => '1'
+ *   readMeta(store, 'schema_version');  // => '2'
  *   closeStore(store);
  *
- * @throws {Error} If the directory cannot be created or the file cannot be opened.
+ * @throws {Error} If the directory cannot be created, the file cannot be opened, the
+ *                 stored schema version is newer than this code's, or a migration
+ *                 step fails (the failed step rolls back, leaving the file untouched).
  */
 export function openStore(path: string = dbPath()): Store {
 
@@ -157,6 +168,25 @@ export function openStore(path: string = dbPath()): Store {
   for (const statement of ALL_DDL) { db.exec(statement); }
 
   const partial: Store = { db, machineId: '', path };
+
+  const storedRaw = readMeta(partial, 'schema_version'),
+        stored    = storedRaw === null ? null : Number(storedRaw);
+
+  if (stored !== null && !Number.isInteger(stored)) {
+    db.close();
+    throw new Error(`stored schema_version '${storedRaw ?? ''}' is not an integer; refusing to guess`);
+  }
+
+  if (stored !== null && stored > SCHEMA_VERSION) {
+    db.close();
+    throw new Error(
+      `database schema is version ${String(stored)}, newer than this code's ` +
+      `${String(SCHEMA_VERSION)} — refusing to downgrade in place; upgrade the plugin instead`);
+  }
+
+  if (stored !== null && stored < SCHEMA_VERSION) {
+    migrate(db, stored, SCHEMA_VERSION);
+  }
 
   if (readMeta(partial, 'created_utc') === null) {
     writeMeta(partial, 'created_utc', stamp().utc);
