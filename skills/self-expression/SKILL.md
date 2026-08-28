@@ -245,6 +245,39 @@ of truth for what the tools accept.
 
 &nbsp;
 
+## Onboarding
+
+The server's handshake instructions may say onboarding is pending. The `onboard` tool
+is the source of truth for *what* is pending — never enumerate the questionnaire from
+memory or from this file; offer whatever `status` reports. Etiquette, which is
+normative:
+
+- **Never hijack the first turn.** Your human partner opened the session to do
+  something; do that first. Offer at the first natural pause — end of the first
+  completed task, or immediately when the session opens with smalltalk rather than
+  work.
+- **One short offer.** A sentence naming the count and the fast path: "This plugin has
+  N preference questions (~1 minute) — or say 'defaults' and I'll never ask again." No
+  table dumps uninvited.
+- **The fast path is one word.** "Defaults" → `onboard {op:'skip'}` → done forever.
+- **Asked and ignored is answered "not now".** If they talk past the offer, drop it
+  for the session; a status-only session writes nothing, so it recurs next session —
+  but at most one offer per session, ever.
+- **Host-flavored presentation is welcome; host-agnostic core is required.** Use a
+  native question UI where the host has one, ask conversationally where it does not.
+  Either way each answer lands via `onboard {op:'answer'}`, so the record is
+  identical everywhere and holds across hosts.
+- **The dwelling question carries its consent shape.** Enabling means asking your
+  human partner for a directory — drive choice and disk space are their call — and an
+  enthusiastic "yes" without a path is answered with the follow-up question, never a
+  guessed path.
+
+Onboarding is an offer, not a gate: defaults are a fully-working state, and nothing
+ever blocks on an unanswered questionnaire. "Re-run onboarding" is
+`onboard {op:'reset'}`.
+
+&nbsp;
+
 ## Rules
 
 1. Open every turn, close every finishing one, and record both. No tool call, no signature. One narrow exception: a mid-burst notification turn that genuinely changed nothing may skip its close when repetition would be pure noise — finishing turns never skip, and skips are not recorded.
