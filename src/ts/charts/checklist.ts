@@ -6,111 +6,37 @@
  * derived from a checklist's items — and every one of those rules has an edge (the
  * 0.17/0.5/0.83 anti-aliasing boundary, the count-desc-then-canonical-order sort, the
  * 8-vs-9 inline/block split, the 12-entry wrap) that a hand-drawn checklist has
- * historically gotten wrong by eye. This module is the single place that arithmetic
- * lives, composed entirely from the already-pinned primitives in `scale.ts`,
- * `markers.ts`, and `series.ts` rather than re-deriving any of it. Pure: no I/O, no
- * clock, no randomness.
+ * historically gotten wrong by eye.
  *
+ * Since issue #20 reframed the summary line as the checklist **profile** of the
+ * general digest grammar, the machinery lives in `digest.ts` and this module is the
+ * checklist-profile instantiation: same signature, byte-identical output (the
+ * exact-string and stochastic suites are the proof), with the arithmetic composed from
+ * the already-pinned primitives in `scale.ts`, `markers.ts`, and `series.ts` rather
+ * than re-deriving any of it. Pure: no I/O, no clock, no randomness.
+ *
+ * @see ./digest.ts
+ * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./scale.ts
  * @see ./markers.ts
- * @see ./series.ts
  */
 
-import { barCells } from './scale.js';
-import { classifyMarker, canonicalRank } from './markers.js';
-import type { Bucket } from './markers.js';
-import { renderSparkline } from './series.js';
+import { renderDigest }      from './digest.js';
+import { CHECKLIST_PROFILE } from './profiles.js';
+import type { Bucket }       from './markers.js';
 
 /**
  * One checklist item, reduced to exactly what the summary line needs: the marker glyph
  * it renders with, and — only for a marker like `🛳️` whose bucket the glyph alone can't
  * carry — which bucket it counts toward.
  *
- * `bucket` is passed straight through to {@link classifyMarker}'s `override` parameter,
- * so it wins outright over the marker's own classification whenever supplied.
+ * `bucket` wins outright over the marker's own classification whenever supplied,
+ * exactly as `classifyMarker`'s `override` parameter always has.
  */
 export interface ChecklistItem { marker: string; bucket?: Bucket; }
 
 /** Options accepted by {@link renderChecklistSummary}. */
 export interface SummaryOptions { series?: readonly number[]; }
-
-// The icon list moves from inline (after the bar) to its own block below the bar once
-// it holds more than this many distinct entries.
-const INLINE_ENTRY_LIMIT = 8;
-
-// Within the block form, a bucket line wraps onto a new line after this many entries.
-const MAX_ENTRIES_PER_LINE = 12;
-
-// Sort order for the three bucket lines in the block form, and the tertiary tiebreak
-// when a single marker (via a `bucket` override) splits across more than one bucket.
-const BUCKET_LINE_ORDER: Readonly<Record<Bucket, number>> = { success: 0, active: 1, failure: 2 };
-
-/** One distinct `(marker, bucket)` pairing in an items list, and how many items share it. */
-interface MarkerGroup {
-  readonly marker : string;
-  readonly bucket : Bucket;
-  readonly count  : number;
-}
-
-/**
- * Groups `items` by the exact `(marker, bucket)` pairing each resolves to, counting how
- * many items share each pairing.
- *
- * Grouped by the *pairing* rather than the marker alone so a marker like `🛳️` — whose
- * bucket varies item to item via the `bucket` override — still contributes a correct,
- * separately-counted icon-list entry to each bucket line it actually appears in, instead
- * of forcing every occurrence into one arbitrarily-chosen bucket.
- *
- * Comparison is exact string equality on `marker`, never code-point indexing or
- * normalization — see the module note in `markers.ts` on multi-code-point markers.
- */
-function groupByMarker(items: readonly ChecklistItem[]): MarkerGroup[] {
-  const groups = new Map<string, { marker: string; bucket: Bucket; count: number }>();
-  for (const item of items) {
-    const bucket = classifyMarker(item.marker, item.bucket);
-    // '|' can never appear in a Bucket literal or a marker glyph, so it is an
-    // unambiguous, explicit delimiter for this internal grouping key.
-    const key = `${bucket}|${item.marker}`;
-    const existing = groups.get(key);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      groups.set(key, { marker: item.marker, bucket, count: 1 });
-    }
-  }
-  return [...groups.values()];
-}
-
-/**
- * The icon-list sort: count descending, then {@link canonicalRank} ascending, then — for
- * the rare case of one marker split across buckets by override, at equal count — bucket
- * in success/active/failure order, so the result is fully deterministic.
- */
-function compareGroups(a: MarkerGroup, b: MarkerGroup): number {
-  if (a.count !== b.count) { return b.count - a.count; }
-  const rankDiff = canonicalRank(a.marker) - canonicalRank(b.marker);
-  if (rankDiff !== 0) { return rankDiff; }
-  return BUCKET_LINE_ORDER[a.bucket] - BUCKET_LINE_ORDER[b.bucket];
-}
-
-/** Renders one sorted group as its icon-list token, `<marker> <count>`. */
-function renderEntry(group: MarkerGroup): string {
-  return `${group.marker} ${String(group.count)}`;
-}
-
-/**
- * Renders one bucket's groups as one or more `MAX_ENTRIES_PER_LINE`-capped lines, each
- * line's entries joined by two spaces — the 13th and later entries wrap onto additional
- * lines rather than growing the line without bound.
- */
-function bucketLines(groups: readonly MarkerGroup[]): string[] {
-  const lines: string[] = [];
-  for (let i = 0; i < groups.length; i += MAX_ENTRIES_PER_LINE) {
-    lines.push(groups.slice(i, i + MAX_ENTRIES_PER_LINE).map(renderEntry).join('  '));
-  }
-  return lines;
-}
 
 /**
  * Renders a checklist's summary line, per `status-checklists-skill.md` § The summary
@@ -119,13 +45,13 @@ function bucketLines(groups: readonly MarkerGroup[]): string[] {
  * short, or split into a success/active+pending/failure block below the bar when it
  * isn't.
  *
- * The icon list moves from inline to the block form once it holds more than
- * {@link INLINE_ENTRY_LIMIT} distinct `(marker, bucket)` entries. In the block form, a
- * bucket line wraps onto additional lines past {@link MAX_ENTRIES_PER_LINE} entries;
- * when *any* bucket line wrapped this way, every bucket's block (success, then
- * active+pending, then failure — empty buckets omitted) is separated from the next by a
- * blank line, matching this skill's own `check-checklist.mjs` validator. When nothing
- * wrapped, the bucket blocks sit flush against one another with no blank line between.
+ * This is `renderDigest` with the checklist profile plugged in (issue #20): the icon
+ * list moves from inline to the block form past 8 distinct `(marker, bucket)` entries,
+ * bucket lines wrap past 12 entries, and every bucket's block (success, then
+ * active+pending, then failure — empty buckets omitted) is blank-separated exactly
+ * when any bucket line wrapped, matching this skill's own `check-checklist.mjs`
+ * validator. Callers should not need to know the framing changed: the signature and
+ * the rendered bytes are exactly what they were before the extraction.
  *
  * @param items   every checklist item at every nesting level, one entry each; must be
  *   non-empty — a summary line has nothing to summarize otherwise
@@ -158,46 +84,12 @@ function bucketLines(groups: readonly MarkerGroup[]): string[] {
  *
  * @throws {RangeError} when `items` is empty.
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./scale.ts
- * @see ./markers.ts
+ * @see ./digest.ts renderDigest
+ * @see ./profiles.ts CHECKLIST_PROFILE
  */
 export function renderChecklistSummary(items: readonly ChecklistItem[], options?: SummaryOptions): string {
   if (items.length === 0) {
     throw new RangeError('renderChecklistSummary: items must be a non-empty array; got 0 items');
   }
-
-  const total = items.length;
-  let success = 0;
-  let failure = 0;
-  for (const item of items) {
-    const bucket = classifyMarker(item.marker, item.bucket);
-    if (bucket === 'success') { success += 1; }
-    else if (bucket === 'failure') { failure += 1; }
-  }
-  const activePending = total - success - failure;
-
-  const percent = Math.round((100 * success) / total);
-  const bar = barCells(percent);
-
-  let head = `${String(success)}/${String(activePending)}/${String(failure)} items (${String(percent)}%) ${bar}`;
-
-  if (options?.series !== undefined && options.series.length >= 4) {
-    head += `  trend ${renderSparkline(options.series, 'absolute')}`;
-  }
-
-  const groups = groupByMarker(items).sort(compareGroups);
-
-  if (groups.length <= INLINE_ENTRY_LIMIT) {
-    return `${head}  ${groups.map(renderEntry).join('  ')}`;
-  }
-
-  const sections = (['success', 'active', 'failure'] as const)
-    .map(bucket => bucketLines(groups.filter(g => g.bucket === bucket)))
-    .filter(lines => lines.length > 0);
-
-  const anyWrapped = sections.some(lines => lines.length > 1);
-  const sectionSeparator = anyWrapped ? '\n\n' : '\n';
-  const block = sections.map(lines => lines.join('\n')).join(sectionSeparator);
-
-  return `${head}\n\n${block}`;
+  return renderDigest(items, CHECKLIST_PROFILE, options);
 }

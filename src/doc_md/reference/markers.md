@@ -66,3 +66,25 @@ place of a status marker.
 - **success:** ✅ · 💯 · 🏁 · 👍 · 😎 · ⚠️ (caveated work still landed; the caveat stays visible in the icon list) · a completed 🛳️
 - **failure:** ❌ · 🚫 · 🦗 · 💀 · 🧟 · 🦹 · 🌋 · 🤬 · 🤡 · 😕 · 🤌 · 🤥 · 🥵 · 😴 · 🫨 · 🌗
 - **active+pending:** every other marker, including all running markers, an in-progress 🛳️, and every topic/action marker not listed above
+
+## Profile bucket membership (digest profiles)
+
+The status-checklist buckets above are one **profile** of the general digest grammar
+(`<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — see the
+compression-mechanic design, issue #20). Each profile partitions its units into the
+buckets below, in canonical order; a unit matching no listed marker counts toward the
+profile's *residual* bucket, marked ※. The glyph vocabulary is shared across profiles —
+new glyphs are added to this file, never to a profile privately.
+
+| profile | noun | buckets (canonical order) | scalar axis |
+|---|---|---|---|
+| checklist | items | success / active+pending ※ / failure — per Bucket membership above | percent = success ÷ total |
+| findings | findings | blocking (❗ 🦹 🌋 ❌ 🚫) / degraded (⚠️ 🌗 🐛 🤡 😕) / note ※ | none |
+| options | options | chosen (✅ 👍) / open (🤔 ❓ ⏸️ ※) / rejected (❌ 👎 ✋) | none |
+| diff | files | added / modified ※ / removed — classified by change kind, not marker | none; a `+N −M` line-count tail instead of a bar |
+| results | hits | matched ※ / partial (🌗) / missed (🦗 ❌) | none |
+
+Only the checklist profile has a scalar axis; a percent or bar on any other profile is
+fabricated and fails validation. The diff profile is the one profile whose buckets are
+assigned per unit (by change kind) rather than read off the marker, which stays free to
+carry the kind of work (🪚 📝 🧪 …).
