@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-56 merges; 2 releases
+58 merges; 2 releases
 
 
 
@@ -14,6 +14,76 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:25:17 AM
+
+Commit [db54ef9cc4453057d85c92bf104ba578e7b23b10](https://github.com/StoneCypher/self-expression/commit/db54ef9cc4453057d85c92bf104ba578e7b23b10)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [676e7ad, 384486c]
+
+  * chore: merge origin/main (#19 diagrams, #20 digest); union tool registrations, keep 60s stoch timeouts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:22:33 AM
+
+Commit [e6126629f4edd8c45dbc4aa1fa42f31776c7508c](https://github.com/StoneCypher/self-expression/commit/e6126629f4edd8c45dbc4aa1fa42f31776c7508c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: post-checkpoint test work rescued after agent hit session rate limit mid-write
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:22:15 AM
+
+Commit [384486ce866b48bc68390bde01963c10a3a7ff7c](https://github.com/StoneCypher/self-expression/commit/384486ce866b48bc68390bde01963c10a3a7ff7c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [52dc11c, 1c6d59b]
+
+  * Merge pull request #73 from StoneCypher/feat_26-08-28_compression_20
+  * feat: treat compression as the mechanic, not lists — digest core, profiles, render_digest, verifyDigest (#20)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:29:41 AM
+
+Commit [1c6d59bd98965533bb0318f941c49677e1d8f5e3](https://github.com/StoneCypher/self-expression/commit/1c6d59bd98965533bb0318f941c49677e1d8f5e3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: rebuild after merging origin/main (diagrams #19, dwelling #45, channel extensions #42)
+  * Post-merge full build green (exit 0): tsc, eslint, unit and stochastic
+suites, typedoc, rollup, attw. Conflicts existed only in generated
+artifacts (dist, coverage, changelogs, README); all regenerated here by
+the green build. No source-file conflicts.
+  * Refs #20
 
 
 
