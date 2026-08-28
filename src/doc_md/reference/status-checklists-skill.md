@@ -58,6 +58,14 @@ The marker changes as the item progresses:
 
 The last row: `<count-section> items (<P>%) <progress-bar>  <trend sparkline?>  <per-marker counts>`
 
+This is the **checklist profile** of the general digest grammar
+`<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — the same
+machinery, with different bucket sets and nouns, digests review findings, decision
+options, diffs, and search results (see `markers.md` § Profile bucket membership, and
+the compression-mechanic design, issue #20). Everything below is that grammar with the
+checklist profile plugged in; the rules are stated here in checklist terms because this
+skill's subject is the checklist instance.
+
 - **Count section** — three numbers `<success>/<active+pending>/<failure>` that partition every item and always sum to the total. Show all three (a zero is fine: `12/8/0`).
   - **success** (1st) = ✅ · 💯 · 🏁 · 👍 · 😎 · ⚠️ (the work landed; the caveat stays visible in the icon list) · and any 🛳️ whose deploy has completed.
   - **failure** (3rd) = ❌ · 🚫 · 🦗 · 💀 · 🧟 · 🦹 · 🌋 · 🤬 · 🤡 · 😕 · 🤌 · 🤥 · 🥵 · 😴 · 🫨 · 🌗.
