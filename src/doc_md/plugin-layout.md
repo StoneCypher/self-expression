@@ -49,6 +49,7 @@ self-expression/
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage
 │   ├── charts/              pure ASCII renderers
+│   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)
 │   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
@@ -122,5 +123,11 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
 - **Mutation testing is kept, deliberately.** Unlike the Playwright suite, Stryker earns its
   place here: the ASCII renderers are pure functions emitting exact strings across dense
   threshold bands, which is the case mutation testing is actually for. It stays opt-in
-  (`ci.stryker: false`), and `mutate` is now narrowed to `src/ts/charts/**/*.ts` — the pure
-  renderer directory — so runs stay fast.
+  (`ci.stryker: false`), and `mutate` covers the pure renderer directories —
+  `src/ts/charts/**/*.ts` and `src/ts/raster/**/*.ts` (the exact-byte PNG encoder and its
+  threshold-heavy layout arithmetic are the same sweet spot) — so runs stay fast.
+- **The PNG history renderer is now implemented (issue #7).** `src/ts/raster/` carries the
+  zero-dependency encoder, 5×7 bitmap font, drawing surface, and five-panel dashboard;
+  `render_history_png` in `src/ts/mcp/chart_tools.ts` and the `self-expression render`
+  subcommand write the file and return the path — never image content over MCP. See the
+  README's History PNG section and `src/superpowers/spec/2026-08-27-png-history-design.md`.

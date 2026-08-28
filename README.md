@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787900436173` from hash `960abf0`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787928740359` from hash `4b4cf6f`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787900436173 Friday, August 28, 2026 at GMT-07:00 87.13 85 84 960abf0 44.92 51.64 45.91 50.45 46 530 86.13 81.63 87.41 484 0.2.1 -->
+<!-- Supported embeds: 1787928740359 Friday, August 28, 2026 at GMT-07:00 91.59 170 88 4b4cf6f 50.29 64.8 56.07 63.83 62 679 86.07 86.66 91.82 617 0.2.1 -->
 
 
 
@@ -26,6 +26,29 @@ field selecting which of its renderers to use:
 
 Every renderer behind these tools is also exported directly from the library
 (`self-expression`'s `src/ts/charts/index.ts`), for use outside MCP.
+
+&nbsp;
+
+&nbsp;
+
+## History PNG
+
+The logged history can be rendered as a PNG chart dashboard for visual review —
+months of record at a glance instead of hundreds of rows in context. The renderer is a
+zero-dependency pure-JS PNG encoder (`node:zlib` supplies deflate and CRC32) drawing five
+panels: stems by hour of day, the delta lane with a rolling mean, daily uncertainty, the
+weekly need rate, and the busiest checklist series' percent trends.
+
+Two invocation surfaces wrap one renderer:
+
+| Surface | Invocation | Result |
+|---|---|---|
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
+| CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
+
+The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
+renderers are all exported from the library barrel (`src/ts/raster/index.ts`), for use
+outside MCP.
 
 &nbsp;
 
@@ -63,19 +86,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>484</td>
-    <td>87.13<small>%</small></td>
-    <td>86.13<small>%</small></td>
-    <td>81.63<small>%</small></td>
-    <td>87.41<small>%</small></td>
+    <td>617</td>
+    <td>91.59<small>%</small></td>
+    <td>86.07<small>%</small></td>
+    <td>86.66<small>%</small></td>
+    <td>91.82<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>46</td>
-    <td>87.13<small>%</small></td>
-    <td>44.92<small>%</small></td>
-    <td>45.91<small>%</small></td>
-    <td>50.45<small>%</small></td>
+    <td>62</td>
+    <td>91.59<small>%</small></td>
+    <td>50.29<small>%</small></td>
+    <td>56.07<small>%</small></td>
+    <td>63.83<small>%</small></td>
   </tr>
 </table>
 
@@ -83,12 +106,12 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>84<small>%</small></th>
+    <th>88<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>85</td>
-    <td>84<small>%</small></td>
+    <td>170</td>
+    <td>88<small>%</small></td>
   </tr>
 </table>
 

@@ -11,6 +11,17 @@
  *
  * @see ../doc_md/plugin-layout.md
  */
+import type { HistoryChart } from './raster/compose.js';
+/** A resolved `render` subcommand: the window, the chart, and where to write. */
+export interface RenderCommand {
+    readonly kind: 'render';
+    /** Days of history to render, counted back from now; a positive integer. */
+    readonly days: number;
+    /** Which chart to draw — the dashboard, or one panel alone. */
+    readonly chart: HistoryChart;
+    /** Explicit output path, or `null` for the default beside the database. */
+    readonly out: string | null;
+}
 /** A resolved command line, after parsing but before execution. */
 export type CliCommand = {
     readonly kind: 'mcp';
@@ -19,6 +30,9 @@ export type CliCommand = {
     readonly name: string;
 } | {
     readonly kind: 'help';
+} | RenderCommand | {
+    readonly kind: 'invalid';
+    readonly message: string;
 } | {
     readonly kind: 'unknown';
     readonly token: string;
@@ -59,6 +73,8 @@ export declare function helpText(): string;
 export type ServerStarter = () => Promise<void>;
 /** Runs one named hook, reading its payload from stdin and writing its own output. */
 export type HookRunner = (name: string) => Promise<void>;
+/** Renders the history PNG and resolves to the absolute path it was written at. */
+export type RenderRunner = (command: RenderCommand) => Promise<string>;
 /**
  * Dispatch a command line, including the one command that is asynchronous.
  *
@@ -66,13 +82,16 @@ export type HookRunner = (name: string) => Promise<void>;
  * returns a number. Everything else delegates to `run` unchanged, so the pure dispatch
  * stays pure and only the genuinely asynchronous path lives here.
  *
- * `startServer` is injected so this can be tested without opening a pipe or a database.
+ * `startServer`, `runHook`, and `runRender` are injected so this can be tested
+ * without opening a pipe, a database, or writing an image to disk.
  *
  * @example
- *   await runAsync(['help'], streams, start)  // => 0, never calls start
- *   await runAsync(['mcp'],  streams, start)  // => 0 once the server's transport closes
+ *   await runAsync(['help'], streams, start, hook, render)  // => 0, never calls start
+ *   await runAsync(['mcp'],  streams, start, hook, render)  // => 0 once the transport closes
+ *   await runAsync(['render', '--days', '30'], streams, start, hook, render)
+ *   // => 0, having written the rendered path to streams.out
  */
-export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner): Promise<number>;
+export declare function runAsync(argv: readonly string[], streams: CliStreams, startServer: ServerStarter, runHook: HookRunner, runRender: RenderRunner): Promise<number>;
 /**
  * Execute a parsed command and report the process exit code.
  *
