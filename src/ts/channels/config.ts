@@ -24,6 +24,7 @@
  */
 
 import { CHANNELS, describeVocabulary } from './vocabulary.js';
+import { LEITMOTIFS }                   from '../claudio/vocabulary.js';
 import { readConfig, allConfig }        from './store.js';
 import type { Store }                   from './store.js';
 
@@ -170,7 +171,10 @@ export function stringValidator(maxLength: number): (raw: string) => Validation 
  * what makes it possible to *say* it is unknown, not a gate that rejects it. The
  * `dwelling.*` keys belong to issue #45's facility and are registered here so the
  * config surface and the dwelling cannot disagree about their names, kinds, or
- * defaults.
+ * defaults. The `audio.*` keys belong to issue #44's claudio facility on the same
+ * terms: the keys ride this registry and the shared `config` table (no second
+ * mechanism), while the claudio server reads them through its own tolerant reader
+ * in `../claudio/config.ts`.
  */
 export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
@@ -206,6 +210,28 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
     description: 'dwelling file size, in gigabytes, at which a visit warns the user',
     validate: intValidator(0, 1048576) },
+  { key: 'audio.enabled', kind: 'bool', fallback: 'false',
+    description: "whether the claudio audio facility (#44) offers its tools; only exactly 'true' enables — read at claudio server startup for the schema, and re-checked per strike",
+    validate: validateBool },
+  { key: 'audio.volume_ceiling', kind: 'int', fallback: '50',
+    description: 'loudest volume (0-100) the assistant may choose; the CLAUDIO_VOLUME_CEILING environment variable can only lower it further, never raise it',
+    validate: intValidator(0, 100) },
+  { key: 'audio.tts_local', kind: 'bool', fallback: 'false',
+    description: "the local offline TTS tier's own consent gate; only exactly 'true' registers the say tool. Cloud TTS tiers deliberately do not exist in this build",
+    validate: validateBool },
+  { key: 'audio.min_gap_seconds', kind: 'int', fallback: '30',
+    description: 'minimum seconds between audible strikes, enforced server-side from the ledger',
+    validate: intValidator(0, 3600) },
+  { key: 'audio.hourly_budget', kind: 'int', fallback: '6',
+    description: 'audible strikes allowed per rolling hour; scarcity is structural, not aspirational',
+    validate: intValidator(0, 600) },
+  { key: 'audio.hourly_budget_attention', kind: 'int', fallback: '8',
+    description: "the slightly larger per-hour budget 'attention' strikes draw from — it exists for exactly the moments the budget protects",
+    validate: intValidator(0, 600) },
+  ...LEITMOTIFS.map((leitmotif): ConfigKeyDef => ({
+    key: `audio.wav.${leitmotif}`, kind: 'string', fallback: null,
+    description: `absolute path to a replacement 16-bit PCM WAV for the '${leitmotif}' leitmotif; unset plays the vendored asset`,
+    validate: stringValidator(1024) })),
 ];
 
 /**

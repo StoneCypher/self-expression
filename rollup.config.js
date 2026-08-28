@@ -153,6 +153,27 @@ const cli_config = {
 
 
 
+// The claudio audio facility (issue #44) ships as its own bin bundle so the main
+// server never loads a line of player code — the process/dependency isolation the
+// design pins. Same external policy as the cli bundle.
+const claudio_config = {
+
+  input: 'build/ts/claudio_cli.js',
+
+  external: (id) => !id.startsWith('.') && !id.startsWith('/'),
+
+  output: {
+    file      : 'build/rollup/claudio.cjs',
+    format    : 'commonjs',
+    banner    : '#!/usr/bin/env node',
+    name      : 'selfExpressionAudioCli',
+    sourcemap : true
+  }
+
+};
+
+
+
 
 // Emits the CommonJS .d.cts declaration that used to live in
 // rollup.ctsphase.config.js. Input is the freshly-emitted .d.ts from
@@ -174,4 +195,4 @@ const cjs_cts = {
 
 
 
-export default [ es_config, cjs_config, iife_config, cjs_cts, cli_config ];
+export default [ es_config, cjs_config, iife_config, cjs_cts, cli_config, claudio_config ];

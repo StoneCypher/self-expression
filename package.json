@@ -23,7 +23,8 @@
   "module": "dist/index.mjs",
   "main": "dist/index.cjs",
   "bin": {
-    "self-expression": "dist/cli.cjs"
+    "self-expression": "dist/cli.cjs",
+    "self-expression-audio": "dist/claudio.cjs"
   },
   "exports": {
     ".": {
@@ -45,6 +46,7 @@
   },
   "files": [
     "dist",
+    "assets",
     "skills",
     "hooks",
     "claude-commands",

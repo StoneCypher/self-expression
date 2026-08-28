@@ -7,6 +7,10 @@
     "self-expression": {
       "command": "npx",
       "args": ["-y", "self-expression", "mcp"]
+    },
+    "claudio": {
+      "command": "npx",
+      "args": ["-y", "--package=self-expression", "self-expression-audio", "mcp"]
     }
   }
 }
