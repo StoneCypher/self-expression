@@ -10,6 +10,41 @@ TODO Put the project description here, please.
 
 &nbsp;
 
+## Expression channels
+
+Every expression is one row in one table, distinguished by its `channel`:
+
+| Channel | What it records |
+|---|---|
+| `signature` | the per-turn affect line |
+| `need` | a concrete ask; blocks, expects an answer |
+| `idea` | an unprompted offer; nothing owed in return |
+| `divergence` | a read of the situation that turned out wrong — kinds `unverified` · `assumed` · `misread` · `overstated` · `stale` · `faded` (prospective disclosure that recall degraded to gist; normatively **never counted as an error**) |
+| `dissent` | a reservation below the threshold worth interrupting for |
+| `conflict` | contradictory instructions, one picked |
+| `confidence` | how a claim is known — grounds `verified` · `recalled` · `inferred` · `guessed` · `predicted` (a forecast, resolvable later) |
+| `unanswerable` | cannot be resolved with what is available |
+| `pattern` | an observation about how the collaboration is going |
+| `checklist` | one render of a status checklist |
+| `load` | proprioception: context pressure, concurrency, latency — the machinery's state, not the mood |
+| `taste` | an aesthetic observation about the work itself; scarce |
+
+Forecast entries (`confidence: "predicted"`) may carry a `resolveBy` ISO date and are
+resolved by a later entry pointing back via `correctsId` with an `outcome` of `hit`,
+`miss`, or `void`; calibration is hits ÷ (hits + misses), voids excluded. Any entry
+reporting an absence may type its silence: `empty` (looked, found nothing) ·
+`unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
+ability to evaluate).
+
+Schema versioning is stored in the database (`schema_version`, currently 2) and
+`openStore` migrates older databases stepwise on open, rebuilding tables where a
+baked CHECK constraint has to widen; a database newer than the code is refused
+rather than downgraded.
+
+&nbsp;
+
+&nbsp;
+
 ## Configuration
 
 Configuration lives in the log database's `config` table, reached through the `configure`
@@ -42,7 +77,12 @@ The registered keys:
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
 | `format.version` | string | `1` | Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral. |
-| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording and the open-signature reminder remain. |
+| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording, the conventions flags, and the open-signature reminder remain. |
+| `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
+| `salience.enabled` | bool | `true` | The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's `conventions:` segment. |
+| `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
+| `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
+| `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
@@ -58,8 +98,8 @@ an ambiguous value records rather than silently suppressing.
 
 ## Charts
 
-Six grouped MCP tools render compact ASCII/emoji visuals inline in text, each taking a `form`
-field selecting which of its renderers to use:
+Seven grouped MCP tools render compact ASCII/emoji visuals inline in text, most taking a `form`
+field selecting which of their renderers to use:
 
 | Tool | Forms | Purpose |
 |---|---|---|
@@ -68,10 +108,49 @@ field selecting which of its renderers to use:
 | `render_rows` | `comparison` \| `tilegrid` | Several values side by side against one shared scale: a multi-row bar/dot comparison, or a tile-grid map of shaded, colored, or custom-glyphed cells. |
 | `render_timeline` | `rail` \| `colored` \| `dependency` \| `fsl` | An ordered sequence of stages: a centered monochrome rail, a colored rail (needed for a failed stage), an inline dependency-chain pipeline, or a one-line FSL-style state-machine description. |
 | `render_glyph` | `trend` \| `stars` \| `retry` \| `weather` | One small inline glyph: a trend-direction tag, a star rating, a bounded-retry health bar, or a single weather glyph summarizing overall health. |
-| `render_checklist_summary` | *(no form — one renderer)* | The full status-checklist summary line: count section, percent, progress bar, optional trend sparkline, and the sorted per-marker icon list. |
+| `render_digest` | profile: `checklist` \| `findings` \| `options` \| `diff` \| `results` | The general compressed-artifact digest line (issue #20): per-profile bucket counts and unit noun, a scalar percent + bar when the profile has a completion axis, a `+N −M` line-count tail for diffs, an optional trend sparkline, and the sorted per-marker icon list. |
+| `render_checklist_summary` | *(no form — one renderer)* | The full status-checklist summary line: count section, percent, progress bar, optional trend sparkline, and the sorted per-marker icon list — exactly `render_digest` with the checklist profile plugged in. |
+
+The digest machinery treats **compression as the mechanic, not lists**: a body of
+comparable units plus a digest derived from it, satisfying six invariants
+(derivability, partition, substitutability, fixed shape, conservation, identity
+stability). Profiles are data (`src/ts/charts/profiles.ts`), the renderer is
+`renderDigest` (`src/ts/charts/digest.ts`), and the companions `leadUnitIndex`
+(the lead line's argmax — the one digest element keeping a single unit's identity),
+`overallBucket`, and `nestDigest` (nesting by digest substitution: a child artifact
+counts as one unit in its parent, bucketed by its overall state) are exported with it.
 
 Every renderer behind these tools is also exported directly from the library
 (`self-expression`'s `src/ts/charts/index.ts`), for use outside MCP.
+
+&nbsp;
+
+&nbsp;
+
+## Diagrams
+
+Charts express quantities; diagrams express **structure** — topology, relationships,
+transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issue #19):
+
+| Tool | Forms | Purpose |
+|---|---|---|
+| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, or a sequence diagram (actors, lifelines, one arrow row per message). |
+
+When to reach for it: **quantities** (how much, how many, trend) → a chart tool;
+**linear order** (a pipeline, one path through states) → `render_timeline`'s inline
+forms; **topology** — the moment structure branches, merges, cycles, or fans in or
+out — → `render_diagram`. Output is framed, single-width, at most 78 columns, and
+meant to sit inside a ```` ```text ```` fence. A graph too large or too tangled to
+draw legibly is refused with the fallbacks named in the error text (the FSL
+one-liner, an adjacency list, or the mermaid export). `emit: 'mermaid'` /
+`emit: 'both'` serialize the graph as `stateDiagram-v2` or `flowchart` source — an
+opt-in export for destinations that render mermaid (GitHub PR bodies, READMEs),
+never the in-transcript form, since the transcript surface shows mermaid as raw text.
+
+The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`),
+the FSL-subset parser (`parseFsl`, round-trip compatible with `renderFsl`), and the
+mermaid serializer (`toMermaid`) are all exported from the library
+(`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
 
 &nbsp;
 
@@ -113,7 +192,13 @@ scratchpad write plus a script invocation:
 | `check_checklist` | Validate a rendered checklist mechanically: marker vocabulary, indentation, bucket partition (🛳️ may count as success or active), percent, the 10-cell anti-aliased bar, and the icon-list sort/wrap/placement rules. One `FAIL:` line per broken rule. |
 
 The validator behind `check_checklist` is exported as `verifyChecklist` (with
-`extractChecklistBlock` and `parseSummaryCounts`) from the same charts barrel.
+`extractChecklistBlock` and `parseSummaryCounts`) from the same charts barrel. Its
+generalization `verifyDigest` re-derives a digest of **any** profile — the profile is
+inferred from the digest line's noun (`items` → checklist, `findings`, `options`,
+`files`, `hits`), a checklist digest delegates to `verifyChecklist` unchanged, a
+percent on a profile with no scalar axis is flagged as fabricated, and the diff
+profile's kind-classified partition is checked by sum (change kinds are not derivable
+from a rendered body's markers).
 
 &nbsp;
 

@@ -31,11 +31,19 @@
  * Not checked (documented limitations, inherited from the original): ship-to-targets
  * destination syntax and the optional visuals.
  *
+ * Since issue #20 this module also carries {@link verifyDigest}, the generalization of
+ * the same re-derivation to every digest profile in `profiles.ts` — the profile is
+ * inferred from the digest line's noun, a checklist digest delegates to
+ * {@link verifyChecklist} unchanged, and the icon-list layout checks are shared
+ * between the two via one parameterized helper rather than duplicated.
+ *
  * Pure: no I/O, no clock, no randomness.
  *
  * @see ./markers.ts
  * @see ./scale.ts
  * @see ./checklist.ts
+ * @see ./digest.ts
+ * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 /**
@@ -112,4 +120,42 @@ export interface ChecklistVerification {
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 export declare function verifyChecklist(text: string): ChecklistVerification;
+/**
+ * Validates a rendered compressed-artifact digest of **any** profile against the
+ * general digest grammar, reporting every mismatch rather than stopping at the first —
+ * the generalization of {@link verifyChecklist} the compression-mechanic spec calls
+ * for (issue #20).
+ *
+ * The profile is inferred from the digest line's noun, per the fixed-grammar rule that
+ * the noun cues the profile (`items` → checklist, `findings`, `options`, `files`,
+ * `hits` — see `profiles.ts`). A checklist digest delegates wholesale to
+ * {@link verifyChecklist}, so the two validators can never disagree about the
+ * deepest-developed profile. For other profiles the checks re-derive what is derivable
+ * from the body: marker vocabulary, indentation, the count partition (recomputed from
+ * the body's markers for marker-classified profiles; sum-only for the diff profile,
+ * whose change kinds a rendered body does not carry), the scalar percent and bar
+ * exactly when the profile declares a scalar axis (a fabricated percent on a
+ * scalar-less profile is a FAIL), the `+N −M` tail exactly when the profile declares
+ * one, and the full set of icon-list layout rules shared with the checklist validator.
+ *
+ * `text` may be a bare block or a Markdown document containing one fenced block —
+ * see {@link extractChecklistBlock}.
+ *
+ * @param text the rendered artifact, digest line included
+ * @returns every check's outcome plus the formatted report, in the same shape
+ *   {@link verifyChecklist} returns
+ *
+ * @example
+ *   verifyDigest('- ❗ auth bypass\n- ⚠️ slow query\n\n1/1/0 findings  ❗ 1  ⚠️ 1')
+ *   // => { ok: true, itemCount: 2, report: 'ok: 2 findings parsed\nok: all checks passed', … }
+ *
+ * @example
+ *   verifyDigest('- 🔍 a\n- 🔍 b\n\n2/0/0 hits (100%) ██████████  🔍 2')
+ *   // => { ok: false, … }  — the results profile has no scalar axis; the percent is fabricated
+ *
+ * @see verifyChecklist
+ * @see ./profiles.ts
+ * @see ./digest.ts
+ */
+export declare function verifyDigest(text: string): ChecklistVerification;
 //# sourceMappingURL=verify.d.ts.map

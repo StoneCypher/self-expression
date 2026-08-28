@@ -10,12 +10,14 @@ After editing this file, run `node check-checklist.mjs --file example.md` (both 
 
 The order markers appear in this file — status markers first in their listed order, then the topic/action groups top to bottom — is the **canonical order**. It is the tiebreaker when sorting the per-marker counts: equal-count markers are ordered by first appearance here. 💯 (the perfect-pass variant of ✅) sorts immediately after ✅.
 
-## Status markers (22, canonical order)
+## Status markers (25, canonical order)
 
 - ✅ done
 - 🤖 running in an agent (a dispatched sub-agent)
 - ⏳ running in general (direct work or a background process, not an agent)
 - 🌐 web search or web read in progress
+- 🔬 under review — the work exists and a reviewer is examining it
+- 🔁 in a fix round — judged by review, now being amended (distinct from the retry-after-failure badger below)
 - 🛠️ deferred to a skill
 - 🛰️ monitoring (waiting on a different task — a dependency-wait)
 - 🔜 queued (not started, no specific blocker)
@@ -66,3 +68,25 @@ place of a status marker.
 - **success:** ✅ · 💯 · 🏁 · 👍 · 😎 · ⚠️ (caveated work still landed; the caveat stays visible in the icon list) · a completed 🛳️
 - **failure:** ❌ · 🚫 · 🦗 · 💀 · 🧟 · 🦹 · 🌋 · 🤬 · 🤡 · 😕 · 🤌 · 🤥 · 🥵 · 😴 · 🫨 · 🌗
 - **active+pending:** every other marker, including all running markers, an in-progress 🛳️, and every topic/action marker not listed above
+
+## Profile bucket membership (digest profiles)
+
+The status-checklist buckets above are one **profile** of the general digest grammar
+(`<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — see the
+compression-mechanic design, issue #20). Each profile partitions its units into the
+buckets below, in canonical order; a unit matching no listed marker counts toward the
+profile's *residual* bucket, marked ※. The glyph vocabulary is shared across profiles —
+new glyphs are added to this file, never to a profile privately.
+
+| profile | noun | buckets (canonical order) | scalar axis |
+|---|---|---|---|
+| checklist | items | success / active+pending ※ / failure — per Bucket membership above | percent = success ÷ total |
+| findings | findings | blocking (❗ 🦹 🌋 ❌ 🚫) / degraded (⚠️ 🌗 🐛 🤡 😕) / note ※ | none |
+| options | options | chosen (✅ 👍) / open (🤔 ❓ ⏸️ ※) / rejected (❌ 👎 ✋) | none |
+| diff | files | added / modified ※ / removed — classified by change kind, not marker | none; a `+N −M` line-count tail instead of a bar |
+| results | hits | matched ※ / partial (🌗) / missed (🦗 ❌) | none |
+
+Only the checklist profile has a scalar axis; a percent or bar on any other profile is
+fabricated and fails validation. The diff profile is the one profile whose buckets are
+assigned per unit (by change kind) rather than read off the marker, which stays free to
+carry the kind of work (🪚 📝 🧪 …).
