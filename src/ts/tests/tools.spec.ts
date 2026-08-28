@@ -133,7 +133,9 @@ describe('handleConfigure list — D4, effective configuration', () => {
 
   test('reports every registry key with its source, plus unknown rows labeled', () => withStore(s => {
     handleConfigure(s, { op: 'set', key: 'retention.days', value: '90' });
-    writeConfig(s, 'mailbox.enabled', 'true');
+    // A synthetic key no release registers: naming a real-but-not-yet-shipped key here
+    // makes the test fail the day that key ships, which is drift rather than coverage.
+    writeConfig(s, 'from.a.newer.version', 'true');
 
     const parsed = JSON.parse(text(handleConfigure(s, { op: 'list' }))) as
       { key: string; value: string | null; source: string; known: boolean }[];
@@ -143,7 +145,7 @@ describe('handleConfigure list — D4, effective configuration', () => {
 
     const retention = parsed.find(e => e.key === 'retention.days'),
           gate      = parsed.find(e => e.key === 'gate.signature'),
-          unknown   = parsed.find(e => e.key === 'mailbox.enabled');
+          unknown   = parsed.find(e => e.key === 'from.a.newer.version');
 
     expect(retention).toMatchObject({ value: '90', source: 'override' });
     expect(gate).toMatchObject({ value: 'true', source: 'default' });

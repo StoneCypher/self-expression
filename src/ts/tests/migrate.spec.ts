@@ -5,9 +5,7 @@ import { join }   from 'node:path';
 import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js';
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
 import { migrate, MIGRATIONS, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS } from '../channels/migrate.js';
-import {
-  SCHEMA_VERSION, INDEX_DDL, MESSAGE_INDEX_DDL, NOTE_INDEX_DDL, entriesDdl,
-} from '../channels/schema.js';
+import { SCHEMA_VERSION, ALL_INDEX_DDL, entriesDdl } from '../channels/schema.js';
 import { postMessage, readMessages, unreadCounts }    from '../channels/messages.js';
 import { composeNote, listNotes }                     from '../channels/notes.js';
 import { writeConfig }                                from '../channels/store.js';
@@ -102,7 +100,7 @@ describe('openStore on a v1 database', () => {
     const s = openStore(path);
     const idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                     .all().map(r => r.name as string);
-    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length);
+    expect(idx).toHaveLength(ALL_INDEX_DDL.length);
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
@@ -274,7 +272,7 @@ describe('openStore on a v3 database (#18)', () => {
           idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                     .all().map(r => r.name as string);
     expect(idx).toContain('idx_entries_anchor');
-    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length + NOTE_INDEX_DDL.length);
+    expect(idx).toHaveLength(ALL_INDEX_DDL.length);
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
@@ -337,7 +335,7 @@ describe('openStore on a v4 database (#43)', () => {
   test('migrates: the messagebox survives untouched, and notes become usable', () => {
     const dir = tmp(), path = join(dir, 'log.sqlite3'),
           v4  = buildV4(path);
-    insertV4Message(v4, 'm-1', 'a pre-migration aside');
+    insertV4Message(v4, 'm-1', 'a pre-migration aside', 'user');
     v4.close();
 
     const s = openStore(path);

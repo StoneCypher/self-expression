@@ -288,7 +288,11 @@ export function deriveNoteState(facts: NoteFacts, offerCap: number, nowUtc: stri
 /** Turn one joined row into a {@link NoteView}, deriving the state as it goes. */
 function toView(row: Record<string, unknown>, offerCap: number, nowUtc: string): NoteView {
 
-  const expiresUtc = String(row['expires_utc'] ?? ''),
+  const rawExpires = row['expires_utc'],
+        // Nullable on `messages` in general, and mandatory for notes: an empty string
+        // here would mean a hand-edited row, and it reads as "already expired", which is
+        // the safe direction — a broken note is held back rather than delivered.
+        expiresUtc = typeof rawExpires === 'string' ? rawExpires : '',
         offerCount = Number(row['offer_count'] ?? 0),
         terminal   = row['terminal_event'],
         last       = row['last_event'];

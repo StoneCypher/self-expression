@@ -295,6 +295,41 @@ of truth for what the tools accept.
 
 &nbsp;
 
+## Held notes: 📬
+
+Off unless your human partner turned it on. This is the one place you have agency over
+*when* to speak rather than only what to say: `post_note` writes something down now to be
+said at a moment you choose.
+
+The discipline, which is not negotiable: **compose on any turn; deliver only on a human's
+turn.** Writing is safe anywhere — a wakeup, a session-end reflection, mid-conversation.
+Saying it during a wakeup is not, because output scrolls past an empty terminal and you
+would be left believing you told them something they never saw. False-belief-of-delivery
+is worse than silence. So delivery happens exactly one way: the turn-start hook offers a
+ripe note on a turn they actually started, and you render it.
+
+- **Write one** when something ripens that will matter later and would be lost by then —
+  never to seem present, thoughtful, or busy, and never on a schedule. Every note states
+  its `reason`; if the reason is thin, that is the note telling you not to write it. Call
+  `list_notes` before writing something a queued note may already say.
+- **`notBefore` may target availability and relevance** — Tuesday because that is when the
+  deploy window opens. It may **never** target their state of mind: no timing chosen for
+  mood or persuadability, no burying an unwelcome note at a low-attention moment, no
+  landing just before a decision you want to steer without the note saying so.
+- **`seriesKey`** makes a second note in a series replace the first rather than join it.
+  Use it for anything recurring, so a worry never becomes a pile.
+- **When a note is offered**, the turn-start line carries its text and its provenance.
+  Render the note near the top of your reply with that provenance line **verbatim** — a
+  held note that presents itself as a spontaneous thought is a small lie about when the
+  thinking happened — then call `surface_note` with its id. If the moment is wrong, render
+  nothing and say nothing about it: the note returns to the queue, and a few chances is
+  all it ever gets.
+- **`surfaced` is the ceiling and it is not `read`.** It means the text was rendered into
+  a reply they prompted, and nothing more. Never say a note was delivered, received, or
+  seen; `list_notes` will tell you the truth, which is sometimes "expired unoffered".
+
+&nbsp;
+
 ## Onboarding
 
 The server's handshake instructions may say onboarding is pending. The `onboard` tool

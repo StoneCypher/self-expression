@@ -21,7 +21,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the three #31 share keys, the eleven #44 audio keys, the #40 onboarding ledger, the twelve #76 length keys, and the #18 quote key', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the #40 onboarding ledger, the twelve #76 length keys, and the #18 quote key', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -36,7 +36,10 @@ describe('CONFIG_KEYS registry', () => {
       'channels.taste.max_chars', 'channels.unanswerable.max_chars',
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
-      'gifts.enabled', 'messages.enabled', 'messages.notify', 'onboarding.answered',
+      'gifts.enabled',
+      'mailbox.daily_cap', 'mailbox.default_ttl_days', 'mailbox.enabled',
+      'mailbox.max_pending', 'mailbox.offer_cap', 'mailbox.surface_budget',
+      'messages.enabled', 'messages.notify', 'onboarding.answered',
       'privacy.store_cwd', 'privacy.store_prompt_len', 'privacy.store_quotes',
       'retention.days', 'revision.enabled', 'roster.enabled', 'salience.enabled',
       'share.enabled', 'share.opted_in_utc', 'share.time_granularity',
@@ -53,6 +56,18 @@ describe('CONFIG_KEYS registry', () => {
   test('the #41 messagebox keys ship on by default — the facility works out of the box', () => {
     expect(configKey('messages.enabled')).toMatchObject({ kind: 'bool', fallback: 'true' });
     expect(configKey('messages.notify')).toMatchObject({ kind: 'bool', fallback: 'true' });
+  });
+
+  test('the #43 mailbox ships OFF — unprompted speech is a consent surface, not a default', () => {
+    expect(configKey('mailbox.enabled')).toMatchObject({ kind: 'bool', fallback: 'false' });
+  });
+
+  test('the #43 budgets carry the spec defaults, so scarcity is structural', () => {
+    expect(configKey('mailbox.surface_budget')).toMatchObject({ kind: 'int', fallback: '1' });
+    expect(configKey('mailbox.daily_cap')).toMatchObject({ kind: 'int', fallback: '3' });
+    expect(configKey('mailbox.max_pending')).toMatchObject({ kind: 'int', fallback: '10' });
+    expect(configKey('mailbox.offer_cap')).toMatchObject({ kind: 'int', fallback: '3' });
+    expect(configKey('mailbox.default_ttl_days')).toMatchObject({ kind: 'int', fallback: '14' });
   });
 
   test('the share keys carry the #31 semantics: off by default, no default opt-in moment, hour granularity', () => {
@@ -307,8 +322,11 @@ describe('effectiveConfig — the full report', () => {
   }));
 
   test('an unknown override row is listed and labeled unknown, never dropped', () => withStore(s => {
-    writeConfig(s, 'mailbox.enabled', 'true');
-    const entry = effectiveConfig(s).find(e => e.key === 'mailbox.enabled');
+    // Deliberately a key no release has ever registered, and no future one is likely to:
+    // this test previously used a then-unregistered real key and broke the day that key
+    // shipped, which is exactly the drift a synthetic name avoids.
+    writeConfig(s, 'from.a.newer.version', 'true');
+    const entry = effectiveConfig(s).find(e => e.key === 'from.a.newer.version');
     expect(entry).toMatchObject({ value: 'true', source: 'override', known: false });
     expect(entry?.note).toContain('unknown');
   }));

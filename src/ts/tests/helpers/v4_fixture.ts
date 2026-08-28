@@ -39,7 +39,7 @@ export const V4_ENTRIES_DDL: string = entriesDdl();
  *
  * @example
  *   const db = buildV4(join(dir, 'log.sqlite3'));
- *   insertV4Message(db, 'm1', 'an ordinary aside');
+ *   insertV4Message(db, 'm1', 'an ordinary aside', 'user');
  *   db.close();
  *
  * @see insertV4Message
@@ -62,7 +62,9 @@ export function buildV4(path: string): DatabaseSync {
  * Insert one minimal v4 message through raw SQL — the way rows genuinely reached a v4
  * database, bypassing today's code.
  *
- * @param audience the messagebox audience; `'user'` is the one #43 later overlays notes on
+ * @param audience the messagebox audience; `'user'` is the one #43 later overlays notes
+ *                 on, and is required explicitly so a test never leans on a default that
+ *                 would quietly change what it is asserting
  *
  * @example
  *   insertV4Message(db, 'm-1', 'an ordinary aside', 'user');
@@ -73,7 +75,7 @@ export function insertV4Message(
   db       : DatabaseSync,
   uuid     : string,
   text     : string,
-  audience : string = 'user',
+  audience : string,
 ): void {
   db.prepare(`
     INSERT INTO messages (uuid, ts_utc, ts_local, tz, session, machine_id, audience, text, plugin_version)
