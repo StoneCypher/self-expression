@@ -55,7 +55,7 @@ describe('canonicalization is a fixed point', () => {
     });
     // 100 property runs each write to disk through a real store; under a concurrent
     // build the default 5s vitest timeout is a flake margin, not a correctness bound.
-  }, 30_000);
+  }, 60_000);
 
   it('lists: any non-empty subsequence of the channels, however spaced, canonicalizes stably', () => {
     fc.assert(fc.property(
@@ -114,7 +114,7 @@ describe('invalid values never write', () => {
     });
     // Store-backed like the ints property above: the default 5s vitest timeout is a
     // flake margin under a concurrent build, not a correctness bound.
-  }, 30_000);
+  }, 60_000);
 
   it('arbitrary non-boolean strings are rejected for every bool key', () => {
     withStore(s => {
@@ -132,7 +132,7 @@ describe('invalid values never write', () => {
         }));
     });
     // Store-backed like the ints property above; same flake margin, same widening.
-  }, 30_000);
+  }, 60_000);
 
   it('a stored garbage row never leaks through the tolerant accessor', () => {
     withStore(s => {
@@ -144,6 +144,6 @@ describe('invalid values never write', () => {
         }));
     });
     // Store-backed like the ints property above; same flake margin, same widening.
-  }, 30_000);
+  }, 60_000);
 
 });

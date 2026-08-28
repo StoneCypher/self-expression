@@ -16,6 +16,7 @@
  * @see ./chart_tools.js
  * @see ./checklist_tools.js
  * @see ./diagram_tools.js
+ * @see ./share_tools.js
  */
 
 import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -28,6 +29,7 @@ import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
 import { registerChecklistTools } from './checklist_tools.js';
 import { registerDiagramTools } from './diagram_tools.js';
+import { registerShareTools } from './share_tools.js';
 import { maybeOpenDwelling, registerDwellTool } from './dwell_tool.js';
 import { closeDwelling } from '../dwelling/store.js';
 import type { DwellingStore } from '../dwelling/store.js';
@@ -60,6 +62,7 @@ export function buildServer(store: Store, version: string, dwelling?: DwellingSt
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
   registerDiagramTools(server, store);
+  registerShareTools(server, store, version);
 
   const house = dwelling === undefined ? maybeOpenDwelling(store) : dwelling;
   if (house !== null) { registerDwellTool(server, store, house); }

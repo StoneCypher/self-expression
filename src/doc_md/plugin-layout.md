@@ -123,6 +123,19 @@ tracking the code default, and `list` reports the effective configuration rather
 the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
 server startup — it never archives, and never touches `meta` or `config`.
 
+**Public aggregation is one module, allowlist-only (issue #31).**
+`src/ts/channels/public_export.ts` is the single point where rows are shaped for any
+public aggregation, and the only code allowed to do so. Its `PUBLIC_TREATMENTS` table
+classifies every `entries` column — verbatim, coarsen, hash, derive, or excluded — and
+the exporter builds its `SELECT` from that table, so an unlisted column is unreachable
+rather than filtered; a totality test against `ENTRIES_DDL` makes an unclassified future
+column fail the build. The `share` MCP tool (`src/ts/mcp/share_tools.ts`) wraps it:
+`preview` renders the exporter's actual output, `export` refuses until that preview has
+been seen this session, and the whole surface is off by default behind an event-based,
+never-retroactive opt-in (`share.enabled` / `share.opted_in_utc`). Free text never
+exports; the honest claim is *no free text, reduced linkage, coarsened time* — nothing
+stronger.
+
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
 there is no sharing to be had, so Claude is pointed at `claude-commands/` and Gemini keeps

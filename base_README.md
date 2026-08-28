@@ -86,11 +86,60 @@ The registered keys:
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+| `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
+| `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
+| `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
 hand-edited database or a downgrade can never wedge the server or the gates. The
 privacy and `time.hook` switches additionally act only on the exact string `false` —
-an ambiguous value records rather than silently suppressing.
+an ambiguous value records rather than silently suppressing. `share.enabled` inverts
+that: only the exact string `true` enables, and anything else means no.
+
+&nbsp;
+
+&nbsp;
+
+## Sharing — structured fields only, never free text
+
+Public aggregation is opt-in, off by default, and carries **no free text, ever** —
+not the note text, not titles, not paths, branches, or user-chosen names. The `share`
+MCP tool exposes three verbs:
+
+| Verb | Effect |
+|---|---|
+| `preview` | Renders exactly what an export would produce — the same code path, the same rows — plus the full column-by-column treatment table. |
+| `export` | Produces the submission as one JSON document (to a file when `path` is given). Refuses until a preview for the same options has been rendered this session: seeing what goes is mechanical, not optional. |
+| `status` | Reports the opt-in state, the opt-in moment, and how many rows are eligible. |
+
+Every column of the local schema is classified in a single allowlist
+(`src/ts/channels/public_export.ts`), and the exporter builds its query from that
+allowlist — an unlisted column is unreachable by construction, and a test fails the
+build if a future schema column is ever left unclassified. The treatments:
+
+- **Verbatim** — closed vocabularies (`channel`, `stem`, `delta`, …), booleans, and
+  bounded counts; plus `model` and `host`, which name software, not people.
+- **Coarsened** — timestamps truncated to the hour (or day); lengths and token counts
+  as log2 buckets; small counters capped at `33+`; host version to its major.
+- **Hashed** — `session`, `prompt_id`, `machine_id`, `agent_id`, `uuid`, `series_key`,
+  and correction edges, under a fresh per-submission salt that is never persisted:
+  grouping works within one submission, nothing joins across submissions.
+- **Derived** — `local_period` (six-hour band) and `local_dow` (weekday/weekend)
+  replace any timezone export; `cctype` and `face` export only when they validate
+  against a closed list or as exactly one emoji grapheme, else `NULL`.
+- **Excluded** — `text`, `title`, `cwd`, `project`, `git_branch`, `tz`, `agent_type`,
+  `context_emoji`, `permission_mode`, `turn_index`, `resolve_by`, and every raw
+  identifier.
+
+Opting in is an **event, never retroactive**: setting `share.enabled` to `true`
+records the moment, and only rows recorded at or after the most recent opt-in are
+eligible — rows from before it are permanently outside the export, and opting out
+clears the window entirely. v1 ships no network transport: the export is a local file
+the user inspects and sends however they choose, or not at all.
+
+The honest claim, in full: *no free text, reduced linkage, coarsened time.* This is
+not differential privacy and not a formal anonymity guarantee, and nothing in this
+tool should be read as claiming either.
 
 &nbsp;
 

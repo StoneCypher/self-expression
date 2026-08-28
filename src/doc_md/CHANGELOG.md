@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-56 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+58 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -14,6 +14,76 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:25:17 AM
+
+Commit [db54ef9cc4453057d85c92bf104ba578e7b23b10](https://github.com/StoneCypher/self-expression/commit/db54ef9cc4453057d85c92bf104ba578e7b23b10)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [676e7ad, 384486c]
+
+  * chore: merge origin/main (#19 diagrams, #20 digest); union tool registrations, keep 60s stoch timeouts
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:22:33 AM
+
+Commit [e6126629f4edd8c45dbc4aa1fa42f31776c7508c](https://github.com/StoneCypher/self-expression/commit/e6126629f4edd8c45dbc4aa1fa42f31776c7508c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: post-checkpoint test work rescued after agent hit session rate limit mid-write
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 11:22:15 AM
+
+Commit [384486ce866b48bc68390bde01963c10a3a7ff7c](https://github.com/StoneCypher/self-expression/commit/384486ce866b48bc68390bde01963c10a3a7ff7c)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [52dc11c, 1c6d59b]
+
+  * Merge pull request #73 from StoneCypher/feat_26-08-28_compression_20
+  * feat: treat compression as the mechanic, not lists — digest core, profiles, render_digest, verifyDigest (#20)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 8:29:41 AM
+
+Commit [1c6d59bd98965533bb0318f941c49677e1d8f5e3](https://github.com/StoneCypher/self-expression/commit/1c6d59bd98965533bb0318f941c49677e1d8f5e3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: rebuild after merging origin/main (diagrams #19, dwelling #45, channel extensions #42)
+  * Post-merge full build green (exit 0): tsc, eslint, unit and stochastic
+suites, typedoc, rollup, attw. Conflicts existed only in generated
+artifacts (dist, coverage, changelogs, README); all regenerated here by
+the green build. No source-file conflicts.
+  * Refs #20
 
 
 
@@ -190,101 +260,3 @@ Merges [560ac8c, 60c2f90]
 
   * Merge pull request #69 from StoneCypher/feat_26-08-28_diagrams_19
   * feat: diagrams as a distinct mechanic from charts (#19)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:25:01 AM
-
-Commit [e48135372643e10f96debad804157904a83705f3](https://github.com/StoneCypher/self-expression/commit/e48135372643e10f96debad804157904a83705f3)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: checkpoint before token exhaustion — compression mechanic (#20) implemented, final full-build rerun pending
-  * Implements the compression-mechanic spec: charts/digest.ts core extracted
-from checklist.ts (byte-identical checklist output), charts/profiles.ts
-profile data (checklist/findings/options/diff/results), render_digest MCP
-tool, generalized verifyDigest validator, lead-line argmax + overallBucket
-+ nestDigest composition helpers, six invariants as fast-check properties,
-docs (markers.md profile buckets, skill pointer, base_README).
-  * Build-verification state, honestly: tsc clean; eslint clean; all targeted
-spec suites green (116 tests) incl. unmodified checklist gate; stochastic
-suites green (19 props incl. byte-identity oracle, 500 runs); first full
-build failed ONLY on pre-existing src/ts/tests/config.stoch.ts 5s timeout
-(unrelated, passes standalone in 4.2s); full-build rerun was in progress
-at checkpoint time.
-  * Refs #20
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:24:44 AM
-
-Commit [676e7ad8596d436935d4c4d430e7746933f8f1d4](https://github.com/StoneCypher/self-expression/commit/676e7ad8596d436935d4c4d430e7746933f8f1d4)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: checkpoint before token exhaustion — regenerated artifacts after the #42 merge rebuild
-  * Build-verification state, honestly: the full build completed green (exit 0)
-immediately before this commit — 910 unit and 83 stochastic tests passing,
-eslint clean, attw clean — on top of the second origin/main merge (#42 channel
-extensions, schema v2). This commit is that rebuild's regenerated artifacts
-(dist, coverage, CHANGELOGs, README) plus nothing else; all source work was
-already committed in 956114f and earlier.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:23:30 AM
-
-Commit [60c2f907bdf463aeb46dd4f25ac318c867e7022f](https://github.com/StoneCypher/self-expression/commit/60c2f907bdf463aeb46dd4f25ac318c867e7022f)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [6bfe771, 560ac8c]
-
-  * chore: merge origin/main (channel extensions #42) and rebuild
-  * Integrations:
-- src/doc_md/plugin-layout.md: tree keeps the migrations note beside the
-  charts/diagrams contract split
-- src/ts/tests/config.stoch.ts: took main's convergent 30s widening of
-  the ints property and extended the identical widening to the other
-  three store-backed properties, which flaked the same way under
-  concurrent sibling builds
-  * Generated artifacts regenerated by the full build on the merged tree.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 8:22:29 AM
-
-Commit [956114ffee795694f7efedcf7f02dcf3823ae8a8](https://github.com/StoneCypher/self-expression/commit/956114ffee795694f7efedcf7f02dcf3823ae8a8)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [056a094, 560ac8c]
-
-  * chore: merge origin/main (#42 channel extensions); classify the three v2 columns
-  * Schema v2's totality drift is exactly what the #31 allowlist exists to catch:
-outcome and silence are CHECK-backed closed vocabularies and classify verbatim
-per the spec's stated rule; resolve_by is write-validated to a local date but
-carries no CHECK, so it stays excluded — conservative until a reviewer promotes
-it to an export-validated date. config.spec/config.stoch hand-merged (the #42
-convention keys alongside the #31 share keys; the wider of the two timeout
-choices kept). Generated artifacts taken from main pending the rebuild.
