@@ -288,7 +288,7 @@ export function correctionProblems(input: EntryInput): string[] {
 
   if (input.correctsKind !== undefined && input.correctsId === undefined) {
     problems.push(
-      `correctsKind '${String(input.correctsKind)}' requires a correctsId — a link kind ` +
+      `correctsKind '${input.correctsKind}' requires a correctsId — a link kind ` +
       'with no link describes a relationship to nothing');
   }
 
@@ -603,9 +603,16 @@ interface Strike {
   readonly kind   : CorrectionKind;
 }
 
-/** A SQLite column as text, or `null` — the shape every read here wants. */
+/**
+ * A `TEXT` column's value as a string, or `null` for anything that is not one.
+ *
+ * Deliberately does **not** stringify a non-string. Every column read through this
+ * (`corrects_kind`, `outcome`, `verbatim`) is declared `TEXT`, so a value of any other
+ * type came from a hand-edited database; coercing it would manufacture a plausible-looking
+ * term out of a blob, while `null` routes it to the read rules' honest fallback.
+ */
 function text(value: unknown): string | null {
-  return value === null || value === undefined ? null : String(value);
+  return typeof value === 'string' ? value : null;
 }
 
 /**

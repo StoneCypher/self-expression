@@ -376,11 +376,27 @@ describe('the shaped rows', () => {
   test('corrects_uuid is the salted hash of the target row\'s uuid, never the local rowid', () => withStore(s => {
     optIn(s, '2020-01-01T00:00:00.000Z');
     const target = recordEntry(s, { channel: 'signature', text: 'original', session: 's1' }, '0.0.0');
-    recordEntry(s, { channel: 'divergence', text: 'retraction', session: 's1', correctsId: target.id }, '0.0.0');
+    recordEntry(s, { channel: 'divergence', text: 'retraction', session: 's1',
+                     correctsId: target.id, correctsKind: 'retracts' }, '0.0.0');
     const salt = freshSalt(),
           doc  = exportPublicRows(s, salt, OPTS),
           edge = doc.rows.find(r => r['corrects_uuid'] !== null);
     expect(edge?.['corrects_uuid']).toBe(saltedHash(salt, target.uuid));
+    expect(edge?.['corrects_kind']).toBe('retracts');
+  }));
+
+  test('#16: a retracted row still exports — the corpus keeps its errors, analytics exclude them', () => withStore(s => {
+    optIn(s, '2020-01-01T00:00:00.000Z');
+    const target = recordEntry(s, { channel: 'checklist', text: 'wrong', session: 's1' }, '0.0.0');
+    recordEntry(s, { channel: 'divergence', text: 'taken back', session: 's1',
+                     correctsId: target.id, correctsKind: 'retracts',
+                     verbatim: 'the exact wrong words' }, '0.0.0');
+    const doc = exportPublicRows(s, freshSalt(), OPTS);
+    // Both rows leave: dropping the retracted one would delete the correction edge along
+    // with the claim, and retraction rate by ground is the statistic this makes possible.
+    expect(doc.rows).toHaveLength(2);
+    // …and the quoted words never do.
+    for (const row of doc.rows) { expect(row['verbatim']).toBeUndefined(); }
   }));
 
   test('#18: an anchored row exports its kind and a blinded hash, and no anchor words at all', () => withStore(s => {

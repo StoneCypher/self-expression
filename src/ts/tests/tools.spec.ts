@@ -5,7 +5,7 @@ import { join }                from 'node:path';
 import { openStore, closeStore, writeConfig, readConfig } from '../channels/store.js';
 import type { Store } from '../channels/store.js';
 import { recordContext }  from '../channels/context.js';
-import { recentEntries } from '../channels/entries.js';
+import { recentEntries, register } from '../channels/entries.js';
 import { pruneExpired }  from '../channels/retention.js';
 import {
   FORMAT_VERSION, CONFIG_KEYS, MAX_TEXT_CEILING, channelMaxCharsKey,
@@ -553,6 +553,155 @@ describe('handleAnnotate — #18 the batch', () => {
         anchorTarget: 'a.ts', anchorSpan: 'L1' },
     ] })).toThrow(/allows at most 40/);
     expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get()?.['n']).toBe(0);
+  }));
+
+});
+
+describe('handleExpress — #16 retraction', () => {
+
+  test('records a retraction with its kind and its verbatim quote', () => withStore(s => {
+    const original = recordedId(handleExpress(s, VERSION, {
+      channel: 'checklist', text: 'Project Atlas 31%', seriesKey: 'atlas', percent: 31,
+    }));
+    const strike = recordedId(handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'sort is rank then bucket 😬', divergenceKind: 'stale',
+      correctsId: original, correctsKind: 'retracts',
+      verbatim: 'icons sort by status first, then alphabetically',
+    }));
+    const row = s.db.prepare(
+      'SELECT corrects_id, corrects_kind, verbatim FROM entries WHERE id = ?').get(strike);
+    expect(row?.['corrects_id']).toBe(original);
+    expect(row?.['corrects_kind']).toBe('retracts');
+    expect(row?.['verbatim']).toBe('icons sort by status first, then alphabetically');
+  }));
+
+  test('the reply echoes the target and its channel, so a wrong aim shows at write time', () => withStore(s => {
+    const original = recordedId(handleExpress(s, VERSION, { channel: 'checklist', text: 'Atlas 31%' }));
+    const out = text(handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'rank then bucket', correctsId: original, correctsKind: 'retracts',
+    }));
+    expect(out).toContain(`retracts #${String(original)} (checklist)`);
+  }));
+
+  test('an ordinary entry gets no echo at all', () => withStore(s => {
+    expect(text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' })))
+      .toMatch(/^recorded #1 [0-9a-f-]{36}$/);
+  }));
+
+  test('a link with no kind is refused, and nothing is written', () => withStore(s => {
+    const original = recordedId(handleExpress(s, VERSION, { channel: 'checklist', text: 'Atlas 31%' }));
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'rank then bucket', correctsId: original,
+    })).toThrow(/correctsKind/);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM entries').get()?.['n']).toBe(1);
+  }));
+
+  test('a retraction pointing at nothing is refused, naming the highest id there is', () => withStore(s => {
+    handleExpress(s, VERSION, { channel: 'checklist', text: 'Atlas 31%' });
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'x', correctsId: 999, correctsKind: 'retracts',
+    })).toThrow(/highest id so far is 1/);
+  }));
+
+  test('retracts and amends may target any row — only resolves demands a forecast', () => withStore(s => {
+    const idea = recordedId(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'that was wrong', correctsId: idea, correctsKind: 'retracts',
+    })).not.toThrow();
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'confidence', text: 'resolved?', correctsId: idea, correctsKind: 'resolves',
+    })).toThrow(/not a forecast/);
+  }));
+
+  test('a prose-only retraction needs no link at all', () => withStore(s => {
+    const id = recordedId(handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'it runs markdownlint 😬', divergenceKind: 'stale',
+      verbatim: 'the build skips lint on spec-only PRs',
+    }));
+    expect(register(s).map(row => row.replacement.id)).toEqual([id]);
+    expect(register(s)[0]?.original).toBeNull();
+  }));
+
+  test('a quote where nothing is being taken back is refused', () => withStore(s => {
+    expect(() => handleExpress(s, VERSION, {
+      channel: 'signature', text: 'still; unchanged', verbatim: 'something',
+    })).toThrow(/verbatim is only valid/);
+  }));
+
+});
+
+describe('recall — #16 marked rows and the register', () => {
+
+  /** The tool handlers `registerTools` installs, captured without a transport. */
+  function handlers(s: Store): Map<string, (args: Record<string, unknown>) => {
+    content: { type: 'text'; text: string }[] } > {
+    const found = new Map<string, (args: Record<string, unknown>) => {
+      content: { type: 'text'; text: string }[] }>();
+    const stub = {
+      registerTool: (name: string, _config: unknown, handler: unknown): void => {
+        found.set(name, handler as (args: Record<string, unknown>) => {
+          content: { type: 'text'; text: string }[] });
+      },
+      server: { getClientVersion: (): undefined => undefined },
+    };
+    registerTools(stub as unknown as Parameters<typeof registerTools>[0], s, VERSION);
+    return found;
+  }
+
+  /** Call the real `recall` handler and parse its JSON reply. */
+  function recall(s: Store, args: Record<string, unknown> = {}): Record<string, unknown> {
+    const handler = handlers(s).get('recall');
+    if (handler === undefined) { throw new Error('recall was not registered'); }
+    return JSON.parse(text(handler(args))) as Record<string, unknown>;
+  }
+
+  /** A claim and its retraction; returns both ids. */
+  function takeBack(s: Store): { original: number; strike: number } {
+    const original = recordedId(handleExpress(s, VERSION, {
+      channel: 'checklist', text: 'Project Atlas 31%', seriesKey: 'atlas', percent: 31 }));
+    const strike = recordedId(handleExpress(s, VERSION, {
+      channel: 'divergence', text: 'sort is rank then bucket', correctsId: original,
+      correctsKind: 'retracts', verbatim: 'icons sort by status first' }));
+    return { original, strike };
+  }
+
+  test('every returned row carries its id, so a retraction can aim from the record', () => withStore(s => {
+    const { original } = takeBack(s);
+    const rows = recall(s)['recent'] as Record<string, unknown>[];
+    expect(rows.map(row => row['id'])).toContain(original);
+  }));
+
+  test('a retracted row comes back marked, and is not omitted', () => withStore(s => {
+    const { original, strike } = takeBack(s);
+    const rows   = recall(s)['recent'] as Record<string, unknown>[],
+          marked = rows.find(row => row['id'] === original);
+    expect(rows).toHaveLength(2);
+    expect(marked?.['status']).toBe('retracted');
+    expect(marked?.['by']).toBe(strike);
+  }));
+
+  test('the register is absent unless asked for — no context spent on an unrequested key', () => withStore(s => {
+    takeBack(s);
+    expect(recall(s)['retractions']).toBeUndefined();
+  }));
+
+  test('retractions: true returns the register beside the usual blocks', () => withStore(s => {
+    const { original, strike } = takeBack(s);
+    const out = recall(s, { retractions: true });
+    expect(out).toHaveProperty('context');
+    expect(out).toHaveProperty('previous');
+    expect(out).toHaveProperty('recent');
+    const listed = out['retractions'] as { kind: string; original: { id: number } | null;
+                                           replacement: { id: number } }[];
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.kind).toBe('retracts');
+    expect(listed[0]?.original?.id).toBe(original);
+    expect(listed[0]?.replacement.id).toBe(strike);
+  }));
+
+  test('an empty register is an empty list, not a missing key, once asked for', () => withStore(s => {
+    handleExpress(s, VERSION, { channel: 'idea', text: 'what if' });
+    expect(recall(s, { retractions: true })['retractions']).toEqual([]);
   }));
 
 });

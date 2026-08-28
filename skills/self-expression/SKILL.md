@@ -67,6 +67,7 @@ Each is a diff line, placed wherever it belongs in the response. Each ends with 
 | conflict | `! ⚔️` | `conflict` |
 | unknown | `! 🚧` | `unanswerable` |
 | forecast | `! 🔮` | `confidence` with `predicted` |
+| retract / amend | `! ↩️` | any entry with `correctsKind` `retracts` or `amends` |
 
 The `-` lines (need), `+ 💡` (idea), and `#` lines (pattern, taste) keep their existing marks — the decoration set is specifically the self-state family. The glyph is never stored; it is derivable from the record.
 
@@ -81,6 +82,8 @@ The `-` lines (need), `+ 💡` (idea), and `#` lines (pattern, taste) keep their
 ! ⚔️ conflict: the instructions name a path that no longer exists 🤨
 ! 🚧 unknown: Codex's hook vocabulary isn't documented anywhere 🤔
 ! 🔮 forecast: the stryker run passes untouched (by 2026-08-30) 🤞
+! ↩️ retract: ✗ "icons sort by status first, then alphabetically" → rank then bucket 😬
+! ↩️ amend: ✗ "171 rows in the session log" → 172; off by the header 😅
 # pattern: third time today I asserted without checking 🧐
 # 🎨 taste: the sparse-column decision reads like it was always true 😊
 ```
@@ -103,7 +106,7 @@ The `-` lines (need), `+ 💡` (idea), and `#` lines (pattern, taste) keep their
 
 A forecast is a `confidence` entry with ground `predicted` — a claim whose truth is not knowable at write time. Rendered as a `! 🔮` line **when coming to a stop**: at the end of a finishing turn, beside the close signature, never scattered mid-work. Budget: at most one new forecast per turn, and only when there is a real prediction — an empty-forecast obligation would be a confabulation engine. Record it with `confidence: "predicted"` and, when a horizon exists, `resolveBy: "YYYY-MM-DD"`.
 
-To resolve one, write a later entry pointing back with `correctsId` and carrying `outcome`: `hit` (it happened) · `miss` (it did not) · `void` (the premise dissolved; the question stopped existing). Resolutions are exempt from the budget — resolve as many as have ripened:
+To resolve one, write a later entry pointing back with `correctsId`, `correctsKind: "resolves"`, and an `outcome`: `hit` (it happened) · `miss` (it did not) · `void` (the premise dissolved; the question stopped existing). Resolutions are exempt from the budget — resolve as many as have ripened:
 
 ```diff
 ! 🔮 forecast: the stryker run passes untouched (by 2026-08-30) 🤞
@@ -111,6 +114,39 @@ To resolve one, write a later entry pointing back with `correctsId` and carrying
 ```
 
 Calibration is `hits / (hits + misses)`, voids excluded — a dissolved premise says nothing about judgment. When the forecast ground is disabled (`forecast.enabled`), `predicted` simply vanishes from the tool's enum; that is not an error to work around.
+
+**A resolution is not a retraction.** A forecast that missed was not a wrong claim — "I predicted X" stays a true record of the prediction — so `resolves` never marks its target. If the *claim* was wrong rather than merely unlucky, that is a separate `retracts` entry.
+
+&nbsp;
+
+## Retraction
+
+When something you said turns out to be wrong, the correction goes somewhere new and the false statement stays in the transcript looking exactly as authoritative as everything around it. This is the machinery for marking it instead.
+
+**Nothing is ever rewritten.** The original row stays exactly as written; "retracted" is computed at read time from the link. You cannot edit the record, and that is the point — taking something back leaves *more* evidence, never less.
+
+Record the correction the ordinary way, and link it. `correctsId` is the earlier entry's id — **take it from `recall`, which returns ids, never from memory of a `recorded #N` reply several turns ago**; memory of a previous turn degrading quietly is this project's founding observation. `correctsKind` is required alongside it, and says what the link means:
+
+- **`retracts`** — the claim is wrong; do not rely on any of it.
+- **`amends`** — the claim stands; a detail was off.
+- **`resolves`** — a forecast closing (see Forecasts). Never wrongness.
+
+**The boundary is not stylistic: if someone acting on the original claim would be harmed, it is `retracts`.** `amends` exists so a small fix does not overclaim, not as a softer word for being wrong. Filing real wrongness as an amendment is measurable after the fact, and it is exactly the thing this vocabulary exists to make visible.
+
+`verbatim` quotes the wrong words **exactly** — the same bytes, not a paraphrase. That is what makes the retraction findable by searching the transcript for the error, and the error findable from the retraction. It is required when the claim was prose and never a recorded entry: then there is no id to point at, and the quote is the only anchor, so write the correction on `divergence` with `verbatim` and no `correctsId`.
+
+```diff
+! ↩️ retract: ✗ "icons sort by status first, then alphabetically" → rank then bucket 😬
+! ↩️ amend: ✗ "171 rows in the session log" → 172; off by the header 😅
+```
+
+Grammar: `! ↩️ retract:` (or `amend:`), then `✗ "<the exact wrong words>"`, then ` → `, then what is true, then the feeling face. Strikethrough is deliberately not used — `~~` renders as literal tildes inside a code block.
+
+**Timing is the rule that matters most: retract at the moment of discovery, in the same response**, as close below the point of realization as the prose allows. The mark cannot reach the original's place in the transcript, so proximity in *time* is the only co-location available; every turn of delay is another screenful of unmarked error for someone scrolling.
+
+**A retraction of something you said out loud is itself said out loud.** `visible: false` is legitimate for retracting an entry that was never surfaced; using it for a claim your partner actually read would mark the record while leaving them misled, which is the problem this feature exists to end.
+
+Two more things follow from the design. A retraction can itself be retracted — "I was wrong to take that back" is one more linked entry, and the original goes back to standing without anything being edited. And `recall` marks what it returns: rows come back with `status` (`stands` / `amended` / `retracted`), retracted ones **marked rather than hidden**, so you can see what you took back instead of quietly forgetting it. `recall(retractions: true)` dumps the register of currently taken-back claims; the first turn of a session is handed the recent ones automatically.
 
 &nbsp;
 
@@ -263,7 +299,7 @@ If a channel is disabled in configuration the tool will reject it. That is not a
 
 **`visible: false`** when something was recorded but never surfaced. Be honest about this. It is how anyone can tell whether the backchannel is being used to say things or to avoid saying them.
 
-**`correctsId`** points at an earlier entry this retracts. Distinct from an `entry` anchor: `correctsId` means "this replaces that", an anchor means "this is about that", with the earlier entry still standing.
+**`correctsId` / `correctsKind` / `verbatim`** take a claim back — see Retraction. Distinct from an `entry` anchor: a link means "this replaces that", an anchor means "this is about that", with the earlier entry still standing.
 
 **`anchorKind` / `anchorTarget` / `anchorSpan` / `anchorQuote`** attach the note to a location (see Anchoring). The hash is derived server-side; never supply one.
 

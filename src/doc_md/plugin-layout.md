@@ -53,9 +53,11 @@ self-expression/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
 │   │                        migrations (migrate.ts; CHECK growth forces table rebuilds),
 │   │                        the messagebox facility (messages.ts, issue #41),
-│   │                        anchoring's pure resolvers (anchors.ts, issue #18), and
-│   │                        held notes (notes.ts, issue #43) — a timing sidecar on
-│   │                        messages whose only delivery door is the turn-start hook
+│   │                        anchoring's pure resolvers (anchors.ts, issue #18), held
+│   │                        notes (notes.ts, issue #43) — a timing sidecar on messages
+│   │                        whose only delivery door is the turn-start hook — and
+│   │                        retraction's read-time standing computation (entries.ts,
+│   │                        issue #16): marked, never mutated
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
 │   ├── claudio/             the voluntary audio facility: its own MCP server, gate, ledger,
 │   │                        WAV pipeline, and PowerShell player seam (issue #44)
@@ -239,6 +241,42 @@ recording surface is four optional `express` arguments plus the all-or-nothing
 so the model pastes a computed rendering instead of imitating one. `anchor_hash` is
 derived server-side and survives `privacy.store_quotes` suppression, so drift detection
 and #31 aggregation carry no words.
+
+**Retraction marks the original, and marking is never mutating (issue #16).** Two
+nullable columns on `entries` — `corrects_kind` (CHECK-constrained over
+`retracts`/`amends`/`resolves`) and `verbatim` — plus one index, in exactly the qualifier
+pattern typed silence and anchoring use. There is deliberately **no `retracted` column
+and no `retracted_by` back-pointer**: standing is computed at read time from the
+`corrects_id` chain by `standingOf`, because a stored flag has two silent failure modes
+(set wrongly, never set), because a stored value can disagree with the chain that implies
+it and the disagreement is then unresolvable, and above all because one legitimate
+`UPDATE` path would dissolve "the only verb is INSERT" from a structural property into a
+code-review promise. Un-retraction is one more appended row and the recursion resolves it,
+so even changing your mind rewrites nothing.
+
+The kind vocabulary exists because #42's forecast resolutions already share the
+`corrects_id` chain: without it a retraction could be filed as a mere resolution
+(softening wrongness into bookkeeping) and every resolution would inflate the retraction
+count (crying wolf until the register reads as noise). Legacy kind-less links are handled
+by a **read rule** in the one place standing is computed — `retracts`, or `resolves` when
+an `outcome` rides along — never by a backfill. `verbatim` is the transcript bridge: the
+plugin cannot mark a sent message, but an exact quote makes the retraction findable from
+the error and the error findable from the retraction, and it is the only way a prose-only
+claim (never a row, so nothing for `corrects_id` to point at) enters the register.
+
+The standing computation is a recursive CTE for **reachability only**, with the
+well-founded recursion evaluated in TypeScript, because the rule contains a negation
+inside its own recursion ("R strikes E only if R has not itself been retracted") and
+SQLite admits no negated reference to a recursive table. One query per batch, not one per
+row. Marking is applied at every plugin-mediated re-reading: `recall` rows gain
+`id`/`status`/`by`, `recall(retractions: true)` returns the register (a query, never a
+table — a materialized register would invite reading the clean view instead of the marked
+one, which is filtering by architecture), and the turn-start hook replays the last
+fortnight's retractions on a session's first turn, gated by `retraction.replay`. Display
+surfaces **mark**; only derived analytics exclude — `seriesPercents` and
+`previousSignature`, each documenting the exclusion at the query. Public export
+deliberately keeps retracted rows, because dropping them would delete the correction edge
+along with the claim and make retraction-rate-by-ground uncomputable.
 
 **Public aggregation is one module, allowlist-only (issue #31).**
 `src/ts/channels/public_export.ts` is the single point where rows are shaped for any
