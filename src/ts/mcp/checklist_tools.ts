@@ -10,10 +10,12 @@
  * rather than remembered, and the checklist rows land in the same `entries` table as
  * every other channel instead of a second database.
  *
- * The series is keyed by `seriesKey` when supplied, defaulting to the display title —
- * the old logger's behavior — so a caller that adopts a stable key gets a rename-proof
- * series while an unmigrated caller loses nothing (see issue #27 for why title-keying
- * is fragile).
+ * The series is keyed by `seriesKey`, which is required and explicit — chosen once at
+ * the checklist's first render and repeated verbatim on every re-render, never the
+ * display title. The old logger keyed on the title, which silently forked the series
+ * whenever a checklist was renamed (issue #27); #54 made the explicit stable key the
+ * record's contract, and this tool holds the same line rather than reintroducing the
+ * title default it replaced.
  *
  * Handler bodies are exported as pure functions separate from registration, matching
  * `chart_tools.ts`, so they can be exercised in tests without a transport.
@@ -75,9 +77,10 @@ const LOG_CHECKLIST_SHAPE = {
     'exactly as surfaced'),
   title: z.string().min(1).describe(
     "the checklist's display title; free to change between renders"),
-  seriesKey: z.string().optional().describe(
-    'stable identifier grouping re-renders into one trend series; defaults to the ' +
-    'title — supply one and keep it fixed so a title edit cannot silently fork the series'),
+  seriesKey: z.string().min(1).describe(
+    'stable identifier grouping re-renders into one trend series; chosen once at the ' +
+    "checklist's first render and repeated verbatim on every re-render — never the " +
+    'display title, which may be reworded freely without splitting the series'),
   project: z.string().optional().describe('narrows the series when titles collide across projects'),
   session: z.string().optional().describe(
     'usually omit — the hook supplies it, and an observed session beats a claimed one'),
@@ -94,7 +97,7 @@ const LOG_CHECKLIST_SHAPE = {
 export interface LogChecklistArgs {
   block: string;
   title: string;
-  seriesKey?: string | undefined;
+  seriesKey: string;
   project?: string | undefined;
   session?: string | undefined;
   promptId?: string | undefined;
@@ -126,8 +129,9 @@ expectType<Equal<LogChecklistArgs, z.infer<z.ZodObject<typeof LOG_CHECKLIST_SHAP
  *   handleLogChecklist(store, '0.2.1', {
  *     block: '- ✅ shipped\n- ❌ broke\n\n1/0/1 items (50%) █████░░░░░  ✅ 1  ❌ 1',
  *     title: 'Release 12',
+ *     seriesKey: 'release-12',
  *   })
- *   // => { content: [{ type: 'text', text: "[9:14 am PDT] recorded #7 …\nseries 'Release 12': 50" }] }
+ *   // => { content: [{ type: 'text', text: "[9:14 am PDT] recorded #7 …\nseries 'release-12': 50" }] }
  *
  * @see ../charts/verify.js parseSummaryCounts
  */
@@ -157,8 +161,7 @@ export function handleLogChecklist(
           return typeof v === 'number' ? v : undefined;
         };
 
-  const seriesKey = args.seriesKey ?? args.title,
-        when      = new Date();
+  const when = new Date();
 
   // Anything the caller supplied wins; everything else is adopted from what the hook
   // observed, with the same 'no-hook' sentinel and privacy re-gate as `express`.
@@ -166,7 +169,7 @@ export function handleLogChecklist(
     channel        : 'checklist',
     text           : args.block,
     title          : args.title,
-    seriesKey,
+    seriesKey      : args.seriesKey,
     succ           : summary.success,
     active         : summary.active,
     fail           : summary.failure,
@@ -187,11 +190,11 @@ export function handleLogChecklist(
     hostVersion    : client?.version,
   }, pluginVersion, when);
 
-  const series = seriesPercents(store, seriesKey);
+  const series = seriesPercents(store, args.seriesKey);
 
   return reply(
     `[${stamp(when).local}] recorded #${String(written.id)} ${written.uuid}\n` +
-    `series '${seriesKey}': ${series.join(' ')}`
+    `series '${args.seriesKey}': ${series.join(' ')}`
   );
 
 }
@@ -310,8 +313,9 @@ export function registerChecklistTools(server: McpServer, store: Store, pluginVe
       'series. Pass the full block, summary line included — the S/A/F counts and ' +
       'percent are parsed out of it, and a block with no summary line is rejected. The ' +
       "reply carries the series' full percent history, so the next trend sparkline is " +
-      'computed from the record instead of remembered. Keep seriesKey stable across ' +
-      're-renders; the title may change freely.',
+      'computed from the record instead of remembered. seriesKey is the series identity: ' +
+      'chosen once at the first render and repeated verbatim on every re-render — never ' +
+      'the display title, which may change freely.',
     inputSchema : LOG_CHECKLIST_SHAPE,
   }, (args) => handleLogChecklist(store, pluginVersion, args, server.server.getClientVersion()));
 

@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Thursday, August 27, 2026 at GMT-07:00 `1787898901340` from hash `e0465f6`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787900436173` from hash `960abf0`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787898901340 Thursday, August 27, 2026 at GMT-07:00 87.07 85 84 e0465f6 32.2 45.09 38.26 43.78 43 521 85.96 81.63 87.34 478 0.2.1 -->
+<!-- Supported embeds: 1787900436173 Friday, August 28, 2026 at GMT-07:00 87.13 85 84 960abf0 44.92 51.64 45.91 50.45 46 530 86.13 81.63 87.41 484 0.2.1 -->
 
 
 
@@ -39,7 +39,7 @@ scratchpad write plus a script invocation:
 
 | Tool | Purpose |
 |---|---|
-| `log_checklist` | Record one rendered checklist block. The `S/A/F items (P%)` summary is parsed out of the block (a block without one is rejected), and the reply carries the series' full percent history so the next trend sparkline is computed from the record rather than remembered. `seriesKey` defaults to the title; supply a stable one so a title edit cannot fork the series. |
+| `log_checklist` | Record one rendered checklist block. The `S/A/F items (P%)` summary is parsed out of the block (a block without one is rejected), and the reply carries the series' full percent history so the next trend sparkline is computed from the record rather than remembered. `seriesKey` is required and stable — chosen once at the first render and repeated verbatim on every re-render, never the display title, so a title edit cannot fork the series (#27). |
 | `recall_checklists` | Read back recent checklist rows and, given a `seriesKey`, that series' chronological percent history — the old `tail` and `series` ops as one tool. |
 | `check_checklist` | Validate a rendered checklist mechanically: marker vocabulary, indentation, bucket partition (🛳️ may count as success or active), percent, the 10-cell anti-aliased bar, and the icon-list sort/wrap/placement rules. One `FAIL:` line per broken rule. |
 
@@ -63,19 +63,19 @@ The validator behind `check_checklist` is exported as `verifyChecklist` (with
   </tr>
   <tr>
     <th>Unit</th>
-    <td>478</td>
-    <td>87.07<small>%</small></td>
-    <td>85.96<small>%</small></td>
+    <td>484</td>
+    <td>87.13<small>%</small></td>
+    <td>86.13<small>%</small></td>
     <td>81.63<small>%</small></td>
-    <td>87.34<small>%</small></td>
+    <td>87.41<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>43</td>
-    <td>87.07<small>%</small></td>
-    <td>32.2<small>%</small></td>
-    <td>38.26<small>%</small></td>
-    <td>43.78<small>%</small></td>
+    <td>46</td>
+    <td>87.13<small>%</small></td>
+    <td>44.92<small>%</small></td>
+    <td>45.91<small>%</small></td>
+    <td>50.45<small>%</small></td>
   </tr>
 </table>
 

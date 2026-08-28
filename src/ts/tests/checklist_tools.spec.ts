@@ -40,14 +40,15 @@ function block(succ: number, active: number, fail: number): string {
 describe('handleLogChecklist', () => {
 
   test('records a checklist row with the summary parsed out of the block', () => withStore(s => {
-    const out = text(handleLogChecklist(s, VERSION, { block: block(1, 0, 1), title: 'Release 12' }));
+    const out = text(handleLogChecklist(s, VERSION,
+      { block: block(1, 0, 1), title: 'Release 12', seriesKey: 'release-12' }));
     expect(out).toMatch(/^\[\d{1,2}:\d{2} [ap]m [^\]]+\] recorded #1 [0-9a-f-]{36}\n/);
-    expect(out).toContain("series 'Release 12': 50");
+    expect(out).toContain("series 'release-12': 50");
     const row = s.db.prepare(
       'SELECT channel, title, series_key, succ, active, fail, percent, session FROM entries').get();
     expect(row.channel).toBe('checklist');
     expect(row.title).toBe('Release 12');
-    expect(row.series_key).toBe('Release 12');
+    expect(row.series_key).toBe('release-12');
     expect(row.succ).toBe(1);
     expect(row.active).toBe(0);
     expect(row.fail).toBe(1);
@@ -55,12 +56,18 @@ describe('handleLogChecklist', () => {
     expect(row.session).toBe('no-hook');
   }));
 
-  test('an explicit seriesKey wins over the title default', () => withStore(s => {
+  test('seriesKey, not the title, is the stored series identity', () => withStore(s => {
     handleLogChecklist(s, VERSION, { block: block(1, 1, 0), title: 'Project Atlas — phase 2', seriesKey: 'atlas' });
     const row = s.db.prepare('SELECT title, series_key FROM entries').get();
     expect(row.title).toBe('Project Atlas — phase 2');
     expect(row.series_key).toBe('atlas');
     expect(seriesPercents(s, 'atlas')).toEqual([50]);
+  }));
+
+  test('a blank seriesKey is rejected by entry validation, and nothing is written', () => withStore(s => {
+    expect(() => handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: '  ' }))
+      .toThrow(/seriesKey must not be blank/);
+    expect(s.db.prepare('SELECT COUNT(*) AS n FROM entries').get().n).toBe(0);
   }));
 
   test('re-renders accumulate into one series, and the reply carries the whole history', () => withStore(s => {
@@ -73,7 +80,8 @@ describe('handleLogChecklist', () => {
   }));
 
   test('a block with no summary line is rejected, and nothing is written', () => withStore(s => {
-    const out = text(handleLogChecklist(s, VERSION, { block: '- ✅ done\n- ❌ broke', title: 'T' }));
+    const out = text(handleLogChecklist(s, VERSION,
+      { block: '- ✅ done\n- ❌ broke', title: 'T', seriesKey: 'k' }));
     expect(out).toMatch(/^error: /);
     expect(out).toContain('summary');
     expect(s.db.prepare('SELECT COUNT(*) AS n FROM entries').get().n).toBe(0);
@@ -81,7 +89,7 @@ describe('handleLogChecklist', () => {
 
   test('adopts the session and turn context the hook observed', () => withStore(s => {
     recordContext(s, { session: 'observed-session', promptId: 'p9', effort: 'high' });
-    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T' });
+    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: 'k' });
     const row = s.db.prepare('SELECT session, prompt_id, effort FROM entries').get();
     expect(row.session).toBe('observed-session');
     expect(row.prompt_id).toBe('p9');
@@ -90,18 +98,18 @@ describe('handleLogChecklist', () => {
 
   test('a caller-supplied session beats the observed one', () => withStore(s => {
     recordContext(s, { session: 'observed-session' });
-    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', session: 'claimed' });
+    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: 'k', session: 'claimed' });
     expect(s.db.prepare('SELECT session FROM entries').get().session).toBe('claimed');
   }));
 
   test('project is dropped when privacy.store_cwd is false', () => withStore(s => {
     writeConfig(s, 'privacy.store_cwd', 'false');
-    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', project: 'secret-project' });
+    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: 'k', project: 'secret-project' });
     expect(s.db.prepare('SELECT project FROM entries').get().project).toBeNull();
   }));
 
   test('the host identity from the handshake is stamped when supplied', () => withStore(s => {
-    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T' },
+    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: 'k' },
                        { name: 'claude-code', version: '2.0.0' });
     const row = s.db.prepare('SELECT host, host_version FROM entries').get();
     expect(row.host).toBe('claude-code');
@@ -113,8 +121,8 @@ describe('handleLogChecklist', () => {
 describe('handleRecallChecklists', () => {
 
   test('returns recent checklist rows oldest first, with the checklist columns', () => withStore(s => {
-    handleLogChecklist(s, VERSION, { block: block(1, 1, 0), title: 'first' });
-    handleLogChecklist(s, VERSION, { block: block(2, 0, 0), title: 'second' });
+    handleLogChecklist(s, VERSION, { block: block(1, 1, 0), title: 'first', seriesKey: 'first' });
+    handleLogChecklist(s, VERSION, { block: block(2, 0, 0), title: 'second', seriesKey: 'second' });
     const parsed = JSON.parse(text(handleRecallChecklists(s, {}))) as {
       recent: { title: string; percent: number; series_key: string }[];
     };
@@ -125,7 +133,7 @@ describe('handleRecallChecklists', () => {
 
   test('limit narrows the window to the most recent rows', () => withStore(s => {
     for (const title of ['a', 'b', 'c']) {
-      handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title });
+      handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title, seriesKey: title });
     }
     const parsed = JSON.parse(text(handleRecallChecklists(s, { limit: 2 }))) as {
       recent: { title: string }[];
@@ -152,7 +160,7 @@ describe('handleRecallChecklists', () => {
 
   test('non-checklist entries never leak into the recall', () => withStore(s => {
     recordContext(s, { session: 's1' });
-    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'only-this' });
+    handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'only-this', seriesKey: 'only-this' });
     s.db.prepare(`INSERT INTO entries (uuid, ts_utc, ts_local, tz, session, channel, text, plugin_version)
                   VALUES ('u1', 't', 't', 'z', 's1', 'idea', 'not a checklist', ?)`).run(VERSION);
     const parsed = JSON.parse(text(handleRecallChecklists(s, {}))) as { recent: { title: string }[] };

@@ -293,7 +293,25 @@
 <a name='L228'></a><a href='#L228'>228</a>
 <a name='L229'></a><a href='#L229'>229</a>
 <a name='L230'></a><a href='#L230'>230</a>
-<a name='L231'></a><a href='#L231'>231</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -386,6 +404,24 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -625,8 +661,9 @@ export function <span class="fstat-no" title="function not covered" >registerToo
       "instructions contradict each other and you picked one; confidence records how you " +
       'know what you just claimed; unanswerable records that something cannot be resolved ' +
       'with what is available; pattern is an observation about how the collaboration is ' +
-      'going. "Nothing notable" is always a valid signature — the requirement is to look, ' +
-      'not to produce.',
+      'going; checklist logs one render of a status checklist — its identity is seriesKey, ' +
+      'a stable id chosen once, never the display title. "Nothing notable" is always a ' +
+      'valid signature — the requirement is to look, not to produce.',
     inputSchema : {
       channel        : z.enum(tuple(channels)).describe('which kind of expression this is'),
       text           : z.string().min(1).max(280).describe('the content; terse, honest over flattering'),
@@ -649,6 +686,23 @@ export function <span class="fstat-no" title="function not covered" >registerToo
       model          : z.string().optional().describe('exact model id, including variant markers'),
       cctype         : z.string().optional().describe('conventional-commits type for the work'),
       project        : z.string().optional(),
+      seriesKey      : z.string().min(1).optional().describe(
+        "checklists only: the stable series identifier, chosen once at the checklist's first " +
+        'render and repeated verbatim on every re-render — never the display title, which may ' +
+        'be reworded freely without splitting the series; percent snapshots recorded under one ' +
+        'key form the trend series the sparkline replays'),
+      title          : z.string().optional().describe(
+        'checklists only: the display title as rendered; free to change between renders — ' +
+        'series identity lives in seriesKey, not here'),
+      succ           : z.number().int().min(0).optional().describe(
+        'checklists only: items counted as success in the summary line'),
+      active         : z.number().int().min(0).optional().describe(
+        'checklists only: items counted as active or pending in the summary line'),
+      fail           : z.number().int().min(0).optional().describe(
+        'checklists only: items counted as failure in the summary line'),
+      percent        : z.number().int().min(0).max(100).optional().describe(
+        "checklists only: the summary line's completion percent for this snapshot; requires " +
+        'seriesKey, so the snapshot joins a series instead of being silently orphaned'),
     },
 <span class="fstat-no" title="function not covered" >  }, (a</span>rgs) =&gt; {
 &nbsp;
@@ -760,7 +814,7 @@ export function <span class="fstat-no" title="function not covered" >registerToo
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-08-28T06:34:57.246Z
+                at 2026-08-28T07:00:34.322Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
