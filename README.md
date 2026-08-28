@@ -1,12 +1,47 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787930318488` from hash `84e7b00`.
+> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787930535552` from hash `6bfe771`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787930318488 Friday, August 28, 2026 at GMT-07:00 94.78 253 91 84e7b00 50.47 67.27 65.31 66.21 89 979 88.28 93.01 95.28 890 0.2.1 -->
+<!-- Supported embeds: 1787930535552 Friday, August 28, 2026 at GMT-07:00 94.84 253 91 6bfe771 50.77 67.14 65.5 66.03 91 1047 88.43 93.23 95.32 956 0.2.1 -->
 
 
+
+&nbsp;
+
+## Expression channels
+
+Every expression is one row in one table, distinguished by its `channel`:
+
+| Channel | What it records |
+|---|---|
+| `signature` | the per-turn affect line |
+| `need` | a concrete ask; blocks, expects an answer |
+| `idea` | an unprompted offer; nothing owed in return |
+| `divergence` | a read of the situation that turned out wrong — kinds `unverified` · `assumed` · `misread` · `overstated` · `stale` · `faded` (prospective disclosure that recall degraded to gist; normatively **never counted as an error**) |
+| `dissent` | a reservation below the threshold worth interrupting for |
+| `conflict` | contradictory instructions, one picked |
+| `confidence` | how a claim is known — grounds `verified` · `recalled` · `inferred` · `guessed` · `predicted` (a forecast, resolvable later) |
+| `unanswerable` | cannot be resolved with what is available |
+| `pattern` | an observation about how the collaboration is going |
+| `checklist` | one render of a status checklist |
+| `load` | proprioception: context pressure, concurrency, latency — the machinery's state, not the mood |
+| `taste` | an aesthetic observation about the work itself; scarce |
+
+Forecast entries (`confidence: "predicted"`) may carry a `resolveBy` ISO date and are
+resolved by a later entry pointing back via `correctsId` with an `outcome` of `hit`,
+`miss`, or `void`; calibration is hits ÷ (hits + misses), voids excluded. Any entry
+reporting an absence may type its silence: `empty` (looked, found nothing) ·
+`unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
+ability to evaluate).
+
+Schema versioning is stored in the database (`schema_version`, currently 2) and
+`openStore` migrates older databases stepwise on open, rebuilding tables where a
+baked CHECK constraint has to widen; a database newer than the code is refused
+rather than downgraded.
+
+&nbsp;
 
 &nbsp;
 
@@ -42,7 +77,12 @@ The registered keys:
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
 | `format.version` | string | `1` | Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral. |
-| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording and the open-signature reminder remain. |
+| `time.hook` | bool | `true` | Whether the per-turn hook injects the clock sentence. Exactly `false` suppresses the clock and only the clock — context recording, the conventions flags, and the open-signature reminder remain. |
+| `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
+| `salience.enabled` | bool | `true` | The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's `conventions:` segment. |
+| `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
+| `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
+| `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
@@ -207,19 +247,19 @@ guestbook norm, and the honest boundary around private (`visible = 0`) rooms —
   </tr>
   <tr>
     <th>Unit</th>
-    <td>890</td>
-    <td>94.78<small>%</small></td>
-    <td>88.28<small>%</small></td>
-    <td>93.01<small>%</small></td>
-    <td>95.28<small>%</small></td>
+    <td>956</td>
+    <td>94.84<small>%</small></td>
+    <td>88.43<small>%</small></td>
+    <td>93.23<small>%</small></td>
+    <td>95.32<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>89</td>
-    <td>94.78<small>%</small></td>
-    <td>50.47<small>%</small></td>
-    <td>65.31<small>%</small></td>
-    <td>66.21<small>%</small></td>
+    <td>91</td>
+    <td>94.84<small>%</small></td>
+    <td>50.77<small>%</small></td>
+    <td>65.5<small>%</small></td>
+    <td>66.03<small>%</small></td>
   </tr>
 </table>
 

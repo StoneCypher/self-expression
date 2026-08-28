@@ -15,11 +15,13 @@ import { randomUUID } from 'node:crypto';
 import {
   CHANNELS, POSITIONS, DELTAS, TURNS, EFFORTS, STEMS,
   CONFIDENCE_GROUNDS, DIVERGENCE_KINDS, MODALITIES,
+  FORECAST_OUTCOMES, SILENCE_KINDS,
   isMember, describeVocabulary,
 } from './vocabulary.js';
 import type {
   Channel, Position, Delta, Turn, Effort, Stem,
   ConfidenceGround, DivergenceKind, Modality,
+  ForecastOutcome, SilenceKind,
 } from './vocabulary.js';
 import { stamp } from './time.js';
 import type { Store } from './store.js';
@@ -74,6 +76,18 @@ export interface EntryInput {
   readonly confidence?      : ConfidenceGround | undefined;
   readonly divergenceKind?  : DivergenceKind | undefined;
 
+  // Forecast fields (#42). `resolveBy` is an ISO-8601 local date (YYYY-MM-DD), a real
+  // column rather than prose so a future ripening-check (#43) can query it; valid only
+  // with `confidence: 'predicted'`. `outcome` rides the entry that RESOLVES a
+  // forecast, pointing back at it via `correctsId` — a resolution genuinely is a
+  // correction, of "unknown" to "known".
+  readonly resolveBy?       : string | undefined;
+  readonly outcome?         : ForecastOutcome | undefined;
+
+  // Typed silence (#42): which honest shape of nothing this entry reports, on any
+  // channel whose content is an absence. Nullable; the untyped shrug remains valid.
+  readonly silence?         : SilenceKind | undefined;
+
   // Checklist only. `seriesKey` is the series' stable identity (#27): chosen once at
   // the checklist's first render and repeated verbatim on every re-render, so `title`
   // — display prose — may be reworded freely without silently forking the percent
@@ -105,7 +119,12 @@ const CONSTRAINED: readonly [keyof EntryInput, readonly string[]][] = [
   ['confidence',     CONFIDENCE_GROUNDS],
   ['divergenceKind', DIVERGENCE_KINDS],
   ['modality',       MODALITIES],
+  ['outcome',        FORECAST_OUTCOMES],
+  ['silence',        SILENCE_KINDS],
 ];
+
+/** The shape `resolveBy` must take: an ISO-8601 local date, so it stays queryable. */
+const ISO_LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Check every closed field against its vocabulary — and the checklist series fields
@@ -119,12 +138,19 @@ const CONSTRAINED: readonly [keyof EntryInput, readonly string[]][] = [
  * by {@link seriesPercents}, so it would silently vanish from the trend rather than
  * erroring — this makes that loud at write time instead.
  *
+ * The forecast rules (#42) are cross-field: `resolveBy` only makes sense on a claim
+ * that resolves later (`confidence: 'predicted'`), and an `outcome` with nothing to
+ * point at (`correctsId`) resolves no forecast at all. Whether the pointed-at row
+ * really is a forecast needs the store, so that half lives at the tool layer.
+ *
  * @example
  *   validate({ channel: 'signature', text: 'x', session: 's' })      // => []
  *   validate({ channel: 'vibes', text: 'x', session: 's' })
  *   // => ["'vibes' is not a valid channel; expected 'signature', 'need', ..."]
  *   validate({ channel: 'checklist', text: 'x', session: 's', percent: 80 })
  *   // => ['percent requires a seriesKey — a snapshot recorded without one can never join a trend series']
+ *   validate({ channel: 'confidence', text: 'x', session: 's', resolveBy: '2026-08-30' })
+ *   // => ["resolveBy is only valid with confidence 'predicted' — only a forecast resolves later"]
  */
 export function validate(input: EntryInput): string[] {
 
@@ -152,6 +178,20 @@ export function validate(input: EntryInput): string[] {
 
   if (input.percent !== undefined && (input.percent < 0 || input.percent > 100 || !Number.isInteger(input.percent))) {
     problems.push(`percent must be an integer from 0 to 100; received ${String(input.percent)}`);
+  }
+
+  if (input.resolveBy !== undefined && input.confidence !== 'predicted') {
+    problems.push("resolveBy is only valid with confidence 'predicted' — only a forecast resolves later");
+  }
+
+  if (input.resolveBy !== undefined && !ISO_LOCAL_DATE.test(input.resolveBy)) {
+    problems.push(
+      `resolveBy must be an ISO-8601 local date (YYYY-MM-DD); received '${input.resolveBy}' — ` +
+      'a ripening check has to be able to query it as a date, not grep prose');
+  }
+
+  if (input.outcome !== undefined && input.correctsId === undefined) {
+    problems.push('outcome requires a correctsId naming the forecast it resolves');
   }
 
   return problems;
@@ -202,7 +242,7 @@ export function recordEntry(
       tool_calls, error_count, compactions, prompt_len, response_len,
       context_tokens, output_tokens, thinking_tokens, corrects_id,
       position, delta, uncertain, face, context_emoji, stem, cctype,
-      confidence, divergence_kind,
+      confidence, divergence_kind, resolve_by, outcome, silence,
       series_key, title, succ, active, fail, percent,
       plugin_version, format_version
     ) VALUES (
@@ -214,7 +254,7 @@ export function recordEntry(
       ?,?,?,?,?,
       ?,?,?,?,
       ?,?,COALESCE(?,0),?,?,?,?,
-      ?,?,
+      ?,?,?,?,?,
       ?,?,?,?,?,?,
       ?,?
     )`).run(
@@ -233,6 +273,7 @@ export function recordEntry(
     input.position ?? null, input.delta ?? null, bit(input.uncertain),
     input.face ?? null, input.contextEmoji ?? null, input.stem ?? null, input.cctype ?? null,
     input.confidence ?? null, input.divergenceKind ?? null,
+    input.resolveBy ?? null, input.outcome ?? null, input.silence ?? null,
     input.seriesKey ?? null, input.title ?? null,
     input.succ ?? null, input.active ?? null, input.fail ?? null, input.percent ?? null,
     pluginVersion, input.formatVersion ?? null,
@@ -285,14 +326,47 @@ export function previousSignature(store: Store, session: string): Record<string,
 /**
  * The most recent entries, newest last.
  *
+ * Carries `confidence`, `divergence_kind`, `silence`, and `outcome` alongside the
+ * display fields, so delta-derivation's neighbor — "what did I recently forecast, and
+ * what silences did I type" — is answerable without raw SQL.
+ *
  * @example
  *   recentEntries(store, 3)  // => [{ … }, { … }, { … }]
  */
 export function recentEntries(store: Store, limit = 10): Record<string, unknown>[] {
   const rows = store.db.prepare(
-    `SELECT ts_local, tz, channel, position, delta, face, stem, text
+    `SELECT ts_local, tz, channel, position, delta, face, stem, text,
+            confidence, divergence_kind, silence, outcome
        FROM entries ORDER BY id DESC LIMIT ?`).all(limit);
   return rows.reverse();
+}
+
+/**
+ * Every resolved forecast outcome, in resolution order — the calibration series.
+ *
+ * A row counts only when it carries an `outcome` and its `corrects_id` points at a
+ * genuine forecast (`confidence = 'predicted'`), so a stray outcome that slipped past
+ * the tool layer cannot pollute the series. Mapped `hit → 'pass'`, `miss → 'fail'`,
+ * `void → 'skipped'`, the result feeds `render_series` `winloss` directly; hit rate is
+ * `hits / (hits + misses)`, voids excluded, because a dissolved premise says nothing
+ * about judgment.
+ *
+ * @returns each resolution's outcome, ascending by the resolving entry's id
+ *
+ * @example
+ *   forecastOutcomes(store)  // => ['hit', 'hit', 'miss', 'void']
+ *
+ * @see recordEntry
+ */
+export function forecastOutcomes(store: Store): ForecastOutcome[] {
+  const rows = store.db.prepare(
+    `SELECT resolution.outcome AS outcome
+       FROM entries resolution
+       JOIN entries forecast ON resolution.corrects_id = forecast.id
+      WHERE resolution.outcome IS NOT NULL
+        AND forecast.confidence = 'predicted'
+      ORDER BY resolution.id ASC`).all();
+  return rows.map(row => String(row['outcome']) as ForecastOutcome);
 }
 
 /**
