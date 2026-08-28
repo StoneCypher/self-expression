@@ -15,11 +15,12 @@
 import { readFileSync }  from 'node:fs';
 import { join }          from 'node:path';
 import { runAsync }      from './cli_commands.js';
-import type { RenderCommand } from './cli_commands.js';
+import type { RenderCommand, MessagesCommand } from './cli_commands.js';
 import { startStdio }    from './mcp/server.js';
 import { handleHook }    from './mcp/hooks.js';
 import type { HookPayload } from './mcp/hooks.js';
 import { renderHistoryToFile } from './mcp/chart_tools.js';
+import { readMessages, formatMessages } from './channels/messages.js';
 import { openStore, closeStore } from './channels/store.js';
 import type { Store }    from './channels/store.js';
 
@@ -100,12 +101,36 @@ function runRender(command: RenderCommand): Promise<string> {
   }
 }
 
+/**
+ * Run one `messages` command against the real store — the user's direct door, with
+ * no model in the loop. The reader is `'user'`; `--ack` collects (writing the
+ * human's own receipts), its absence peeks. Only `user` mail is ever acked from
+ * here: the other audiences' receipts belong to the model, and the facility never
+ * lets one party write the other's — so `self`, `agents`, and `record` are always
+ * a peek from the CLI. The store closes even when the read throws.
+ */
+function runMessages(command: MessagesCommand): Promise<string> {
+  const store = openStore();
+  try {
+    const ack  = command.audience === 'user' && command.ack,
+          rows = readMessages(store, { reader: 'user' }, {
+            audience : command.audience,
+            box      : command.box === null ? undefined : command.box,
+            ack,
+            limit    : command.limit,
+          });
+    return Promise.resolve(formatMessages(rows));
+  } finally {
+    closeStore(store);
+  }
+}
+
 const streams = {
   out: (line: string): void => { console.log(line);   },
   err: (line: string): void => { console.error(line); },
 };
 
-runAsync(process.argv.slice(2), streams, () => startStdio(version()), runHook, runRender)
+runAsync(process.argv.slice(2), streams, () => startStdio(version()), runHook, runRender, runMessages)
   .then(code => { process.exit(code); })
   .catch((error: unknown) => {
     console.error(`self-expression: ${error instanceof Error ? error.message : String(error)}`);

@@ -5,8 +5,10 @@ import { join }   from 'node:path';
 import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js';
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
 import { migrate, MIGRATIONS, V1_ENTRY_COLUMNS }      from '../channels/migrate.js';
-import { SCHEMA_VERSION, INDEX_DDL }                  from '../channels/schema.js';
+import { SCHEMA_VERSION, INDEX_DDL, MESSAGE_INDEX_DDL } from '../channels/schema.js';
+import { postMessage, readMessages }                  from '../channels/messages.js';
 import { buildV1, insertV1 }                          from './helpers/v1_fixture.js';
+import { buildV2, insertV2 }                          from './helpers/v2_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -93,7 +95,7 @@ describe('openStore on a v1 database', () => {
     const s = openStore(path);
     const idx = s.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
                     .all().map(r => r.name as string);
-    expect(idx).toHaveLength(INDEX_DDL.length);
+    expect(idx).toHaveLength(INDEX_DDL.length + MESSAGE_INDEX_DDL.length);
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
@@ -130,6 +132,64 @@ describe('openStore on a v1 database', () => {
     expect(readMeta(s, 'created_utc')).toBe('2026-08-18T00:00:00Z');
     expect(s.machineId).toBe('11111111-2222-3333-4444-555555555555');
     closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
+describe('openStore on a v2 database (#41)', () => {
+
+  test('the fixture really is v2: no messagebox tables, but the v2 vocabulary writes', () => {
+    const dir = tmp(), db = buildV2(join(dir, 'log.sqlite3'));
+    insertV2(db, 'u-taste', 'taste');
+    insertV2(db, 'u-pred', 'confidence', { confidence: 'predicted', resolve_by: '2026-08-30' });
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
+                     .all().map(r => String(r.name));
+    expect(tables).not.toContain('messages');
+    expect(tables).not.toContain('message_reads');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('migrates additively: entries untouched, messagebox tables usable, version stamped', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v2  = buildV2(path);
+    insertV2(v2, 'u1', 'signature', { position: 'close', stem: 'still', silence: 'empty' });
+    insertV2(v2, 'u2', 'taste');
+    const before = JSON.parse(JSON.stringify(
+      v2.prepare('SELECT * FROM entries ORDER BY id').all())) as unknown;
+    v2.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    const after = JSON.parse(JSON.stringify(
+      s.db.prepare('SELECT * FROM entries ORDER BY id').all())) as unknown;
+    expect(after).toEqual(before);
+
+    // The whole point: the messagebox works through the normal path post-migration.
+    postMessage(s, { audience: 'self', text: 'note to future self', session: 's1' }, '0.2.1');
+    expect(readMessages(s, { reader: 'model', session: 's1' }, {})).toHaveLength(1);
+
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('meta identity survives migration: created_utc and machine_id are untouched', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV2(path).close();
+    const s = openStore(path);
+    expect(readMeta(s, 'created_utc')).toBe('2026-08-27T00:00:00Z');
+    expect(s.machineId).toBe('22222222-3333-4444-5555-666666666666');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('reopening after migration is idempotent — a no-op, not a second pass', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV2(path).close();
+    const a = openStore(path);
+    postMessage(a, { audience: 'record', text: 'for posterity', session: 's1' }, '0.2.1');
+    closeStore(a);
+    const b = openStore(path);
+    expect(readMeta(b, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    expect(b.db.prepare('SELECT COUNT(*) n FROM messages').get().n).toBe(1);
+    closeStore(b); rmSync(dir, { recursive: true, force: true });
   });
 
 });
