@@ -3,10 +3,11 @@
  *
  * Every renderer, type, and constant a caller might reasonably import lives in one of
  * `scale.ts`, `markers.ts`, `series.ts`, `bars.ts`, `rows.ts`, `timeline.ts`,
- * `glyphs.ts`, and `checklist.ts`; this barrel re-exports all of it so consumers — the
- * MCP chart tools in `mcp/chart_tools.ts` and library users importing from the package
- * root — need one import path instead of eight. `src/ts/index.ts` re-exports this
- * module in turn, so the renderers are also part of the package's public API.
+ * `glyphs.ts`, `checklist.ts`, and `verify.ts`; this barrel re-exports all of it so
+ * consumers — the MCP chart tools in `mcp/chart_tools.ts`, the checklist tools in
+ * `mcp/checklist_tools.ts`, and library users importing from the package root — need
+ * one import path instead of nine. `src/ts/index.ts` re-exports this module in turn,
+ * so the renderers are also part of the package's public API.
  *
  * @see ./scale.js
  * @see ./markers.js
@@ -16,6 +17,7 @@
  * @see ./timeline.js
  * @see ./glyphs.js
  * @see ./checklist.js
+ * @see ./verify.js
  */
 
 export * from './scale.js';
@@ -26,3 +28,4 @@ export * from './rows.js';
 export * from './timeline.js';
 export * from './glyphs.js';
 export * from './checklist.js';
+export * from './verify.js';

@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-34 merges; 2 releases
+36 merges; 2 releases
 
 
 
@@ -14,6 +14,60 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:54:50 PM
+
+Commit [872f24d858374a2c2680a06d8504b3147bc5eea7](https://github.com/StoneCypher/self-expression/commit/872f24d858374a2c2680a06d8504b3147bc5eea7)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [733744b, 0f6f14c]
+
+  * Merge pull request #54 from StoneCypher/fix_26-08-27_stable-checklist-series-key_27
+  * fix: checklist series key is a stable id, not the title
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:53:48 PM
+
+Commit [0f6f14cc90707a39fff993b8e3ca5639a36c7c97](https://github.com/StoneCypher/self-expression/commit/0f6f14cc90707a39fff993b8e3ca5639a36c7c97)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [13c25cc, 733744b]
+
+  * chore: merge origin/main and rebuild artifacts
+  * Resolved conflicts (all in generated artifacts: CHANGELOGs, README,
+coverage-stoch, doc_md changelogs) by taking main's side, then
+regenerated everything with a full build over the merged source.
+444 unit + 43 stochastic tests pass.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:52:55 PM
+
+Commit [c63d4b755390058cabc5ea39fca705cb55454933](https://github.com/StoneCypher/self-expression/commit/c63d4b755390058cabc5ea39fca705cb55454933)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 733744b96989f24a62336bb51553f4fbe57aafa4
 
 
 

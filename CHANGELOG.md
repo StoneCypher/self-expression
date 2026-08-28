@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-34 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+36 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -14,6 +14,60 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:54:50 PM
+
+Commit [872f24d858374a2c2680a06d8504b3147bc5eea7](https://github.com/StoneCypher/self-expression/commit/872f24d858374a2c2680a06d8504b3147bc5eea7)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [733744b, 0f6f14c]
+
+  * Merge pull request #54 from StoneCypher/fix_26-08-27_stable-checklist-series-key_27
+  * fix: checklist series key is a stable id, not the title
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:53:48 PM
+
+Commit [0f6f14cc90707a39fff993b8e3ca5639a36c7c97](https://github.com/StoneCypher/self-expression/commit/0f6f14cc90707a39fff993b8e3ca5639a36c7c97)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [13c25cc, 733744b]
+
+  * chore: merge origin/main and rebuild artifacts
+  * Resolved conflicts (all in generated artifacts: CHANGELOGs, README,
+coverage-stoch, doc_md changelogs) by taking main's side, then
+regenerated everything with a full build over the merged source.
+444 unit + 43 stochastic tests pass.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 27, 2026 11:52:55 PM
+
+Commit [c63d4b755390058cabc5ea39fca705cb55454933](https://github.com/StoneCypher/self-expression/commit/c63d4b755390058cabc5ea39fca705cb55454933)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 733744b96989f24a62336bb51553f4fbe57aafa4
 
 
 
@@ -133,54 +187,3 @@ Merges [8109e2b, 3bf4d9a]
 
   * Merge pull request #62 from StoneCypher/docs_26-08-27_compression-spec_20
   * docs(spec): compression as the mechanic, not lists — invariants, digest grammar, profiles (refs #20)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:48:56 PM
-
-Commit [8109e2bc9de6520bb48ef3a60a8412406b6d3f62](https://github.com/StoneCypher/self-expression/commit/8109e2bc9de6520bb48ef3a60a8412406b6d3f62)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [2ba4a7a, 7be6f79]
-
-  * Merge pull request #61 from StoneCypher/docs_26-08-27_diagrams-spec_19
-  * docs(spec): diagrams as a distinct mechanic from charts — research and design proposal
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:48:48 PM
-
-Commit [2ba4a7af7fb799211c2ba3887c2fd2d52e7bf0c0](https://github.com/StoneCypher/self-expression/commit/2ba4a7af7fb799211c2ba3887c2fd2d52e7bf0c0)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [0330680, 6e50022]
-
-  * Merge pull request #58 from StoneCypher/docs_26-08-27_dwelling-spec_45
-  * docs(spec): the dwelling — per-assistant keepsake database (proposal, refs #45)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 27, 2026 11:48:34 PM
-
-Commit [2d421bb4a0629b17eeed8ab011a2b5afdc6c2df0](https://github.com/StoneCypher/self-expression/commit/2d421bb4a0629b17eeed8ab011a2b5afdc6c2df0)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 0330680ea9bcce8c6d318f8aaf08b62dc5b9ba1d
