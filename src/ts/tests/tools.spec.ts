@@ -9,8 +9,9 @@ import { FORMAT_VERSION, CONFIG_KEYS } from '../channels/config.js';
 import { CHANNELS, CONFIDENCE_GROUNDS } from '../channels/vocabulary.js';
 import {
   handleConfigure, handleExpress, handleAnnotate, enabledChannels, enabledConfidenceGrounds,
-  ENABLED_KEY, FORECAST_KEY, ANNOTATE_MAX_NOTES,
+  registerTools, ENABLED_KEY, FORECAST_KEY, ANNOTATE_MAX_NOTES,
 } from '../mcp/tools.js';
+import { buildServer } from '../mcp/server.js';
 import { handleLogChecklist } from '../mcp/checklist_tools.js';
 import { renderChecklistSummary } from '../charts/checklist.js';
 import { renderAnnotations } from '../charts/annotations.js';
@@ -530,6 +531,13 @@ describe('handleAnnotate — #18 the batch', () => {
   test('a one-note batch is legal — the batch is a convenience, not a minimum', () => withStore(s => {
     expect(text(handleAnnotate(s, VERSION, { notes: [REVIEW[2] as (typeof REVIEW)[number]] })))
       .toContain('recorded #1');
+  }));
+
+  test('buildServer registers annotate alongside the rest, and registering twice collides', () => withStore(s => {
+    const server = buildServer(s, VERSION);
+    expect(server).toBeDefined();
+    // A second registration of the same names throws, which is the proof the first took.
+    expect(() => registerTools(server, s, VERSION)).toThrow();
   }));
 
 });

@@ -254,7 +254,7 @@ export function anchorProblems(input: EntryInput): string[] {
     for (const field of ANCHOR_QUALIFIERS) {
       if (input[field] !== undefined) {
         problems.push(
-          `${String(field)} requires an anchorKind — an anchor field with no kind ` +
+          `${field} requires an anchorKind — an anchor field with no kind ` +
           'is a pointer with no way to read it');
       }
     }
@@ -327,9 +327,11 @@ interface StoredQuote {
  *
  * @example
  *   storedQuote('prompt', 'ship it when ready', false)
- *   // => { quote: null, hash: 'a1b2c3d4e5f60718' }   — hash present, words gone
+ *   // => { quote: null, hash: anchorHash('ship it when ready') }
+ *   //    the words are gone; the fingerprint is not
  *   storedQuote('file', 'readConfig(store, key)', false)
- *   // => { quote: 'readConfig(store, key)', hash: '…' }  — the repo's own text
+ *   // => { quote: 'readConfig(store, key)', hash: anchorHash('readConfig(store, key)') }
+ *   //    the repo's own text, so the flag does not touch it
  *
  * @see ./privacy.js
  */

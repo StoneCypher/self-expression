@@ -51,8 +51,9 @@ self-expression/
 │                            generated offline by src/scripts/generate_leitmotifs.mjs
 ├── src/ts/
 │   ├── channels/            backchannel capture and storage, incl. versioned schema
-│   │                        migrations (migrate.ts; CHECK growth forces table rebuilds)
-│   │                        and the messagebox facility (messages.ts, issue #41)
+│   │                        migrations (migrate.ts; CHECK growth forces table rebuilds),
+│   │                        the messagebox facility (messages.ts, issue #41), and
+│   │                        anchoring's pure resolvers (anchors.ts, issue #18)
 │   ├── charts/              pure ASCII renderers — quantities (exact-string contract)
 │   ├── claudio/             the voluntary audio facility: its own MCP server, gate, ledger,
 │   │                        WAV pipeline, and PowerShell player seam (issue #44)
@@ -164,6 +165,27 @@ as it delivers. `self` is fenced by hook-observed session, `agents` by a require
 (`expires_utc`) only excludes from delivery; deletion belongs to `retention.days`,
 which prunes messages by age and receipts only by orphanhood. The
 `self-expression messages` CLI subcommand is the human's own door.
+
+**Anchoring is a qualifier on entries, not a table or a channel (issue #18).** Five
+nullable columns on `entries` — `anchor_kind` (CHECK-constrained), `anchor_target`,
+`anchor_span`, `anchor_quote`, `anchor_hash` — in exactly the pattern typed silence
+uses, plus one index (`idx_entries_anchor`) for the query anchoring exists to answer:
+every note ever attached to this file, this message, this series. A separate `anchors`
+table was rejected because the data does not exhibit the many-locations-one-note shape
+it would exist for, and an `annotation` channel was rejected because it would force
+choosing between recording *what kind of thing was said* and *that it was attached* —
+an anchored dissent is a dissent. Resolution (`fresh` → `moved` → `orphaned`, with
+`distant` for message anchors) is **computed at read time and never stored**: it is a
+fact about the target's present state, and storing it would rot on the next edit. The
+resolvers in `channels/anchors.ts` are pure — the tool layer does the file read and
+passes the lines in — and match **exactly**, never fuzzily: silent wrong-attachment is
+the worst failure available here, so two identical candidates orphan rather than guess,
+and an orphan degrades *to* today's floating-prose behavior rather than below it. The
+recording surface is four optional `express` arguments plus the all-or-nothing
+`annotate` batch tool, which returns the canonical block from `charts/annotations.ts`
+so the model pastes a computed rendering instead of imitating one. `anchor_hash` is
+derived server-side and survives `privacy.store_quotes` suppression, so drift detection
+and #31 aggregation carry no words.
 
 **Public aggregation is one module, allowlist-only (issue #31).**
 `src/ts/channels/public_export.ts` is the single point where rows are shaped for any

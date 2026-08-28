@@ -24,8 +24,45 @@
  */
 
 import { ANCHOR_KINDS, isMember, describeVocabulary } from '../channels/vocabulary.js';
-import type { AnchorKind } from '../channels/vocabulary.js';
-import type { AnchorResolution } from '../channels/anchors.js';
+
+/**
+ * The five addressable kinds, restated here as a literal union rather than imported
+ * from `channels/vocabulary.ts`.
+ *
+ * The reason is what ships: `dist/charts/*.d.ts` are published, `dist/channels/` are
+ * not, so a chart declaration file naming a channels type would dangle for every
+ * consumer resolving the package's types. Every other renderer's declarations already
+ * stand alone; this keeps that true — a pure presentation module describing its own
+ * inputs, which is the honest shape for it anyway.
+ *
+ * The restatement is the same two-layer arrangement the schema's `CHECK`s and
+ * `entries.validate` already use, and it is guarded the same way: `annotations.spec.ts`
+ * asserts this union and `ANCHOR_KINDS` accept exactly the same set, so they cannot
+ * drift apart silently.
+ *
+ * @see ../channels/vocabulary.js ANCHOR_KINDS
+ */
+export type AnnotationKind = 'file' | 'prompt' | 'reply' | 'checklist' | 'entry';
+
+/**
+ * How an anchor stands against its target's current state, as the renderer receives it.
+ *
+ * Structurally identical to `AnchorResolution` in `channels/anchors.ts`, and restated
+ * for the same shipping reason as {@link AnnotationKind}: a verdict from `resolveAnchor`
+ * is assignable here directly, so a caller passes one straight through.
+ *
+ * @see ../channels/anchors.js resolveAnchor
+ */
+export type AnnotationStatus = 'fresh' | 'moved' | 'orphaned' | 'distant';
+
+/** One resolution verdict, plus where the content is now when that differs. */
+export interface AnnotationResolution {
+  readonly status : AnnotationStatus;
+  /** The span the content occupies *now*, in the kind's own grammar, when known. */
+  readonly span?  : string | undefined;
+  /** The span originally recorded, present only on a `moved` verdict. */
+  readonly from?  : string | undefined;
+}
 
 /** `⚓` — the anchor mark that opens every anchored segment and every group header. */
 const ANCHOR_GLYPH = '\u{2693}';
@@ -36,10 +73,12 @@ const GUILLEMET = '\u{00BB}';
 /**
  * How many characters of quote text a rendered line shows before truncating with `…`.
  *
- * Smaller than the stored {@link ANCHOR_QUOTE_MAX} on purpose: storage keeps enough to
- * *resolve* the anchor, while the block keeps enough to *recognize* it. A block whose
- * quote column ran to 120 characters would push every note off the right edge, which is
- * the floating-prose failure in a new costume.
+ * Smaller than the stored cap (`ANCHOR_QUOTE_MAX`, 120) on purpose: storage keeps
+ * enough to *resolve* the anchor, while the block keeps enough to *recognize* it. A
+ * quote column running to 120 characters would push every note off the right edge,
+ * which is the floating-prose failure in a new costume.
+ *
+ * @see ../channels/anchors.js
  */
 export const QUOTE_DISPLAY_CAP = 40;
 
@@ -52,7 +91,7 @@ export interface AnnotationNote {
   readonly text          : string;
   /** The feeling face that ends every channel line. Omitted renders no face. */
   readonly face?         : string | undefined;
-  readonly anchorKind    : AnchorKind;
+  readonly anchorKind    : AnnotationKind;
   /** Repo-relative path, `prompt_id`, `series_key`, or entry id as text. */
   readonly anchorTarget  : string;
   readonly anchorSpan?   : string | undefined;
@@ -68,7 +107,7 @@ export interface AnnotationNote {
    */
   readonly turnsAgo?     : number | undefined;
   /** The verdict from `resolveAnchor`; absent reads as `fresh`. */
-  readonly resolution?   : AnchorResolution | undefined;
+  readonly resolution?   : AnnotationResolution | undefined;
 }
 
 /** Options both renderers accept. */
@@ -82,7 +121,7 @@ export interface AnnotationOptions {
 }
 
 /** The note's effective status; an absent resolution means nothing was checked, so: fresh. */
-function statusOf(note: AnnotationNote): AnchorResolution['status'] {
+function statusOf(note: AnnotationNote): AnnotationStatus {
   return note.resolution?.status ?? 'fresh';
 }
 
@@ -168,18 +207,23 @@ function faceSuffix(note: AnnotationNote): string {
   return note.face === undefined || note.face === '' ? '' : ` ${note.face}`;
 }
 
-/** Reject the shapes neither renderer can render, naming the accepted domain. */
-function checkNote(note: AnnotationNote, where: string, index: number): void {
+/**
+ * Reject the shapes neither renderer can render, naming the accepted domain — and, in
+ * a batch, which note is at fault, so a fifteen-note block does not have to be bisected
+ * by hand.
+ */
+function checkNote(note: AnnotationNote, where: string, index?: number): void {
+  const which = index === undefined ? 'the note' : `note ${String(index)}`;
   if (!isMember(ANCHOR_KINDS, note.anchorKind)) {
     throw new RangeError(
-      `${where}: note ${String(index)} has anchorKind '${String(note.anchorKind)}'; ` +
+      `${where}: ${which} has anchorKind '${String(note.anchorKind)}'; ` +
       `expected ${describeVocabulary(ANCHOR_KINDS)}`);
   }
   if (note.anchorTarget.trim() === '') {
-    throw new RangeError(`${where}: note ${String(index)} has a blank anchorTarget; every anchor names a target`);
+    throw new RangeError(`${where}: ${which} has a blank anchorTarget; every anchor names a target`);
   }
   if (note.text.trim() === '') {
-    throw new RangeError(`${where}: note ${String(index)} has empty text; an annotation with no note is not an annotation`);
+    throw new RangeError(`${where}: ${which} has empty text; an annotation with no note is not an annotation`);
   }
 }
 
@@ -220,7 +264,7 @@ function checkNote(note: AnnotationNote, where: string, index: number): void {
  */
 export function renderAnchorSegment(note: AnnotationNote, options?: AnnotationOptions): string {
 
-  checkNote(note, 'renderAnchorSegment', 0);
+  checkNote(note, 'renderAnchorSegment');
 
   const moved  = statusOf(note) === 'moved' && note.resolution?.from !== undefined
           ? ` ${note.resolution.from}\u{2192}${note.resolution.span ?? ''} (moved)`
@@ -272,26 +316,28 @@ interface Group {
   readonly notes  : readonly AnnotationNote[];
 }
 
-/** Group by (kind, target), targets in first-appearance order, notes by position within. */
+/**
+ * Group by (kind, target) — a kind is part of an address, so the same id under `prompt`
+ * and under `reply` are two groups — with targets in first-appearance order and notes
+ * ordered by position within each. A `Map` preserves insertion order, so first
+ * appearance needs no second list to track it.
+ */
 function groupNotes(notes: readonly AnnotationNote[], options?: AnnotationOptions): Group[] {
 
-  const order : string[] = [],
-        byKey = new Map<string, AnnotationNote[]>();
+  const byKey = new Map<string, { first: AnnotationNote; members: AnnotationNote[] }>();
 
   for (const note of notes) {
     const key   = `${note.anchorKind}\u{0000}${note.anchorTarget}`,
           found = byKey.get(key);
-    if (found === undefined) { order.push(key); byKey.set(key, [note]); }
-    else                     { found.push(note); }
+    if (found === undefined) { byKey.set(key, { first: note, members: [note] }); }
+    else                     { found.members.push(note); }
   }
 
-  return order.map(key => {
-    const members = byKey.get(key) ?? [],
-          first   = members[0] as AnnotationNote,
-          sorted  = members
-            .map((note, index) => ({ note, index }))
-            .sort((a, b) => positionOf(a.note) - positionOf(b.note) || a.index - b.index)
-            .map(entry => entry.note);
+  return [...byKey.values()].map(({ first, members }) => {
+    const sorted = members
+      .map((note, index) => ({ note, index }))
+      .sort((a, b) => positionOf(a.note) - positionOf(b.note) || a.index - b.index)
+      .map(entry => entry.note);
     // The header names the *target*, never a position or a verdict: the position column
     // carries both, per note, and a group of ten notes has ten of each.
     const naked: AnnotationNote = { ...first, anchorSpan: undefined, resolution: undefined };

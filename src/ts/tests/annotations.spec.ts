@@ -1,7 +1,9 @@
 import {
   renderAnnotations, renderAnchorSegment, renderAnchorTarget, QUOTE_DISPLAY_CAP,
 } from '../charts/annotations.js';
-import type { AnnotationNote } from '../charts/annotations.js';
+import type { AnnotationNote, AnnotationKind, AnnotationResolution } from '../charts/annotations.js';
+import { ANCHOR_KINDS } from '../channels/vocabulary.js';
+import { resolveAnchor } from '../channels/anchors.js';
 
 /** The store.ts pair from the design's own worked example. */
 const STORE_NOTES: readonly AnnotationNote[] = [
@@ -10,6 +12,38 @@ const STORE_NOTES: readonly AnnotationNote[] = [
   { anchorKind: 'file', anchorTarget: 'src/ts/channels/store.ts', anchorSpan: 'L162',
     anchorQuote: 'writeConfig', text: 'local timestamp never updated', face: '\u{1F928}' },
 ];
+
+describe('the renderer’s local types agree with the channels layer', () => {
+
+  // The renderer restates the anchor vocabulary so its shipped declaration file stands
+  // alone (dist/channels/ is not published). These are the guards that keep the two
+  // statements of it from drifting — the same arrangement, and the same defence, as the
+  // schema's CHECKs versus entries.validate.
+
+  test('every ANCHOR_KINDS member is a legal AnnotationKind, and every one renders', () => {
+    for (const kind of ANCHOR_KINDS) {
+      const asAnnotationKind: AnnotationKind = kind;   // compile-time: the union covers it
+      expect(() => renderAnchorTarget({ text: 'x', anchorKind: asAnnotationKind, anchorTarget: 't' }))
+        .not.toThrow();
+    }
+  });
+
+  test('AnnotationKind admits nothing ANCHOR_KINDS does not', () => {
+    const declared: AnnotationKind[] = ['file', 'prompt', 'reply', 'checklist', 'entry'];
+    expect([...declared].sort()).toEqual([...ANCHOR_KINDS].sort());
+  });
+
+  test('a verdict from resolveAnchor is accepted by the renderer unchanged', () => {
+    const verdict: AnnotationResolution = resolveAnchor(
+      { kind: 'file', target: 'a.ts', span: 'L1', quote: 'moved me' },
+      { fileLines: ['pad', 'moved me'] });
+    expect(verdict.status).toBe('moved');
+    expect(renderAnnotations([{ anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1',
+                                anchorQuote: 'moved me', text: 'still true', resolution: verdict }]))
+      .toContain('L1\u{2192}L2 (moved)');
+  });
+
+});
 
 describe('renderAnchorTarget — per-kind target rendering', () => {
 

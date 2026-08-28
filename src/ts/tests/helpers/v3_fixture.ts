@@ -27,7 +27,7 @@ import { V2_ENTRIES_DDL } from './v2_fixture.js';
  * column. Aliased rather than copied so the two can never disagree about a shape they
  * genuinely share.
  */
-export const V3_ENTRIES_DDL = V2_ENTRIES_DDL;
+export const V3_ENTRIES_DDL: string = V2_ENTRIES_DDL;
 
 /**
  * Build a genuine v3 database on disk, the way v3 `openStore` would have: the v3

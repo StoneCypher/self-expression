@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-63 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+67 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -22,39 +22,13 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:48:48 AM
+## [Untagged] - Aug 28, 2026 12:36:16 PM
 
-Commit [f1f573e8faf30c8a93d2800929515fc33fb1175e](https://github.com/StoneCypher/self-expression/commit/f1f573e8faf30c8a93d2800929515fc33fb1175e)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [90a1269, d8562eb]
-
-  * chore: merge origin/main (#31 share keys, #41 messagebox); union the registry and its pin test
-  * Source integration: audio.* keys sit alongside the new share.* and
-messages.* keys in CONFIG_KEYS; the registry pin test now lists all
-32 keys. surface.stoch timeouts were widened identically on both sides
-(main's 30_000 spelling kept). Generated artifacts taken from main;
-rebuild follows.
-  * Refs #44
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:45:06 AM
-
-Commit [d8562eb486fe72eee473113dd4f84386b5e156c9](https://github.com/StoneCypher/self-expression/commit/d8562eb486fe72eee473113dd4f84386b5e156c9)
+Commit [d7424964c5cacd9802105c89f3fe50ee893d366b](https://github.com/StoneCypher/self-expression/commit/d7424964c5cacd9802105c89f3fe50ee893d366b)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [4be9711, 3bc0eb6]
-
-  * Merge pull request #72 from StoneCypher/feat_26-08-28_addressivity_41
-  * feat: addressivity — audience-tagged messagebox facility (#41)
+  * wip: anchoring tests — resolver, renderer, migration, tools, stochastic
 
 
 
@@ -63,57 +37,13 @@ Merges [4be9711, 3bc0eb6]
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:44:04 AM
+## [Untagged] - Aug 28, 2026 12:34:38 PM
 
-Commit [90a126904484d542ff959ec4b661596e53ec0b66](https://github.com/StoneCypher/self-expression/commit/90a126904484d542ff959ec4b661596e53ec0b66)
+Commit [feef2ea14fed5ec07a5b8102a88461779f2c3826](https://github.com/StoneCypher/self-expression/commit/feef2ea14fed5ec07a5b8102a88461779f2c3826)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat: claudio — voluntary audio expression as its own facility (strike/audition/say)
-  * The successor to the hook-triggered prototype, per the approved design in
-src/superpowers/spec/2026-08-27-voluntary-audio-design.md and issue #44:
-sound is voluntary, meaning-mapped, and dependency-free, or it does not
-ship.
-  * Own facility, structurally: src/ts/claudio/ builds into its own bundle
-(dist/claudio.cjs) behind its own bin (self-expression-audio) and its own
-MCP server ('claudio' in .mcp.json / gemini-extension.json), so a broken
-audio stack can never take the backchannel down and the main bundles load
-no player code. Zero new dependencies.
-  * Mechanism as pinned: a spawned 'powershell -NoProfile -NonInteractive'
-child plays a vendored WAV via System.Media.SoundPlayer.PlaySync() and
-exits. Volume is applied by scaling PCM samples in Node (the player has
-no volume knob); a kill timer enforces the hard duration cap. Platforms
-without a player register no tools: absence degrades to silence.
-  * Policy, enforced server-side and re-checked per strike:
-- default off; only exactly 'true' on audio.enabled enables
-- volume ceiling min(audio.volume_ceiling, CLAUDIO_VOLUME_CEILING env) —
-  the env var lives where no tool call can reach, so the assistant can
-  never raise it
-- closed five-leitmotif vocabulary (cap six), <= 3 s assets, 10 s hard
-  cap, nothing loops
-- min-gap + rolling hourly budget from the ledger; attention draws a
-  slightly larger budget; session-open at most once per process
-- every attempt — played, refused, errored — lands in the facility's own
-  audio.sqlite3 ledger; silence records nothing
-- say ships at the local SAPI tier only, behind its own exact-affirmative
-  gate (audio.tts_local); spoken text stays local per the #31 rule; cloud
-  tiers deliberately do not exist in this build
-  * audio.* keys ride the #30 registry; assets ship in assets/leitmotifs/
-with the offline generation script in src/scripts/; the scarcity ethos
-ships in skills/audio-expression/SKILL.md; README and plugin-layout.md
-document the facility and record the in-repo scaffolding choice.
-  * Deferred to their owning issues, per the spec's own gating: quiet hours
-and the shared unprompted-output surface (#43), onboarding wording (#40),
-the express cross-log (no sound-suitable channel exists yet), the OneCore
-TTS tier, cloud TTS, and macOS/Linux players behind the same seam. The
-audition tool's undetectable 'interactive conversation' gate is reduced
-to fixed low volume plus its own rate allowance, as the spec flags.
-  * Also widens three surface.stoch timeouts that flaked at the 5 s default
-under a loaded build machine, and extends the config registry pin test
-with the eleven audio keys.
-  * Refs #44 — the facility core is delivered; the deferred items above
-belong to #43/#40 and later platform work, so closure is left to the
-human's judgment.
+  * chore: rebuild generated artifacts after merging origin/main (#40 onboarding)
 
 
 
@@ -122,32 +52,15 @@ human's judgment.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:42:54 AM
+## [Untagged] - Aug 28, 2026 12:31:46 PM
 
-Commit [3bc0eb6ead3291ae1b64cb962710983c88312fa7](https://github.com/StoneCypher/self-expression/commit/3bc0eb6ead3291ae1b64cb962710983c88312fa7)
+Commit [e0d80d2ae17cf50e42ae6f47c02b04e1f3f1af8a](https://github.com/StoneCypher/self-expression/commit/e0d80d2ae17cf50e42ae6f47c02b04e1f3f1af8a)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: regenerate artifacts after merging origin/main
-  * Coverage, dist bundles, README, and changelogs rebuilt green on the
-merged tree (#41 messagebox atop #19 diagrams, #20 digest, #31 share).
+Merges [b7da1ac, 28b41be]
 
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 11:39:43 AM
-
-Commit [cb24f7619f8c7fa04859771316bfccd13fbfbf32](https://github.com/StoneCypher/self-expression/commit/cb24f7619f8c7fa04859771316bfccd13fbfbf32)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [b5ca98a, 4be9711]
-
-  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_addressivity_41
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_channel-text-lengths_76
   * # Conflicts:
 #       CHANGELOG.long.md
 #       CHANGELOG.md
@@ -158,9 +71,11 @@ Merges [b5ca98a, 4be9711]
 #       coverage-stoch/ts/channels/context.ts.html
 #       coverage-stoch/ts/channels/entries.ts.html
 #       coverage-stoch/ts/channels/index.html
+#       coverage-stoch/ts/channels/messages.ts.html
 #       coverage-stoch/ts/channels/migrate.ts.html
 #       coverage-stoch/ts/channels/paths.ts.html
 #       coverage-stoch/ts/channels/privacy.ts.html
+#       coverage-stoch/ts/channels/public_export.ts.html
 #       coverage-stoch/ts/channels/retention.ts.html
 #       coverage-stoch/ts/channels/schema.ts.html
 #       coverage-stoch/ts/channels/store.ts.html
@@ -168,17 +83,40 @@ Merges [b5ca98a, 4be9711]
 #       coverage-stoch/ts/channels/vocabulary.ts.html
 #       coverage-stoch/ts/charts/bars.ts.html
 #       coverage-stoch/ts/charts/checklist.ts.html
+#       coverage-stoch/ts/charts/digest.ts.html
 #       coverage-stoch/ts/charts/glyphs.ts.html
 #       coverage-stoch/ts/charts/index.html
 #       coverage-stoch/ts/charts/index.ts.html
 #       coverage-stoch/ts/charts/markers.ts.html
+#       coverage-stoch/ts/charts/profiles.ts.html
 #       coverage-stoch/ts/charts/rows.ts.html
 #       coverage-stoch/ts/charts/scale.ts.html
 #       coverage-stoch/ts/charts/series.ts.html
 #       coverage-stoch/ts/charts/timeline.ts.html
 #       coverage-stoch/ts/charts/verify.ts.html
+#       coverage-stoch/ts/claudio/config.ts.html
+#       coverage-stoch/ts/claudio/gate.ts.html
+#       coverage-stoch/ts/claudio/index.html
+#       coverage-stoch/ts/claudio/ledger.ts.html
+#       coverage-stoch/ts/claudio/paths.ts.html
+#       coverage-stoch/ts/claudio/player.ts.html
+#       coverage-stoch/ts/claudio/schema.ts.html
+#       coverage-stoch/ts/claudio/server.ts.html
+#       coverage-stoch/ts/claudio/synth.ts.html
+#       coverage-stoch/ts/claudio/tools.ts.html
+#       coverage-stoch/ts/claudio/vocabulary.ts.html
+#       coverage-stoch/ts/claudio/wav.ts.html
+#       coverage-stoch/ts/claudio_cli.ts.html
 #       coverage-stoch/ts/cli.ts.html
 #       coverage-stoch/ts/cli_commands.ts.html
+#       coverage-stoch/ts/diagrams/fsl.ts.html
+#       coverage-stoch/ts/diagrams/grid.ts.html
+#       coverage-stoch/ts/diagrams/index.html
+#       coverage-stoch/ts/diagrams/index.ts.html
+#       coverage-stoch/ts/diagrams/layout.ts.html
+#       coverage-stoch/ts/diagrams/mermaid.ts.html
+#       coverage-stoch/ts/diagrams/model.ts.html
+#       coverage-stoch/ts/diagrams/renderers.ts.html
 #       coverage-stoch/ts/dwelling/config.ts.html
 #       coverage-stoch/ts/dwelling/index.html
 #       coverage-stoch/ts/dwelling/ops.ts.html
@@ -189,10 +127,13 @@ Merges [b5ca98a, 4be9711]
 #       coverage-stoch/ts/index.ts.html
 #       coverage-stoch/ts/mcp/chart_tools.ts.html
 #       coverage-stoch/ts/mcp/checklist_tools.ts.html
+#       coverage-stoch/ts/mcp/diagram_tools.ts.html
 #       coverage-stoch/ts/mcp/dwell_tool.ts.html
 #       coverage-stoch/ts/mcp/hooks.ts.html
 #       coverage-stoch/ts/mcp/index.html
+#       coverage-stoch/ts/mcp/message_tools.ts.html
 #       coverage-stoch/ts/mcp/server.ts.html
+#       coverage-stoch/ts/mcp/share_tools.ts.html
 #       coverage-stoch/ts/mcp/tools.ts.html
 #       coverage-stoch/ts/raster/compose.ts.html
 #       coverage-stoch/ts/raster/encoder.ts.html
@@ -204,15 +145,12 @@ Merges [b5ca98a, 4be9711]
 #       coverage-stoch/ts/stub.ts.html
 #       coverage-stoch/ts/tests/helpers/index.html
 #       coverage-stoch/ts/tests/helpers/v1_fixture.ts.html
-#       dist/index.cjs.map
-#       dist/index.iife.js.map
-#       dist/index.mjs.map
+#       coverage-stoch/ts/tests/helpers/v2_fixture.ts.html
 #       src/doc_md/CHANGELOG.long.md
 #       src/doc_md/CHANGELOG.md
-#       src/doc_md/plugin-layout.md
-#       src/ts/mcp/server.ts
+#       src/ts/channels/config.ts
+#       src/ts/mcp/tools.ts
 #       src/ts/tests/config.spec.ts
-#       src/ts/tests/config.stoch.ts
 
 
 
@@ -221,40 +159,40 @@ Merges [b5ca98a, 4be9711]
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:36:18 AM
+## [Untagged] - Aug 28, 2026 12:28:59 PM
 
-Commit [b5ca98a4afcaf4cc502257f7c5d42afbed33b7f5](https://github.com/StoneCypher/self-expression/commit/b5ca98a4afcaf4cc502257f7c5d42afbed33b7f5)
+Commit [b7da1acc965e111c107d83475390ada546de3222](https://github.com/StoneCypher/self-expression/commit/b7da1acc965e111c107d83475390ada546de3222)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat: addressivity — audience-tagged messagebox facility
-  * Implements the 2026-08-27 addressivity design (its own facility, never a
-rendered channel): messages live in the store, not the transcript.
-  * - AUDIENCES vocabulary (self/agents/user/record) in the vocabulary → zod
-  → SQL CHECK pattern; an invalid audience is unnameable
-- messages table plus append-only message_reads receipts; unread is a
-  computed predicate (no receipt from this reader, not expired); expiry
-  excludes from delivery and never deletes
-- SCHEMA_VERSION 2→3 as a purely additive MigrationStep on the #42 chain
-- channels/messages.ts: postMessage / readMessages / unreadCounts with
-  session-fenced self, box-fenced agents (receipt key agent_id falling
-  back to session), user mail never receipted by the model, record never
-  unread; 2000-char cap; replyTo must exist
-- MCP tools post_message / read_messages, identity adopted from
-  turn_context as express does; messages.enabled is a per-call kill
-  switch; reading agents requires a box
-- hooks: config-gated Mailbox count line on UserPromptSubmit
-  (messages.notify), SessionStart handler injecting unread self notes on
-  compact/resume and receipting them (messages.enabled alone);
-  SessionStart registered in hooks.claude.json
-- self-expression messages CLI subcommand — the user's own door; --ack
-  writes the human's receipts, user audience only
-- retention: messages pruned by age, receipts only by orphanhood
-- config keys messages.enabled / messages.notify in CONFIG_KEYS
-- unit + stochastic tests (frozen v2 fixture; migration losslessness;
-  at-most-once delivery, fencing, append-only invariants); README,
-  plugin-layout, SKILL.md addressivity section
-  * Closes #41
+  * feat: per-channel text length, user-configurable, defaults raised to 200
+  * Text length was governed in two disconnected places, neither the user's to
+set: a flat .max(280) on express's text covering all twelve channels, and a
+"<=70 characters" instruction in SKILL.md covering one. The enforced number
+and the taught number disagreed by a factor of four. This replaces both.
+  * - twelve channels.<name>.max_chars keys, generated from CHANNELS so a channel
+  added later arrives with its limit registered rather than silently unbounded;
+  ordinary CONFIG_KEYS entries, so set/unset/get/list need no special-casing
+- defaults of 200 everywhere, replacing both the 280 and the 70
+- a hard ceiling of 2000 left in the static zod schema (matching
+  MESSAGE_TEXT_MAX, so express and post_message agree), with the real
+  per-channel check in handleExpress; the rejection names the channel, the
+  configured limit, the length received, and the key that changes it
+- minimum of 1, not 0: a zero limit would disable a channel through the wrong
+  door, and channels.enabled is that door
+- channelLengths renders a `lengths:` segment on the UserPromptSubmit context
+  line beside #42's `conventions:` flags -- the same transport, not a second
+  one -- against a shared base so the common turn costs `lengths: 200 all`
+- the skill now carries two numbers: <=70 stays the stated recommendation with
+  its reason intact, and the configured ceiling is granted on top of it as
+  headroom for the line that earns it, never as an allowance to spend
+  * Open questions settled: enforce (reject, consistent with every other
+vocabulary here, and truncation would be a lie about what was said); twelve
+flat keys rather than a map (inspectable in `configure list`, no bespoke
+grammar); write-only retroactivity, stated normatively in channelMaxChars'
+DocBlock -- an over-long stored row is never truncated, hidden, excluded, or
+pruned, and deletion belongs to retention.days and to age alone.
+  * Closes #76
 
 
 
@@ -263,13 +201,28 @@ rendered channel): messages live in the store, not the transcript.
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:30:21 AM
+## [Untagged] - Aug 28, 2026 12:21:17 PM
 
-Commit [1edcfc78ab272f0f28cdc11919f8f28aa22b15ad](https://github.com/StoneCypher/self-expression/commit/1edcfc78ab272f0f28cdc11919f8f28aa22b15ad)
+Commit [0ca51840822be11ac662093cd795133dcd6fd124](https://github.com/StoneCypher/self-expression/commit/0ca51840822be11ac662093cd795133dcd6fd124)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * wip: per-channel text length keys, handler check, hook transport, skill wording
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:21:00 PM
+
+Commit [5bd164c9de2ffa0b900a5be93121ea0eff01c582](https://github.com/StoneCypher/self-expression/commit/5bd164c9de2ffa0b900a5be93121ea0eff01c582)
 
 Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
-  * deploy: 4be9711a4faa0c18972a439447199475dda9dbbb
+  * deploy: 28b41beeb9d286b682743b88b3ffccd27378550f
 
 
 
@@ -278,31 +231,31 @@ Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:28:57 AM
+## [Untagged] - Aug 28, 2026 12:19:38 PM
 
-Commit [4be9711a4faa0c18972a439447199475dda9dbbb](https://github.com/StoneCypher/self-expression/commit/4be9711a4faa0c18972a439447199475dda9dbbb)
+Commit [28b41beeb9d286b682743b88b3ffccd27378550f](https://github.com/StoneCypher/self-expression/commit/28b41beeb9d286b682743b88b3ffccd27378550f)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [384486c, 29484e2]
+Merges [8964990, 56ef191]
 
-  * Merge pull request #70 from StoneCypher/feat_26-08-28_structured-aggregation_31
-  * feat: public aggregation carries structured fields only, never free text (#31)
-
-
+  * Merge pull request #74 from StoneCypher/feat_26-08-28_onboarding_40
+  * feat: first-run onboarding questionnaire — registry, ledger, onboard MCP tool (#40)
 
 
-&nbsp;
+
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:27:04 AM
+&nbsp;
 
-Commit [29484e2ad36d069d9444658c3932f948cf649e92](https://github.com/StoneCypher/self-expression/commit/29484e2ad36d069d9444658c3932f948cf649e92)
+## [Untagged] - Aug 28, 2026 12:19:28 PM
+
+Commit [5622fef56c1aac7d1852ccfceed0199606d50eee](https://github.com/StoneCypher/self-expression/commit/5622fef56c1aac7d1852ccfceed0199606d50eee)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: rebuild artifacts on the merged tree (build green, exit 0)
+  * wip: anchoring core — vocabulary, anchors module, schema v4, entries, renderer, tools
 
 
 
@@ -311,12 +264,31 @@ Author: `John Haugeland <stonecypher@gmail.com>`
 
 &nbsp;
 
-## [Untagged] - Aug 28, 2026 11:26:51 AM
+## [Untagged] - Aug 28, 2026 12:16:39 PM
 
-Commit [c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800](https://github.com/StoneCypher/self-expression/commit/c503ac63d02bc1d9c4b6ace54f91b6e75ad4a800)
+Commit [56ef1919339382232049109bce14452fef649dc0](https://github.com/StoneCypher/self-expression/commit/56ef1919339382232049109bce14452fef649dc0)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [601b81f, 384486c]
+  * build: regenerate artifacts after the claudio merge
+  * README.md, CHANGELOG*, and coverage-stoch/ rebuilt from the merged tree.
 
-  * Merge remote-tracking branch 'origin/main' into feat_26-08-28_voluntary-audio_44
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 12:13:47 PM
+
+Commit [a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d](https://github.com/StoneCypher/self-expression/commit/a1a6dda60bfe9f1d5d4be5c1e260b2c2a7a54c8d)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [6d38073, 8964990]
+
+  * chore: merge origin/main (#44 claudio audio facility)
+  * Source conflict was the CONFIG_KEYS pin test: unioned so it lists the eleven
+audio.* keys and onboarding.answered. Generated artifacts (CHANGELOG*, README.md,
+coverage-stoch/) took main's side; the rebuild regenerates them.
