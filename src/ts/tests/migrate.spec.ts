@@ -17,7 +17,7 @@ import { anchoredEntries }                            from '../channels/entries.
 import { buildV1, insertV1 }                          from './helpers/v1_fixture.js';
 import { buildV2, insertV2 }                          from './helpers/v2_fixture.js';
 import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
-import { buildV4, insertV4Message, V4_ENTRIES_DDL }   from './helpers/v4_fixture.js';
+import { buildV4, insertV4, insertV4Message, V4_ENTRIES_DDL } from './helpers/v4_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -318,7 +318,7 @@ describe('openStore on a v3 database (#18)', () => {
 
 describe('openStore on a v4 database (#43)', () => {
 
-  test('the fixture really is v4: no note tables at all', () => {
+  test('the fixture really is v4: no note tables, and no correction columns either', () => {
     const dir = tmp(), db = buildV4(join(dir, 'log.sqlite3'));
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
                      .all().map(r => String(r.name));
@@ -326,6 +326,10 @@ describe('openStore on a v4 database (#43)', () => {
     expect(tables).not.toContain('notes');
     expect(tables).not.toContain('note_events');
     expect(() => db.exec('SELECT 1 FROM notes')).toThrow();
+    // A v4 row can carry a link but never a kind — the column simply is not there.
+    expect(() => insertV4(db, 'u-ok', 'checklist')).not.toThrow();
+    expect(() => insertV4(db, 'u-legacy', 'divergence', { corrects_id: 1 })).not.toThrow();
+    expect(() => insertV4(db, 'u-bad', 'divergence', { corrects_kind: 'retracts' })).toThrow();
     db.close(); rmSync(dir, { recursive: true, force: true });
   });
 

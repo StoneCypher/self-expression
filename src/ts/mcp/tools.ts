@@ -1196,9 +1196,11 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
           recent   = recentEntries(store, args.limit ?? 10);
 
     // Absent rather than empty when not asked for: an always-present `retractions: []`
-    // would spend context on a key nobody requested, every single recall.
+    // would spend context on a key nobody requested, every single recall. The register
+    // takes its own cap rather than `limit` — that argument sizes the recency window, and
+    // "the last 3 entries" is a different question from "how many taken-back claims".
     const retractions = args.retractions === true
-      ? register(store, { limit: args.limit ?? REGISTER_DEFAULT_LIMIT })
+      ? register(store, { limit: REGISTER_DEFAULT_LIMIT })
       : undefined;
 
     return reply(JSON.stringify({ context, previous, recent, retractions }, null, 2));
