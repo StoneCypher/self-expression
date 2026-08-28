@@ -934,6 +934,356 @@ type WeatherState = typeof WEATHER_STATES[number];
 declare function renderWeather(state: WeatherState): string;
 
 /**
+ * The digest profiles: per-domain parameterizations of the compression mechanic,
+ * promoted from the design spec's table to runtime data.
+ *
+ * `2026-08-27-compression-mechanic-design.md` (issue #20) reframes the status-checklist
+ * summary line as one instance of a general digest grammar —
+ * `<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — whose
+ * per-domain variation is entirely data: the unit noun, the bucket partition and its
+ * marker classification, and whether a scalar axis exists. This module is that data,
+ * in the `vocabulary.ts` / `markers.ts` pattern: exported `const` profile tables that
+ * feed both rendering (`digest.ts`) and validation (`verify.ts`), so the partition
+ * rules live in exactly one place instead of being re-derived per caller.
+ *
+ * The glyph vocabulary is shared across profiles — every marker any profile names must
+ * appear in `markers.md` (and thus `markers.ts`'s `CANONICAL_ORDER`); a profile never
+ * introduces a glyph privately. Bucket membership below mirrors the "Profile bucket
+ * membership" section of `markers.md`, which is the prose source of truth.
+ *
+ * @see ./digest.ts
+ * @see ./markers.ts
+ * @see ../../doc_md/reference/markers.md
+ * @see ../../superpowers/spec/2026-08-27-compression-mechanic-design.md
+ */
+/**
+ * One bucket of a profile's partition: its id (the name validation and overrides refer
+ * to) and the markers that classify into it.
+ *
+ * An empty `markers` list means no marker classifies here by glyph alone — units land
+ * in such a bucket only by explicit override (the diff profile's change-kind buckets)
+ * or by being the profile's residual bucket.
+ */
+interface DigestBucketSpec {
+    /** The bucket's id, unique within its profile — e.g. `'success'`, `'blocking'`. */
+    readonly id: string;
+    /** Markers whose units classify into this bucket, exactly as rendered (see the multi-code-point note in `markers.ts`). */
+    readonly markers: readonly string[];
+}
+/**
+ * One digest profile: everything the general renderer and validator need to know about
+ * a domain, as data.
+ *
+ * The invariants (spec § The invariants) constrain the data: `buckets` is a partition
+ * in canonical order (invariant 2), `residual` names the bucket a unit falls into when
+ * no marker list claims it (so every unit is counted exactly once), and `scalar` exists
+ * only for a genuinely monotone axis — no percent is fabricated for a profile without
+ * one (spec § Alternatives rejected).
+ */
+interface DigestProfile {
+    /** The profile's name, the key it is registered under — e.g. `'checklist'`. */
+    readonly name: string;
+    /** The unit noun rendered after the counts — one word, plural, unique across profiles; it is the reader's cue for which profile grammar to pattern-match, and the validator's profile-inference key. */
+    readonly noun: string;
+    /** The partition, in canonical (rendered) order. */
+    readonly buckets: readonly DigestBucketSpec[];
+    /** The id of the bucket a unit counts toward when no bucket's marker list contains its marker — the partition's completeness guarantee. */
+    readonly residual: string;
+    /** When present, the id of the bucket whose share of the total renders as `(<P>%) <bar>`; absent for profiles with no monotone axis. */
+    readonly scalar?: string;
+    /** When `true`, the digest carries a `+N −M` line-count tail after the noun, summed from the units' `plus`/`minus` fields (the diff profile). */
+    readonly plusMinus?: boolean;
+    /** Bucket ids, most-defining-first: an artifact's overall state is the first bucket in this order that holds at least one unit — how a nested artifact is bucketed in its parent (spec § Composition rules, rule 3). Must cover every bucket id. */
+    readonly overallOrder: readonly string[];
+    /** Markers, most-salient-first, that qualify a unit as the lead line's argmax; empty when the profile has no mechanical salience rule (diff — the riskiest file is a judgment call). */
+    readonly attention: readonly string[];
+}
+/**
+ * The status-checklist profile — the deepest-developed instance, and the one
+ * `renderChecklistSummary` must reproduce byte-identically.
+ *
+ * Bucket membership comes straight from `markers.ts` (`SUCCESS_MARKERS`,
+ * `FAILURE_MARKERS`); the residual `active` bucket is the skill's "active+pending:
+ * every other marker" rule. The scalar axis is completion: percent = success ÷ total.
+ *
+ * @example
+ *   CHECKLIST_PROFILE.noun               // => 'items'
+ *   CHECKLIST_PROFILE.buckets[0]?.id     // => 'success'
+ */
+declare const CHECKLIST_PROFILE: DigestProfile;
+/**
+ * The findings profile: the digest a review or audit closes with — severity tallies
+ * readable instead of the findings. Blocking leads the bucket order because the
+ * digest's first number is the one a glance reads first, and for findings the blocker
+ * count is the headline. No scalar: 60% of findings being minor is not 60% of anything
+ * a bar should imply progress toward.
+ *
+ * @example
+ *   // ❗❗ ⚠️⚠️⚠️⚠️⚠️ 🐛🐛🐛 🔍🔍 as findings:
+ *   // => '2/8/2 findings  ⚠️ 5  🐛 3  ❗ 2  🔍 2'
+ */
+declare const FINDINGS_PROFILE: DigestProfile;
+/**
+ * The options profile: the decision summary over per-option detail. The verdict is the
+ * lead line ("✅ chose sqlite: single-file, zero-daemon"); the digest says at a glance
+ * whether the decision is still open (`0/4/1 options`). No scalar — a decided tradeoff
+ * is not 25% complete.
+ *
+ * `overallOrder` puts `open` first (any open option means the decision is undecided),
+ * then `chosen` (a made decision), then `rejected` (everything was declined).
+ *
+ * @example
+ *   // ✅ 🤔🤔 ❌❌❌ as options:
+ *   // => '1/2/3 options  ❌ 3  🤔 2  ✅ 1'
+ */
+declare const OPTIONS_PROFILE: DigestProfile;
+/**
+ * The diff profile: the shape of the change over the hunks — `git diff --stat` restated
+ * in the house grammar so it composes. The first profile to classify by something other
+ * than the marker: buckets are change kinds, assigned per unit via the explicit
+ * `bucket` override (`'added'` | `'modified'` | `'removed'`), leaving the marker free
+ * to carry the work kind (🪚 📝 🧪 …). A unit with no stated change kind counts as
+ * `modified`, the residual. Instead of a bar, the digest carries a `+N −M` line-count
+ * tail summed from the units' `plus`/`minus` fields.
+ *
+ * `attention` is empty: the spec puts the lead line on "the riskiest file", which is a
+ * judgment call, not a marker rule — the caller picks the lead unit by hand.
+ *
+ * @example
+ *   // 16 changed files, 214 lines added, 96 removed:
+ *   // => '3/11/2 files +214 −96  🪚 6  📝 4  🧪 3  🗑️ 2  🔨 1'
+ */
+declare const DIFF_PROFILE: DigestProfile;
+/**
+ * The results profile: what was found over where. The digest answers "did the search
+ * pay?" before the reader commits to the detail; the `missed` bucket (🦗 for a source
+ * that returned nothing) makes silent-miss reporting structural rather than optional.
+ * Anything neither partial nor missed counts as `matched`, the residual.
+ *
+ * @example
+ *   // 🔍×14 🌗×2 🦗×1 as results:
+ *   // => '14/2/1 hits  🔍 14  🌗 2  🦗 1'
+ */
+declare const RESULTS_PROFILE: DigestProfile;
+/**
+ * Every registered profile name, in the spec's listed order — the closed vocabulary
+ * the `render_digest` MCP tool's `profile` enum is built from, so a misspelled profile
+ * is unnameable.
+ *
+ * @example
+ *   PROFILE_NAMES.includes('findings')  // => true
+ */
+declare const PROFILE_NAMES: readonly ["checklist", "findings", "options", "diff", "results"];
+/** One of the registered profile names. */
+type ProfileName = (typeof PROFILE_NAMES)[number];
+/**
+ * The registered profiles by name — the single lookup rendering and tooling share.
+ *
+ * @example
+ *   PROFILES.findings.noun  // => 'findings'
+ */
+declare const PROFILES: Readonly<Record<ProfileName, DigestProfile>>;
+/**
+ * The profile whose noun is `noun`, or `undefined` when no profile renders that noun —
+ * the validator's profile inference, per the fixed-grammar rule that the digest's noun
+ * cues the profile.
+ *
+ * @param noun the unit noun exactly as rendered in a digest line, e.g. `'findings'`
+ * @returns the matching profile, or `undefined` for an unknown noun
+ * @example
+ *   profileForNoun('items')?.name  // => 'checklist'
+ *   profileForNoun('zebras')       // => undefined
+ * @see ./verify.ts verifyDigest
+ */
+declare function profileForNoun(noun: string): DigestProfile | undefined;
+
+/**
+ * The general digest renderer: the profile-independent machinery of the compression
+ * mechanic, extracted from `checklist.ts` (issue #20).
+ *
+ * A compressed artifact is a body of comparable units plus a digest derived from them;
+ * this module renders the digest — one fixed-shape line (plus the existing overflow
+ * block) per the grammar
+ * `<counts> <noun> [(<scalar>%) <bar>] [trend <sparkline>] <icon-list>` — for any
+ * profile in `profiles.ts`. The grouping by `(marker, bucket)`, the tallying, the
+ * count-desc/canonical-rank sort, the 8-entry inline/block split, and the 12-entry
+ * wrap were all pinned by the status-checklist convention and are unchanged here; only
+ * the bucket set, the noun, and the scalar formula became parameters. The status-
+ * checklist summary line is this grammar with the checklist profile plugged in —
+ * byte-identical, which the existing checklist suites prove.
+ *
+ * Also here: the two composition helpers the spec's invariants call for —
+ * {@link leadUnitIndex} (the lead line's argmax, the one digest element that keeps a
+ * single unit's identity) and {@link overallBucket} / {@link nestDigest} (nesting by
+ * digest substitution: a child artifact appears in its parent as one line carrying the
+ * child's digest, counted as one unit bucketed by the child's overall state).
+ *
+ * Pure: no I/O, no clock, no randomness.
+ *
+ * @see ./profiles.ts
+ * @see ./checklist.ts
+ * @see ../../superpowers/spec/2026-08-27-compression-mechanic-design.md
+ */
+
+/**
+ * One unit of a compressed artifact, reduced to exactly what the digest needs: the
+ * marker glyph it renders with, and — when the glyph alone can't carry it — which
+ * bucket it counts toward.
+ *
+ * `bucket` names one of the profile's bucket ids and wins outright over the marker's
+ * own classification when it does; an id the profile does not define is ignored and
+ * the unit classifies by marker as usual. Profiles that classify by something other
+ * than the marker (the diff profile's change kinds) rely on it entirely.
+ *
+ * `plus`/`minus` feed the `+N −M` tail of a `plusMinus` profile (lines added and
+ * removed by this unit, for the diff profile) and are ignored everywhere else.
+ */
+interface DigestUnit {
+    marker: string;
+    bucket?: string;
+    plus?: number;
+    minus?: number;
+}
+/** Options accepted by {@link renderDigest}. */
+interface DigestOptions {
+    series?: readonly number[];
+}
+/**
+ * The icon list moves from inline (after the head) to its own block below once it
+ * holds more than this many distinct `(marker, bucket)` entries.
+ */
+declare const INLINE_ENTRY_LIMIT = 8;
+/** Within the block form, a bucket line wraps onto a new line after this many entries. */
+declare const MAX_ENTRIES_PER_LINE = 12;
+/**
+ * Renders a compressed artifact's digest, per the general grammar:
+ * the per-bucket count section, the profile's unit noun, an optional scalar percent
+ * with the 10-cell anti-aliased progress bar (only when the profile declares a scalar
+ * axis — no percent is fabricated otherwise), an optional `+N −M` line-count tail
+ * (only for a `plusMinus` profile), an optional trend sparkline, and the per-marker
+ * icon list — inline when it is short, or split into per-bucket blocks below when it
+ * isn't.
+ *
+ * Every layout rule is exactly the status-checklist convention's, with the bucket set
+ * as a parameter: the icon list moves from inline to block form past
+ * {@link INLINE_ENTRY_LIMIT} distinct `(marker, bucket)` entries; block bucket lines
+ * appear in the profile's canonical bucket order (empty buckets omitted), wrap past
+ * {@link MAX_ENTRIES_PER_LINE} entries, and are blank-separated exactly when any
+ * bucket line wrapped.
+ *
+ * @param units   every unit of the artifact, one entry each; must be non-empty — a
+ *   digest has nothing to summarize otherwise
+ * @param profile the digest profile: buckets, noun, scalar axis, tail — see
+ *   `profiles.ts`
+ * @param options `series`, the artifact's scalar history in chronological order; a
+ *   trend sparkline is appended only when it has 4 or more points (fewer is silently
+ *   omitted, not an error), always on the `'absolute'` scale so digests of different
+ *   artifacts stay comparable
+ *
+ * @example
+ *   renderDigest(
+ *     [
+ *       ...Array(2).fill({ marker: '❗' }), ...Array(5).fill({ marker: '⚠️' }),
+ *       ...Array(3).fill({ marker: '🐛' }), ...Array(2).fill({ marker: '🔍' }),
+ *     ],
+ *     FINDINGS_PROFILE,
+ *   )
+ *   // => '2/8/2 findings  ⚠️ 5  🐛 3  ❗ 2  🔍 2'
+ *
+ * @throws {RangeError} when `units` is empty.
+ * @see ./profiles.ts
+ * @see ./checklist.ts renderChecklistSummary — the checklist-profile instantiation
+ */
+declare function renderDigest(units: readonly DigestUnit[], profile: DigestProfile, options?: DigestOptions): string;
+/**
+ * The index of the artifact's lead unit — the argmax of the body by the profile's
+ * attention order — or `-1` when no unit qualifies.
+ *
+ * This is the lead-line exception made mechanical: the lead line is the one digest
+ * element that keeps a unit's identity, a 1-unit compression sitting between the
+ * digest (0 units of identity) and the body (all of them) — which is why the result is
+ * a single index, never a list: two lead lines would be a body. The winner is the unit
+ * whose marker appears earliest in `profile.attention`; ties go to the earliest unit
+ * in body order. A `-1` means nothing needs attention — the caller leads with the
+ * all-clear (✅) or omits the lead line entirely, per the skill's own rule.
+ *
+ * @param units   the artifact's units, in body order
+ * @param profile the profile whose `attention` order ranks salience
+ * @returns the winning unit's index in `units`, or `-1` when no marker qualifies
+ *
+ * @example
+ *   leadUnitIndex(
+ *     [{ marker: '✅' }, { marker: '🚫' }, { marker: '❌' }],
+ *     CHECKLIST_PROFILE,
+ *   )  // => 2 — ❌ outranks 🚫 in the checklist attention order
+ *
+ * @see ./profiles.ts
+ */
+declare function leadUnitIndex(units: readonly DigestUnit[], profile: DigestProfile): number;
+/**
+ * The artifact's overall state: the first bucket in the profile's `overallOrder` that
+ * holds at least one unit.
+ *
+ * This is how a nested artifact is bucketed in its parent (spec § Composition rules,
+ * rule 3): a checklist with any failure is overall `'failure'`, one with work still
+ * running is `'active'`, one fully landed is `'success'`; an options artifact with any
+ * open option is overall `'open'`. Guaranteed to return a bucket id as long as
+ * `overallOrder` covers every bucket (which every registered profile's does); the
+ * residual bucket is the defensive fallback.
+ *
+ * @param units   the artifact's units; must be non-empty — an empty artifact has no state
+ * @param profile the profile whose `overallOrder` defines "overall"
+ * @returns the id of the artifact's overall bucket
+ *
+ * @example
+ *   overallBucket([{ marker: '✅' }, { marker: '⏳' }], CHECKLIST_PROFILE)  // => 'active'
+ *   overallBucket([{ marker: '✅' }, { marker: '✅' }], CHECKLIST_PROFILE)  // => 'success'
+ *
+ * @throws {RangeError} when `units` is empty.
+ * @see nestDigest
+ */
+declare function overallBucket(units: readonly DigestUnit[], profile: DigestProfile): string;
+/** What {@link nestDigest} hands the parent artifact: the child's one-line representation and overall bucket. */
+interface NestedDigest {
+    /** The child's digest head line — the fixed-shape part, safe to embed as one body line even when the child's own icon list went block-form. */
+    readonly line: string;
+    /** The child's overall bucket id, per {@link overallBucket} — what the parent's partition counts the child under. */
+    readonly bucket: string;
+}
+/**
+ * Represents a whole child artifact as one unit-sized line for a parent artifact's
+ * body — nesting by digest substitution (spec § Composition rules, rule 3).
+ *
+ * When a unit is itself a compressed artifact, the child appears in the parent's body
+ * as one line carrying the child's *digest*, and counts as exactly **one** unit in the
+ * parent's partition, bucketed by the child's overall state — its units are never
+ * double-counted into the parent, because the digest is its representation. The
+ * returned `line` is the child digest's head line (identical to the full digest when
+ * the child's icon list fit inline); the returned `bucket` is what the parent passes
+ * as the unit's explicit `bucket` override when parent and child share a bucket
+ * vocabulary (checklist-in-checklist), or maps into its own partition otherwise.
+ *
+ * Within a single artifact, plain indentation sub-items remain individually counted
+ * exactly as before — this rule applies only across artifacts, where the nested thing
+ * has a digest of its own.
+ *
+ * @param childUnits   the child artifact's units; must be non-empty
+ * @param childProfile the child artifact's profile
+ * @param options      passed through to the child's {@link renderDigest} (trend series)
+ * @returns the child's head line and overall bucket
+ *
+ * @example
+ *   nestDigest([{ marker: '✅' }, { marker: '❌' }], CHECKLIST_PROFILE)
+ *   // => { line: '1/0/1 items (50%) █████░░░░░  ✅ 1  ❌ 1', bucket: 'failure' }
+ *   // The parent then carries e.g. `- 📋 subplan — 1/0/1 items (50%) …` as ONE unit,
+ *   // with { marker: '📋', bucket: 'failure' } in its own units list.
+ *
+ * @throws {RangeError} when `childUnits` is empty (via {@link renderDigest}).
+ * @see overallBucket
+ */
+declare function nestDigest(childUnits: readonly DigestUnit[], childProfile: DigestProfile, options?: DigestOptions): NestedDigest;
+
+/**
  * The status-checklist summary line, computed instead of imitated.
  *
  * `status-checklists-skill.md` § The summary line spells out, in prose, exactly how the
@@ -941,15 +1291,19 @@ declare function renderWeather(state: WeatherState): string;
  * derived from a checklist's items — and every one of those rules has an edge (the
  * 0.17/0.5/0.83 anti-aliasing boundary, the count-desc-then-canonical-order sort, the
  * 8-vs-9 inline/block split, the 12-entry wrap) that a hand-drawn checklist has
- * historically gotten wrong by eye. This module is the single place that arithmetic
- * lives, composed entirely from the already-pinned primitives in `scale.ts`,
- * `markers.ts`, and `series.ts` rather than re-deriving any of it. Pure: no I/O, no
- * clock, no randomness.
+ * historically gotten wrong by eye.
  *
+ * Since issue #20 reframed the summary line as the checklist **profile** of the
+ * general digest grammar, the machinery lives in `digest.ts` and this module is the
+ * checklist-profile instantiation: same signature, byte-identical output (the
+ * exact-string and stochastic suites are the proof), with the arithmetic composed from
+ * the already-pinned primitives in `scale.ts`, `markers.ts`, and `series.ts` rather
+ * than re-deriving any of it. Pure: no I/O, no clock, no randomness.
+ *
+ * @see ./digest.ts
+ * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./scale.ts
  * @see ./markers.ts
- * @see ./series.ts
  */
 
 /**
@@ -957,8 +1311,8 @@ declare function renderWeather(state: WeatherState): string;
  * it renders with, and — only for a marker like `🛳️` whose bucket the glyph alone can't
  * carry — which bucket it counts toward.
  *
- * `bucket` is passed straight through to {@link classifyMarker}'s `override` parameter,
- * so it wins outright over the marker's own classification whenever supplied.
+ * `bucket` wins outright over the marker's own classification whenever supplied,
+ * exactly as `classifyMarker`'s `override` parameter always has.
  */
 interface ChecklistItem {
     marker: string;
@@ -975,13 +1329,13 @@ interface SummaryOptions {
  * short, or split into a success/active+pending/failure block below the bar when it
  * isn't.
  *
- * The icon list moves from inline to the block form once it holds more than
- * {@link INLINE_ENTRY_LIMIT} distinct `(marker, bucket)` entries. In the block form, a
- * bucket line wraps onto additional lines past {@link MAX_ENTRIES_PER_LINE} entries;
- * when *any* bucket line wrapped this way, every bucket's block (success, then
- * active+pending, then failure — empty buckets omitted) is separated from the next by a
- * blank line, matching this skill's own `check-checklist.mjs` validator. When nothing
- * wrapped, the bucket blocks sit flush against one another with no blank line between.
+ * This is `renderDigest` with the checklist profile plugged in (issue #20): the icon
+ * list moves from inline to the block form past 8 distinct `(marker, bucket)` entries,
+ * bucket lines wrap past 12 entries, and every bucket's block (success, then
+ * active+pending, then failure — empty buckets omitted) is blank-separated exactly
+ * when any bucket line wrapped, matching this skill's own `check-checklist.mjs`
+ * validator. Callers should not need to know the framing changed: the signature and
+ * the rendered bytes are exactly what they were before the extraction.
  *
  * @param items   every checklist item at every nesting level, one entry each; must be
  *   non-empty — a summary line has nothing to summarize otherwise
@@ -1014,8 +1368,8 @@ interface SummaryOptions {
  *
  * @throws {RangeError} when `items` is empty.
  * @see ../../doc_md/reference/status-checklists-skill.md
- * @see ./scale.ts
- * @see ./markers.ts
+ * @see ./digest.ts renderDigest
+ * @see ./profiles.ts CHECKLIST_PROFILE
  */
 declare function renderChecklistSummary(items: readonly ChecklistItem[], options?: SummaryOptions): string;
 
@@ -1052,11 +1406,19 @@ declare function renderChecklistSummary(items: readonly ChecklistItem[], options
  * Not checked (documented limitations, inherited from the original): ship-to-targets
  * destination syntax and the optional visuals.
  *
+ * Since issue #20 this module also carries {@link verifyDigest}, the generalization of
+ * the same re-derivation to every digest profile in `profiles.ts` — the profile is
+ * inferred from the digest line's noun, a checklist digest delegates to
+ * {@link verifyChecklist} unchanged, and the icon-list layout checks are shared
+ * between the two via one parameterized helper rather than duplicated.
+ *
  * Pure: no I/O, no clock, no randomness.
  *
  * @see ./markers.ts
  * @see ./scale.ts
  * @see ./checklist.ts
+ * @see ./digest.ts
+ * @see ./profiles.ts
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 /**
@@ -1133,6 +1495,44 @@ interface ChecklistVerification {
  * @see ../../doc_md/reference/status-checklists-skill.md
  */
 declare function verifyChecklist(text: string): ChecklistVerification;
+/**
+ * Validates a rendered compressed-artifact digest of **any** profile against the
+ * general digest grammar, reporting every mismatch rather than stopping at the first —
+ * the generalization of {@link verifyChecklist} the compression-mechanic spec calls
+ * for (issue #20).
+ *
+ * The profile is inferred from the digest line's noun, per the fixed-grammar rule that
+ * the noun cues the profile (`items` → checklist, `findings`, `options`, `files`,
+ * `hits` — see `profiles.ts`). A checklist digest delegates wholesale to
+ * {@link verifyChecklist}, so the two validators can never disagree about the
+ * deepest-developed profile. For other profiles the checks re-derive what is derivable
+ * from the body: marker vocabulary, indentation, the count partition (recomputed from
+ * the body's markers for marker-classified profiles; sum-only for the diff profile,
+ * whose change kinds a rendered body does not carry), the scalar percent and bar
+ * exactly when the profile declares a scalar axis (a fabricated percent on a
+ * scalar-less profile is a FAIL), the `+N −M` tail exactly when the profile declares
+ * one, and the full set of icon-list layout rules shared with the checklist validator.
+ *
+ * `text` may be a bare block or a Markdown document containing one fenced block —
+ * see {@link extractChecklistBlock}.
+ *
+ * @param text the rendered artifact, digest line included
+ * @returns every check's outcome plus the formatted report, in the same shape
+ *   {@link verifyChecklist} returns
+ *
+ * @example
+ *   verifyDigest('- ❗ auth bypass\n- ⚠️ slow query\n\n1/1/0 findings  ❗ 1  ⚠️ 1')
+ *   // => { ok: true, itemCount: 2, report: 'ok: 2 findings parsed\nok: all checks passed', … }
+ *
+ * @example
+ *   verifyDigest('- 🔍 a\n- 🔍 b\n\n2/0/0 hits (100%) ██████████  🔍 2')
+ *   // => { ok: false, … }  — the results profile has no scalar axis; the percent is fabricated
+ *
+ * @see verifyChecklist
+ * @see ./profiles.ts
+ * @see ./digest.ts
+ */
+declare function verifyDigest(text: string): ChecklistVerification;
 
 /**
  * The shared graph model for the diagram renderers: nodes, edges, and the
@@ -2289,5 +2689,5 @@ declare const LOGICAL_HEIGHT = 720;
  */
 declare function renderHistoryPng(data: HistoryData, options?: RenderOptions): Buffer;
 
-export { BLUE, BRAILLE, CANONICAL_ORDER, DEFAULT_DIAGRAM_WIDTH, DELTA_WINDOW, DIAGRAM_FALLBACKS, EIGHTHS, FAILURE_MARKERS, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_DIAGRAM_NODES, ORANGE, OUTCOMES, PNG_SIGNATURE, PURPLE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, layoutDigraph, makeGrid, makeSurface, measureText, mergeLine, normalizeGraph, parseFsl, parseSummaryCounts, pixel, polyline, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, vline };
-export type { BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, HistoryChart, HistoryData, MermaidDialect, Milestone, MilestoneState, NeedWeekRow, NodeBox, Outcome, RangeStyle, Region, RenderGridOptions, RenderOptions, Rgba, RoutedEdge, SequenceMessage, SeriesScale, SignatureRow, StateDiagramOptions, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };
+export { BLUE, BRAILLE, CANONICAL_ORDER, CHECKLIST_PROFILE, DEFAULT_DIAGRAM_WIDTH, DELTA_WINDOW, DIAGRAM_FALLBACKS, DIFF_PROFILE, EIGHTHS, FAILURE_MARKERS, FINDINGS_PROFILE, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, INLINE_ENTRY_LIMIT, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MAX_DIAGRAM_NODES, MAX_ENTRIES_PER_LINE, OPTIONS_PROFILE, ORANGE, OUTCOMES, PNG_SIGNATURE, PROFILES, PROFILE_NAMES, PURPLE, RESULTS_PROFILE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, layoutDigraph, leadUnitIndex, makeGrid, makeSurface, measureText, mergeLine, nestDigest, normalizeGraph, overallBucket, parseFsl, parseSummaryCounts, pixel, polyline, profileForNoun, readPixel, rect, relativeIndex, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigest, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, verifyDigest, vline };
+export type { BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, DigestBucketSpec, DigestOptions, DigestProfile, DigestUnit, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, HistoryChart, HistoryData, MermaidDialect, Milestone, MilestoneState, NeedWeekRow, NestedDigest, NodeBox, Outcome, ProfileName, RangeStyle, Region, RenderGridOptions, RenderOptions, Rgba, RoutedEdge, SequenceMessage, SeriesScale, SignatureRow, StateDiagramOptions, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };
