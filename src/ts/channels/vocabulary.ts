@@ -334,6 +334,33 @@ export const NOTE_EVENTS = [
 ] as const;
 
 /**
+ * Which path deposited a `turn_context` row (issue: MCP portability).
+ *
+ * Turn context can now arrive two ways, and a study reading this database later must be
+ * able to tell them apart without inference. A `hook` row was **observed** by the
+ * harness: the `UserPromptSubmit` event fired, and the session, the turn identity, the
+ * effort level and the permission mode are facts the model never touched. A `tool` row
+ * was **volunteered** by the model through `begin_turn`, on a host with no hook to
+ * observe anything — the same fields, one evidentiary step weaker, because the only
+ * witness is the subject.
+ *
+ * That difference is the whole reason the column exists. Pooling the two would let a
+ * self-reported session id sit in the record looking exactly like an observed one, which
+ * is precisely the substitution this plugin's design exists to prevent everywhere else.
+ *
+ * A row written before the column existed carries NULL, which honestly means "written by
+ * a version that had only one path" — and, since that path was the hook, it is readable
+ * as a hook row without anything being backfilled onto it.
+ *
+ * @see ./context.js recordContext
+ * @see ../mcp/tools.js handleBeginTurn
+ */
+export const CONTEXT_SOURCES = [
+  'hook',   // observed by the harness at UserPromptSubmit; the model asserted nothing
+  'tool',   // volunteered by the model via begin_turn, on a host that fires no hook
+] as const;
+
+/**
  * `model` is deliberately NOT a closed vocabulary.
  *
  * Model identifiers appear faster than any enum could track, and rejecting an unknown
@@ -369,6 +396,7 @@ export type Audience         = typeof AUDIENCES[number];
 export type AnchorKind       = typeof ANCHOR_KINDS[number];
 export type NoteState        = typeof NOTE_STATES[number];
 export type NoteEvent        = typeof NOTE_EVENTS[number];
+export type ContextSource    = typeof CONTEXT_SOURCES[number];
 
 /**
  * Whether `value` belongs to the closed vocabulary `vocabulary`, narrowing its type

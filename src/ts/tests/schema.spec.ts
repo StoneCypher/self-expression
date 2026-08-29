@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
 import {
-  ALL_DDL, TABLE_DDL, ALL_INDEX_DDL,
+  ALL_DDL, TABLE_DDL, ALL_INDEX_DDL, TURN_CONTEXT_DDL, TURN_CONTEXT_SOURCE_COLUMN,
   SCHEMA_VERSION, check, entriesDdl,
 } from '../channels/schema.js';
 import {
@@ -306,8 +306,13 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 6 — the #16 retraction shape', () => {
-    expect(SCHEMA_VERSION).toBe(6);
+  test('is 7 — the turn_context.source shape', () => {
+    expect(SCHEMA_VERSION).toBe(7);
+  });
+
+  test('turn_context declares source, and still bakes no CHECK into that table', () => {
+    expect(TURN_CONTEXT_DDL).toContain(TURN_CONTEXT_SOURCE_COLUMN);
+    expect(TURN_CONTEXT_DDL).not.toContain('CHECK');
   });
 
 });

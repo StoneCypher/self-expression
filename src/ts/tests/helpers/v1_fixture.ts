@@ -11,7 +11,38 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL } from '../../channels/schema.js';
+import { META_DDL, CONFIG_DDL } from '../../channels/schema.js';
+
+/**
+ * The `turn_context` DDL as every database from v1 through v6 carried it, frozen —
+ * **no `source` column**, which is exactly what the v6→v7 step adds.
+ *
+ * Frozen here, in the oldest fixture, and re-exported by the later ones rather than
+ * copied, because the table genuinely did not change across those six versions: one
+ * constant for one shape means the v2–v6 fixtures cannot disagree about it. Before this
+ * existed, every fixture imported the live `TURN_CONTEXT_DDL` — harmless while the table
+ * was immutable, and silently wrong the moment it was not, since a "v1" database would
+ * have been built with a v7 table and the migration would have had nothing to prove.
+ *
+ * @see ../../channels/schema.js TURN_CONTEXT_DDL
+ */
+export const V1_TURN_CONTEXT_DDL = `
+CREATE TABLE IF NOT EXISTS turn_context (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts_utc          TEXT    NOT NULL,
+  session         TEXT    NOT NULL,
+  prompt_id       TEXT,
+  turn_index      INTEGER,
+  turn            TEXT,
+  cwd             TEXT,
+  git_branch      TEXT,
+  permission_mode TEXT,
+  agent_id        TEXT,
+  agent_type      TEXT,
+  effort          TEXT,
+  compactions     INTEGER,
+  prompt_len      INTEGER
+)`;
 
 /**
  * The indices a v1 database carried, frozen alongside its DDL.
@@ -112,7 +143,7 @@ CREATE TABLE IF NOT EXISTS entries (
  */
 export function buildV1(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
-  for (const s of [V1_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, ...V1_INDEX_DDL]) {
+  for (const s of [V1_ENTRIES_DDL, V1_TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, ...V1_INDEX_DDL]) {
     db.exec(s);
   }
   db.prepare("INSERT INTO meta (key, value, updated_utc) VALUES ('schema_version','1','2026-08-18T00:00:00Z')").run();

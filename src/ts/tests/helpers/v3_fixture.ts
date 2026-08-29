@@ -17,9 +17,9 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import {
-  TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL, MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
+  META_DDL, CONFIG_DDL, MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
 } from '../../channels/schema.js';
-import { V1_INDEX_DDL } from './v1_fixture.js';
+import { V1_INDEX_DDL, V1_TURN_CONTEXT_DDL } from './v1_fixture.js';
 import { V2_ENTRIES_DDL } from './v2_fixture.js';
 
 /**
@@ -48,7 +48,7 @@ export const V3_ENTRIES_DDL: string = V2_ENTRIES_DDL;
 export function buildV3(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   const statements = [
-    V3_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
+    V3_ENTRIES_DDL, V1_TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
     MESSAGES_DDL, MESSAGE_READS_DDL,
     ...V1_INDEX_DDL, ...MESSAGE_INDEX_DDL,
   ];

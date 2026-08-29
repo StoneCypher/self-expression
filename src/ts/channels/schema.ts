@@ -68,9 +68,17 @@ import {
  * derived at read time from the `corrects_id` chain, and the rebuild copies rows
  * verbatim, which is the one standing exception to the INSERT-only rule.
  *
+ * v7 (MCP portability): `turn_context` gained the nullable `source` column, naming which
+ * path deposited the row — `hook` (observed by the harness) or `tool` (volunteered
+ * through `begin_turn` on a hookless host). Purely additive **and** constraint-free, so
+ * unlike every other `entries` growth this needs no table rebuild: `turn_context`
+ * deliberately carries no `CHECK` clauses at all, so the v6→v7 step is a single
+ * `ALTER TABLE … ADD COLUMN`. Pre-existing rows keep NULL, which honestly reads as
+ * "written by a version that had only the hook path"; nothing is backfilled.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -206,6 +214,16 @@ export const ENTRIES_DDL: string = entriesDdl();
  *
  * Rows accumulate rather than being replaced, so a turn's context survives for later
  * inspection and so concurrent sessions do not overwrite each other.
+ *
+ * `source` (v7) names which path deposited the row — `hook` when the harness observed
+ * the turn, `tool` when the model volunteered it through `begin_turn` on a host with no
+ * hook to fire. It is deliberately a plain `TEXT` column with no `CHECK`, matching the
+ * `turn` column beside it: this table has never baked a vocabulary into a constraint,
+ * and keeping it that way is what lets the v6→v7 step be one `ALTER TABLE` instead of
+ * the table rebuild every `entries` vocabulary growth has needed. The vocabulary is
+ * enforced in TypeScript at the one call site that writes it.
+ *
+ * @see ./vocabulary.js CONTEXT_SOURCES
  */
 // eslint-disable-next-line @typescript-eslint/no-inferrable-types
 export const TURN_CONTEXT_DDL: string = `
@@ -223,8 +241,17 @@ CREATE TABLE IF NOT EXISTS turn_context (
   agent_type      TEXT,
   effort          TEXT,
   compactions     INTEGER,
-  prompt_len      INTEGER
+  prompt_len      INTEGER,
+  source          TEXT
 )`;
+
+/**
+ * The column the v6→v7 step adds to `turn_context`, and its type — named once so the
+ * migration and the fresh-install DDL cannot drift into two different shapes.
+ *
+ * @see ./migrate.js
+ */
+export const TURN_CONTEXT_SOURCE_COLUMN = 'source';
 
 /** System state. Not user-editable; changes at install and upgrade only. */
 export const META_DDL = `

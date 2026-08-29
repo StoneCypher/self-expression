@@ -14,10 +14,10 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import {
-  TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
+  META_DDL, CONFIG_DDL,
   MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
 } from '../../channels/schema.js';
-import { V1_INDEX_DDL } from './v1_fixture.js';
+import { V1_INDEX_DDL, V1_TURN_CONTEXT_DDL } from './v1_fixture.js';
 
 /**
  * The indices a v4 database carried, frozen alongside its DDL: v1's plus
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS entries (
 export function buildV4(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   const statements = [
-    V4_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
+    V4_ENTRIES_DDL, V1_TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
     MESSAGES_DDL, MESSAGE_READS_DDL,
     ...V4_INDEX_DDL, ...MESSAGE_INDEX_DDL,
   ];
