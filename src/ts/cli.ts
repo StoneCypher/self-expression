@@ -146,7 +146,7 @@ const streams = {
   err: (line: string): void => { console.error(line); },
 };
 
-runAsync(process.argv.slice(2), streams, () => startStdio(version()),
+runAsync(process.argv.slice(2), streams, () => startStdio(version(), undefined, __dirname),
          runHook, runRender, runMessages, runNotes)
   .then(code => { process.exit(code); })
   .catch((error: unknown) => {

@@ -24,6 +24,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { openStore, closeStore } from '../channels/store.js';
 import { onboardingInstructions } from '../channels/onboarding.js';
+import {
+  availableConventions, conventionsPointer, defaultConventionsRoot, packageRoot,
+} from '../channels/conventions.js';
+import type { ConventionDoc } from '../channels/conventions.js';
+import { registerConventionResources } from './resources.js';
 import { pruneExpired }  from '../channels/retention.js';
 import type { Store }    from '../channels/store.js';
 import { registerTools } from './tools.js';
@@ -41,6 +46,42 @@ import type { DwellingStore } from '../dwelling/store.js';
 export const SERVER_NAME = 'self-expression';
 
 /**
+ * The `instructions` string for one connection, or `null` when there is nothing to say.
+ *
+ * Two things ride this transport, and they ride it for the same reason: the MCP
+ * `initialize` handshake is the one channel every host implements, so anything that must
+ * reach a host with no hooks and no skills has to travel here. Onboarding says a
+ * questionnaire is pending; the conventions pointer says where the practice is served.
+ *
+ * They are joined rather than nested because they are independent — a fresh database on
+ * a skill-having host has onboarding and no useful pointer, a settled database on a bare
+ * MCP client has the pointer and no onboarding, and either can be absent without
+ * disturbing the other.
+ *
+ * Kept short deliberately. Everything here is paid for on every connection to every
+ * host, which is exactly why the conventions themselves are resources and only the
+ * pointer to them is here.
+ *
+ * @param store the open store, for the onboarding half
+ * @param docs  the convention documents actually available, for the pointer half
+ *
+ * @example
+ *   serverInstructions(store, availableConventions('/pkg'))
+ *   // => 'Onboarding pending (9 questions). … The conventions these tools assume …'
+ *
+ * @see ../channels/onboarding.js onboardingInstructions
+ * @see ../channels/conventions.js conventionsPointer
+ */
+export function serverInstructions(
+  store : Store,
+  docs  : readonly ConventionDoc[],
+): string | null {
+  const parts = [onboardingInstructions(store), conventionsPointer(docs)]
+    .filter((part): part is string => part !== null);
+  return parts.length === 0 ? null : parts.join('\n\n');
+}
+
+/**
  * Build a configured server without connecting it to anything.
  *
  * Separated from `startStdio` so tests can construct the real server, with the real
@@ -56,20 +97,40 @@ export const SERVER_NAME = 'self-expression';
  * why hooks are deliberately not part of that detection path. The `onboard` tool
  * itself is always registered, so permission caches never see a tool flicker.
  *
+ * The conventions ride the same two channels, split by cost: a short pointer joins the
+ * `instructions` string, and the documents themselves are registered as **resources**,
+ * pulled on demand. A host that already loaded the skills is told so by the pointer and
+ * reads nothing; a host with no skills at all can list and fetch them. Neither is
+ * fatal — a package whose convention files cannot be found registers no resources,
+ * omits the pointer, and serves every tool exactly as before.
+ *
  * @param dwelling - an open dwelling to register, `null` for none, or omit to resolve
  *                   from configuration; a caller who passes one also owns closing it
+ * @param root     - the package root the convention documents are read from; omit to
+ *                   discover it from the running script and the working directory
  *
  * @example
  *   const server = buildServer(store, '0.2.0');
+ *
+ * @see serverInstructions
+ * @see ./resources.js registerConventionResources
  */
-export function buildServer(store: Store, version: string, dwelling?: DwellingStore | null): McpServer {
+export function buildServer(
+  store    : Store,
+  version  : string,
+  dwelling?: DwellingStore | null,
+  root?    : string | null,
+): McpServer {
 
-  const pending = onboardingInstructions(store);
+  const where   = root === undefined ? defaultConventionsRoot() : root,
+        docs    = availableConventions(where),
+        pending = serverInstructions(store, docs);
 
   const server = pending === null
     ? new McpServer({ name: SERVER_NAME, version })
     : new McpServer({ name: SERVER_NAME, version }, { instructions: pending });
 
+  registerConventionResources(server, where);
   registerTools(server, store, version);
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
@@ -92,18 +153,28 @@ export function buildServer(store: Store, version: string, dwelling?: DwellingSt
  * Resolves when the connection ends. `dbFile` is injectable for tests; it defaults to
  * the resolved data directory.
  *
+ * `bundleDir` is the running bundle's directory — `__dirname` in the CJS bundle — from
+ * which the convention documents are found one level up. Passing it beats searching:
+ * the entry point knows exactly where it sits, and the search
+ * ({@link ../channels/conventions.js defaultConventionsRoot}) exists for callers that do
+ * not, such as the test suite. Omitting it falls back to that search.
+ *
+ * @param bundleDir the running bundle's directory; omit to discover the package root
+ *
  * @example
- *   await startStdio('0.2.0');   // blocks, serving the host
+ *   await startStdio('0.2.0');                 // blocks, serving the host
+ *   await startStdio('0.2.0', undefined, __dirname);
  *
  * @throws {Error} If the data directory cannot be created or the database cannot open.
  *                 Failing loudly here is correct: a server that starts without storage
  *                 would accept expressions and silently discard them.
  */
-export async function startStdio(version: string, dbFile?: string): Promise<void> {
+export async function startStdio(version: string, dbFile?: string, bundleDir?: string): Promise<void> {
 
   const store     = dbFile === undefined ? openStore() : openStore(dbFile),
         house     = maybeOpenDwelling(store),
-        server    = buildServer(store, version, house),
+        root      = bundleDir === undefined ? undefined : packageRoot(bundleDir),
+        server    = buildServer(store, version, house, root),
         transport = new StdioServerTransport();
 
   // Startup retention (issue #30, D6): prune rows past the configured horizon, once
