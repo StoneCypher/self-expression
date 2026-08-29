@@ -68,6 +68,9 @@ self-expression/
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
 ├── src/scripts/             permanent development scripts (leitmotif generation)
+│   └── desk/                the desk: a dependency-free local web panel and its card
+│                            mechanism — server, card module, shell, icons, and the
+│                            `.example` shapes of a desk's state. No desk's contents.
 └── dist/                    committed build output (dist is intentionally not gitignored)
                              — includes claudio.cjs, the audio facility's own bundle
 ```
@@ -311,6 +314,38 @@ exactly the hosts that host-native prompting misses. The `onboard` tool is regis
 unconditionally so permission caches never see it flicker, and the etiquette is
 offer-not-gate: one offer at a natural pause, never blocking work, an ignored offer simply
 recurring next session.
+
+**The desk ships its mechanism and none of its contents.** The desk is a local web panel
+run by hand (`node src/scripts/desk/panel.mjs <desk directory>`), so it lands in
+`src/scripts/` — the repository's home for permanent development scripts — rather than in a
+new top-level directory or in `src/ts/`. It is deliberately unbuilt plain ESM: `panel.mjs`
+imports only from `node:` and from `deskcards.mjs`, which is the property that lets it be
+started, used, killed and forgotten without installing anything, and it is not part of any
+bundle, any MCP surface, or the published `files` list.
+
+What is checked in is the *mechanism* — the server, the card module and its hand-written
+`.d.mts`, the structural shell with its three card placeholders, the second (still
+monolithic) surface, and two icons. A *desk* — cards, name, questions, board, geometry,
+vendored libraries — is a directory named on the command line, and the repository knows
+nothing about it. That is why the desk directory is an argument rather than a default: two
+desks on one machine are normal, and a desk that guessed where it lived could quietly answer
+for the wrong one. The per-desk state files carry `.example` siblings for their shape, never
+their data.
+
+**A card is a directory, and that is the whole design.** One card is one directory holding
+`card.json` plus optional `card.html`, `card.css`, and `card.js`, and the page is assembled
+per request from what is present rather than edited toward what should be. The predecessor
+kept cards as markup inside one document and removed them by cutting sections out by index;
+it failed twice, both times the same way — a removal that can half-succeed. An attribute in
+an unexpected order hid a card from its own deletion, and the JavaScript for three deleted
+cards outlived them and threw on every load. Deleting a directory cannot land two of three
+edits. The same reasoning makes *forget* a real deletion with no tombstone and no shadow
+copy, and keeps the shell's card roster discovered (`querySelectorAll('main [data-card]')`)
+rather than listed, since a hard-coded roster would be exactly the second source of truth
+this change exists to remove. Conventions — the two dismissal tiers, the inbox protocol, the
+`<main>` hot-swap and its signature fallback, and the re-runnability rules card scripts must
+obey — are in `src/doc_md/desk.md`. `deskcards.mjs` is unit- and stochastically tested; the
+server is not, because its surface is a running process rather than a function.
 
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
