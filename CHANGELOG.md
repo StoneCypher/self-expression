@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-71 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+72 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -14,6 +14,122 @@ Published tags:
 
 <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 5:45:28 PM
+
+Commit [033de66aeccff43b5e023da87170d727c052818e](https://github.com/StoneCypher/self-expression/commit/033de66aeccff43b5e023da87170d727c052818e)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat(config): window.browser and window.editor postures, and an enum kind
+  * Two new registry keys say whether a page may be put on the user's screen,
+each an enum over never / ask / always, defaulting to ask.
+  * - config: fourth kind `enum`, carrying its permitted values on the key
+  definition. The existing choiceValidator is the enum validator — it already
+  canonicalizes case-insensitively to lowercase and rejects outside the set,
+  naming the set in describeVocabulary shape. A bool cannot express three
+  states, and a string kind would make the rejection say "kind: string" where
+  the useful message is "one of: never, ask, always".
+- config: WINDOW_SURFACES / WINDOW_POSTURES / DEFAULT_WINDOW_POSTURE,
+  windowPostureKey, and the tolerant windowPosture reader — an invalid stored
+  row reads as ask (D5), the safe direction, never as permission.
+- config: share.time_granularity moves from kind string to kind enum. It has
+  always used choiceValidator; the kind was simply the closest available label
+  before enum existed, and its rejection improves for free.
+- hooks: onUserPromptSubmit appends a `windows:` segment to additionalContext
+  beside #42's conventions flags and #76's lengths, on D9's mechanism. Fails
+  open on its own terms like every other segment.
+  * Two keys rather than one because the costs differ: an external browser window
+steals focus and may land while nobody is at the machine, while an editor tab
+appears in the window the user is already sitting in. One key would force the
+expensive answer onto the cheap case.
+  * Advisory by construction — there is deliberately no enforcing tool. Nothing
+can stop a shell command from opening a window, so a gate would be a lock on
+one of several doors, and a lock that can be walked around is worse than an
+honest request.
+  * - tests: registry (both keys validate their own defaults; every enum key
+  carries a non-empty choice set and no other kind does; mixed-case
+  canonicalization; rejection names the whole set), reader, effective listing,
+  and every posture-by-surface hook sentence
+- stochastic: arbitrary strings outside the vocabulary never write, and
+  arbitrary case permutations round-trip store to read to posture
+- docs: base_README config table plus a window-posture section, and the config
+  surface paragraph in src/doc_md/plugin-layout.md
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 2:31:11 PM
+
+Commit [6b07359b5a5c313cbd1fb9756d5ae5b8fc09c8e3](https://github.com/StoneCypher/self-expression/commit/6b07359b5a5c313cbd1fb9756d5ae5b8fc09c8e3)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 4ecc9b12ec69e5c0072ceb50464b8afacf11f98a
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 2:29:34 PM
+
+Commit [4ecc9b12ec69e5c0072ceb50464b8afacf11f98a](https://github.com/StoneCypher/self-expression/commit/4ecc9b12ec69e5c0072ceb50464b8afacf11f98a)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [ca657f2, 0fff283]
+
+  * Merge pull request #82 from StoneCypher/feat_26-08-28_retraction_16
+  * feat: retraction marks the original, not just the correction (#16)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 28, 2026 2:25:50 PM
+
+Commit [0fff2832d33c3f87d31317e7682ab46d0357cd5f](https://github.com/StoneCypher/self-expression/commit/0fff2832d33c3f87d31317e7682ab46d0357cd5f)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat: retraction marks the original, not just the correction (#16)
+  * Implements src/superpowers/spec/2026-08-27-retraction-design.md. The
+load-bearing property is mark, never mutate: "retracted" is derived at read
+time from the corrects_id chain and is never written onto the original row.
+  * - vocabulary: CORRECTION_KINDS (retracts / amends / resolves), needed because
+  #42 forecast resolutions already share the corrects_id chain
+- schema v6: nullable corrects_kind (CHECK) and verbatim, plus
+  idx_entries_corrects; the v5-to-v6 step is a table rebuild through the
+  shared recipe, with a frozen v5 fixture round-trip
+- entries: cross-field correction rules, effectiveCorrectionKind carrying the
+  legacy read rule, standingOf (one query per batch), and the register
+- marked read surfaces: recentEntries gains the link columns and derived
+  status/by, recall gains retractions, express gains correctsKind and
+  verbatim and echoes the target it corrects
+- analytics: seriesPercents excludes retracted snapshots, previousSignature
+  skips a retracted signature; both document the exclusion at the query
+- hooks: first-turn retraction replay gated by retraction.replay, default on
+- stochastic: standing agrees with an independent naive fixpoint, and no
+  operation sequence mutates or deletes an existing row
+- docs: base_README, plugin-layout, and the skill Retraction section
+  * Closes #16
 
 
 
@@ -140,66 +256,3 @@ Commit [79e589dfe2cdbc766db73bbd6bd6975bb0c9475c](https://github.com/StoneCypher
 Author: `John Haugeland <stonecypher@gmail.com>`
 
   * wip: docs, skill guidance, and lint fixes for held notes
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 1:25:39 PM
-
-Commit [a04fc493ffe3a051ba09203b5dae16d84f46c503](https://github.com/StoneCypher/self-expression/commit/a04fc493ffe3a051ba09203b5dae16d84f46c503)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: held-note unit, tool, hook, and stochastic tests
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 1:16:35 PM
-
-Commit [b11d52e0b86b86bd1b8d99b9e929d54decfe52dd](https://github.com/StoneCypher/self-expression/commit/b11d52e0b86b86bd1b8d99b9e929d54decfe52dd)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * wip: held notes core — schema v5, notes.ts, tools, hook offer path
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 1:01:12 PM
-
-Commit [2da163dbb0c2c478ec1555892d1f54415fd7f297](https://github.com/StoneCypher/self-expression/commit/2da163dbb0c2c478ec1555892d1f54415fd7f297)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [8fc723d, 9f7a387]
-
-  * Merge pull request #80 from StoneCypher/feat_26-08-28_anchoring_18
-  * feat: anchoring — commentary bound to a location instead of floating in prose (#18)
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 12:58:22 PM
-
-Commit [9f7a387f8d2d47877cebc2e07070fb8618a010d3](https://github.com/StoneCypher/self-expression/commit/9f7a387f8d2d47877cebc2e07070fb8618a010d3)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: regenerate artifacts after merging origin/main
