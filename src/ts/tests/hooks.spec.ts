@@ -9,10 +9,12 @@ import {
   onUserPromptSubmit, onStop, handleHook, describeMoment,
   OPEN_REMINDER, OPEN_REMINDER_CLOCKLESS,
   conventionFlags, CONVENTION_FLAGS, channelLengths,
+  windowPostureLine, windowClause, WINDOW_SURFACE_NOUNS,
   renderReplayItem, retractionReplayLine,
   REPLAY_WINDOW_DAYS, REPLAY_MAX_ITEMS, REPLAY_QUOTE_MAX,
 } from '../mcp/hooks.js';
-import { configKey, channelMaxCharsKey, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
+import { configKey, channelMaxCharsKey, DEFAULT_CHANNEL_MAX_CHARS,
+         WINDOW_SURFACES, WINDOW_POSTURES, windowPostureKey } from '../channels/config.js';
 import { CHANNELS }                           from '../channels/vocabulary.js';
 import { zoneAbbreviation }                   from '../channels/time.js';
 
@@ -236,6 +238,98 @@ describe('channelLengths — the #76 ceiling transport', () => {
 
 });
 
+describe('windowPostureLine — the advisory window-posture transport', () => {
+
+  /** The whole `additionalContext` string one turn produces. */
+  function contextOf(store: Store | null): string {
+    return String((onUserPromptSubmit(store, { session_id: 'x' }, NOW) as
+      { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
+  }
+
+  test('an unconfigured install states ask for both surfaces — ask is itself an instruction', () => withStore(s => {
+    expect(windowPostureLine(s)).toBe(
+      'windows: ask before opening an external browser window; ' +
+      'ask before opening an editor tab');
+  }));
+
+  test.each([
+    ['never',  'windows: never open an external browser window; ask before opening an editor tab'],
+    ['ask',    'windows: ask before opening an external browser window; ask before opening an editor tab'],
+    ['always', 'windows: opening an external browser window is pre-approved; ask before opening an editor tab'],
+  ])('the browser posture %s produces its own sentence', (posture, expected) => withStore(s => {
+    writeConfig(s, 'window.browser', posture);
+    expect(windowPostureLine(s)).toBe(expected);
+  }));
+
+  test.each([
+    ['never',  'windows: ask before opening an external browser window; never open an editor tab'],
+    ['ask',    'windows: ask before opening an external browser window; ask before opening an editor tab'],
+    ['always', 'windows: ask before opening an external browser window; opening an editor tab is pre-approved'],
+  ])('the editor posture %s produces its own sentence', (posture, expected) => withStore(s => {
+    writeConfig(s, 'window.editor', posture);
+    expect(windowPostureLine(s)).toBe(expected);
+  }));
+
+  test('the two surfaces are stated independently — the whole point of two keys', () => withStore(s => {
+    writeConfig(s, 'window.browser', 'never');
+    writeConfig(s, 'window.editor', 'always');
+    expect(windowPostureLine(s)).toBe(
+      'windows: never open an external browser window; opening an editor tab is pre-approved');
+  }));
+
+  test('every posture-by-surface combination renders as a distinct, grammatical clause', () => {
+    const seen = new Set<string>();
+    for (const surface of WINDOW_SURFACES) {
+      for (const posture of WINDOW_POSTURES) {
+        const clause = windowClause(posture, WINDOW_SURFACE_NOUNS[surface]);
+        expect(clause).toContain(WINDOW_SURFACE_NOUNS[surface]);
+        expect(clause).not.toMatch(/^\s|\s$|[.;]$/);
+        seen.add(clause);
+      }
+    }
+    expect(seen.size).toBe(WINDOW_SURFACES.length * WINDOW_POSTURES.length);
+  });
+
+  test('an invalid stored value behaves as ask, never as permission', () => withStore(s => {
+    for (const bad of ['sometimes', 'true', 'yes', '', 'whenever', 'never ask']) {
+      writeConfig(s, 'window.browser', bad);
+      writeConfig(s, 'window.editor', bad);
+      expect(windowPostureLine(s)).toBe(
+        'windows: ask before opening an external browser window; ' +
+        'ask before opening an editor tab');
+    }
+  }));
+
+  test('a valid-but-uncanonical row is canonicalized on read, not treated as garbage', () => withStore(s => {
+    writeConfig(s, 'window.browser', ' ALWAYS ');   // a hand-edited row that still means something
+    expect(windowPostureLine(s)).toContain('opening an external browser window is pre-approved');
+  }));
+
+  test('the segment sits after the lengths and before the reminder', () => withStore(s => {
+    const context = contextOf(s);
+    expect(context.indexOf('lengths:')).toBeLessThan(context.indexOf('windows:'));
+    expect(context.indexOf('windows:')).toBeLessThan(context.indexOf(OPEN_REMINDER));
+  }));
+
+  test('the configured posture, not the default, is what reaches the turn', () => withStore(s => {
+    writeConfig(s, 'window.browser', 'never');
+    expect(contextOf(s)).toContain('never open an external browser window');
+  }));
+
+  test('with no store there is no windows segment, and the clock still arrives', () => {
+    const context = contextOf(null);
+    expect(context).not.toContain('windows:');
+    expect(context).toContain('2:05 pm');
+  });
+
+  test('both registered keys are the ones the line actually reads', () => {
+    for (const surface of WINDOW_SURFACES) {
+      expect(configKey(windowPostureKey(surface))?.fallback).toBe('ask');
+    }
+  });
+
+});
+
 describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
 
   function additionalContext(out: unknown): string {
@@ -248,7 +342,8 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW));
     // The conventions flags are config transport, not time presentation (#42), so they
     // still lead the clockless line; only the clock sentence is suppressed.
-    expect(context).toBe(`${conventionFlags(s)}. ${channelLengths(s)}. ${OPEN_REMINDER_CLOCKLESS}`);
+    expect(context).toBe(
+      `${conventionFlags(s)}. ${channelLengths(s)}. ${windowPostureLine(s)}. ${OPEN_REMINDER_CLOCKLESS}`);
     expect(context).not.toContain('2:05 pm');
     expect(context).not.toContain('Turn starting');
     expect(context).not.toContain('timestamp above');   // the shipped wording must not dangle
@@ -277,10 +372,11 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     expect(context).toContain(OPEN_REMINDER);
   }));
 
-  test('unset keeps the clock, with the conventions flags and lengths between clock and reminder', () => withStore(s => {
+  test('unset keeps the clock, with the conventions flags, lengths, and windows between clock and reminder', () => withStore(s => {
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
     expect(context).toBe(
-      `${describeMoment(NOW)} ${conventionFlags(s)}. ${channelLengths(s)}. ${OPEN_REMINDER}`);
+      `${describeMoment(NOW)} ${conventionFlags(s)}. ${channelLengths(s)}. ` +
+      `${windowPostureLine(s)}. ${OPEN_REMINDER}`);
   }));
 
 });
