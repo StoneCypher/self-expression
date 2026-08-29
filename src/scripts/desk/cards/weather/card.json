@@ -1,0 +1,11 @@
+{
+  "ord": 75,
+  "type": "weather",
+  "id": "weather",
+  "title": "Seattle",
+  "settings": {
+    "place": "Seattle",
+    "units": "f",
+    "hours": 24
+  }
+}

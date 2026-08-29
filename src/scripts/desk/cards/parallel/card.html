@@ -1,0 +1,21 @@
+<section data-card="parallel" class="ck-parallel">
+  <h2>every type on four measured axes</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="parallel-axisOrder">axis order</label>
+    <select id="parallel-axisOrder" name="axisOrder">
+      <option value="given">given</option>
+      <option value="correlation">correlation</option>
+    </select>
+    <label for="parallel-curve">curved</label>
+    <input type="checkbox" id="parallel-curve" name="curve">
+    <label for="parallel-opacity">line opacity</label>
+    <input type="number" id="parallel-opacity" name="opacity" min="0.03" max="1" step="0.05">
+    <div class="ck-set-foot">every axis is scaled on its own; the numbers beside each axis are its own top and bottom, and nothing about height is comparable between two axes.</div>
+  </div>
+  <div class="ck-scroll ck-pc-scroll">
+    <svg class="ck-pc" role="img" viewBox="0 0 100 40" aria-label="Parallel coordinates, 41 rows across 4 axes. each axis is scaled on its own, from its own smallest value to its own largest, so a line high here and low there has not gone down -- it has moved between two ranges that have nothing to do with each other. axes in the order given; 464 crossings between neighbours."></svg>
+  </div>
+  <div class="ck-cap"><b>41</b> rows across <b>4</b> axes. <i class="ck-pc-note">each axis is scaled on its own, from its own smallest value to its own largest, so a line high here and low there has not gone down -- it has moved between two ranges that have nothing to do with each other. axes in the order given; 464 crossings between neighbours.</i></div>
+  <div class="ck-legend"><span><i data-s="1"></i>live</span><span><i data-s="2"></i>structure</span><span><i data-s="3"></i>quantities</span><span><i data-s="4"></i>work</span><span><i data-s="5"></i>time</span><span><i data-s="6"></i>text</span><span><i data-s="7"></i>pictures</span></div>
+</section>

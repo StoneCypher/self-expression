@@ -1,0 +1,13 @@
+{
+  "ord": 59,
+  "type": "treemap",
+  "title": "the catalogue by area",
+  "settings": {
+    "depth": 2,
+    "labels": "fit",
+    "padding": 2
+  },
+  "leaves": 41,
+  "branches": 8,
+  "total": 38748
+}

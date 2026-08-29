@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>John's desk</title>
+<!-- The white flash on reload is the browser painting its default canvas before any CSS
+     has parsed. This is the only thing that fixes it, because it is the only signal the
+     browser has that early — a stylesheet, inline or not, arrives too late.
+     Kept at `dark` because that is the desk's default; the light theme rewrites it from
+     script, early, before the first paint. -->
+<meta name="color-scheme" content="dark" id="cscheme">
+<!-- A digest of this page's own scripts and styles, computed by the server. The hot swap
+     compares it against the fetched page's, so "did the code change" is answered by the
+     side that assembled both, rather than by two different derivations that can disagree. -->
+<!--CODESIG-->
+<link rel="icon" type="image/svg+xml" href="/icon-john.svg">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    color-scheme: light dark;    /* scrollbars and form controls, which the meta does not reach */
+    --ink:      oklch(0.93 0.01 250);
+    --ink-dim:  oklch(0.62 0.01 250);
+    --ink-faint:oklch(0.42 0.01 250);
+    --ground:   oklch(0.155 0.008 90);
+    --ground-2: oklch(0.20 0.010 90);
+    --rule:     oklch(0.30 0.010 90);
+    --accent:   oklch(0.84 0.14 95);
+    --hairline: oklch(0.235 0.010 90);   /* the faint rule between cards */
+    --well:     oklch(0.12 0.008 90);    /* recessed fields */
+    --good:     oklch(0.80 0.14 145);    /* the acknowledgement green */
+    /* Halfway between the first charcoal and the ground the inbox actually sits on.
+       Sections paint no background of their own, so that ground is `--ground` 0.155 rather
+       than the card token — midpoint(0.255, 0.155) = 0.205. Still above the ground, so a
+       pill reads as sitting on the desk, but only just: the separation is now carried more
+       by the rim than by the fill. */
+    /* The drawn buttons, shared by the inbox rows and the lab that chose them. Two tones:
+       the structure a glyph acts on, and the part of it that moves. The green is darker and
+       more saturated than it first was because a 13px render loses chroma to antialiasing —
+       at that size half of every stroke is a blend with the ground, so a colour that reads
+       correctly at 26px reads washed out at working size. Compensate at the token. */
+    --ic-body:  oklch(0.60 0.045 245);
+    --ic-land:  oklch(0.72 0.20 152);
+    --ic-queue: oklch(0.82 0.16 72);
+    /* The same land glyph, for a PR that is someone else's. Ownership as hue rather than
+       as a second drawing: the act is identical, only the author differs. */
+    --ic-theirs: oklch(0.74 0.13 215);
+
+    --pill:      oklch(0.205 0.010 90);
+    --pill-edge: oklch(0.243 0.010 90);   /* 0.221 x1.1 — rim now 0.038 clear of the fill */
+    --ui:   'Space Grotesk', system-ui, sans-serif;
+    --disp: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  /* Light is a CHOICE, not a detection.
+
+     `prefers-color-scheme` reports the operating system, and John's two viewing contexts
+     disagree with it in opposite directions: his browser is light and his editor is dark,
+     while the OS says light for both. An embedded browser inherits the OS rather than the
+     editor's theme, so sniffing turned the editor's desk light — the one place it was
+     already right. No media query can separate those two cases, because from inside the
+     page they are identical. So the desk carries an explicit attribute instead.
+
+     Grounds and inks are reflected about mid-grey; the accent is not. A hue that carries
+     meaning has to stay recognisable, and reflecting L 0.84 gives a pale wash — it is
+     darkened to sit on a light ground while keeping its hue. */
+  :root[data-theme="light"] {
+    --ink:      oklch(0.17 0.010 250);
+    --ink-dim:  oklch(0.42 0.010 250);
+    --ink-faint:oklch(0.56 0.010 250);
+    --ground:   oklch(0.985 0.003 90);
+    --ground-2: oklch(0.955 0.004 90);
+    --rule:     oklch(0.86 0.006 90);
+    --accent:   oklch(0.52 0.13 95);
+    --hairline:  oklch(0.90 0.004 90);
+    --well:      oklch(1 0 0);
+    --good:      oklch(0.48 0.14 145);
+    /* The same midpoint construction, mirrored: halfway between the first pale stone
+       (0.925) and the ground the inbox sits on (`--ground` 0.985) = 0.955. */
+    --ic-body:  oklch(0.52 0.050 245);
+    --ic-land:  oklch(0.50 0.18 152);
+    --ic-queue: oklch(0.62 0.15 62);
+    --ic-theirs: oklch(0.52 0.13 220);
+
+    --pill:      oklch(0.955 0.004 90);
+    /* Raising L here would fade the rim toward the ground, not strengthen it, so the 10%
+       goes onto its separation from the fill instead: 0.055 x1.1. */
+    --pill-edge: oklch(0.895 0.005 90);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--ui); font-size: 13px; line-height: 1.45;
+    -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; overflow: hidden;
+  }
+  header { flex: 0 0 auto; border-bottom: 1px solid var(--rule); padding: 12px 16px 11px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .eyebrow b { color: var(--accent); font-weight: 400; }
+
+  /* Green for live, matching the other desk — the same word in the same corner meaning the
+     same thing should not be two colours. It goes red when the connection drops, which is
+     the one state worth interrupting a glance for, and the transition is slow enough that a
+     single missed poll reads as a fade rather than a flicker. */
+  #pulse { color: oklch(0.78 0.16 150); transition: color .4s; }
+  #pulse.down { color: oklch(0.72 0.17 25); }
+  :root[data-theme="light"] #pulse { color: oklch(0.52 0.16 150); }
+  :root[data-theme="light"] #pulse.down { color: oklch(0.55 0.19 25); }
+
+  /* Drawn rather than typed: the emoji ❓ renders red in Segoe UI Emoji, which is both the
+     wrong colour and at the mercy of whatever font stack a machine happens to have.
+     Sized to the eyebrow it now sits in, rather than to the row it used to head. */
+  /* `middle` rather than a pixel offset, because a pixel offset was aligning against the
+     wrong thing. An inline-block's baseline is the baseline of its own last line box — here
+     the '?' inside a 17px line — so shifting it by -4px moved a box that was already sitting
+     several pixels low, and the error compounded. `middle` centres the circle on the parent
+     text's x-height and depends on nothing inside the button; the 1px lift is the difference
+     between half an x-height and half a cap height, which is where the eye reads centre. */
+  .qmark {
+    width: 17px; height: 17px; padding: 0; margin-left: 5px;
+    vertical-align: middle; position: relative; top: -1px;
+    border: none; border-radius: 50%; background: oklch(0.56 0.15 250); color: oklch(0.99 0 0);
+    font-family: var(--ui); font-size: 11px; font-weight: 700; line-height: 17px; cursor: pointer;
+  }
+  .qmark:hover { background: oklch(0.66 0.17 250); color: oklch(0.99 0 0); }
+  .qmark[aria-expanded="true"] { background: var(--accent); color: var(--ground); }
+
+  /* Two regions, not one scroller with a sticky tail. `main` itself never scrolls; it is
+     just the column that divides the height between a scrolling deck and a fixed inbox.
+
+     The auto top margin this replaces put the inbox on the floor of a SHORT desk, but once
+     the cards overflowed the margin resolved to zero and the inbox scrolled off the bottom
+     with everything else — bottom-anchored exactly when it did not need to be. Making it a
+     sibling of the scroller instead of its last child is what actually pins it.
+
+     `min-height: 0` on both is load-bearing: a flex item's default floor is its content, so
+     without it the deck refuses to shrink, the column grows past the viewport, and nothing
+     scrolls anywhere. */
+  main { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  #deskscroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  /* `flex: 0 0 auto` because a flex item shrinks by default: without it the workbench's
+     declared height would be quietly crushed the moment the desk got crowded. */
+  section {
+    position: relative; flex: 0 0 auto;
+    border-bottom: 1px solid var(--hairline); padding: 12px 16px 14px;
+  }
+  section.away { display: none; }
+  /* On the floor by structure rather than by margin. It is `main`'s second child, not the
+     scroller's last, so no amount of content above it can push it out of view. The rule
+     above it is the seam between the two regions and reads heavier than a card boundary,
+     which is right: everything above scrolls and this does not. */
+  #inbox {
+    flex: 0 0 auto; margin-top: 0;
+    border-top: 1px solid var(--rule); border-bottom: none;
+  }
+
+  /* Faint until wanted: a card should not look like it is asking to be closed — but it
+     does have to be findable. Tuned by composited lightness rather than by the opacity
+     number: over this ground, .3 lands near L=0.234 and .55 near L=0.301, which is the
+     ~30% lift asked for. Raising the opacity rather than the colour keeps the token. */
+  .x {
+    position: absolute; top: 5px; right: 7px; width: 17px; height: 17px; padding: 0;
+    border: none; background: transparent; color: var(--ink-faint);
+    font-family: var(--ui); font-size: 15px; line-height: 15px; cursor: pointer; opacity: .55;
+  }
+  .x:hover { opacity: 1; color: oklch(0.70 0.17 25); border: none; background: transparent; }
+  #theme {
+    border: none; background: transparent; color: var(--ink-faint);
+    padding: 0 4px; font-size: 12px; line-height: 1; cursor: pointer; vertical-align: -1px;
+  }
+  #theme:hover { color: var(--accent); background: transparent; border: none; }
+  #tray { font-family: var(--mono); color: var(--ink-faint); }
+  #tray button {
+    border: none; background: transparent; color: var(--accent); padding: 0 0 0 5px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    text-decoration: underline; cursor: pointer;
+  }
+  h2 {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 9px; font-weight: 400;
+  }
+
+  .line { display: flex; gap: 7px; align-items: center; margin-bottom: 7px; }
+  input[type=text] {
+    flex: 1; min-width: 0; background: var(--well); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 0; padding: 7px 9px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: transparent; color: var(--ink); border: 1px solid var(--rule); border-radius: 0;
+    padding: 7px 12px; font-family: var(--mono); font-size: 11px; cursor: pointer; white-space: nowrap;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .ack { font-family: var(--mono); font-size: 10.5px; color: var(--good); min-height: 15px; }
+  .sent { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-top: 8px; }
+  .sent div { padding: 3px 0; border-top: 1px solid var(--hairline); }
+  .sent span { color: var(--ink-faint); }
+
+  .mnote { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }
+  
+  .cap { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); line-height: 1.6; margin-top: 7px; }
+  <!--CARD-CSS-->
+
+  .inbox { margin: 0; padding: 0; list-style: none; }
+  .inbox li {
+    display: inline-block; max-width: 100%; margin: 0 12px 5px 0;
+    font-size: 12px; color: var(--ink-dim); vertical-align: baseline;
+  }
+  .inbox li::before { content: "\2022"; color: var(--ink-faint); padding-right: 6px; }
+  .inbox button { padding: 2px 8px; font-size: 10px; margin-left: 5px; }
+
+  /* Its own full-width row, in red. Something already decided that then quietly did not
+     happen is precisely the item an inline bullet is good at hiding, so it gets the one
+     treatment the rest of the list cannot: a line of its own. */
+  .inbox li.stuck { display: block; margin-right: 0; color: oklch(0.72 0.17 25); }
+  .inbox li.stuck::before { color: inherit; }
+
+  /* Tasks get their own row too, but in the ordinary ink: they are work waiting for a
+     disposition, not something going wrong. Three buttons per row is why they cannot
+     share the inline flow the questions use. */
+  .inbox li.task { display: block; margin-right: 0; color: var(--ink); }
+  .inbox li.task::before { content: "\25B8"; color: var(--ink-faint); }
+  .inbox li.queued { color: var(--accent); }
+  .inbox li.queued::before { color: inherit; }
+  /* Struck through while it is out with agents: the work has left your desk and is
+     happening elsewhere, which is a different state from "I promise to do this next".
+     The row disappears entirely when the agents report back. */
+  .inbox li.agents { color: var(--ink-faint); text-decoration: line-through; }
+  .inbox li.agents .qd, .inbox li.agents button { text-decoration: none; }
+  .inbox .qd {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); padding-left: 7px;
+  }
+  /* Tickets: inline like the questions, quieter than the tasks, and set off by a rule so
+     "things I suggest" is visibly a different register from "things you are owed". */
+  .tickhead {
+    margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .inbox.tickets { margin-top: 6px; }
+  /* Pills. Inline-block rows in a wrapped list run together — the eye has to find the
+     boundaries from spacing alone, and spacing is exactly what wrapping keeps changing.
+     A ground of its own gives each ticket an edge that survives any line break.
+     The bullet goes: a pill is already a delimiter, and two delimiters is one too many. */
+  .inbox li.tick {
+    color: var(--ink-dim);
+    background: var(--pill);
+    border: 1px solid var(--pill-edge);
+    border-radius: 999px;
+    padding: 2px 9px 3px;
+    margin: 0 6px 5px 0;
+  }
+  .inbox li.tick::before { content: none; }
+  .inbox li.tick:hover { border-color: var(--rule); }
+  /* AI-authored: same lightness as its neighbours, a little chroma added. Legible as a
+     difference when you look for it, invisible when you are not — it is a provenance note,
+     not a warning, and the row it sits in already says who is responsible. */
+  .inbox li.byai { color: oklch(0.62 0.045 250); }
+  :root[data-theme="light"] .inbox li.byai { color: oklch(0.42 0.045 250); }
+  /* Slightly blue, not loud: enough hue to separate the identifier from the words around
+     it, not enough to read as a link and invite a click that does nothing. */
+  .inbox .num {
+    color: oklch(0.64 0.09 250); text-decoration: none; cursor: pointer;
+  }
+  .inbox .num:hover { color: oklch(0.74 0.13 250); text-decoration: underline; }
+  .inbox li.agents .num { color: inherit; }
+
+  .inbox button.act {
+    border: none; background: transparent; padding: 0 0 0 6px;
+    font-size: 12px; line-height: 1; filter: grayscale(.55); opacity: .75;
+  }
+  /* Half the gap BETWEEN the three, while the gap after the text keeps its full width.
+     The buttons are one control group and should read as a cluster; the space separating
+     them from the sentence is doing a different job and wants to stay.
+
+     The earlier attempt at this only halved the PADDING and left the gap unchanged,
+     because `.inbox button` also contributes `margin-left: 5px` — so the real gap was
+     5 + 6 and I was editing the smaller half of it. Margin zeroed here so one property
+     controls the spacing. */
+  .inbox button.act { margin-left: 0; }
+
+  /* Drawn buttons sit in the same cluster as the emoji ones and must not be treated like
+     them. The grayscale that mutes 🤖 and 🗑️ at rest would eat exactly the hue these were
+     drawn to carry, so a button holding a glyph opts out of it and rides a little lower
+     opacity instead — same restraint, applied to the property that survives colour. */
+  /* `vertical-align` because an inline-flex box has no baseline of its own to offer: an
+     <svg> is not a baseline-bearing child, so the box aligns by its bottom margin edge and
+     the glyph sits a few pixels high of the emoji beside it. The offset is the descender
+     room the emoji occupy and the drawing does not. */
+  .inbox button.act.dico {
+    filter: none; opacity: .85;
+    display: inline-flex; align-items: center; vertical-align: -3px;
+  }
+  .inbox button.act.dico:hover { opacity: 1; }
+  .dicon { width: 13px; height: 13px; display: block; color: var(--ic-body); }
+  .dicon.land  .m { stroke: var(--ic-land); }
+  .dicon.queue .m { stroke: var(--ic-queue); }
+  /* Same glyph, whose work. Green for mine, teal for someone else's — the section heading
+     already says it, and this says it again without being read. */
+  #prtheir .dicon.land .m { stroke: var(--ic-theirs); }
+  .inbox button.act + button.act { padding-left: 3px; }
+  .inbox button.act:hover { filter: none; opacity: 1; background: transparent; }
+
+  /* Retire a row without answering it. Faint like the card Xes, for the same reason. */
+  .inbox button.kill {
+    border: none; background: transparent; color: var(--ink-faint);
+    padding: 0 0 0 7px; font-size: 12px; opacity: .55;
+  }
+  .inbox button.kill:hover { opacity: 1; color: oklch(0.70 0.17 25); background: transparent; }
+
+  /* The inbox's headings carry weight rather than size: they are the only thing in the
+     card that says what a group of rows IS, and at this size weight separates better than
+     scale does. */
+  #inbox h2, .tickhead { font-weight: 700; }
+
+  /* cardkit: the idiom every card type shares. Inlined by the server so its contents are
+     part of the page digest — a linked stylesheet would let the kit change under an open
+     desk without the desk ever being told. */
+<!--KIT-CSS-->
+</style></head>
+<body>
+<script>
+/* Self-renewal, deliberately first and deliberately not a module: this is the page's
+   own repair mechanism, so it must survive any error in everything below it. If the
+   rest of the page throws, editing the file still fixes the open tab. */
+/* The repo the desk is about. Named once here rather than inlined at the link, because it
+   was hardcoded to a different repo than the one being worked on and every ticket number
+   silently pointed at the wrong tracker. One place to be wrong is better than many. */
+/* `sig` is read from the head's own stamp rather than left null, so the very first swap
+   already has something true to compare against. This script runs in the head, where that
+   <meta> is the only thing that needs to have been parsed — and it precedes us. */
+window.DESK = {
+  inits: [], repo: 'StoneCypher/self-expression',
+  sig: (document.querySelector('meta[name="codesig"]') || {}).content || null,
+  page: (document.querySelector('meta[name="pagesig"]') || {}).content || null,
+};
+
+/* Theme, applied before anything paints — and stored PER VIEWER, never on the server.
+
+   That is the whole design. The same desk is open in two places at once: a browser tab
+   and an editor tab, both live, both reloading on every edit. A server-side theme would
+   be one value shared between them, so setting it correctly for one would set it wrongly
+   for the other, every time. localStorage is scoped to the viewer, so the two tabs hold
+   different answers from the same served page.
+
+   Read synchronously rather than fetched for a second reason: a fetch resolves after the
+   first paint, and the desk would flash the wrong theme on every reload. */
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('desk-theme'); } catch (e) { /* private window */ }
+  if (t === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    var m = document.getElementById('cscheme');
+    if (m) m.setAttribute('content', 'light');
+  }
+  window.DESK.setTheme = function (next) {
+    var light = next === 'light';
+    document.documentElement.toggleAttribute('data-theme', false);
+    if (light) document.documentElement.setAttribute('data-theme', 'light');
+    var m = document.getElementById('cscheme');
+    if (m) m.setAttribute('content', light ? 'light' : 'dark');
+    try { localStorage.setItem('desk-theme', light ? 'light' : 'dark'); } catch (e) {}
+  };
+  window.DESK.theme = function () {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  };
+})();
+
+/**
+ * Replace `<main>` in place instead of reloading the document.
+ *
+ * A full reload throws away the paint, the fonts, the scroll position and the custom
+ * element registry and rebuilds all of it, which is what the flash actually is. Fetching
+ * the same URL and swapping one subtree keeps every one of those.
+ *
+ * Only markup can be swapped this way: the page's own scripts and styles have already
+ * executed, so if those changed there is nothing for a swap to do and it falls back to a
+ * real reload. That case is detected rather than assumed — both documents carry a digest
+ * of their own scripts and styles, stamped into the head by the server that assembled them.
+ *
+ * The digest used to be derived here, from the fetched document, and compared against a
+ * baseline the page recorded the first time it swapped. That is not a baseline: the first
+ * change after any load compared against nothing and swapped regardless of what the code
+ * had done. A card added while the page was open therefore received its markup and never
+ * its builder, and drew nothing — silently, since a builder that is not there cannot throw.
+ *
+ * @returns nothing; either the subtree is swapped or the location is reloaded
+ */
+async function deskSwap() {
+  var res  = await fetch(location.href, { cache: 'no-store' }),
+      doc  = new DOMParser().parseFromString(await res.text(), 'text/html'),
+      next = doc.querySelector('main'),
+      tag  = doc.querySelector('meta[name="codesig"]'),
+      sig  = tag ? tag.content : null;
+
+  if (!next) { location.reload(); return; }
+
+  /* Nothing changed: do nothing at all. The cheapest possible update, and the common one.
+     A renewal fires because a FILE moved, which is not the same as the PAGE differing — under
+     load most renewals rebuild an identical document, and rebuilding an identical document is
+     pure flicker for no information. Compared before anything else because everything else
+     costs DOM. */
+  var pt   = doc.querySelector('meta[name="pagesig"]'),
+      page = pt ? pt.content : null;
+  if (page !== null && page === window.DESK.page) { return; }
+
+  /* No stamp on either side means the old behaviour: swap and hope. An absent stamp on one
+     side only is a mismatch, and a mismatch always reloads, which is the safe direction. */
+  if (sig !== window.DESK.sig) { location.reload(); return; }
+
+  /* Replace the cards that differ, and ONLY those.
+     Replacing the whole of `<main>` re-created every card on the desk to change one of them:
+     images reloaded, animations restarted, an open settings panel closed, and on a large deck
+     the reflow was visible as a flash. A card whose markup is byte-identical is left strictly
+     alone — its DOM nodes are never touched, so there is nothing to repaint. */
+  var box = document.getElementById('deskscroll'), top = box ? box.scrollTop : 0;
+  var main = document.querySelector('main');
+  var have = {}, i, el, list;
+
+  list = main.querySelectorAll('[data-card]');
+  for (i = 0; i < list.length; i++) have[list[i].getAttribute('data-card')] = list[i];
+
+  var want = next.querySelectorAll('[data-card]'), seen = {}, changed = 0;
+  for (i = 0; i < want.length; i++) {
+    var id = want[i].getAttribute('data-card');
+    seen[id] = true;
+    el = have[id];
+    if (!el) { changed++; continue; }                   // new card: handled by the order pass
+    if (el.outerHTML !== want[i].outerHTML) { el.replaceWith(want[i].cloneNode(true)); changed++; }
+  }
+  for (var gone in have) if (!seen[gone]) { have[gone].remove(); changed++; }
+
+  /* Anything that arrived, or any change to the ORDER, still needs the container rebuilt — but
+     only the container that holds cards, and only when the card set itself moved. The inbox and
+     the header are untouched either way. */
+  var fresh = document.getElementById('deskscroll');
+  var mineIds = [], theirIds = [];
+  list = main.querySelectorAll('[data-card]');
+  for (i = 0; i < list.length; i++) mineIds.push(list[i].getAttribute('data-card'));
+  for (i = 0; i < want.length; i++) theirIds.push(want[i].getAttribute('data-card'));
+  if (mineIds.join(',') !== theirIds.join(',')) {
+    main.replaceWith(next);
+    fresh = document.getElementById('deskscroll');
+    changed++;
+  }
+  if (fresh) fresh.scrollTop = top;            // the swap should be invisible, including here
+
+  window.DESK.page = page;
+  if (changed) {
+    window.DESK.inits.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
+  }
+}
+
+/* The renewal poll, and the reconnect.
+ *
+ * Self-scheduling rather than a fixed interval, so the cadence can differ by state: a live
+ * desk checks often enough that an edit feels immediate, and a desk whose server has gone
+ * away backs off to a patient retry instead of hammering a closed port several times a
+ * second and filling the console with failures.
+ *
+ * Backing off is the whole point of the two rates. A dead server is usually dead for as
+ * long as it takes to restart it, which is seconds — so the retry has to keep going
+ * forever, and it also has to be cheap enough to leave running on a desk nobody is
+ * watching. It never gives up: there is no failure count and no final state.
+ *
+ * Coming back is a reload, not a swap. A server that has restarted may be serving different
+ * code, and `edition` restarts at zero on a new process — so the number is not comparable
+ * across the gap and the only honest response to "it went away and came back" is to fetch
+ * the page again. */
+(function () {
+  var LIVE = 1200, DOWN = 5000;
+  var born = null, lost = false;
+
+  clearTimeout(window.__renew);                // idempotent, so re-running cannot double it
+
+  function pulse(word, down) {
+    var p = document.getElementById('pulse');
+    if (!p) return;
+    p.textContent = word;
+    p.classList.toggle('down', !!down);
+  }
+
+  function tick() {
+    fetch('/edition', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (lost) { pulse('reconnected'); location.reload(); return; }
+        if (born === null) { born = d.edition; pulse('live'); }
+        else if (d.edition !== born) {
+          born = d.edition;
+          pulse('renewing');
+          deskSwap().then(function () { pulse('live'); })
+                    .catch(function () { location.reload(); });
+        }
+        window.__renew = setTimeout(tick, LIVE);
+      })
+      .catch(function () {
+        lost = true;
+        pulse('offline — retrying', true);
+        window.__renew = setTimeout(tick, DOWN);
+      });
+  }
+
+  tick();
+})();
+</script>
+<header>
+  <!-- One line. The desk explains itself by being a desk; the standing instructions that
+       used to sit here were read once and then occupied a row forever. -->
+  <div class="eyebrow"><span><b id="dname" title="click to rename">your desk</b></span>
+    <span><span id="tray"></span> <button id="theme" title="light or dark — this viewer only">◐</button>
+      <span id="geom" style="opacity:.55"></span> <span id="pulse">live</span>
+      <button class="qmark" id="asktoggle" aria-expanded="false" aria-controls="asksec"
+              title="ask me something">?</button></span></div>
+</header>
+
+<main>
+  <!-- Everything that scrolls, and nothing that does not. The inbox is a sibling of this
+       box rather than its last child, which is what pins it: it cannot scroll away because
+       it is not inside the thing that scrolls. -->
+  <div id="deskscroll">
+  <section id="asksec" hidden>
+    <h2>ask</h2>
+    <div class="line">
+      <input type="text" id="say" placeholder="tell me what to show you, or anything else" autocomplete="off">
+      <button id="send">send</button>
+    </div>
+    <div class="ack" id="ack"></div>
+    <div class="sent" id="sent"></div>
+  </section>
+
+  <!--CARD-HTML-->
+  </div>
+
+  <!-- Last in the DOM and deliberately absent from the put-away list: questions have to
+       wait somewhere fixed, so this is the one card that cannot be arranged away. -->
+  <section id="inbox">
+    <h2>inbox &mdash; <span id="inboxn">…</span></h2>
+    <ul class="inbox" id="inboxlist"></ul>
+    <div class="cap" id="inboxnone" hidden>nothing outstanding &mdash; anything I need from
+      you lands here.</div>
+
+    <!-- Each PR section hides entirely when empty. An empty heading is a small lie — it
+         implies a category you have to check, when the truthful state is silence. -->
+    <div id="prminewrap" hidden>
+      <div class="tickhead">pull requests out by me</div>
+      <ul class="inbox tickets" id="prmine"></ul>
+    </div>
+    <div id="prtheirwrap" hidden>
+      <div class="tickhead">pull requests out by someone else</div>
+      <ul class="inbox tickets" id="prtheir"></ul>
+    </div>
+
+    <!-- Tickets sit below everything else on purpose: they are my suggestions, not your
+         obligations, and they should not compete with rows that are actually waiting. -->
+    <div id="ticketwrap" hidden>
+      <div class="tickhead">tickets i&rsquo;d pick up next</div>
+      <ul class="inbox tickets" id="ticketlist"></ul>
+    </div>
+  </section>
+</main>
+
+<script>
+/* Classic and deliberately ahead of the modules, for the same reason the renewal poll is:
+   this button is the only way back to the ask box, so it must not depend on anything
+   below it parsing, resolving, or surviving. */
+/* The theme switch lives in the header, which the hot-swap never replaces, so it is bound
+   once here rather than from the re-runnable init list. */
+(function () {
+  var t = document.getElementById('theme');
+  if (!t) return;
+  var paint = function () { t.textContent = DESK.theme() === 'light' ? '◑' : '◐'; };
+  t.onclick = function () {
+    DESK.setTheme(DESK.theme() === 'light' ? 'dark' : 'light');
+    paint();
+  };
+  paint();
+})();
+
+DESK.inits.push(function () {
+  var btn = document.getElementById('asktoggle'),
+      sec = document.getElementById('asksec');
+  if (!btn || !sec) return;                   // same tolerance: a missing card is not a fault
+
+  function show(open) {
+    sec.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) { var i = document.getElementById('say'); if (i) i.focus(); }
+  }
+
+  btn.onclick = function () { show(sec.hidden); };
+
+  /* Removed before added: this builder re-runs after every hot-swap, and a document-level
+     listener is the one binding that would quietly accumulate instead of being replaced. */
+  if (window.__askKey) document.removeEventListener('keydown', window.__askKey);
+  window.__askKey = function (e) {
+    if (e.key === 'Escape' && !sec.hidden) { show(false); btn.focus(); }
+  };
+  document.addEventListener('keydown', window.__askKey);
+
+  var x = document.createElement('button');           // the ask card closes, it does not persist
+  x.className = 'x'; x.textContent = '×'; x.title = 'close';
+  x.onclick = function () { show(false); btn.focus(); };
+  sec.appendChild(x);
+});
+
+/* Cards can be put away, and the choice is kept server-side: the desk reloads itself
+   whenever the page changes, so a purely local dismissal would spring back within
+   seconds. Nothing is destroyed — the header offers everything back. */
+DESK.inits.push(function () {
+  /* Discovered, not listed. The deck is assembled from a directory now, so a hard-coded
+     roster would be a second source of truth that goes stale the first time a card is
+     added or removed — which is the whole failure this change exists to end. */
+  var CARDS = [].map.call(document.querySelectorAll('main [data-card]'),
+                          function (el) { return el.dataset.card; }),
+      away  = [],       // put away, still offered back by the tray
+      gone  = [];       // dismissed for good; the tray stops mentioning them at all
+  var card = function (id) { return document.querySelector('[data-card="' + id + '"]'); };
+
+  function save() {
+    fetch('/desk-config', { method: 'POST', headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify({ hidden: away, gone: gone }) })
+      .catch(function () {});
+  }
+
+  function button(label, title, fn) {
+    var b = document.createElement('button');
+    b.textContent = label; b.title = title; b.onclick = fn;
+    return b;
+  }
+
+  function paint() {
+    CARDS.forEach(function (id) {
+      var el = card(id);
+      if (el) el.classList.toggle('away', away.indexOf(id) >= 0 || gone.indexOf(id) >= 0);
+    });
+
+    /* Two tiers, because "not right now" and "never again" are different wishes and
+       collapsing them means one of the two is always wrong. */
+    var tray = document.getElementById('tray');
+    tray.textContent = away.length ? away.length + ' away' : '';
+    if (!away.length) return;
+    tray.appendChild(button('bring back', 'put them back on the desk', function () {
+      away = []; save(); paint();
+    }));
+    tray.appendChild(button('forget', 'dismiss these for good — the tray stops offering them',
+      function () {
+        away.forEach(function (id) { if (gone.indexOf(id) < 0) gone.push(id); });
+        away = []; save(); paint();
+      }));
+  }
+
+  CARDS.forEach(function (id) {
+    var el = card(id);
+    if (!el) return;
+    el.appendChild(button('×', 'put this away', function () {
+      if (away.indexOf(id) < 0) away.push(id);
+      save(); paint();
+    }));
+    el.lastChild.className = 'x';
+  });
+
+  fetch('/desk-config', { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      away = Array.isArray(d.hidden) ? d.hidden : [];
+      gone = Array.isArray(d.gone)   ? d.gone   : [];
+      away = away.filter(function (id) { return gone.indexOf(id) < 0; });
+      paint();
+    })
+    .catch(function () {});
+});
+
+/**
+ * Draw a Sankey diagram into `#sankey` from the invented flows below.
+ *
+ * Hand-rolled because the panel's CSP forbids loading a charting library, and because a
+ * ribbon really is just two cubic beziers sharing a fill. Node heights and ribbon
+ * thicknesses share one scale factor, so the picture stays honest about its own numbers
+ * even though the numbers themselves are fiction.
+ *
+ * Columns must each sum to the same total, or the ribbons will not meet their nodes.
+ */
+
+/* cardkit's runtime, ahead of every card because every card may use it. */
+<!--KIT-JS-->
+
+<!--CARD-JS-->
+
+/* The inbox — questions I have put to John, answered in place.
+   Polled rather than pushed on the edition bump: a reload would discard whatever is
+   half-typed in the workbench editor, and a new question is not worth that. */
+(function () {
+  /* Looked up per call rather than captured once: a hot-swap replaces these nodes, and a
+     captured reference would keep painting a detached element forever — the classic way
+     a live-updating panel goes quietly dead. */
+  var list  = function () { return document.getElementById('inboxlist'); },
+      none  = function () { return document.getElementById('inboxnone'); },
+      head  = function () { return document.getElementById('inboxn'); },
+      shown = null;
+
+  function send(body) {
+    fetch('/questions', { method: 'POST', headers: { 'content-type': 'application/json' },
+                          body: JSON.stringify(body) })
+      .then(load).catch(function () {});
+  }
+  function answer(id, text) { send({ id: id, answer: text }); }
+  function dismiss(id)      { send({ id: id, dismiss: true }); }
+  function act(id, what)    { send({ id: id, action: what }); }
+
+  /* The two verbs no emoji could say, drawn instead. `m` marks the moving part — the arrow,
+     the thing being placed — which takes the saturated hue while the structure it acts on
+     stays slate. Chosen from a hundred candidates on the icon lab card; L03 and Q02. */
+  var TRAY   = '<path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/>' +
+               '<path class="m" d="M12 3v9"/><path class="m" d="M8.5 9L12 12.5 15.5 9"/>';
+  var ICONS = {
+    land:  TRAY,
+    queue: '<path d="M4 3h16"/><path d="M4 7h16"/><path d="M4 11h16"/>' +
+           '<path class="m" d="M12 21v-6"/><path class="m" d="M9.5 17.5L12 15l2.5 2.5"/>',
+  };
+
+  /**
+   * One drawn glyph as inline SVG markup.
+   *
+   * `stroke-linecap: round` because at 13px a mitre is a pixel of noise, and the stroke is
+   * deliberately allowed to scale with the box: pinning it would make the small render a
+   * bolder drawing rather than a smaller one.
+   */
+  function icon(name, cls) {
+    return '<svg class="dicon ' + cls + '" viewBox="0 0 24 24" fill="none" ' +
+           'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+           'stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+
+  /**
+   * Build one row-action button from a `[glyph, title, verb]` spec.
+   *
+   * A spec whose glyph is SVG markup gets `innerHTML` and the `dico` class, which is what
+   * exempts it from the emoji cluster's grayscale; a plain emoji still goes in as text, so
+   * nothing untrusted is ever parsed as markup.
+   */
+  function actBtn(spec, id) {
+    var b = document.createElement('button');
+    b.className = 'act'; b.title = spec[1];
+    if (spec[0].charAt(0) === '<') { b.classList.add('dico'); b.innerHTML = spec[0]; }
+    else { b.textContent = spec[0]; }
+    b.onclick = function () { act(id, spec[2]); };
+    return b;
+  }
+
+  /* Three buttons per row, and at this size a word label would cost more width than the
+     whole rest of the line. Shared by tasks and tickets, which want the same verbs and
+     would otherwise drift apart the first time one of them changed. */
+  function actions(li, q) {
+    /* Drawn, not found. Every emoji candidate for this verb leaked a social meaning it did
+       not have a way to shed — the bell says urgent, the pin says permanent, the flag says
+       wrong — because Unicode has no pictographs for list surgery: nobody encoded "move to
+       front" or "insert here", as those are operations on a data structure and there is
+       nothing to mime. So it is a glyph of our own, in the desk's own tokens. */
+    [[icon('queue', 'queue'), 'add this to the queue', 'next'],
+     ['🤖', 'dispatch to agents', 'agents'],
+     ['🗑️', 'remove from the inbox', 'drop']
+    ].forEach(function (spec) { li.appendChild(actBtn(spec, q.id)); });
+  }
+
+  function paint(open) {
+    var el = list(), tickEl = document.getElementById('ticketlist'),
+        wrap = document.getElementById('ticketwrap');
+    if (!el || !tickEl) return;
+    el.innerHTML = '';
+    tickEl.innerHTML = '';
+    if (wrap) wrap.hidden = !open.some(function (q) { return q.kind === 'ticket'; });
+
+    /* Three tiers. Stuck first — things already decided that then quietly failed to
+       happen, which must not queue politely behind anything. Then tasks, which are work
+       waiting for a disposition. Then questions, which only need a word. */
+    var kind    = function (k) { return function (q) { return !q.stuck && q.kind === k; }; },
+        stuck   = open.filter(function (q) { return q.stuck; }),
+        tasks   = open.filter(kind('task')),
+        tickets = open.filter(kind('ticket')),
+        asks    = open.filter(function (q) {
+                    return !q.stuck && q.kind !== 'task' && q.kind !== 'ticket'; }),
+        ordered = stuck.concat(tasks, asks, tickets);
+
+    ordered.forEach(function (q) {
+      var li   = document.createElement('li'),
+          opts = Array.isArray(q.options) ? q.options : [];
+      if (q.stuck) li.className = 'stuck';
+
+      /* Tickets ride the same three actions as tasks but stay inline: twenty of them on
+         their own lines would bury the rows that are actually waiting on you. */
+      if (q.kind === 'ticket') {
+        li.className = 'tick' + (q.queued ? ' queued ' + q.queued : '');
+
+        /* The issue number gets its own node so it can carry its own colour. It is an
+           identifier rather than part of the sentence, and tinting it lets the eye skip
+           past it when reading the list and land on it when hunting for one. */
+        var m = /^(#\d+)\s+([\s\S]+)$/.exec(q.text);
+        if (m) {
+          /* A real anchor, so it hovers, copies and middle-clicks like a link — but the
+             click is intercepted. Following it normally would navigate the desk itself
+             away whenever the page is being viewed inside an embedded browser. The server
+             hands the URL to the OS instead, which opens the browser John actually uses. */
+          var num = document.createElement('a');
+          num.className = 'num';
+          num.textContent = m[1];
+          num.href = 'https://github.com/' + DESK.repo + '/issues/' + m[1].slice(1);
+          num.title = 'open on github';
+          num.onclick = function (e) {
+            e.preventDefault();
+            fetch('/open', { method: 'POST', headers: { 'content-type': 'application/json' },
+                             body: JSON.stringify({ url: num.href }) }).catch(function () {});
+          };
+          li.appendChild(num);
+          li.appendChild(document.createTextNode(' ' + m[2]));
+        } else {
+          li.appendChild(document.createTextNode(q.text));
+        }
+        actions(li, q);
+        tickEl.appendChild(li);
+        return;
+      }
+
+      if (q.kind === 'task') {
+        /* The queue name rides along as a class, so "up next" and "out with agents" can
+           look different: one is a promise, the other is already happening. */
+        li.className = 'task' + (q.queued ? ' queued ' + q.queued : '');
+        li.appendChild(document.createTextNode(q.text));
+        if (q.queued) {
+          var tag = document.createElement('span');
+          tag.className = 'qd';
+          tag.textContent = q.queued === 'agents' ? 'to agents' : 'up next';
+          li.appendChild(tag);
+        }
+        actions(li, q);
+        el.appendChild(li);
+        return;
+      }
+
+      li.appendChild(document.createTextNode(q.text));   // text node, never innerHTML
+
+      /* Buttons only for a genuinely short answer set. Past three they stop being a
+         glance, and a question with that many answers belongs in conversation. */
+      if (opts.length && opts.length <= 3) {
+        opts.forEach(function (opt) {
+          var b = document.createElement('button');
+          b.textContent = opt;
+          b.onclick = function () { answer(q.id, opt); };
+          li.appendChild(b);
+        });
+      }
+
+      /* Every row can be retired without answering it. A question whose premise went
+         stale is not a question John owes an answer to, and leaving it there teaches
+         him to stop reading the list. */
+      var kill = document.createElement('button');
+      kill.className = 'kill'; kill.textContent = '×'; kill.title = 'stale — retire it';
+      kill.onclick = function () { dismiss(q.id); };
+      li.appendChild(kill);
+
+      el.appendChild(li);
+    });
+    /* Tickets are suggestions, not obligations, so they are excluded from the count —
+       "20 waiting on you" would be a lie told by my own to-do list. */
+    var owed = stuck.length + tasks.length + asks.length;
+    none().hidden = owed > 0;
+    head().textContent = !owed ? 'clear'
+                     : stuck.length ? owed + ' waiting on you, ' + stuck.length + ' stuck'
+                     :                owed + ' waiting on you';
+  }
+
+  var lastOpen = null;
+
+  function load() {
+    return fetch('/questions', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var open = (d.questions || []).filter(function (q) { return !q.answer; }),
+            key  = JSON.stringify(open);
+        lastOpen = open;
+        if (key !== shown) { shown = key; paint(open); }   // repaint only on real change
+      })
+      .catch(function () {});
+  }
+
+  /* Repaint the moment `<main>` is swapped, and force the next poll to repaint too.
+     `shown` is a change-detector over the DATA, but a hot-swap replaces the DOM underneath
+     it — so the cached key still matched, the poll decided nothing had changed, and the
+     inbox stayed blank until a question happened to change. It looked like the disappearing
+     act was the write race fixed earlier; it was not. This is why it kept happening
+     during work: every edit swaps the subtree, and I edit constantly. */
+  DESK.inits.push(function () {
+    shown = null;
+    if (lastOpen) paint(lastOpen);   // instant, from cache — no waiting on the 3s tick
+    load();                          // then reconcile with the server
+  });
+
+  /* Pull requests, in two lists split by GitHub authorship. An agent that pushes under
+     John's token IS John here — the account is the author, not whose hands moved. */
+  var lastPRs = null;
+
+  function prRow(pr) {
+    var li = document.createElement('li');
+    /* `ai` tints the text; it never changes which list the row is in. Ownership and
+       authorship are different questions and the layout should not blur them. */
+    li.className = 'tick' + (pr.draft ? ' agents' : '') + (pr.ai ? ' byai' : '');
+
+    var num = document.createElement('a');
+    num.className = 'num';
+    num.textContent = '#' + pr.number;
+    num.href = 'https://github.com/' + DESK.repo + '/pull/' + pr.number;
+    num.title = 'open on github';
+    num.onclick = function (e) {
+      e.preventDefault();
+      fetch('/open', { method: 'POST', headers: { 'content-type': 'application/json' },
+                       body: JSON.stringify({ url: num.href }) }).catch(function () {});
+    };
+    li.appendChild(num);
+    li.appendChild(document.createTextNode(' ' + pr.title));
+
+    if (pr.draft || pr.review || pr.intent) {
+      var tag = document.createElement('span');
+      tag.className = 'qd';
+      tag.textContent = pr.intent === 'land'  ? 'land requested'
+                      : pr.intent === 'agent' ? 'to agents'
+                      : pr.draft ? 'draft'
+                      : pr.review === 'APPROVED' ? 'approved'
+                      : pr.review === 'CHANGES_REQUESTED' ? 'changes requested'
+                      : String(pr.review).toLowerCase();
+      li.appendChild(tag);
+    }
+
+    /* These RECORD an intention; none of them acts on GitHub. Landing a PR merges into
+       main, and main is protected — that needs asking every time, not a button that does it
+       quietly. So the button says "I want this landed", the desk writes that to the audit
+       log, and the merge stays a thing a person authorises out loud.
+
+       One drawing, two hues: green where the PR is yours and teal where it is someone
+       else's. The verb is identical, so the shape is identical; what differs is whose work
+       is being placed, and the section it sits in already says that — the colour just makes
+       it legible without reading the heading. Keyed in CSS off the list, not built in here,
+       so a row cannot end up tinted for a section it is not in. */
+    [[icon('land', 'land'), 'land this — records the request; the merge still needs asking', 'land'],
+     ['🤖', 'hand this to agents', 'agent'],
+     ['🗑️', 'remove from this list', 'drop']
+    ].forEach(function (spec) {
+      var b = document.createElement('button');
+      b.className = 'act'; b.title = spec[1];
+      if (spec[0].charAt(0) === '<') { b.classList.add('dico'); b.innerHTML = spec[0]; }
+      else { b.textContent = spec[0]; }
+      b.onclick = function () {
+        fetch('/pr', { method: 'POST', headers: { 'content-type': 'application/json' },
+                       body: JSON.stringify({ number: pr.number, action: spec[2] }) })
+          .then(loadPRs).catch(function () {});
+      };
+      li.appendChild(b);
+    });
+    return li;
+  }
+
+  function paintPRs(d) {
+    [['prmine', 'prminewrap', d.mine], ['prtheir', 'prtheirwrap', d.theirs]]
+      .forEach(function (spec) {
+        var el = document.getElementById(spec[0]), wrap = document.getElementById(spec[1]);
+        if (!el || !wrap) return;
+        el.innerHTML = '';
+        (spec[2] || []).forEach(function (pr) { el.appendChild(prRow(pr)); });
+        wrap.hidden = !(spec[2] || []).length;
+      });
+  }
+
+  function loadPRs() {
+    return fetch('/prs', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { lastPRs = d; paintPRs(d); })
+      .catch(function () {});
+  }
+
+  DESK.inits.push(function () { if (lastPRs) paintPRs(lastPRs); loadPRs(); });
+
+  load();
+  loadPRs();
+  clearInterval(window.__inboxPoll);          // idempotent: one poll, however often this runs
+  window.__inboxPoll = setInterval(load, 3000);
+  /* Far slower than the inbox: this one costs a network round trip through gh, and open
+     PRs do not change on a three-second cadence. */
+  clearInterval(window.__prPoll);
+  window.__prPoll = setInterval(loadPRs, 60000);
+})();
+
+// First paint. After this, `deskSwap` re-runs the same list against the swapped subtree.
+DESK.inits.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
+</script>
+
+<!-- jssm's viz bundle resolves graphviz with a bare dynamic `import("@viz-js/viz")`, which
+     a browser cannot resolve alone, so the server substitutes a map here. It must be inline
+     and must precede every module it governs, which is why it is not fetched. -->
+<!--IMPORTMAP-->
+<!-- John's own web components, served from our origin so script-src stays 'self'. viz and
+     instance ship self-contained cdn bundles; the editor and widgets do not (fsl#1991), so
+     they load through the generated import map instead. -->
+<script type="module" src="/jssm/cdn/instance.js"></script>
+<script type="module" src="/jssm/cdn/viz.js"></script>
+<script type="module">
+  import 'jssm/wc/editor/define';
+  import 'jssm/wc/widgets/define';   // toolbar, actions, footer, history, simulation, …
+</script>
+
+<script type="module">
+
+const esc = t => String(t ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/* The desk's name belongs to its owner. Stored server-side so it survives a reload,
+   and editable from the desk itself — clicking the name is the whole interface.
+   In the real plugin this becomes a `desk.name` entry in #30's config registry. */
+async function loadName() {
+  try {
+    const d = await (await fetch('/desk-config', { cache: 'no-store' })).json();
+    document.getElementById('dname').textContent = d.name || 'your desk';
+    document.title = d.name || 'your desk';
+  } catch { /* keep whatever is on screen */ }
+}
+
+document.getElementById('dname').onclick = function rename() {
+  const el = this, was = el.textContent;
+  const input = document.createElement('input');
+  input.type = 'text'; input.value = was; input.maxLength = 60;
+  input.style.cssText = 'font:inherit;letter-spacing:inherit;text-transform:inherit;' +
+    'background:var(--well);color:var(--accent);border:1px solid var(--accent);' +
+    'padding:1px 5px;width:14ch';
+  el.replaceWith(input); input.focus(); input.select();
+
+  const done = async keep => {
+    const name = keep ? input.value.trim().slice(0, 60) || was : was;
+    el.textContent = name;
+    input.replaceWith(el);
+    document.title = name;
+    if (keep && name !== was) {
+      await fetch('/desk-config', { method: 'POST', headers: { 'content-type': 'application/json' },
+                                    body: JSON.stringify({ name }) }).catch(() => {});
+    }
+  };
+  input.onkeydown = e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+  input.onblur    = () => done(true);
+};
+
+loadName();
+
+/* Geometry: the frame is yours to resize, so the desk measures itself and says so. */
+let geomTimer = null, lastGeom = '';
+function reportGeometry() {
+  const g = { w: Math.round(document.documentElement.clientWidth),
+              h: Math.round(document.documentElement.clientHeight),
+              paneW: Math.round(document.querySelector('main')?.clientWidth  ?? 0),
+              paneH: Math.round(document.querySelector('main')?.clientHeight ?? 0),
+              dpr: Number((window.devicePixelRatio || 1).toFixed(2)), surface: 'desk' };
+  document.getElementById('geom').textContent = `${g.w}×${g.h}`;
+  const key = JSON.stringify(g);
+  if (key === lastGeom) return;
+  lastGeom = key;
+  clearTimeout(geomTimer);
+  geomTimer = setTimeout(() => {
+    fetch('/geometry', { method:'POST', headers:{'content-type':'application/json'}, body:key }).catch(()=>{});
+  }, 250);
+}
+new ResizeObserver(reportGeometry).observe(document.documentElement);
+reportGeometry();
+
+/* Asking. Everything typed here reaches the assistant's inbox with its surface marked. */
+const history = [];
+async function send() {
+  const el = document.getElementById('say'), text = el.value.trim();
+  if (!text) return;
+  el.value = '';
+  try {
+    const r = await fetch('/input', { method:'POST', headers:{'content-type':'application/json'},
+                                      body: JSON.stringify({ kind:'ask', surface:'desk', value:text }) });
+    const d = await r.json();
+    document.getElementById('ack').textContent = `sent — #${d.n}. it is in my inbox.`;
+    history.unshift({ t: new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}), text });
+    document.getElementById('sent').innerHTML =
+      history.slice(0, 8).map(h => `<div><span>${esc(h.t)}</span> ${esc(h.text)}</div>`).join('');
+  } catch (e) {
+    document.getElementById('ack').textContent = 'failed: ' + e.message;
+  }
+}
+document.getElementById('send').onclick = send;
+document.getElementById('say').onkeydown = e => { if (e.key === 'Enter') send(); };
+
+
+</script></body></html>

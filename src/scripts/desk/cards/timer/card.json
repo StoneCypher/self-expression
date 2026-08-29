@@ -1,0 +1,14 @@
+{
+  "ord": 42,
+  "type": "timer",
+  "id": "timer",
+  "title": "a working session",
+  "mode": "pomodoro",
+  "label": "card review",
+  "settings": {
+    "work": 25,
+    "rest": 5,
+    "rounds": 4,
+    "chime": false
+  }
+}

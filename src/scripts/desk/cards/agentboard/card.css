@@ -1,0 +1,109 @@
+
+  .ck-agentboard { position: relative; }
+
+  /* A checkbox inherits the panel's full-width input rule and comes out as a stretched box;
+     it wants to be its own size, at the start of its column. */
+  .ck-agentboard .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+
+  /* The list scrolls inside itself rather than growing the card without limit: two hundred
+     agents is a real number and a card is not a page. */
+  .ck-agentboard .ck-ab-list { margin-top: 8px; max-height: 60vh; overflow-y: auto; }
+
+  /* ── headings ───────────────────────────────────────────────────────────────────────── */
+
+  .ck-agentboard .ck-ab-head {
+    display: flex; align-items: baseline; gap: 8px; margin: 13px 0 4px;
+  }
+  .ck-agentboard .ck-ab-head:first-child { margin-top: 2px; }
+  .ck-agentboard .ck-ab-head[hidden] { display: none; }
+  .ck-agentboard .ck-ab-head b {
+    font: 400 10px/1 var(--mono); color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+
+  /* ── rows ───────────────────────────────────────────────────────────────────────────── */
+
+  /* The left rule is the load-bearing part of the state treatment: it survives greyscale, it
+     survives a colour-blind reader, and it is visible from across the desk in a way a tinted
+     word is not. Every row reserves it so that turning it on does not shift the text. */
+  .ck-agentboard .ck-ab-row {
+    display: flex; align-items: baseline; gap: 9px;
+    padding: 6px 4px 6px 7px;
+    border-bottom: 1px solid var(--hairline);
+    border-left: 2px solid transparent;
+  }
+  .ck-agentboard .ck-ab-row[hidden] { display: none; }
+  .ck-agentboard .ck-ab-row:hover { background: var(--pill); }
+  .ck-agentboard.ck-ab-dense .ck-ab-row { padding: 2px 4px 2px 7px; gap: 7px; }
+  .ck-agentboard.ck-ab-dense .ck-ab-note { display: none; }
+
+  .ck-agentboard .ck-ab-pill {
+    flex: none; display: inline-flex; align-items: center; gap: 5px; min-width: 72px;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .ck-agentboard .ck-ab-pill svg { width: 12px; height: 12px; flex: none; display: block; }
+  .ck-agentboard .ck-ab-pill b { font-weight: 400; }
+
+  .ck-agentboard .ck-ab-body { flex: 1 1 auto; min-width: 0; }
+
+  /* Ellipsis rather than wrap on the two long fields, so a forty-word dispatch cannot set the
+     width of the card or of the desk column it sits in. The whole string stays in a title. */
+  .ck-agentboard .ck-ab-name {
+    display: block; font-size: 12.5px; line-height: 1.4; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ck-agentboard .ck-ab-task {
+    display: block; font-size: 11.5px; line-height: 1.4; color: var(--ink-dim);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ck-agentboard .ck-ab-note {
+    display: block; font-size: 11px; line-height: 1.4; color: var(--ink-faint); margin-top: 1px;
+  }
+
+  /* Tabular figures so the column of durations holds its places while they tick. */
+  .ck-agentboard .ck-ab-dur {
+    flex: none; min-width: 58px; text-align: right;
+    font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums;
+    color: var(--ink-dim);
+  }
+  /* A duration this card could not compute is marked as well as worded, and the title says
+     which of the several reasons it was. */
+  .ck-agentboard .ck-ab-odd { border-bottom: 1px dotted var(--ck-s2); color: var(--ink-faint); }
+
+  /* ── the quiet weight difference ────────────────────────────────────────────────────── */
+
+  /* Running is the only group whose numbers are still moving, so it gets full ink, a heavier
+     name and a lit rule. Done recedes without disappearing. Failed keeps full weight because
+     it is the row most likely to need a decision. */
+  .ck-agentboard .ck-ab-s-running { border-left-color: var(--accent); }
+  .ck-agentboard .ck-ab-s-running .ck-ab-pill { color: var(--accent); }
+  .ck-agentboard .ck-ab-s-running .ck-ab-name { font-weight: 600; }
+  .ck-agentboard .ck-ab-s-running .ck-ab-dur { color: var(--ink); }
+
+  .ck-agentboard .ck-ab-s-queued .ck-ab-name { color: var(--ink-dim); }
+
+  .ck-agentboard .ck-ab-s-done { opacity: .62; }
+  .ck-agentboard .ck-ab-s-done .ck-ab-pill { color: var(--good); }
+  .ck-agentboard .ck-ab-s-done:hover { opacity: .9; }
+
+  .ck-agentboard .ck-ab-s-failed { border-left-color: var(--ck-s1); background: var(--well); }
+  .ck-agentboard .ck-ab-s-failed .ck-ab-pill { color: var(--ck-s1); font-weight: 700; }
+
+  .ck-agentboard .ck-ab-s-other .ck-ab-pill { color: var(--ck-s2); }
+
+  /* ── the two empties ────────────────────────────────────────────────────────────────── */
+
+  .ck-agentboard .ck-ab-void, .ck-agentboard .ck-ab-none {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    padding: 14px 4px; text-align: center;
+  }
+  .ck-agentboard .ck-ab-void[hidden], .ck-agentboard .ck-ab-none[hidden] { display: none; }
+
+  /* ── the caption ────────────────────────────────────────────────────────────────────── */
+
+  /* The provenance clause is the most important sentence on the card, so it is the one piece
+     of caption that is not faint. It goes quiet, not loud, when the board is not live: a
+     stale board should not shout, it should stop looking current. */
+  .ck-agentboard .ck-ab-state { font-style: normal; color: var(--accent); }
+  .ck-agentboard.ck-ab-stale .ck-ab-state { color: var(--ck-s2); }
+  .ck-agentboard .ck-ab-count { color: var(--ink-faint); }

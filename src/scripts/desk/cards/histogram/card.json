@@ -1,0 +1,12 @@
+{
+  "ord": 51,
+  "type": "histogram",
+  "groups": 2,
+  "values": 41,
+  "refused": 0,
+  "settings": {
+    "bins": 0,
+    "rule": "fd",
+    "cumulative": false
+  }
+}

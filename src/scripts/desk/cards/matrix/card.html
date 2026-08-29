@@ -1,0 +1,27 @@
+<section data-card="matrix" class="ck-matrix">
+  <h2>which card type calls which kit helper</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="matrix-seriate">seriate</label>
+    <select id="matrix-seriate" name="seriate">
+      <option value="both">both</option>
+      <option value="rows">rows</option>
+      <option value="cols">cols</option>
+      <option value="none">none</option>
+    </select>
+    <label for="matrix-labels">labels</label>
+    <select id="matrix-labels" name="labels">
+      <option value="both">both</option>
+      <option value="rows">rows</option>
+      <option value="none">none</option>
+    </select>
+    <label for="matrix-cell">cell (px)</label>
+    <input type="number" id="matrix-cell" name="cell" min="9" max="28" step="1">
+    <div class="ck-set-foot">cells never shrink below 9px; a matrix too wide for the column scrolls instead.</div>
+  </div>
+  <div class="ck-scroll ck-mx-scroll">
+    <svg class="ck-mx" role="img" viewBox="0 0 100 100" aria-label="Incidence matrix, 41 rows by 12 columns, 211 of 492 cells filled (43%), binary. Both axes seriated. 3 sweeps, converged; 5 swaps and 4 relocations. adjacency cost 383 to 141, down 63%. the 7 row groups came out in 26 runs."></svg>
+  </div>
+  <div class="ck-cap"><b>211</b> of 492 cells filled (43%) across 41 rows and 12 columns. <i class="ck-mx-note">both axes seriated: 3 sweeps, converged; 5 swaps and 4 relocations. adjacency cost 383 to 141, down 63%. the 7 row groups came out in 26 runs.</i></div>
+  <div class="ck-legend"><span><i class="sw-cell"></i>cell present</span><span><i class="sw-wash"></i>flagged column</span><span><i data-s="1"></i>structure</span><span><i data-s="2"></i>work</span><span><i data-s="3"></i>text</span><span><i data-s="4"></i>time</span><span><i data-s="5"></i>quantities</span><span><i data-s="6"></i>pictures</span><span><i data-s="7"></i>live</span></div>
+</section>

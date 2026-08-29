@@ -1,0 +1,28 @@
+.ck-heatmap[data-card="heatmap"] { position: relative; }
+.ck-heatmap[data-card="heatmap"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 8px; }
+.ck-heatmap[data-card="heatmap"] .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-heatmap[data-card="heatmap"] .ck-plot .ck-d { stroke: none; }
+.ck-heatmap[data-card="heatmap"] .ck-plot .ck-l0 { fill: var(--well); stroke: var(--hairline); stroke-width: 1; }
+.ck-heatmap[data-card="heatmap"] .ck-lg { display: none; align-items: center; gap: 4px; }
+.ck-heatmap[data-card="heatmap"] .ck-lg i { width: 9px; height: 9px; display: block; border-radius: 2px; }
+.ck-heatmap[data-card="heatmap"] .ck-lg .ck-l0s { background: var(--well); box-shadow: inset 0 0 0 1px var(--hairline); }
+.ck-heatmap[data-card="heatmap"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-heatmap[data-card="heatmap"][data-levels="3"] .ck-lg[data-n="3"] { display: inline-flex; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="3"] i[data-l="1"] { background: var(--ck-s5); opacity: 0.22; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="3"] i[data-l="2"] { background: var(--ck-s5); opacity: 0.61; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="3"] i[data-l="3"] { background: var(--ck-s5); opacity: 1; }
+.ck-heatmap[data-card="heatmap"][data-levels="5"] .ck-lg[data-n="5"] { display: inline-flex; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="5"] i[data-l="1"] { background: var(--ck-s5); opacity: 0.22; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="5"] i[data-l="2"] { background: var(--ck-s5); opacity: 0.415; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="5"] i[data-l="3"] { background: var(--ck-s5); opacity: 0.61; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="5"] i[data-l="4"] { background: var(--ck-s5); opacity: 0.805; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="5"] i[data-l="5"] { background: var(--ck-s5); opacity: 1; }
+.ck-heatmap[data-card="heatmap"][data-levels="7"] .ck-lg[data-n="7"] { display: inline-flex; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="1"] { background: var(--ck-s5); opacity: 0.22; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="2"] { background: var(--ck-s5); opacity: 0.35; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="3"] { background: var(--ck-s5); opacity: 0.48; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="4"] { background: var(--ck-s5); opacity: 0.61; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="5"] { background: var(--ck-s5); opacity: 0.74; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="6"] { background: var(--ck-s5); opacity: 0.87; }
+.ck-heatmap[data-card="heatmap"] .ck-lg[data-n="7"] i[data-l="7"] { background: var(--ck-s5); opacity: 1; }
+.ck-heatmap[data-card="heatmap"] .ck-scroll svg.ck-plot { min-width: 717px; }

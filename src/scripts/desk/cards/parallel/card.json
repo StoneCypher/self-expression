@@ -1,0 +1,47 @@
+{
+  "ord": 54,
+  "type": "parallel",
+  "axes": 4,
+  "rows": 41,
+  "constantAxes": [],
+  "invertedAxes": [],
+  "duplicateRows": 0,
+  "refused": {
+    "rows": 0,
+    "axesWithoutKey": 0,
+    "duplicateAxes": 0,
+    "axesPastLimit": 0
+  },
+  "domains": [
+    {
+      "label": "source lines",
+      "lo": 293,
+      "hi": 1422,
+      "invert": false
+    },
+    {
+      "label": "doc blocks",
+      "lo": 9,
+      "hi": 44,
+      "invert": false
+    },
+    {
+      "label": "kit helpers called",
+      "lo": 0,
+      "hi": 12,
+      "invert": false
+    },
+    {
+      "label": "settings",
+      "lo": 0,
+      "hi": 6,
+      "invert": false
+    }
+  ],
+  "crossings": {
+    "given": 464,
+    "correlation": 435
+  },
+  "crossingsGiven": 464,
+  "keptGivenOrder": true
+}

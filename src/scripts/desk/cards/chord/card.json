@@ -1,0 +1,21 @@
+{
+  "ord": 25,
+  "type": "chord",
+  "entities": 6,
+  "ribbons": 9,
+  "total": 120,
+  "directed": true,
+  "square": true,
+  "selfLoops": 0,
+  "emptyEntities": 0,
+  "refused": {
+    "nonNumeric": 0,
+    "negative": 0
+  },
+  "crossings": {
+    "given": 2,
+    "total": 2,
+    "crossings": 1
+  },
+  "keptGivenOrder": false
+}

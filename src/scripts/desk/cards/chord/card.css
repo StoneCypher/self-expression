@@ -1,0 +1,15 @@
+.ck-chord[data-card="chord"] { position: relative; }
+.ck-chord[data-card="chord"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-chord[data-card="chord"] svg.ck-ch { display: block; width: 100%; height: auto; max-height: 74vh; margin: 0 auto; }
+.ck-chord[data-card="chord"] svg.ck-ch text { font-family: var(--mono); font-size: 9px; fill: var(--ink-dim); }
+.ck-chord[data-card="chord"] .ck-ch .arc { stroke: none; }
+.ck-chord[data-card="chord"] .ck-ch .rib { stroke: none; transition: fill-opacity .12s linear; }
+.ck-chord[data-card="chord"] .ck-ch:hover .rib { fill-opacity: .12; }
+.ck-chord[data-card="chord"] .ck-ch .rib:hover { fill-opacity: .95; }
+.ck-chord[data-card="chord"] .ck-ch .lab { fill: var(--ink-dim); }
+.ck-chord[data-card="chord"] .ck-ch-void { color: var(--ink-faint); font-size: 12px; padding: 12px 0 4px; }
+.ck-chord[data-card="chord"] .ck-set input[type="number"] { width: 6.5em; }
+.ck-chord[data-card="chord"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+@media (prefers-reduced-motion: reduce) {
+.ck-chord[data-card="chord"] .ck-ch .rib { transition: none; }
+}

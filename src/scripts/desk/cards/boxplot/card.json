@@ -1,0 +1,12 @@
+{
+  "ord": 52,
+  "type": "boxplot",
+  "groups": 7,
+  "values": 41,
+  "refused": 0,
+  "settings": {
+    "notch": false,
+    "points": "outliers",
+    "orient": "vertical"
+  }
+}

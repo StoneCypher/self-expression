@@ -1,0 +1,19 @@
+<section data-card="formula" class="ck-formula ck-fx-p-subtle">
+  <h2>four things the catalogue computes</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="formula-palette">palette</label>
+    <select id="formula-palette" name="palette"><option value="none">none</option><option value="subtle" selected>subtle</option><option value="vivid">vivid</option></select>
+    <label for="formula-display">display mode</label>
+    <input type="checkbox" id="formula-display" name="display">
+    <label for="formula-numbered">equation numbers</label>
+    <input type="checkbox" id="formula-numbered" name="numbered">
+    <div class="ck-set-foot">colour follows the tex grammar, not the characters: relations, operators and delimiters are separate roles.</div>
+  </div>
+  <div class="ck-fx-status" hidden></div>
+  <div class="ck-fx-block" data-display="" data-tex="s(v) \;=\; r_0 + \frac{v - d_0}{d_1 - d_0}\,(r_1 - r_0),\qquad d_1 = d_0 \;\Rightarrow\; s(v) = \tfrac{r_0 + r_1}{2}"><div class="ck-fx-render ck-scroll"><code class="ck-fx-src">s(v) \;=\; r_0 + \frac{v - d_0}{d_1 - d_0}\,(r_1 - r_0),\qquad d_1 = d_0 \;\Rightarrow\; s(v) = \tfrac{r_0 + r_1}{2}</code></div><div class="ck-fx-num-tag"></div><div class="ck-fx-err" hidden></div><div class="ck-fx-cap">CK.scale — a zero-width domain maps to the midpoint rather than dividing by zero.</div></div>
+  <div class="ck-fx-block" data-display="" data-tex="\Delta = \frac{\max - \min}{n},\qquad m = 10^{\lfloor \log_{10}\Delta \rfloor},\qquad \mathrm{step} = m \cdot \begin{cases}10 &amp; \Delta/m \ge 5\\ 5 &amp; \Delta/m \ge 2\\ 2 &amp; \Delta/m \ge 1\\ 1 &amp; \text{otherwise}\end{cases}"><div class="ck-fx-render ck-scroll"><code class="ck-fx-src">\Delta = \frac{\max - \min}{n},\qquad m = 10^{\lfloor \log_{10}\Delta \rfloor},\qquad \mathrm{step} = m \cdot \begin{cases}10 &amp; \Delta/m \ge 5\\ 5 &amp; \Delta/m \ge 2\\ 2 &amp; \Delta/m \ge 1\\ 1 &amp; \text{otherwise}\end{cases}</code></div><div class="ck-fx-num-tag"></div><div class="ck-fx-err" hidden></div><div class="ck-fx-cap">CK.ticks — a nice step is 1, 2 or 5 times a power of ten, never a raw division.</div></div>
+  <div class="ck-fx-block" data-display="" data-tex="b(r) \;=\; \frac{\sum_{c} w_{rc}\,\pi(c)}{\sum_{c} w_{rc}}"><div class="ck-fx-render ck-scroll"><code class="ck-fx-src">b(r) \;=\; \frac{\sum_{c} w_{rc}\,\pi(c)}{\sum_{c} w_{rc}}</code></div><div class="ck-fx-num-tag"></div><div class="ck-fx-err" hidden></div><div class="ck-fx-cap">The barycentre the matrix card sweeps with: a row moves to the mean position of the columns it touches, then the columns move to the mean of the new rows.</div></div>
+  <div class="ck-fx-block" data-display="" data-tex="C(\pi) \;=\; \sum_{i=1}^{n-1} \bigl\lVert p_{\pi(i)} - p_{\pi(i+1)} \bigr\rVert_{1}"><div class="ck-fx-render ck-scroll"><code class="ck-fx-src">C(\pi) \;=\; \sum_{i=1}^{n-1} \bigl\lVert p_{\pi(i)} - p_{\pi(i+1)} \bigr\rVert_{1}</code></div><div class="ck-fx-num-tag"></div><div class="ck-fx-err" hidden></div><div class="ck-fx-cap">And the objective it is judged against — bond-energy adjacency cost, which is Hamming distance when the matrix is binary.</div></div>
+  <div class="ck-cap">Every one of these is implemented somewhere in cardkit, and the card exists so the code and the claim can be read side by side. </div>
+</section>

@@ -1,0 +1,28 @@
+.ck-graph[data-card="graph"] { position: relative; }
+.ck-graph[data-card="graph"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-graph[data-card="graph"] .ck-plot .ck-edge { stroke: var(--ink-dim); opacity: .42; fill: none; }
+.ck-graph[data-card="graph"] .ck-plot .ck-arw { fill: var(--ink-dim); opacity: .6; stroke: none; }
+.ck-graph[data-card="graph"] .ck-plot .ck-disc { stroke: var(--ground); stroke-width: 1.5; }
+.ck-graph[data-card="graph"] .ck-plot .ck-lab { fill: var(--ink-dim); }
+.ck-graph[data-card="graph"] .ck-plot .ck-plate { fill: var(--ground); fill-opacity: .8; stroke: none; }
+.ck-graph[data-card="graph"] .ck-plot .ck-node { cursor: default; }
+.ck-graph[data-card="graph"] .ck-plot.hi .ck-edge { opacity: .1; }
+.ck-graph[data-card="graph"] .ck-plot.hi .ck-edge.on { opacity: .95; stroke: var(--accent); }
+.ck-graph[data-card="graph"] .ck-plot.hi .ck-node { opacity: .45; }
+.ck-graph[data-card="graph"] .ck-plot.hi .ck-node.on { opacity: 1; }
+.ck-graph[data-card="graph"] .ck-plot .ck-edge,
+.ck-graph[data-card="graph"] .ck-plot .ck-node { transition: opacity .12s linear; }
+.ck-graph[data-card="graph"] .ck-legend i { border-radius: 50%; }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="1"] { background: var(--ck-s1); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="2"] { background: var(--ck-s2); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="3"] { background: var(--ck-s3); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="4"] { background: var(--ck-s4); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="5"] { background: var(--ck-s5); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="6"] { background: var(--ck-s6); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="7"] { background: var(--ck-s7); }
+.ck-graph[data-card="graph"] .ck-legend i[data-s="8"] { background: var(--ck-s8); }
+.ck-graph[data-card="graph"] .ck-scroll svg.ck-plot { min-width: 732px; }
+@media (prefers-reduced-motion: reduce) {
+.ck-graph[data-card="graph"] .ck-plot .ck-edge,
+.ck-graph[data-card="graph"] .ck-plot .ck-node { transition: none; }
+}

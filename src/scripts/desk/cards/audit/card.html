@@ -1,0 +1,28 @@
+<section data-card="audit" class="ck-audit">
+  <h2>what this desk has been asked to do</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="audit-limit">records</label>
+    <select id="audit-limit" name="limit"><option value="50">50</option><option value="200" selected>200</option><option value="1000">1000</option></select>
+    <label for="audit-family">family</label>
+    <select id="audit-family" name="family" class="ck-au-famsel"><option value="all">all</option></select>
+    <label for="audit-live">follow</label>
+    <input type="checkbox" id="audit-live" name="live">
+    <div class="ck-set-foot">follow re-reads every 15 seconds. the server caps one read at 500 records, so 1000 asks for more than it will give.</div>
+  </div>
+  <div class="ck-au-tools">
+    <input type="search" class="ck-au-find" placeholder="filter action or detail" aria-label="filter the log" autocomplete="off" spellcheck="false" value="">
+  </div>
+  <div class="ck-au-stat">
+    <span class="ck-au-s-count"></span>
+    <span class="ck-au-s-fam"></span>
+    <span class="ck-au-s-ref"></span>
+    <span class="ck-au-s-bad"></span>
+    <span class="ck-au-s-note"></span>
+  </div>
+  <div class="ck-scroll ck-au-scroll">
+    <div class="ck-au-log"></div>
+    <div class="ck-au-none">nothing read yet</div>
+  </div>
+  <div class="ck-cap">the desk’s own append-only log, grouped by action family, newest first inside a family. <b>refusals carry a mark, a rule and a colour</b> because a record showing only what was done cannot show what was stopped. <i class="ck-au-read"></i></div>
+</section>

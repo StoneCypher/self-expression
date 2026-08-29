@@ -1,0 +1,21 @@
+<section data-card="map" class="ck-map">
+  <h2>the largest urban areas</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="map-projection">projection</label>
+    <select id="map-projection" name="projection">
+      <option value="equirectangular">equirectangular</option>
+      <option value="mercator">mercator</option>
+      <option value="orthographic">orthographic</option>
+    </select>
+    <label for="map-graticule">graticule</label>
+    <input type="checkbox" id="map-graticule" name="graticule">
+    <label for="map-labels">labels</label>
+    <input type="checkbox" id="map-labels" name="labels">
+    <div class="ck-set-foot">the centre and the zoom belong to this card&rsquo;s data, not to you: centred on 10 degrees east, 10 degrees north, at 1 times. latitude is used by orthographic only.</div>
+  </div>
+  <div class="ck-map-wrap ck-scroll">
+    <svg class="ck-map-art" role="img" viewBox="-180 -90 360 180" aria-label="World map, equirectangular, centred on 10 degrees east. 21 outlines drawn. 10 marked places: Tokyo, Delhi, Shanghai, São Paulo, Mexico City, Cairo, Dhaka, New York and 2 more. Equirectangular: longitude and latitude straight to x and y, which is honest about position and badly wrong about area away from the equator."></svg>
+  </div>
+  <div class="ck-cap"><b>21</b> shapes and <b>10</b> markers across 330 vertices, from the built-in coarse world outline. <i class="ck-map-note">equirectangular: longitude and latitude straight to x and y, which is honest about position and badly wrong about area away from the equator. 21 outlines drawn, centred on 10 degrees east.</i></div>
+</section>

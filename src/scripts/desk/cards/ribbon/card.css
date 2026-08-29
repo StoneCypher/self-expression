@@ -1,0 +1,17 @@
+.ck-ribbon[data-card="ribbon"] { position: relative; }
+.ck-ribbon[data-card="ribbon"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 2px; }
+.ck-ribbon[data-card="ribbon"] .ck-day { font: 400 11px/1.4 var(--ui); color: var(--ink-dim); margin: 0 0 8px; }
+.ck-ribbon[data-card="ribbon"] .ck-day b { font-weight: 600; color: var(--ink); }
+.ck-ribbon[data-card="ribbon"] .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-ribbon[data-card="ribbon"] .ck-plot .ck-cap-ax { fill: var(--ink-faint); font-size: 9.5px; letter-spacing: .04em; }
+.ck-ribbon[data-card="ribbon"] .ck-plot .ck-b { stroke: none; }
+.ck-ribbon[data-card="ribbon"] .ck-plot .ck-b0 { fill: var(--rule); stroke: none; }
+.ck-ribbon[data-card="ribbon"] .ck-plot .ck-hit { fill: none; stroke: none; pointer-events: all; }
+.ck-ribbon[data-card="ribbon"] .ck-legend i { width: 7px; height: 7px; display: block; border-radius: 1px; }
+.ck-ribbon[data-card="ribbon"][data-legend="off"] .ck-legend { display: none; }
+.ck-ribbon[data-card="ribbon"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-ribbon[data-card="ribbon"] .ck-legend i[data-k="0"] { background: var(--ck-s6); }
+.ck-ribbon[data-card="ribbon"] .ck-legend i[data-k="1"] { background: var(--ck-s4); }
+.ck-ribbon[data-card="ribbon"] .ck-legend i[data-k="2"] { background: var(--ck-s5); }
+.ck-ribbon[data-card="ribbon"] .ck-legend i[data-k="3"] { background: var(--ck-s3); }
+.ck-ribbon[data-card="ribbon"] .ck-legend i[data-k="4"] { background: var(--ck-s1); }

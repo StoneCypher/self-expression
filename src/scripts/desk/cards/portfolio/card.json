@@ -1,0 +1,17 @@
+{
+  "ord": 57,
+  "type": "portfolio",
+  "id": "portfolio",
+  "title": "the book",
+  "settings": {
+    "group": "sector",
+    "showCash": true,
+    "sort": "weight"
+  },
+  "holdings": 8,
+  "totals": {
+    "basis": 392733.2,
+    "value": 454740.05,
+    "gain": 37826.3
+  }
+}

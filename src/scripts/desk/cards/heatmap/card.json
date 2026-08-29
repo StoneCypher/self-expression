@@ -1,0 +1,15 @@
+{
+  "ord": 44,
+  "type": "heatmap",
+  "start": "2025-08-31",
+  "end": "2026-08-29",
+  "days": 364,
+  "total": 1628,
+  "skipped": 0,
+  "settings": {
+    "weekStart": "mon",
+    "levels": 5,
+    "scale": "quantile",
+    "months": true
+  }
+}

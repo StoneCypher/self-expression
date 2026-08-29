@@ -1,0 +1,20 @@
+.ck-sunburst[data-card="sunburst"] { position: relative; }
+.ck-sunburst[data-card="sunburst"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-sunburst[data-card="sunburst"] .ck-plot { max-width: 460px; margin: 0 auto; }
+.ck-sunburst[data-card="sunburst"] .ck-plot text { pointer-events: none; }
+.ck-sunburst[data-card="sunburst"] .ck-sb-seg { fill: none; }
+.ck-sunburst[data-card="sunburst"] .ck-plot .ck-sb-lab { fill: var(--ground); font-weight: 700; }
+.ck-sunburst[data-card="sunburst"] .ck-plot .ck-sb-hole { font-family: var(--disp), var(--ui); font-size: 15px; fill: var(--ink); font-variant-numeric: tabular-nums; }
+.ck-sunburst[data-card="sunburst"] .ck-plot .ck-sb-holename { font-family: var(--disp), var(--ui); font-size: 12px; fill: var(--ink); }
+.ck-sunburst[data-card="sunburst"] .ck-plot .ck-sb-holelab { font-family: var(--ui); font-size: 8px; fill: var(--ink-faint); letter-spacing: .12em; text-transform: uppercase; }
+.ck-sunburst[data-card="sunburst"] .ck-legend i { border-radius: 1px; }
+.ck-sunburst[data-card="sunburst"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-sunburst[data-card="sunburst"] .ck-cap { overflow-wrap: anywhere; }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="1"] { background: var(--ck-s1); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="2"] { background: var(--ck-s2); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="3"] { background: var(--ck-s3); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="4"] { background: var(--ck-s4); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="5"] { background: var(--ck-s5); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="6"] { background: var(--ck-s6); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="7"] { background: var(--ck-s7); }
+.ck-sunburst[data-card="sunburst"] .ck-legend i[data-s="8"] { background: var(--ck-s8); }

@@ -1,0 +1,21 @@
+.ck-candles { position: relative; }
+.ck-candles h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-candles .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-candles .ck-up { stroke: var(--ck-s4); }
+.ck-candles .ck-dn { stroke: var(--ck-s1); }
+.ck-candles .ck-wick { stroke-width: 1; fill: none; }
+.ck-candles .ck-body { stroke-width: 1; }
+.ck-candles .ck-up .ck-body { fill: none; }
+.ck-candles .ck-dn .ck-body { fill: var(--ck-s1); }
+.ck-candles .ck-vol { stroke: none; }
+.ck-candles .ck-vol.ck-up { fill: var(--ck-s4); fill-opacity: .30; }
+.ck-candles .ck-vol.ck-dn { fill: var(--ck-s1); fill-opacity: .62; }
+.ck-candles .ck-ma { fill: none; stroke: var(--ck-s6); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.ck-candles .ck-ma-dot { fill: var(--ck-s6); stroke: none; }
+.ck-candles .ck-legend i { width: 8px; height: 8px; border-radius: 1px; }
+.ck-candles .ck-legend .ck-k-up { background: none; box-shadow: inset 0 0 0 1.5px var(--ck-s4); }
+.ck-candles .ck-legend .ck-k-dn { background: var(--ck-s1); }
+.ck-candles .ck-legend .ck-k-ma i { background: var(--ck-s6); height: 2px; border-radius: 0; }
+.ck-candles[data-ma="off"] .ck-legend .ck-k-ma { display: none; }
+.ck-candles .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-candles .ck-cap { overflow-wrap: anywhere; }

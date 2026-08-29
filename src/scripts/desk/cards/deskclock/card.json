@@ -1,0 +1,12 @@
+{
+  "ord": 20,
+  "type": "clock",
+  "id": "deskclock",
+  "title": "the clock, as a test of the catalogue",
+  "settings": {
+    "tz": "local",
+    "seconds": true,
+    "face": "both",
+    "hour12": false
+  }
+}

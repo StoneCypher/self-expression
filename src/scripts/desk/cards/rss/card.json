@@ -1,0 +1,11 @@
+{
+  "ord": 74,
+  "type": "rss",
+  "id": "rss",
+  "title": "four feeds, merged",
+  "data": {
+    "feeds": "https://hnrss.org/frontpage\nhttps://lobste.rs/rss\nhttps://www.theregister.com/headlines.atom\nhttps://feeds.bbci.co.uk/news/technology/rss.xml",
+    "count": 10,
+    "group": "source"
+  }
+}

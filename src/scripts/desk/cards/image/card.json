@@ -1,0 +1,18 @@
+{
+  "ord": 63,
+  "type": "image",
+  "asked": 3,
+  "laidOut": 3,
+  "shown": 3,
+  "columns": 3,
+  "fit": "contain",
+  "inlineBytes": 0,
+  "refused": {
+    "refused": 0,
+    "noAlt": 0,
+    "remote": 0,
+    "overCap": 0,
+    "noSrc": 0
+  },
+  "overflow": 0
+}

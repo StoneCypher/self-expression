@@ -1,0 +1,13 @@
+{
+  "ord": 31,
+  "type": "code",
+  "id": "code",
+  "title": "kit.js — the timer that survives a swap",
+  "settings": {
+    "lang": "javascript",
+    "numbers": true,
+    "wrap": false
+  },
+  "lines": 27,
+  "marked": 7
+}

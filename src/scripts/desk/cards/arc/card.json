@@ -1,0 +1,28 @@
+{
+  "ord": 23,
+  "type": "arc",
+  "nodes": 12,
+  "edges": 28,
+  "selfLoops": 0,
+  "isolated": 3,
+  "groups": 4,
+  "refused": {
+    "unknownRef": 0,
+    "nonNumeric": 0,
+    "negative": 0,
+    "duplicate": 0
+  },
+  "crossings": {
+    "above/given": 64,
+    "above/group": 60,
+    "above/barycentre": 48,
+    "both/given": 48,
+    "both/group": 40,
+    "both/barycentre": 24
+  },
+  "crossingsGiven": {
+    "above": 64,
+    "both": 48
+  },
+  "keptGivenOrder": false
+}

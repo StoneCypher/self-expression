@@ -1,0 +1,95 @@
+  .ck-logtail { position: relative; }
+
+  /* A checkbox inherits the settings panel's full-width input rule and comes out as a
+     stretched box; it wants to be its own size, at the start of its column. */
+  .ck-logtail .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+
+  /* the tool row */
+
+  .ck-logtail .ck-lt-tools { display: flex; align-items: center; gap: 8px; margin: 10px 0 7px; }
+  .ck-logtail .ck-lt-find {
+    flex: 1 1 auto; min-width: 0;
+    font: inherit; font-family: var(--mono); font-size: 11px;
+    box-sizing: border-box; padding: 5px 8px;
+    background: var(--well); color: var(--ink);
+    border: 1px solid var(--hairline); border-radius: 5px;
+  }
+  .ck-logtail .ck-lt-find:focus { outline: none; border-color: var(--accent); }
+  .ck-logtail .ck-lt-find::placeholder { color: var(--ink-faint); }
+
+  /* Following or paused, said in words. A dot that changes colour says it to some readers
+     and to nobody else. */
+  .ck-logtail .ck-lt-live {
+    flex: none; font-family: var(--mono); font-size: 9.5px;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint);
+  }
+  .ck-logtail.ck-lt-on .ck-lt-live { color: var(--good); }
+
+  /* the window */
+
+  /* Both axes belong to this box and to nothing outside it. A ten-thousand-character line
+     makes a row very wide; the row is inside this scroller, so the card keeps its width and
+     the desk column never moves sideways. */
+  .ck-logtail .ck-lt-view {
+    max-width: 100%; max-height: 46vh; min-height: 96px;
+    overflow: auto; overscroll-behavior: contain;
+    background: var(--well); border: 1px solid var(--hairline); border-radius: 6px;
+    padding: 4px 0;
+  }
+  .ck-logtail .ck-lt-view:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+  /* max-content so one long line sets the scroll width; min-width 100% so a highlighted row
+     still reaches the right edge when every line is short. */
+  .ck-logtail .ck-lt-rows { width: max-content; min-width: 100%; }
+  .ck-logtail.ck-lt-wrap .ck-lt-rows { width: auto; }
+
+  .ck-logtail .ck-lt-row {
+    display: flex; align-items: flex-start;
+    font-family: var(--mono); font-size: 11px; line-height: 1.55;
+    background: var(--well);
+  }
+  /* [hidden] and display:flex tie on specificity and this sheet loads after the browser's,
+     so a filtered-out row would stay visible without ever saying so. */
+  .ck-logtail .ck-lt-row[hidden] { display: none; }
+
+  /* The gutter never joins a copy: select the window, paste the log, and the line numbers and
+     severity markers are not in what you pasted. It also sticks to the left edge, so it stays
+     readable while a very long line is scrolled sideways. */
+  .ck-logtail .ck-lt-g {
+    flex: none; position: sticky; left: 0; z-index: 1;
+    display: flex; align-items: baseline; gap: 4px; padding: 0 8px 0 4px;
+    background: inherit; border-left: 2px solid transparent;
+    user-select: none; -webkit-user-select: none;
+  }
+  .ck-logtail .ck-lt-n {
+    min-width: 4ch; text-align: right;
+    color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+  .ck-logtail .ck-lt-m { min-width: 1ch; text-align: center; font-weight: 700; color: var(--ink-faint); }
+
+  .ck-logtail .ck-lt-x { flex: 1 1 auto; white-space: pre; color: var(--ink); padding-right: 10px; }
+  .ck-logtail.ck-lt-wrap .ck-lt-x { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* Severity is carried three ways and only one of them is colour: the letter in the gutter,
+     the rule down the left edge, and the weight of the line. A reader who cannot tell coral
+     from amber still reads E against W. */
+  .ck-logtail .ck-lt-row.sev-err { background: var(--pill); }
+  .ck-logtail .ck-lt-row.sev-err .ck-lt-g { border-left-color: var(--ck-s1); }
+  .ck-logtail .ck-lt-row.sev-err .ck-lt-m { color: var(--ck-s1); }
+  .ck-logtail .ck-lt-row.sev-err .ck-lt-x { font-weight: 700; }
+  .ck-logtail .ck-lt-row.sev-warn { background: var(--pill); }
+  .ck-logtail .ck-lt-row.sev-warn .ck-lt-g { border-left-color: var(--ck-s2); }
+  .ck-logtail .ck-lt-row.sev-warn .ck-lt-m { color: var(--ck-s2); }
+
+  /* the caption */
+
+  /* pre-line because the server explains a refusal across two lines and the second one is the
+     list of roots, which is the useful half. */
+  .ck-logtail .ck-lt-note {
+    display: block; white-space: pre-line; font-style: normal; color: var(--ink-dim);
+  }
+  .ck-logtail.ck-lt-bad .ck-lt-note { color: var(--ck-s1); }
+  .ck-logtail .ck-lt-path {
+    display: block; font-family: var(--mono); font-size: 10px;
+    overflow-wrap: anywhere; color: var(--ink-faint);
+  }

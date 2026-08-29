@@ -1,0 +1,105 @@
+
+  .ck-snippet { position: relative; }
+
+  /* A checkbox inherits the panel's full-width input rule and comes out as a stretched box;
+     it wants to be its own size, at the start of its column. */
+  .ck-snippet .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+
+  /* ── the status line ────────────────────────────────────────────────────────────────── */
+
+  .ck-snippet .ck-sn-head {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 6px 12px; margin: 10px 0 7px;
+  }
+
+  /* The glyph carries the status as a shape and the word carries it as language; colour is the
+     third signal and never the only one. A reader in greyscale, a reader who is colour-blind
+     and a reader glancing from a metre away all get the same answer. */
+  .ck-snippet .ck-sn-exit {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums;
+    padding: 2px 8px 2px 6px; border-radius: 5px;
+    border: 1px solid var(--pill-edge); background: var(--pill);
+  }
+  .ck-snippet .ck-sn-exit svg { width: 13px; height: 13px; display: block; flex: none; }
+  .ck-snippet .ck-sn-exit b { font-weight: 400; }
+  .ck-snippet .ck-sn-e-ok  { color: var(--good); }
+  .ck-snippet .ck-sn-e-bad { color: var(--ck-s1); border-color: var(--ck-s1); }
+  /* Not recorded is faint and dashed: it must not read as a quiet success, and a dashed edge
+     is the one border that says "incomplete" without needing a colour. */
+  .ck-snippet .ck-sn-e-unknown { color: var(--ink-faint); border-style: dashed; }
+
+  .ck-snippet .ck-sn-meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint); min-width: 0;
+  }
+  .ck-snippet .ck-sn-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch; }
+  .ck-snippet .ck-sn-cwd[hidden] { display: none; }
+
+  /* ── the command ────────────────────────────────────────────────────────────────────── */
+
+  .ck-snippet .ck-sn-cmdbox {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 8px 8px 10px; border-radius: 6px;
+    background: var(--well); border: 1px solid var(--hairline);
+  }
+
+  /* pre-wrap rather than pre: a multi-line command keeps its line breaks, and a long one wraps
+     rather than pushing a scrollbar onto the thing a reader is most likely to want to read. */
+  .ck-snippet .ck-sn-cmd {
+    flex: 1 1 auto; min-width: 0;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.55; color: var(--ink);
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+
+  .ck-snippet .ck-sn-copy {
+    flex: none; display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 7px; border-radius: 4px; cursor: pointer;
+    background: transparent; color: var(--ink-faint);
+    border: 1px solid var(--pill-edge);
+    font-family: var(--mono); font-size: 10px;
+  }
+  .ck-snippet .ck-sn-copy svg { width: 12px; height: 12px; display: block; }
+  .ck-snippet .ck-sn-copy:hover { color: var(--accent); border-color: var(--accent); }
+  .ck-snippet .ck-sn-copy:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+  /* ── the output ─────────────────────────────────────────────────────────────────────── */
+
+  /* The block owns both axes: a wide line scrolls sideways inside it and a long run scrolls
+     down inside it, so neither ever moves the desk column or grows the card without limit. */
+  .ck-snippet .ck-sn-out { margin-top: 8px; max-height: 46vh; overflow-y: auto; }
+
+  .ck-snippet .ck-sn-pre {
+    margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--ink-dim);
+  }
+
+  /* A hanging indent, so a wrapped line lines up under the text rather than under its number. */
+  .ck-snippet .ck-sn-l { display: block; min-height: 1.5em; white-space: pre; }
+  .ck-snippet .ck-sn-l[hidden] { display: none; }
+  .ck-snippet .ck-sn-wrap .ck-sn-l { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .ck-snippet .ck-sn-num .ck-sn-l { padding-left: 4.4em; text-indent: -4.4em; }
+
+  /* The number comes from an attribute rather than a CSS counter on purpose: a counter skips
+     the lines the fold hides, so every line after a fold would be renumbered and the record
+     would claim line 61 was line 51. */
+  .ck-snippet .ck-sn-num .ck-sn-l::before {
+    content: attr(data-n);
+    display: inline-block; width: 3.5em; padding-right: .9em; text-indent: 0;
+    text-align: right; color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+
+  /* The fold announces itself: ruled above and below so it cannot be mistaken for output, and
+     carrying the count of what it hides. */
+  .ck-snippet .ck-sn-cut {
+    display: block; margin: 6px 0; padding: 5px 0;
+    border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule);
+    color: var(--ck-s2); font-size: 10.5px; text-align: center; white-space: normal;
+  }
+  .ck-snippet .ck-sn-cut[hidden] { display: none; }
+
+  .ck-snippet .ck-sn-void {
+    margin-top: 8px; padding: 14px 4px; text-align: center;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+  }
+
+  .ck-snippet .ck-sn-count { font-style: normal; color: var(--ink-faint); }

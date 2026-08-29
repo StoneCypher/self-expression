@@ -1,0 +1,104 @@
+
+  .ck-choice { position: relative; }
+
+  /* The grid, the tile and the kept state all come from kit.css: a contact sheet of glyphs and
+     a contact sheet of colour swatches should not be able to disagree about what a tile is. */
+  .ck-choice .ck-c-sheet { margin: 2px 0 4px; }
+
+  /* Reading size, then working size. The large render is fixed — it is not a thing you tune,
+     it is just "big enough to see" — while the small one is the setting, because the small one
+     is the measurement. */
+  .ck-choice .ck-c-big { font-size: 26px; line-height: 1; display: block; }
+  .ck-choice.ck-c-nolarge .ck-c-big { display: none; }
+
+  .ck-choice .ck-c-row { display: flex; align-items: center; gap: 3px; line-height: 1; font-size: 13px; }
+  .ck-choice .ck-c-sm { display: block; }
+  .ck-choice .ck-c-ctx { display: inline-flex; align-items: center; gap: 3px; }
+
+  /* Sized in em so the rules above are the only place a number appears. vector-effect is
+     deliberately not set: strokes should thin with the drawing, or the small render becomes a
+     bolder picture rather than a smaller one — which would make the whole card lie. */
+  .ck-choice .ck-c-big svg, .ck-choice .ck-c-big img,
+  .ck-choice .ck-c-sm svg,  .ck-choice .ck-c-sm img { width: 1em; height: 1em; display: block; }
+
+  /* The neighbours are the setting, not the subject, so they sit back until you are actually
+     judging — and then they come fully forward, because a muted neighbour is a neighbour the
+     comparison never really happened against. The mute lives on the context and never on the
+     row: put it on the row and it drains the candidate of exactly the colour it was drawn to
+     carry, and the sheet is then lying about how the real thing looks. */
+  .ck-choice .ck-c-ctx { filter: grayscale(.55); opacity: .75; }
+  .ck-choice .ck-c-tile:hover .ck-c-ctx,
+  .ck-choice .ck-c-tile.on .ck-c-ctx { filter: none; opacity: 1; }
+
+  /* An empty render, drawn as empty. A blank tile is indistinguishable from one that failed,
+     and telling those apart is most of what a contact sheet is for. */
+  .ck-choice .ck-c-blank {
+    display: block; width: 1em; height: 1em;
+    border: 1px dashed var(--rule); border-radius: 2px;
+  }
+
+  .ck-choice .ck-c-id { font: 400 9px/1 var(--mono); color: var(--ink-faint); letter-spacing: .04em; }
+  .ck-choice .ck-c-tile.on .ck-c-id { color: var(--accent); }
+
+  /* The line you read back. Set off by a rule because it is the card's output, not more card. */
+  .ck-choice .ck-c-picks {
+    margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--hairline);
+    font: 400 12px/1.5 var(--mono); color: var(--accent);
+  }
+  .ck-choice .ck-c-picks .ck-c-none { color: var(--ink-faint); }
+  .ck-choice .ck-c-clear {
+    margin-left: 10px; font: inherit; font-family: var(--ui); font-size: 10px;
+    padding: 2px 8px; cursor: pointer;
+    background: var(--pill); color: var(--ink-dim);
+    border: 1px solid var(--pill-edge); border-radius: 4px;
+  }
+  .ck-choice .ck-c-clear:hover { color: var(--accent); border-color: var(--accent); }
+
+  .ck-choice .ck-c-void { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin: 10px 0; }
+  .ck-choice .ck-c-count { color: var(--ink-faint); }
+
+  /* A checkbox inherits the panel's full-width input rule and comes out as a stretched box;
+     it wants to be its own size, at the start of its column. */
+  .ck-choice .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+
+  .ck-choice.ck-c-px8 .ck-c-row { font-size: 8px; }
+  .ck-choice.ck-c-px9 .ck-c-row { font-size: 9px; }
+  .ck-choice.ck-c-px10 .ck-c-row { font-size: 10px; }
+  .ck-choice.ck-c-px11 .ck-c-row { font-size: 11px; }
+  .ck-choice.ck-c-px12 .ck-c-row { font-size: 12px; }
+  .ck-choice.ck-c-px13 .ck-c-row { font-size: 13px; }
+  .ck-choice.ck-c-px14 .ck-c-row { font-size: 14px; }
+  .ck-choice.ck-c-px15 .ck-c-row { font-size: 15px; }
+  .ck-choice.ck-c-px16 .ck-c-row { font-size: 16px; }
+  .ck-choice.ck-c-px17 .ck-c-row { font-size: 17px; }
+  .ck-choice.ck-c-px18 .ck-c-row { font-size: 18px; }
+  .ck-choice.ck-c-px19 .ck-c-row { font-size: 19px; }
+  .ck-choice.ck-c-px20 .ck-c-row { font-size: 20px; }
+  .ck-choice.ck-c-px21 .ck-c-row { font-size: 21px; }
+  .ck-choice.ck-c-px22 .ck-c-row { font-size: 22px; }
+  .ck-choice.ck-c-px23 .ck-c-row { font-size: 23px; }
+  .ck-choice.ck-c-px24 .ck-c-row { font-size: 24px; }
+  .ck-choice.ck-c-px25 .ck-c-row { font-size: 25px; }
+  .ck-choice.ck-c-px26 .ck-c-row { font-size: 26px; }
+  .ck-choice.ck-c-px27 .ck-c-row { font-size: 27px; }
+  .ck-choice.ck-c-px28 .ck-c-row { font-size: 28px; }
+  .ck-choice.ck-c-px29 .ck-c-row { font-size: 29px; }
+  .ck-choice.ck-c-px30 .ck-c-row { font-size: 30px; }
+  .ck-choice.ck-c-px31 .ck-c-row { font-size: 31px; }
+  .ck-choice.ck-c-px32 .ck-c-row { font-size: 32px; }
+  .ck-choice.ck-c-px33 .ck-c-row { font-size: 33px; }
+  .ck-choice.ck-c-px34 .ck-c-row { font-size: 34px; }
+  .ck-choice.ck-c-px35 .ck-c-row { font-size: 35px; }
+  .ck-choice.ck-c-px36 .ck-c-row { font-size: 36px; }
+  .ck-choice.ck-c-px37 .ck-c-row { font-size: 37px; }
+  .ck-choice.ck-c-px38 .ck-c-row { font-size: 38px; }
+  .ck-choice.ck-c-px39 .ck-c-row { font-size: 39px; }
+  .ck-choice.ck-c-px40 .ck-c-row { font-size: 40px; }
+  .ck-choice.ck-c-px41 .ck-c-row { font-size: 41px; }
+  .ck-choice.ck-c-px42 .ck-c-row { font-size: 42px; }
+  .ck-choice.ck-c-px43 .ck-c-row { font-size: 43px; }
+  .ck-choice.ck-c-px44 .ck-c-row { font-size: 44px; }
+  .ck-choice.ck-c-px45 .ck-c-row { font-size: 45px; }
+  .ck-choice.ck-c-px46 .ck-c-row { font-size: 46px; }
+  .ck-choice.ck-c-px47 .ck-c-row { font-size: 47px; }
+  .ck-choice.ck-c-px48 .ck-c-row { font-size: 48px; }

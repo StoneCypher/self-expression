@@ -1,0 +1,19 @@
+<section data-card="chord" class="ck-chord">
+  <h2>where a pull request goes in a week</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="chord-sort">arc order</label>
+    <select id="chord-sort" name="sort">
+      <option value="given">given</option>
+      <option value="total">total</option>
+      <option value="crossings">crossings</option>
+    </select>
+    <label for="chord-pad">pad (deg)</label>
+    <input type="number" id="chord-pad" name="padAngle" min="0" max="20" step="0.5">
+    <label for="chord-labels">labels</label>
+    <input type="checkbox" id="chord-labels" name="labels">
+    <div class="ck-set-foot">padding is capped at two fifths of the circle however much you ask for, because wider than that leaves the arcs no room at all.</div>
+  </div>
+  <svg class="ck-ch" role="img" viewBox="0 0 100 100" aria-label="Chord diagram: 6 entities, 9 ribbons, 120 PRs of flow in all. directed: each pair is one ribbon, as wide at each end as the flow leaving that end, so a one-way flow tapers to a point where it arrives. crossings 2 to 1 after 48 sweeps, 2 swaps and 0 relocations."></svg>
+  <div class="ck-cap"><b>120</b> PRs of flow between <b>6</b> entities, directed. <i class="ck-ch-note">crossings 2 to 1 after 48 sweeps, 2 swaps and 0 relocations.</i></div>
+</section>

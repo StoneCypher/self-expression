@@ -1,0 +1,42 @@
+<section data-card="image" class="ck-image">
+  <h2>what the desk actually serves</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="image-columns">columns</label>
+    <select id="image-columns" name="columns">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+    <label for="image-fit">fit</label>
+    <select id="image-fit" name="fit">
+      <option value="contain">contain</option>
+      <option value="cover">cover</option>
+    </select>
+    <label for="image-captions">captions</label>
+    <input type="checkbox" id="image-captions" name="captions">
+    <div class="ck-set-foot">click a tile to enlarge it in place; escape puts it back.</div>
+  </div>
+  <div class="ck-img-grid" data-fit="contain" data-caps="1">
+  <figure class="ck-img-fig" data-big="0">
+    <button type="button" class="ck-img-tile" aria-expanded="false" aria-label="enlarge image 1 of 3: The desk’s own background artwork, a wide painterly scene.">
+      <span class="ck-img-frame"><img src="/desk-art.png" alt="The desk’s own background artwork, a wide painterly scene." data-src="/desk-art.png" loading="lazy" decoding="async"></span>
+    </button>
+    <figcaption class="ck-img-cap">desk-art.png — the only bitmap the desk owns, at 1.0 MB</figcaption>
+  </figure>
+  <figure class="ck-img-fig" data-big="0">
+    <button type="button" class="ck-img-tile" aria-expanded="false" aria-label="enlarge image 2 of 3: A drawn glyph standing for the assistant.">
+      <span class="ck-img-frame"><img src="/icon-claude.svg" alt="A drawn glyph standing for the assistant." data-src="/icon-claude.svg" loading="lazy" decoding="async"></span>
+    </button>
+    <figcaption class="ck-img-cap">icon-claude.svg — the desk shell’s favicon</figcaption>
+  </figure>
+  <figure class="ck-img-fig" data-big="0">
+    <button type="button" class="ck-img-tile" aria-expanded="false" aria-label="enlarge image 3 of 3: A drawn glyph standing for the desk’s owner.">
+      <span class="ck-img-frame"><img src="/icon-john.svg" alt="A drawn glyph standing for the desk’s owner." data-src="/icon-john.svg" loading="lazy" decoding="async"></span>
+    </button>
+    <figcaption class="ck-img-cap">icon-john.svg — the panel’s favicon</figcaption>
+  </figure>
+  </div>
+  <div class="ck-cap"><b>3</b> images, contain in 3 columns by default. <i class="ck-img-note"></i></div>
+</section>

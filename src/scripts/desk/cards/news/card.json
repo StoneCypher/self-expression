@@ -1,0 +1,11 @@
+{
+  "ord": 73,
+  "type": "news",
+  "id": "news",
+  "title": "Hacker News",
+  "data": {
+    "feed": "https://hnrss.org/frontpage",
+    "count": 10,
+    "summaries": true
+  }
+}

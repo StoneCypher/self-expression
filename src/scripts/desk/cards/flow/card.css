@@ -1,0 +1,32 @@
+.ck-flow[data-card="flow"] { position: relative; }
+.ck-flow[data-card="flow"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-flow[data-card="flow"] .ck-fl-scroll { margin-top: 2px; }
+.ck-flow[data-card="flow"] svg.ck-fl { display: block; width: 100%; height: auto; }
+.ck-flow[data-card="flow"] svg.ck-fl text { font-family: var(--mono); }
+.ck-flow[data-card="flow"] .ck-fl .node { fill: var(--ink-dim); }
+.ck-flow[data-card="flow"] .ck-fl .ribbon { stroke: none; }
+.ck-flow[data-card="flow"] .ck-fl .stub { fill: var(--ink); fill-opacity: .07; stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 2; }
+.ck-flow[data-card="flow"] .ck-fl .lab { fill: var(--ink-dim); }
+.ck-flow[data-card="flow"] .ck-fl .labf { fill: var(--ink-faint); }
+.ck-flow[data-card="flow"] .ck-fl .head { fill: var(--ink-faint); letter-spacing: .04em; }
+.ck-flow[data-card="flow"] .ck-fl .short { fill: var(--accent); }
+.ck-flow[data-card="flow"] .ck-fl-void { color: var(--ink-faint); font-size: 12px; padding: 12px 0 4px; }
+.ck-flow[data-card="flow"] .ck-fl-void b { color: var(--accent); font-weight: 400; }
+.ck-flow[data-card="flow"] .ck-fl-void code { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.ck-flow[data-card="flow"] .ck-set input[type="number"] { width: 6.5em; }
+.ck-flow[data-card="flow"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+.ck-flow[data-card="flow"] .ck-fl .ribbon { transition: fill-opacity .12s linear; }
+.ck-flow[data-card="flow"] .ck-fl:hover .ribbon { fill-opacity: .16; }
+.ck-flow[data-card="flow"] .ck-fl .ribbon:hover { fill-opacity: .72; }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="1"] { background: var(--ck-s1); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="2"] { background: var(--ck-s2); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="3"] { background: var(--ck-s3); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="4"] { background: var(--ck-s4); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="5"] { background: var(--ck-s5); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="6"] { background: var(--ck-s6); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="7"] { background: var(--ck-s7); }
+.ck-flow[data-card="flow"] .ck-legend i[data-s="8"] { background: var(--ck-s8); }
+@media (prefers-reduced-motion: reduce) {
+.ck-flow[data-card="flow"] .ck-fl .ribbon { transition: none; }
+}
+:root[data-theme="light"] .ck-flow[data-card="flow"] .ck-fl .stub { fill-opacity: .10; }

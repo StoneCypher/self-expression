@@ -1,0 +1,101 @@
+
+  .ck-formula { position: relative; }
+
+  /* Every role defaults to the body ink, so an unpainted role is invisible rather than absent
+     and the "none" palette needs no rules of its own. */
+  .ck-formula {
+    --fx-ord: var(--ink);   --fx-rel: var(--ink);   --fx-bin: var(--ink);
+    --fx-op: var(--ink);    --fx-delim: var(--ink); --fx-punct: var(--ink);
+    --fx-digit: var(--ink); --fx-greek: var(--ink);
+  }
+
+  .ck-formula.ck-fx-p-subtle { --fx-rel: var(--accent); --fx-bin: var(--ink-dim); --fx-op: var(--ck-s5); --fx-delim: var(--ink-faint); --fx-punct: var(--ink-faint); --fx-digit: var(--ink-dim); --fx-greek: var(--ck-s7); }
+  .ck-formula.ck-fx-p-vivid { --fx-rel: var(--ck-s6); --fx-bin: var(--ck-s1); --fx-op: var(--ck-s4); --fx-delim: var(--ck-s3); --fx-punct: var(--ck-s2); --fx-digit: var(--ck-s2); --fx-greek: var(--ck-s7); }
+
+  /* ── blocks ─────────────────────────────────────────────────────────────────────────── */
+
+  .ck-formula .ck-fx-block {
+    display: grid; grid-template-columns: 1fr auto; align-items: center;
+    gap: 2px 10px; margin: 14px 0;
+  }
+  .ck-formula .ck-fx-block + .ck-fx-block { border-top: 1px solid var(--hairline); padding-top: 14px; }
+
+  /* Wide maths scrolls inside its own box; the desk column never moves sideways. */
+  .ck-formula .ck-fx-render { min-width: 0; color: var(--fx-ord); }
+  .ck-formula.ck-fx-p-none .ck-fx-render { color: var(--ink); }
+
+  .ck-formula .ck-fx-cap {
+    grid-column: 1 / -1; font-size: 11px; color: var(--ink-faint); line-height: 1.5;
+  }
+
+  /* ── equation numbers ───────────────────────────────────────────────────────────────── */
+
+  /* Hidden by default and shown only for blocks actually in display mode: a number beside a
+     phrase set inline is a cross-reference to something that is not a statement. */
+  .ck-formula .ck-fx-num-tag {
+    display: none; font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .ck-formula.ck-fx-numbered .ck-fx-block.ck-fx-d .ck-fx-num-tag { display: block; }
+
+  /* ── the fallbacks ──────────────────────────────────────────────────────────────────── */
+
+  /* The source, shown before KaTeX arrives, if it never does, and beside an expression it
+     refused. It is the card's floor: there is no state in which this card is blank. */
+  .ck-formula .ck-fx-src {
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.6;
+    color: var(--ink-dim); background: var(--well);
+    border: 1px solid var(--hairline); border-radius: 5px;
+    padding: 6px 9px; display: block; white-space: pre-wrap; word-break: break-word;
+  }
+  .ck-formula .ck-fx-err {
+    grid-column: 1 / -1;
+    font-family: var(--mono); font-size: 10.5px; line-height: 1.5; color: var(--ck-s1);
+    white-space: pre-wrap; word-break: break-word; margin-top: 3px;
+  }
+  .ck-formula .ck-fx-err[hidden] { display: none; }
+  .ck-formula .ck-fx-status {
+    font-family: var(--mono); font-size: 10.5px; color: var(--ck-s2);
+    border-left: 2px solid var(--ck-s2); padding: 3px 0 3px 8px; margin: 10px 0;
+  }
+  .ck-formula .ck-fx-status[hidden] { display: none; }
+  .ck-formula .ck-fx-warn, .ck-formula .ck-fx-none {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+  }
+  .ck-formula .ck-fx-none { margin: 10px 0; }
+
+  /* ── the palette, applied to KaTeX's own atom classes ───────────────────────────────── */
+
+  /* These class names are the TeX grammar, not KaTeX's implementation detail: mrel is a
+     relation, mbin is a binary operator, mop is a large operator or a named function. Colouring
+     by them generalises to every expression, including ones nobody has typed yet. */
+  .ck-formula .katex { font-size: 1.06em; }
+  .ck-formula .katex .mord   { color: var(--fx-ord); }
+  .ck-formula .katex .mrel   { color: var(--fx-rel); }
+  .ck-formula .katex .mbin   { color: var(--fx-bin); }
+  .ck-formula .katex .mop    { color: var(--fx-op); }
+  .ck-formula .katex .mpunct { color: var(--fx-punct); }
+
+  /* Delimiters, named explicitly and last, and this is the trap the whole palette turns on.
+     \left( is emitted as nested "delimsizing" spans and a cases brace as "delimsizing mult";
+     neither carries a role class, so both INHERIT whatever atom wraps them — the same bracket
+     comes out one colour inside a fraction and another inside a sum, and editing a token three
+     symbols away recolours it. An explicit rule on the descendant beats an inherited value from
+     the ancestor, which is the entire fix. */
+  .ck-formula .katex .mopen,
+  .ck-formula .katex .mclose,
+  .ck-formula .katex .delimcenter,
+  .ck-formula .katex .delimsizing,
+  .ck-formula .katex .delimsizinginner,
+  .ck-formula .katex .delim-size1,
+  .ck-formula .katex .delim-size4 { color: var(--fx-delim); }
+
+  /* Content-derived roles, which no selector can find on its own — CSS cannot match text, and
+     a digit and a variable are both "mord". The card's post-render pass adds these classes; see
+     ckFxTag. Placed after the role rules so a tagged leaf wins over the group it sits in. */
+  .ck-formula .katex .ck-fx-digit { color: var(--fx-digit); }
+  .ck-formula .katex .ck-fx-greek { color: var(--fx-greek); }
+
+  /* KaTeX sets its own display margins; the block's grid already owns the spacing. */
+  .ck-formula .katex-display { margin: 0; }
+  .ck-formula .katex-display > .katex { text-align: left; }

@@ -1,0 +1,31 @@
+.ck-timer { position: relative; transition: box-shadow 180ms ease; }
+.ck-timer.ck-alert { box-shadow: 0 0 0 2px var(--accent); }
+@media (prefers-reduced-motion: reduce) { .ck-timer { transition: none; } }
+.ck-timer .ck-body { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.ck-timer .ck-arc { flex: 0 0 auto; width: 106px; max-width: 42%; height: auto; display: block; }
+.ck-timer .ck-read { flex: 1 1 140px; min-width: 0; }
+.ck-timer .ck-arc-well { fill: var(--well); stroke: var(--rule); stroke-width: 4; }
+.ck-timer .ck-arc-run { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; }
+.ck-timer[data-phase="rest"] .ck-arc-run { stroke: var(--good); }
+.ck-timer .ck-mk { display: none; }
+.ck-timer[data-phase="work"] .ck-mk-work { display: block; }
+.ck-timer[data-phase="rest"] .ck-mk-rest { display: block; }
+.ck-timer .ck-mk-work { fill: var(--ink-dim); stroke: none; }
+.ck-timer .ck-mk-rest { fill: none; stroke: var(--ink-dim); stroke-width: 2.5; }
+.ck-timer .ck-elapsed { font: 400 30px/1.05 var(--disp); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; overflow-wrap: anywhere; }
+.ck-timer[data-wide="on"] .ck-elapsed { font-size: 19px; }
+.ck-timer .ck-phase { margin-top: 7px; font: 700 11px/1 var(--ui); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-dim); min-height: 11px; }
+.ck-timer[data-phase="rest"] .ck-phase { color: var(--good); }
+.ck-timer[data-state="refused"] .ck-elapsed { color: var(--ink-faint); }
+.ck-timer .ck-rounds { margin-top: 7px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 400 11.5px/1.4 var(--ui); color: var(--ink-dim); }
+.ck-timer .ck-dot { display: block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--rule); }
+.ck-timer .ck-dot.on { background: var(--accent); border-color: var(--accent); }
+.ck-timer .ck-dot.now { border-color: var(--accent); border-width: 2px; }
+.ck-timer .ck-ctl { display: flex; gap: 8px; margin-top: 12px; }
+.ck-timer .ck-ctl button { font: 400 12px/1 var(--ui); color: var(--ink); background: var(--pill); border: 1px solid var(--pill-edge); border-radius: 5px; padding: 7px 13px; cursor: pointer; }
+.ck-timer .ck-ctl button:hover { border-color: var(--accent); color: var(--accent); }
+.ck-timer .ck-ctl button[disabled] { opacity: 0.45; cursor: default; }
+.ck-timer[data-mode="stopwatch"] .ck-phase { display: none; }
+.ck-timer[data-mode="stopwatch"] .ck-rounds { display: none; }
+.ck-timer .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-timer .ck-cap { overflow-wrap: anywhere; }

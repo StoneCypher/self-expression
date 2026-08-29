@@ -1,0 +1,13 @@
+{
+  "ord": 53,
+  "type": "violin",
+  "groups": 2,
+  "values": 41,
+  "refused": 0,
+  "minN": 8,
+  "settings": {
+    "bandwidth": 1,
+    "inner": "box",
+    "trim": true
+  }
+}

@@ -1,0 +1,13 @@
+.ck-map[data-card="map"] { position: relative; }
+.ck-map[data-card="map"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-map[data-card="map"] .ck-map-wrap { margin-top: 2px; }
+.ck-map[data-card="map"] svg.ck-map-art { display: block; width: 100%; height: auto; overflow: hidden; }
+.ck-map[data-card="map"] svg.ck-map-art text { font-family: var(--mono); fill: var(--ink-dim); }
+.ck-map[data-card="map"] .ck-map-art .ck-sphere { fill: var(--well); stroke: var(--hairline); stroke-width: 1; }
+.ck-map[data-card="map"] .ck-map-art .ck-grat { fill: none; stroke: var(--ck-grid); stroke-width: 0.6; }
+.ck-map[data-card="map"] .ck-map-art .ck-land { fill: var(--ink); fill-opacity: .17; stroke: var(--rule); stroke-width: 0.7; }
+.ck-map[data-card="map"] .ck-map-art .ck-route { fill: none; stroke: var(--accent); stroke-width: 1.2; }
+.ck-map[data-card="map"] .ck-map-art .ck-mark circle { fill: var(--accent); fill-opacity: .5; stroke: var(--accent); stroke-width: 0.9; }
+.ck-map[data-card="map"] .ck-map-void { color: var(--ink-faint); font-size: 12px; padding: 12px 0 4px; }
+.ck-map[data-card="map"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+:root[data-theme="light"] .ck-map[data-card="map"] .ck-map-art .ck-land { fill-opacity: .22; }

@@ -1,0 +1,58 @@
+
+  .ck-markdown .ck-md { font-size: 13px; line-height: 1.6; color: var(--ink); }
+  .ck-markdown .ck-md > :first-child { margin-top: 0; }
+  .ck-markdown .ck-md > :last-child  { margin-bottom: 0; }
+  .ck-markdown .ck-md p { margin: 0 0 10px; }
+
+  .ck-markdown .ck-md h3 { font: 600 16px/1.25 var(--disp); color: var(--ink);      margin: 18px 0 7px; }
+  .ck-markdown .ck-md h4 { font: 600 14px/1.3  var(--disp); color: var(--ink);      margin: 16px 0 6px; }
+  .ck-markdown .ck-md h5 {
+    font: 700 11px/1.3 var(--ui); letter-spacing: .07em; text-transform: uppercase;
+    color: var(--ink-dim); margin: 15px 0 5px;
+  }
+  .ck-markdown .ck-md h6 {
+    font: 700 10px/1.3 var(--ui); letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 14px 0 5px;
+  }
+
+  .ck-markdown .ck-md ul, .ck-markdown .ck-md ol { margin: 0 0 10px; padding-left: 21px; }
+  .ck-markdown .ck-md li { margin: 2px 0; }
+  .ck-markdown .ck-md li::marker { color: var(--ink-faint); }
+  /* A nested list is a continuation of its item, not a new block, so it loses the gap. */
+  .ck-markdown .ck-md li > ul, .ck-markdown .ck-md li > ol { margin: 3px 0 1px; }
+
+  .ck-markdown .ck-md code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: var(--pill); border: 1px solid var(--pill-edge); border-radius: 3px;
+    padding: 0 4px;
+  }
+  /* The scroller owns the width; the block keeps its lines whole and lets them run off the
+     edge into it, so a long line scrolls this box and never the desk column. */
+  .ck-markdown .ck-md .ck-scroll { margin: 0 0 10px; }
+  .ck-markdown .ck-md pre {
+    margin: 0; padding: 9px 11px; white-space: pre;
+    background: var(--well); border: 1px solid var(--hairline); border-radius: 5px;
+  }
+  .ck-markdown .ck-md pre code {
+    background: none; border: 0; padding: 0; line-height: 1.5; color: var(--ink-dim);
+  }
+
+  /* The quote is set in by a rule rather than by indent alone: at 13px an indent of any
+     honest size is indistinguishable from a list, and the rule says "someone else" outright. */
+  .ck-markdown .ck-md blockquote {
+    margin: 0 0 10px; padding: 1px 0 1px 12px;
+    border-left: 2px solid var(--rule); color: var(--ink-dim);
+  }
+  .ck-markdown .ck-md blockquote > :last-child { margin-bottom: 0; }
+
+  .ck-markdown .ck-md hr { border: 0; border-top: 1px solid var(--hairline); margin: 16px 0; }
+
+  /* Underline as a border, so it sits clear of the descenders and can change colour on hover
+     without the text moving. */
+  .ck-markdown .ck-md a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--rule); }
+  .ck-markdown .ck-md a:hover { border-bottom-color: var(--accent); }
+
+  .ck-markdown .ck-md strong { font-weight: 700; color: var(--ink); }
+  .ck-markdown .ck-md em { font-style: italic; }
+
+  .ck-markdown .ck-md-empty { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }

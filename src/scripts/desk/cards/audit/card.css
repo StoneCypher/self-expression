@@ -1,0 +1,107 @@
+
+  .ck-audit { position: relative; }
+
+  /* ── the filter box ───────────────────────────────────────────────────────────────────── */
+
+  .ck-audit .ck-au-tools { margin: 10px 0 7px; }
+  .ck-audit .ck-au-find {
+    font: inherit; font-family: var(--mono); font-size: 11px;
+    width: 100%; box-sizing: border-box; padding: 5px 8px;
+    background: var(--well); color: var(--ink);
+    border: 1px solid var(--hairline); border-radius: 5px;
+  }
+  .ck-audit .ck-au-find:focus { outline: none; border-color: var(--accent); }
+  .ck-audit .ck-au-find::placeholder { color: var(--ink-faint); }
+
+  /* A checkbox inherits the panel's full-width input rule and comes out as a stretched box; it
+     wants to be its own size, at the start of its column. */
+  .ck-audit .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+
+  /* ── the tally strip ──────────────────────────────────────────────────────────────────── */
+
+  .ck-audit .ck-au-stat {
+    display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 0 0 7px;
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  /* An empty span would still take its share of the gap and space the strip out as if something
+     were there. Nothing to say, nothing shown. */
+  .ck-audit .ck-au-stat span:empty { display: none; }
+  .ck-audit .ck-au-s-ref  { color: var(--ck-s1); }
+  .ck-audit .ck-au-s-bad  { color: var(--ck-s2); }
+  .ck-audit .ck-au-s-note { color: var(--ck-s1); }
+
+  /* ── the log ──────────────────────────────────────────────────────────────────────────── */
+
+  /* The scroller owns both axes: a long log scrolls under its own family headers and a wide
+     detail scrolls inside the card. Neither ever moves the desk column sideways. */
+  .ck-audit .ck-au-scroll { max-height: 60vh; overflow-y: auto; }
+
+  .ck-audit .ck-au-fam { margin: 0 0 9px; }
+  .ck-audit .ck-au-fam[hidden] { display: none; }
+
+  .ck-audit .ck-au-famh {
+    position: sticky; top: 0; z-index: 1; background: var(--ground);
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 4px 0 3px; border-bottom: 1px solid var(--rule);
+  }
+  .ck-audit .ck-au-famn {
+    font: 700 10px/1.4 var(--ui); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .ck-audit .ck-au-famc { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }
+  .ck-audit .ck-au-famr {
+    margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--ck-s1);
+  }
+
+  .ck-audit .ck-au-row {
+    display: grid; grid-template-columns: auto 14px auto minmax(0, 1fr);
+    gap: 0 8px; align-items: baseline;
+    padding: 3px 0 3px 7px;
+    border-bottom: 1px solid var(--hairline);
+    border-left: 2px solid transparent;
+  }
+  /* [hidden] and the display rule above it tie on specificity, and this sheet loads after the
+     UA's, so a hidden row would stay visible without saying so. */
+  .ck-audit .ck-au-row[hidden] { display: none; }
+  .ck-audit .ck-au-row:hover { background: var(--pill); }
+
+  .ck-audit .ck-au-t {
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .ck-audit .ck-au-m { position: relative; width: 14px; height: 14px; line-height: 0; align-self: center; }
+  .ck-audit .ck-au-m svg { width: 13px; height: 13px; display: block; }
+  .ck-audit .ck-au-a { font-family: var(--mono); font-size: 11px; color: var(--ink); white-space: nowrap; }
+  .ck-audit .ck-au-d {
+    min-width: 0; font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim);
+    overflow-wrap: anywhere;
+  }
+  .ck-audit .ck-au-kv { margin-right: 11px; }
+  .ck-audit .ck-au-kv b { font-weight: 400; color: var(--ink-faint); }
+  .ck-audit .ck-au-bare { font-style: normal; color: var(--ink-faint); }
+
+  /* ── refusals ─────────────────────────────────────────────────────────────────────────── */
+
+  /* Four signals, not one. The rule and the fill survive a colour-blind reader; the drawn mark
+     survives a monochrome print; the off-screen word survives having no visual channel at all.
+     A row that says something was stopped is the row a reviewer opened this card for, and it has
+     to be findable by whatever channel that reviewer actually has. */
+  .ck-audit .ck-au-no { border-left-color: var(--ck-s1); background: var(--well); }
+  .ck-audit .ck-au-no .ck-au-m { color: var(--ck-s1); }
+  .ck-audit .ck-au-no .ck-au-a { color: var(--ck-s1); font-weight: 700; }
+  .ck-audit .ck-au-no .ck-au-t { color: var(--ink-dim); }
+
+  /* Off screen, still in the accessibility tree. */
+  .ck-audit .ck-au-sr {
+    position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+
+  .ck-audit .ck-au-none {
+    padding: 14px 8px; text-align: center;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+  }
+  .ck-audit .ck-au-none[hidden] { display: none; }
+
+  .ck-audit .ck-au-read { color: var(--ink-faint); font-style: normal; }

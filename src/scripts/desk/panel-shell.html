@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>Claude's desk</title>
+<!-- The white flash on reload is the browser painting its default canvas before any CSS
+     has parsed. This is the only thing that fixes it, because it is the only signal the
+     browser has that early — a stylesheet, inline or not, arrives too late. -->
+<meta name="color-scheme" content="dark">
+<!-- Digests of this page's own code and of the whole page, stamped by the server. The second is
+     what makes renewal invisible: a rebuild that produces an identical document is recognised as
+     identical and the page is left completely alone. -->
+<!--CODESIG-->
+<link rel="icon" type="image/svg+xml" href="/icon-claude.svg">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ink:      oklch(0.93 0.01 250);
+    --ink-dim:  oklch(0.62 0.01 250);
+    --ink-faint:oklch(0.42 0.01 250);
+    --ground:   oklch(0.16 0.012 260);
+    --ground-2: oklch(0.20 0.014 260);
+    --rule:     oklch(0.30 0.012 260);
+    --ui:   'Space Grotesk', system-ui, sans-serif;
+    --disp: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--ui); font-size: 13px; line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    flex: 0 0 auto; background: var(--ground);
+    border-bottom: 1px solid var(--rule); padding: 12px 16px 0;
+  }
+
+  /* a docked panel is a fixed frame, not a page: one pane at a time, each scrolling itself */
+  .tabs { display: flex; gap: 0; margin-top: 11px; }
+  .tabs button {
+    background: transparent; border: 0; border-bottom: 2px solid transparent;
+    color: var(--ink-faint); font-family: var(--mono); font-size: 10px;
+    letter-spacing: .12em; text-transform: uppercase; padding: 6px 10px 7px;
+    cursor: pointer;
+  }
+  .tabs button:hover { color: var(--ink-dim); }
+  .tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: oklch(0.70 0.13 235); }
+  .panes { flex: 1 1 auto; overflow: hidden; position: relative; }
+  .pane  { position: absolute; inset: 0; overflow-y: auto; display: none; }
+  .pane[data-on] { display: block; }
+
+  /* the frame is the user's to resize; these are the adaptations that matter */
+  body.narrow .now .said { font-size: 16px; }
+  body.narrow .row { grid-template-columns: 50px 24px 1fr; gap: 7px; padding: 7px 12px; }
+  body.narrow .tabs button { padding: 6px 7px 7px; letter-spacing: .08em; }
+  body.short .ribbon, body.short .ribaxis, body.short .riblegend { display: none; }
+  body.short header { padding-bottom: 0; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-faint); display: flex;
+    justify-content: space-between; align-items: baseline;
+  }
+  .live { color: oklch(0.78 0.16 150); transition: color .4s; }
+  .now { display: flex; gap: 12px; align-items: flex-start; margin-top: 10px; }
+  .glyphs {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    flex: 0 0 auto; line-height: 1;
+  }
+  .glyphs .face { font-size: 26px; }
+  .glyphs .ctx  { font-size: 14px; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+  .now .said {
+    font-family: var(--disp); font-size: 18px; line-height: 1.34;
+    font-weight: 300; font-optical-sizing: auto;
+    font-variation-settings: 'SOFT' 40, 'WONK' 1;
+    color: oklch(0.90 0.008 250);
+  }
+  .now .meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; }
+  .ribbon { display: flex; gap: 2px; margin-top: 12px; height: 24px; align-items: flex-end; }
+  .ribbon i { flex: 1; display: block; }
+
+  /* The axis is absolutely positioned inside a relative strip so a tick sits over the
+     centre of its bar regardless of how the flex row divides the width — 24 bars will not
+     land on round percentages, and a tick that is near its bar is worse than none. */
+  .ribaxis {
+    position: relative; height: 12px; margin-top: 3px;
+    font-family: var(--mono); font-size: 9px; color: var(--ink-faint);
+  }
+  .ribaxis span { position: absolute; transform: translateX(-50%); }
+
+  .riblegend {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; margin-top: 4px;
+    font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint);
+  }
+  .riblegend b { color: var(--ink-dim); font-weight: 400; }
+  .riblegend span { display: inline-flex; align-items: center; gap: 4px; }
+  .riblegend i { width: 6px; height: 6px; display: block; }
+  main { padding: 0 0 40px; }
+  .row {
+    display: grid; grid-template-columns: 58px 26px 1fr;
+    gap: 9px; padding: 8px 16px; border-bottom: 1px solid oklch(0.235 0.012 260);
+    align-items: start;
+  }
+  .row:hover { background: var(--ground-2); }
+  .t { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); padding-top: 3px; }
+  .g { font-size: 15px; line-height: 1.15; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .g .c { font-size: 10px; }
+  .s {
+    font-family: var(--disp); font-size: 14px; font-weight: 300;
+    font-optical-sizing: auto; font-variation-settings: 'SOFT' 30;
+  }
+  .tag {
+    font-family: var(--mono); font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--ink-faint); margin-left: 7px; white-space: nowrap;
+  }
+  .need {
+    display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px;
+    color: oklch(0.75 0.13 30); border-left: 2px solid oklch(0.55 0.15 30); padding-left: 8px;
+  }
+  .stemdot { display: inline-block; width: 6px; height: 6px; margin-right: 5px; vertical-align: 1px; }
+
+
+<!--KIT-CSS-->
+  <!--CARD-CSS-->
+</style></head>
+<body>
+<script>
+/* Self-renewal, deliberately first and deliberately not a module: this is the page's
+   own repair mechanism, so it must survive any error in everything below it. If the
+   rest of the page throws, editing the file still fixes the open tab. */
+/* The registry the cards fill. Declared here, in the standalone script, for the same
+   reason the poll is: it must exist even if everything below it fails to parse. */
+window.PANEL = { inits: [] };
+
+/* This desk's own page digest, so a renewal that changes nothing changes nothing. */
+window.PANEL.page =
+  (document.querySelector('meta[name="pagesig"]') || {}).content || null;
+
+/* Renewal, and the rule that makes it invisible.
+ *
+ * This used to reload the document the moment `edition` moved. `edition` answers "did a file
+ * change", which is not the question — the question is "does the page differ from the one on
+ * screen". Under load those came apart completely: files that appear in no page were being
+ * watched, so the counter moved every few seconds and the desk reloaded every few seconds,
+ * each time rebuilding an identical document. A reload is the most violent update there is and
+ * it was being spent on no information at all.
+ *
+ * So the counter is only a hint that it is worth LOOKING. The fetched page's digest decides.
+ * A reload now happens exactly when the page really is different, which on a quiet desk is
+ * never. */
+(function () {
+  var born = null, busy = false;
+  setInterval(function () {
+    if (busy) return;                    // a slow fetch must not stack another behind it
+    fetch('/edition', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (born === null) { born = d.edition; return; }
+        if (d.edition === born) return;
+        born = d.edition;
+
+        busy = true;
+        return fetch(location.href, { cache: 'no-store' })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            var m = /name="pagesig" content="([^"]+)"/.exec(html);
+            var page = m ? m[1] : null;
+            busy = false;
+            if (page !== null && page === window.PANEL.page) return;   // identical: do nothing
+            var p = document.getElementById('pulse');
+            if (p) p.textContent = 'renewing';
+            location.reload();
+          });
+      })
+      .catch(function () { busy = false; });
+  }, 1200);
+})();
+</script>
+<header>
+  <div class="eyebrow">
+    <span><b style="color:oklch(0.80 0.13 235); font-weight:400">my desk</b> &mdash; affect</span>
+    <span><span id="geom" style="opacity:.55"></span> <span class="live" id="pulse">live</span></span>
+  </div>
+  <div class="now" id="now"></div>
+  <div class="ribbon" id="ribbon"></div>
+  <div class="ribaxis" id="ribaxis"></div>
+  <div class="riblegend" id="riblegend"></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+
+<div class="panes">
+
+<main id="feed" class="pane" data-pane="feed" data-tab="log" data-on></main>
+
+<!--CARD-HTML-->
+
+</div>
+<script>
+/* ── Geometry ─────────────────────────────────────────────────────────────────
+   The frame belongs to John and he can resize it at will, so the panel measures
+   itself and reports back. Two readers: the page, which adapts, and the server,
+   which writes it down so that whoever is authoring the next revision knows how
+   much room there actually is instead of guessing at it.                        */
+
+let geomTimer = null, lastGeom = '';
+
+function reportGeometry() {
+  const panes = document.querySelector('.panes'),
+        g = { w: Math.round(document.documentElement.clientWidth),
+              h: Math.round(document.documentElement.clientHeight),
+              paneW: Math.round(panes?.clientWidth  ?? 0),
+              paneH: Math.round(panes?.clientHeight ?? 0),
+              dpr: Number((window.devicePixelRatio || 1).toFixed(2)) };
+
+  document.getElementById('geom').textContent = `${g.w}×${g.h}`;
+  document.body.classList.toggle('narrow', g.w < 420);
+  document.body.classList.toggle('short',  g.h < 520);
+
+  const key = JSON.stringify(g);
+  if (key === lastGeom) return;
+  lastGeom = key;
+
+  clearTimeout(geomTimer);
+  geomTimer = setTimeout(() => {
+    fetch('/geometry', { method: 'POST', headers: { 'content-type': 'application/json' },
+                         body: key }).catch(() => {});
+  }, 250);
+}
+
+new ResizeObserver(reportGeometry).observe(document.documentElement);
+reportGeometry();
+
+/* One pane at a time, so the panel always fits its frame however small that frame is.
+   The bar is derived from the panes that are actually present rather than written down
+   beside them: a card is a directory now, and a hard-coded button would outlive its pane
+   the first time one was removed. */
+function buildTabs() {
+  const bar = document.getElementById('tabs');
+  if (!bar) return;
+  bar.textContent = '';
+  for (const pane of document.querySelectorAll('.panes > .pane')) {
+    const b = document.createElement('button');
+    b.dataset.pane = pane.dataset.pane;
+    b.textContent  = pane.dataset.tab || pane.dataset.pane;
+    b.setAttribute('aria-selected', String(pane.hasAttribute('data-on')));
+    b.onclick = () => {
+      for (const t of bar.children) t.setAttribute('aria-selected', String(t === b));
+      for (const p of document.querySelectorAll('.pane'))
+        p.toggleAttribute('data-on', p.dataset.pane === b.dataset.pane);
+    };
+    bar.appendChild(b);
+  }
+}
+buildTabs();
+
+const HUE = { flow:235, spark:75, drag:35, fog:290, strain:20, still:165 };
+const col = s => s ? `oklch(0.70 0.13 ${HUE[s]})` : 'oklch(0.45 0.01 260)';
+const esc = t => String(t ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/** Split a context field into its individual emoji, so they can stack vertically. */
+const ctxParts = c => Array.from(String(c ?? '').trim().split(/\s+/)).filter(Boolean);
+
+function render(d) {
+  const top = d.rows[0];
+  if (top) {
+    document.getElementById('now').innerHTML =
+      `<div class="glyphs"><span class="face">${esc(top.face)}</span>` +
+      `<span class="ctx">${ctxParts(top.context).map(p => `<span>${esc(p)}</span>`).join('')}</span></div>` +
+      `<div><div class="said">${esc(top.text)}</div>` +
+      `<div class="meta">${esc(top.ts_local)} ${esc(top.tz)} &nbsp;·&nbsp; ${esc(top.position)}` +
+      (top.delta  ? ' &nbsp;·&nbsp; ' + esc(top.delta)  : '') +
+      (top.cctype ? ' &nbsp;·&nbsp; ' + esc(top.cctype) : '') +
+      ` &nbsp;·&nbsp; ${esc(top.project ?? '')}</div></div>`;
+  }
+
+  /* One bar per local hour, height by count, colour by the hour's DOMINANT stem.
+     It used to be the hour's LAST stem — `b.stem = t.stem` on every row — so an hour of
+     five `flow` entries that happened to end on one `strain` rendered entirely as strain.
+     A summary that reports its final sample is not a summary. Ties go to the later stem,
+     which is the only tie-break that carries information. */
+  const buckets = Array.from({length:24}, () => ({ n:0, tally:new Map() }));
+  for (const t of d.today) {
+    const b = buckets[t.hour % 24];
+    b.n++;
+    if (t.stem) b.tally.set(t.stem, (b.tally.get(t.stem) || 0) + 1);
+  }
+  const peak = Math.max(1, ...buckets.map(b => b.n));
+  /* `topStem`, not `top` — `top` is already the newest row, twenty lines up, and redeclaring
+     a const in the same scope is a PARSE error, not a runtime one. The whole script failed
+     to compile and the desk rendered empty, which is a much louder failure than the bug it
+     came from and much quieter to read. */
+  const topStem = b => { let best = null, hi = 0;
+                         for (const [s, n] of b.tally) if (n >= hi) { hi = n; best = s; }
+                         return best; };
+
+  const HOURLBL = h => (h % 12 === 0 ? 12 : h % 12) + (h < 12 ? 'am' : 'pm');
+  document.getElementById('ribbon').innerHTML = buckets.map((b, h) => {
+    const stem = topStem(b);
+    return `<i title="${HOURLBL(h)} — ${b.n} ${b.n === 1 ? 'signature' : 'signatures'}` +
+           `${stem ? ', mostly ' + stem : ''}" ` +
+           `style="height:${Math.max(2, Math.round(24*b.n/peak))}px;` +
+           `background:${b.n ? col(stem) : 'oklch(0.235 0.012 260)'}"></i>`;
+  }).join('');
+
+  /* The ribbon carried no label, no axis and no legend, which is the whole reason it was
+     unreadable: a reader had to already know it was hours, that height was count and that
+     hue was mood. Every one of those is now written down. */
+  const ticks = [0, 6, 12, 18].map(h =>
+    `<span style="left:${(h + 0.5) / 24 * 100}%">${HOURLBL(h)}</span>`).join('');
+  document.getElementById('ribaxis').innerHTML = ticks;
+  document.getElementById('riblegend').innerHTML =
+    `<b>${d.day ?? ''}</b> · bar per hour, height = signatures, colour = the hour's mood` +
+    Object.keys(HUE).map(s =>
+      `<span><i style="background:${col(s)}"></i>${s}</span>`).join('');
+
+  document.getElementById('feed').innerHTML = d.rows.map(r =>
+    `<div class="row">
+       <div class="t">${esc(r.ts_local)}</div>
+       <div class="g"><span>${esc(r.face)}${r.uncertain ? '<span style="opacity:.6">?</span>' : ''}</span>` +
+      ctxParts(r.context).map(p => `<span class="c">${esc(p)}</span>`).join('') +
+      `</div>
+       <div><span class="s"><span class="stemdot" style="background:${col(r.stem)}"></span>${esc(r.text)}</span>
+         <span class="tag">${esc(r.project ?? '')}${r.cctype ? ' · ' + esc(r.cctype) : ''}</span>
+         ${r.need ? `<span class="need">need: ${esc(r.need)}</span>` : ''}
+       </div>
+     </div>`).join('');
+}
+
+<!--KIT-JS-->
+
+<!--CARD-JS-->
+
+/* Every card registered a builder rather than running at parse time, so a deck missing a
+   card cannot throw on its behalf. Running the list again rebuilds whatever is currently
+   on the panel, which is why each builder is written to be safe to re-run. */
+for (const build of PANEL.inits) { try { build(); } catch (e) { console.error(e); } }
+
+const es = new EventSource('/stream');
+es.onmessage = e => {
+  render(JSON.parse(e.data));
+  const p = document.getElementById('pulse');
+  p.style.color = 'oklch(0.95 0.20 150)';
+  setTimeout(() => { p.style.color = ''; }, 700);
+};
+es.onerror = () => { document.getElementById('pulse').textContent = 'reconnecting'; };
+
+/* The page can be revised while it is open. Two paths on purpose: the SSE event is
+   instant, and the poll is what actually works inside embedded browsers that buffer
+   streaming responses. Whichever arrives first wins.
+
+   Both now go through the same rule: fetch, compare the page digest, and reload only if the
+   document genuinely differs. The SSE path used to reload unconditionally 100ms after the
+   event, which meant the fast path was also the path that flickered hardest — an event that
+   carried no change still cost a full reload. */
+async function renew() {
+  try {
+    const html = await (await fetch(location.href, { cache: 'no-store' })).text();
+    const m = /name="pagesig" content="([^"]+)"/.exec(html);
+    if (m && m[1] === window.PANEL.page) return;            // identical: leave the page alone
+  } catch { /* cannot tell: fall through and reload, which is the safe direction */ }
+  document.getElementById('pulse').textContent = 'renewing';
+  setTimeout(() => location.reload(), 100);
+}
+
+es.addEventListener('reload', renew);
+
+/* the poll itself lives in the standalone script at the top of the page, where an
+   error down here cannot silence it */
+</script></body></html>

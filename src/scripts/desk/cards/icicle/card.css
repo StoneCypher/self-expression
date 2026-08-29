@@ -1,0 +1,17 @@
+.ck-icicle[data-card="icicle"] { position: relative; }
+.ck-icicle[data-card="icicle"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-icicle[data-card="icicle"] .ck-ic-band { stroke: none; }
+.ck-icicle[data-card="icicle"] .ck-plot text { pointer-events: none; }
+.ck-icicle[data-card="icicle"] .ck-plot .ck-ic-lab { fill: var(--ground); font-weight: 700; }
+.ck-icicle[data-card="icicle"] .ck-plot .ck-ic-root { fill: var(--ink-dim); letter-spacing: .04em; }
+.ck-icicle[data-card="icicle"] .ck-legend i { border-radius: 1px; }
+.ck-icicle[data-card="icicle"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-icicle[data-card="icicle"] .ck-cap { overflow-wrap: anywhere; }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="1"] { background: var(--ck-s1); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="2"] { background: var(--ck-s2); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="3"] { background: var(--ck-s3); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="4"] { background: var(--ck-s4); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="5"] { background: var(--ck-s5); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="6"] { background: var(--ck-s6); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="7"] { background: var(--ck-s7); }
+.ck-icicle[data-card="icicle"] .ck-legend i[data-s="8"] { background: var(--ck-s8); }

@@ -1,0 +1,56 @@
+
+  .ck-note { position: relative; }
+
+  .ck-note .ck-n-ta {
+    display: block; width: 100%; box-sizing: border-box; margin: 10px 0 0;
+    padding: 9px 11px; resize: vertical; min-height: 60px;
+    font: inherit; font-size: 12.5px; line-height: 1.55;
+    background: var(--well); color: var(--ink);
+    border: 1px solid var(--hairline); border-radius: 6px;
+  }
+  .ck-note .ck-n-ta:focus { outline: none; border-color: var(--accent); }
+  .ck-note .ck-n-ta::placeholder { color: var(--ink-faint); }
+  .ck-note .ck-n-ta.ck-n-mono { font-family: var(--mono); font-size: 11.5px; }
+
+  /* Wrapping off. The wrap ATTRIBUTE is set alongside this, but the attribute alone does not
+     reliably restyle a textarea that is already on the page, so CSS carries it. The overflow is
+     the textarea's own: a long line scrolls inside the box and never widens the desk column. */
+  .ck-note .ck-n-ta.ck-n-nowrap { white-space: pre; overflow-x: auto; }
+
+  .ck-note .ck-n-foot {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin-top: 6px; font-family: var(--mono); font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ck-note .ck-n-count { color: var(--ink-faint); }
+
+  /* The indicator. Three states, three colours, and three different sentences — the words are the
+     channel that survives a monochrome screen or a colour-blind reader, and the colour is the one
+     that is readable from across the room. Neither is asked to work alone. */
+  .ck-note .ck-n-state { text-align: right; }
+  .ck-note .ck-n-ok    { color: var(--good); }
+  .ck-note .ck-n-busy  { color: var(--ink-faint); }
+  .ck-note .ck-n-seed  { color: var(--ink-faint); }
+  .ck-note .ck-n-bad   { color: var(--ck-s1); font-weight: 700; }
+
+  /* ── the settings panel ───────────────────────────────────────────────────────────────── */
+
+  /* A checkbox inherits the panel's full-width input rule and comes out as a stretched box; it
+     wants to be its own size, at the start of its column. */
+  .ck-note .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }
+
+  .ck-note .ck-n-reset {
+    justify-self: start; font: inherit; font-family: var(--mono); font-size: 10.5px;
+    padding: 4px 9px; cursor: pointer;
+    background: var(--ground); color: var(--ink-dim);
+    border: 1px solid var(--rule); border-radius: 4px;
+  }
+  .ck-note .ck-n-reset:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Armed, and it looks armed. The second click discards writing, so the control stops looking
+     like the quiet one in the panel for as long as it will actually do that. */
+  .ck-note .ck-n-reset.ck-n-armed {
+    color: var(--ck-s1); border-color: var(--ck-s1); font-weight: 700;
+  }
+
+  .ck-note .ck-n-note { font-style: normal; color: var(--ck-s1); }

@@ -1,0 +1,13 @@
+{
+  "ord": 43,
+  "type": "ribbon",
+  "day": "2026-08-28",
+  "total": 280,
+  "skipped": 0,
+  "offset": -420,
+  "settings": {
+    "bucket": 60,
+    "legend": true,
+    "scale": "peak"
+  }
+}

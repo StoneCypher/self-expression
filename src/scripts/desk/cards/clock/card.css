@@ -1,0 +1,20 @@
+.ck-clock { position: relative; }
+.ck-clock .ck-body { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.ck-clock .ck-dial { flex: 0 0 auto; width: 124px; max-width: 46%; height: auto; display: block; }
+.ck-clock .ck-read { flex: 1 1 132px; min-width: 0; }
+.ck-clock .ck-rim { fill: var(--well); stroke: var(--rule); stroke-width: 1; }
+.ck-clock .ck-tick-h { stroke: var(--ink-dim); stroke-width: 2; stroke-linecap: round; }
+.ck-clock .ck-tick-m { stroke: var(--ink-faint); stroke-width: 0.8; stroke-linecap: round; }
+.ck-clock .ck-dial text { font-family: var(--mono); font-size: 8px; fill: var(--ink-faint); }
+.ck-clock .ck-hand { stroke: var(--ink); stroke-linecap: round; fill: none; }
+.ck-clock .ck-hand-h { stroke-width: 3.4; }
+.ck-clock .ck-hand-m { stroke-width: 2.2; }
+.ck-clock .ck-hand-s { stroke: var(--accent); stroke-width: 1; }
+.ck-clock .ck-pin { fill: var(--accent); stroke: none; }
+.ck-clock .ck-time { font: 400 27px/1.1 var(--disp); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: 0.01em; overflow-wrap: anywhere; }
+.ck-clock .ck-date { margin-top: 4px; font: 400 11.5px/1.35 var(--ui); color: var(--ink-dim); }
+.ck-clock[data-face="digital"] .ck-dial { display: none; }
+.ck-clock[data-face="analogue"] .ck-time { display: none; }
+.ck-clock[data-seconds="off"] .ck-hand-s { display: none; }
+.ck-clock .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-clock .ck-cap { overflow-wrap: anywhere; }

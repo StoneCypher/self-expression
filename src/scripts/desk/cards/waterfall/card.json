@@ -1,0 +1,12 @@
+{
+  "ord": 58,
+  "type": "waterfall",
+  "id": "waterfall",
+  "title": "subscription revenue, Q1 to Q2",
+  "settings": {
+    "showTotals": true,
+    "sort": "given",
+    "unit": "$"
+  },
+  "steps": 6
+}

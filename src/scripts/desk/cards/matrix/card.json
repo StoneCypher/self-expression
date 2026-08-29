@@ -1,0 +1,28 @@
+{
+  "ord": 21,
+  "type": "matrix",
+  "rows": 41,
+  "cols": 12,
+  "filled": 211,
+  "weighted": false,
+  "dropped": {
+    "badRef": 0,
+    "badWeight": 0,
+    "dupe": 0
+  },
+  "seriation": {
+    "mode": "both",
+    "sweeps": 3,
+    "converged": true,
+    "costBefore": 383,
+    "costAfter": 141,
+    "swaps": 5,
+    "moves": 4,
+    "keptGivenRows": false,
+    "keptGivenCols": false,
+    "emptyRows": 0,
+    "emptyCols": 0,
+    "groupRuns": 26,
+    "improvementSkipped": false
+  }
+}

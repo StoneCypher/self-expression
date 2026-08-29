@@ -1,0 +1,10 @@
+.ck-violin[data-card="violin"] { position: relative; }
+.ck-violin[data-card="violin"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-violin[data-card="violin"] .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-violin[data-card="violin"] .ck-plot .ck-cap-ax { fill: var(--ink-faint); font-size: 9.5px; letter-spacing: .04em; }
+.ck-violin[data-card="violin"] .ck-plot .ck-empty { fill: var(--ink-faint); font-size: 11px; }
+.ck-violin[data-card="violin"] .ck-plot .ck-warn { fill: var(--ink-faint); font-size: 8.5px; letter-spacing: .06em; }
+.ck-violin[data-card="violin"] .ck-plot .ck-whisk { stroke: var(--ink-dim); stroke-width: 1; fill: none; }
+.ck-violin[data-card="violin"] .ck-plot .ck-stick { stroke: var(--ink-dim); stroke-width: .8; opacity: .5; }
+.ck-violin[data-card="violin"] .ck-plot .ck-hit { stroke: none; }
+.ck-violin[data-card="violin"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }

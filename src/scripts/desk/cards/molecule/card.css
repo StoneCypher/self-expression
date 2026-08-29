@@ -1,0 +1,54 @@
+
+  /* molecule — element colours. The only literal colours in this file; everything below is
+     scoped under .ck-molecule and names these. */
+  :root {
+    --ck-mol-c:    oklch(0.80 0.010 250);   /* light grey on the dark ground   */
+    --ck-mol-n:    oklch(0.66 0.150 255);
+    --ck-mol-o:    oklch(0.63 0.185 27);
+    --ck-mol-h:    oklch(0.96 0.004 250);   /* near-white                      */
+    --ck-mol-s:    oklch(0.84 0.150 95);
+    --ck-mol-p:    oklch(0.72 0.160 55);
+    --ck-mol-x:    oklch(0.62 0.060 320);   /* anything with no colour of its own */
+    --ck-mol-edge: oklch(0.155 0.008 90);   /* the ground: atom rims cut against it */
+    --ck-mol-spec: oklch(0.99 0.002 250);   /* the gloss, white in both themes  */
+  }
+  :root[data-theme="light"] {
+    --ck-mol-c:    oklch(0.42 0.010 250);   /* dark grey on the light ground   */
+    --ck-mol-n:    oklch(0.45 0.170 255);
+    --ck-mol-o:    oklch(0.50 0.200 27);
+    --ck-mol-h:    oklch(0.22 0.006 250);   /* near-black                      */
+    --ck-mol-s:    oklch(0.58 0.150 95);
+    --ck-mol-p:    oklch(0.55 0.170 50);
+    --ck-mol-x:    oklch(0.46 0.070 320);
+    --ck-mol-edge: oklch(0.985 0.003 90);
+    --ck-mol-spec: oklch(1 0 0);
+  }
+
+  /* Width from the pane, height from the viewBox. A model has one honest aspect ratio and
+     the pane sets the scale, never the shape. */
+  .ck-molecule .ck-mol-stage {
+    display: block; width: 100%; height: auto; cursor: pointer; touch-action: manipulation;
+  }
+
+  /* One property per element, then two shape rules that spend it. A bond half and the atom
+     it grows out of carry the same class and come out the same colour. */
+  .ck-molecule .el-h { --ck-mol-e: var(--ck-mol-h); }
+  .ck-molecule .el-c { --ck-mol-e: var(--ck-mol-c); }
+  .ck-molecule .el-n { --ck-mol-e: var(--ck-mol-n); }
+  .ck-molecule .el-o { --ck-mol-e: var(--ck-mol-o); }
+  .ck-molecule .el-s { --ck-mol-e: var(--ck-mol-s); }
+  .ck-molecule .el-p { --ck-mol-e: var(--ck-mol-p); }
+  .ck-molecule .el-x { --ck-mol-e: var(--ck-mol-x); }
+
+  /* The fallback is not decoration: an unresolved var() computes to the property's initial
+     value, which for fill is black — so an element with no class of ours would come out as
+     a black disc on a black ground rather than as an obvious mistake. */
+  .ck-molecule circle { fill: var(--ck-mol-e, var(--ck-mol-x)); stroke: var(--ck-mol-edge); }
+  .ck-molecule line   { stroke: var(--ck-mol-e, var(--ck-mol-x)); fill: none; stroke-linecap: round; }
+
+  /* The gloss sits inside its atom and is drawn with it, so it never separates from the
+     ball it belongs to when the depth sort reorders everything. */
+  .ck-molecule .ck-mol-gloss { fill: var(--ck-mol-spec); stroke: none; }
+
+  .ck-molecule .ck-legend i { border-radius: 50%; background: var(--ck-mol-e, var(--ck-mol-x)); }
+  .ck-molecule .ck-mol-state { font-family: var(--mono); font-size: 10px; }

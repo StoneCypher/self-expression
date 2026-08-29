@@ -1,0 +1,12 @@
+{
+  "ord": 40,
+  "type": "clock",
+  "id": "clock",
+  "title": "Tokyo",
+  "settings": {
+    "tz": "Asia/Tokyo",
+    "seconds": true,
+    "face": "both",
+    "hour12": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "ord": 56,
+  "type": "candles",
+  "id": "candles",
+  "title": "ACME — ninety sessions",
+  "settings": {
+    "ma": 0,
+    "logScale": false,
+    "volume": true,
+    "bars": 90
+  },
+  "symbol": "ACME"
+}

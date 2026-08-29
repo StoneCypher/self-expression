@@ -1,0 +1,82 @@
+  /* A contact sheet. Tiles are uniform so the eye compares glyphs and not boxes, and the
+     grid is auto-fill rather than a fixed column count because the desk is one document in
+     two panes of different widths. */
+  .iclab .ichead {
+    font: 700 11px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-dim); margin: 18px 0 8px;
+  }
+  .iclab .icgrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 4px;
+  }
+
+  /* The tile is a button because it is one: clicking keeps the icon. Transparent until
+     hovered or kept, so a hundred of them read as a field of glyphs rather than a hundred
+     competing chips. */
+  .iclab .ic {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 8px 2px 6px; border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--ink); cursor: pointer; font: inherit;
+  }
+  .iclab .ic:hover { background: var(--pill); border-color: var(--pill-edge); }
+  .iclab .ic.on {
+    background: var(--pill); border-color: var(--accent); color: var(--accent);
+  }
+
+  /* Two tones, because the neighbours are emoji.
+     A monochrome hairline sitting beside 🤖 and 🗑️ does not read as a third button; it reads
+     as an image that failed to load. So each glyph is split: the STRUCTURE it acts on — the
+     tray, the list, the floor, the container — in a cool slate, and the THING THAT MOVES —
+     the arrow, the inserted item, the approval mark — in a saturated hue. That is also how
+     emoji themselves are built: a body and a highlight, never one flat colour.
+     Green for landing, amber for queueing, so the two families are separable at a glance. */
+  .iclab { --ic-body: oklch(0.60 0.045 245); --ic-move: var(--ic-land); }
+  .iclab #iclab-queue { --ic-move: var(--ic-queue); }
+  :root[data-theme="light"] .iclab { --ic-body: oklch(0.52 0.05 245); }
+
+  .iclab .ic svg { color: var(--ic-body); }
+  .iclab .ic svg .m { stroke: var(--ic-move); stroke-width: 2.5; }
+  .iclab .ic svg .m[fill="currentColor"] { fill: var(--ic-move); }
+
+  /* Reading size, then working size. The small one sits in a mock of the real row so the
+     comparison is against 🤖 and 🗑️ as they actually render, not against nothing. */
+  .iclab .ic svg.big { width: 26px; height: 26px; display: block; }
+  .iclab .ic svg.sm  { width: 13px; height: 13px; display: block; }
+  /* The mute lives on the emoji, not on the row. It used to sit on the row, which meant the
+     grayscale meant for 🤖 and 🗑️ also drained the glyph of exactly the hue it was drawn to
+     carry — and the mock was then lying about how the real button looks, since the live one
+     opts out of that filter. Same treatment as the desk: emoji muted, drawing not. */
+  .iclab .icrow { display: flex; align-items: center; gap: 3px; font-size: 12px; line-height: 1; }
+  .iclab .icrow span { filter: grayscale(.55); opacity: .75; }
+  .iclab .icrow svg { opacity: .85; }
+  .iclab .ic:hover .icrow span, .iclab .ic.on .icrow span { filter: none; opacity: 1; }
+  .iclab .ic:hover .icrow svg, .iclab .ic.on .icrow svg { opacity: 1; }
+
+  .iclab .ic .icid {
+    font: 400 9px/1 var(--mono); color: var(--ink-faint); letter-spacing: .04em;
+  }
+  .iclab .ic.on .icid { color: var(--accent); }
+
+  /* The shortlist gets room the contact sheet cannot afford: a name beside each glyph, and
+     three to a row so a variant sits next to the thing it varies. */
+  .iclab .icfins {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px;
+    margin-bottom: 6px;
+  }
+  .iclab .icfin {
+    display: grid; grid-template-columns: 26px auto 1fr; align-items: center;
+    gap: 9px; padding: 7px 10px;
+    background: var(--pill); border: 1px solid var(--pill-edge); border-radius: 6px;
+  }
+  .iclab .icfin.queue { --ic-move: var(--ic-queue); }
+  .iclab .icfin .icid { grid-column: 1; grid-row: 2; text-align: center; }
+  .iclab .icfin .icnm { font-size: 11px; color: var(--ink-dim); }
+
+  /* The point of the whole card: a line you can read out loud. */
+  .iclab .icpicks {
+    margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--hairline);
+    font: 400 12px/1.5 var(--mono); color: var(--accent);
+  }
+  .iclab .icpicks .icnone { color: var(--ink-faint); }
+  .iclab .icpicks button {
+    margin-left: 10px; font-size: 10px; padding: 2px 8px; font-family: var(--ui);
+  }

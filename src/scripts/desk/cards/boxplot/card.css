@@ -1,0 +1,9 @@
+.ck-boxplot[data-card="boxplot"] { position: relative; }
+.ck-boxplot[data-card="boxplot"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-boxplot[data-card="boxplot"] .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-boxplot[data-card="boxplot"] .ck-plot .ck-cap-ax { fill: var(--ink-faint); font-size: 9.5px; letter-spacing: .04em; }
+.ck-boxplot[data-card="boxplot"] .ck-plot .ck-empty { fill: var(--ink-faint); font-size: 11px; }
+.ck-boxplot[data-card="boxplot"] .ck-plot .ck-whisk { stroke: var(--ink-faint); stroke-width: 1; fill: none; }
+.ck-boxplot[data-card="boxplot"] .ck-plot .ck-med { stroke: var(--ink); stroke-width: 1.8; fill: none; }
+.ck-boxplot[data-card="boxplot"] .ck-plot .ck-hit { stroke: none; }
+.ck-boxplot[data-card="boxplot"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }

@@ -1,0 +1,41 @@
+{
+  "ord": 64,
+  "type": "map",
+  "projection": "equirectangular",
+  "builtin": true,
+  "shapes": 21,
+  "vertices": 330,
+  "markers": 10,
+  "center": {
+    "lon": 10,
+    "lat": 10
+  },
+  "scale": 1,
+  "refused": {
+    "outOfRange": 0,
+    "tooFew": 0,
+    "badGeom": 0,
+    "unnamed": 0,
+    "markers": {
+      "outOfRange": 0,
+      "unnamed": 0,
+      "badValue": 0
+    },
+    "centre": false,
+    "scale": false
+  },
+  "hidden": {
+    "equirectangular": {
+      "shapes": 0,
+      "markers": 0
+    },
+    "mercator": {
+      "shapes": 0,
+      "markers": 0
+    },
+    "orthographic": {
+      "shapes": 8,
+      "markers": 4
+    }
+  }
+}

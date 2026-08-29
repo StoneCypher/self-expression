@@ -1,0 +1,77 @@
+.ck-pf {
+  position: relative;
+  --ck-up: var(--ck-s4);
+  --ck-dn: var(--ck-s1);
+  --ck-na: var(--ink-faint);
+}
+.ck-pf .ck-pf-body-row { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-start; }
+.ck-pf .ck-pf-table { flex: 1 1 320px; min-width: 0; }
+.ck-pf .ck-pf-alloc { flex: 0 1 180px; min-width: 150px; }
+.ck-pf .ck-pf-t {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ck-pf .ck-pf-t th, .ck-pf .ck-pf-t td { white-space: nowrap; text-align: right; }
+.ck-pf .ck-pf-t thead th {
+  font: 700 9px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint); padding: 0 0 5px;
+}
+.ck-pf .ck-pf-t td, .ck-pf .ck-pf-t tbody th { padding: 4px 0; border-top: 1px solid var(--hairline); }
+.ck-pf .ck-pf-t th + th, .ck-pf .ck-pf-t td + td, .ck-pf .ck-pf-t th + td { padding-left: 11px; }
+.ck-pf .ck-pf-t tbody tr:first-child > * { border-top-color: var(--rule); }
+.ck-pf .ck-pf-c-sym { text-align: left; font-weight: 400; }
+.ck-pf .ck-pf-sym { color: var(--ink); font-weight: 700; letter-spacing: .02em; }
+.ck-pf .ck-pf-sec {
+  display: block; font-family: var(--ui); font-size: 9.5px; color: var(--ink-faint); margin-top: 1px;
+  max-width: 16ch; overflow: hidden; text-overflow: ellipsis;
+}
+.ck-pf .ck-pf-t tfoot th, .ck-pf .ck-pf-t tfoot td { border-top: 1px solid var(--rule); padding-top: 6px; }
+.ck-pf .ck-pf-tot .ck-pf-c-sym {
+  font: 700 9px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim);
+}
+.ck-pf .ck-up { color: var(--ck-up); }
+.ck-pf .ck-dn { color: var(--ck-dn); }
+.ck-pf .ck-flat { color: var(--ink-dim); }
+.ck-pf .ck-na { color: var(--ck-na); }
+.ck-pf .ck-pf-donut { width: 100%; max-width: 180px; height: auto; display: block; margin: 0 auto; }
+.ck-pf .ck-pf-seg { fill: none; stroke-width: 15; }
+.ck-pf .ck-pf-track { fill: none; stroke: var(--well); stroke-width: 15; }
+.ck-pf .ck-pf-hole {
+  font-family: var(--disp); font-size: 13px; fill: var(--ink); font-variant-numeric: tabular-nums;
+}
+.ck-pf .ck-pf-holelab {
+  font-family: var(--ui); font-size: 6.5px; fill: var(--ink-faint);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.ck-pf .ck-pf-short { color: var(--ck-dn); }
+.ck-pf .ck-pf-cashnote { display: none; }
+.ck-pf[data-cash="on"] .ck-pf-cashnote { display: inline; }
+.ck-pf .ck-pf-donut, .ck-pf .ck-pf-key { display: none; }
+.ck-pf[data-group="sector"][data-cash="on"] .ck-pf-donut[data-k="sector-on"] { display: block; }
+.ck-pf[data-group="sector"][data-cash="on"] .ck-pf-key[data-k="sector-on"] { display: flex; }
+.ck-pf[data-group="sector"][data-cash="off"] .ck-pf-donut[data-k="sector-off"] { display: block; }
+.ck-pf[data-group="sector"][data-cash="off"] .ck-pf-key[data-k="sector-off"] { display: flex; }
+.ck-pf[data-group="symbol"][data-cash="on"] .ck-pf-donut[data-k="symbol-on"] { display: block; }
+.ck-pf[data-group="symbol"][data-cash="on"] .ck-pf-key[data-k="symbol-on"] { display: flex; }
+.ck-pf[data-group="symbol"][data-cash="off"] .ck-pf-donut[data-k="symbol-off"] { display: block; }
+.ck-pf[data-group="symbol"][data-cash="off"] .ck-pf-key[data-k="symbol-off"] { display: flex; }
+.ck-pf .ck-pf-seg[data-s="1"] { stroke: var(--ck-s1); }
+.ck-pf .ck-legend i[data-s="1"] { background: var(--ck-s1); }
+.ck-pf .ck-pf-seg[data-s="2"] { stroke: var(--ck-s2); }
+.ck-pf .ck-legend i[data-s="2"] { background: var(--ck-s2); }
+.ck-pf .ck-pf-seg[data-s="3"] { stroke: var(--ck-s3); }
+.ck-pf .ck-legend i[data-s="3"] { background: var(--ck-s3); }
+.ck-pf .ck-pf-seg[data-s="4"] { stroke: var(--ck-s4); }
+.ck-pf .ck-legend i[data-s="4"] { background: var(--ck-s4); }
+.ck-pf .ck-pf-seg[data-s="5"] { stroke: var(--ck-s5); }
+.ck-pf .ck-legend i[data-s="5"] { background: var(--ck-s5); }
+.ck-pf .ck-pf-seg[data-s="6"] { stroke: var(--ck-s6); }
+.ck-pf .ck-legend i[data-s="6"] { background: var(--ck-s6); }
+.ck-pf .ck-pf-seg[data-s="7"] { stroke: var(--ck-s7); }
+.ck-pf .ck-legend i[data-s="7"] { background: var(--ck-s7); }
+.ck-pf .ck-pf-seg[data-s="8"] { stroke: var(--ck-s8); }
+.ck-pf .ck-legend i[data-s="8"] { background: var(--ck-s8); }
+.ck-pf .ck-pf-void { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); padding: 10px 0; }
+.ck-pf .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-pf .ck-cap { overflow-wrap: anywhere; }

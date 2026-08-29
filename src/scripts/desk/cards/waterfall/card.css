@@ -1,0 +1,19 @@
+.ck-waterfall { position: relative; }
+.ck-waterfall h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-waterfall .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-waterfall .ck-plot .ck-val { fill: var(--ink-dim); }
+.ck-waterfall .ck-plot .ck-valt { fill: var(--ink); }
+.ck-waterfall .ck-plot .ck-sub { fill: var(--ink-faint); }
+.ck-waterfall .ck-pos { fill: var(--ck-s4); stroke: none; }
+.ck-waterfall .ck-neg { stroke: var(--ck-s1); stroke-width: 1; }
+.ck-waterfall .ck-tot { fill: var(--ck-s6); stroke: none; }
+.ck-waterfall .ck-hatch-bg { fill: var(--ck-s1); fill-opacity: .16; stroke: none; }
+.ck-waterfall .ck-hatch-ln { stroke: var(--ck-s1); stroke-width: 2; fill: none; }
+.ck-waterfall .ck-lead { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 2 2; fill: none; }
+.ck-waterfall .ck-legend i { width: 8px; height: 8px; border-radius: 1px; }
+.ck-waterfall .ck-legend .ck-k-pos { background: var(--ck-s4); }
+.ck-waterfall .ck-legend .ck-k-tot { background: var(--ck-s6); }
+.ck-waterfall .ck-legend .ck-k-neg { background: repeating-linear-gradient(45deg, var(--ck-s1) 0 1.5px, transparent 1.5px 4px), var(--well); }
+.ck-waterfall .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-waterfall .ck-cap { overflow-wrap: anywhere; }
+.ck-waterfall[data-card="waterfall"] .ck-plot { min-width: 724px; }

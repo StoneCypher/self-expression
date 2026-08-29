@@ -1,0 +1,30 @@
+  /* Full width, height from the viewBox. A matrix has one honest aspect ratio — the one
+     where a cell is a cell — so the pane sets the scale and never the shape. */
+  .trkviz { display: block; width: 100%; height: auto; margin-top: 4px; }
+  .trkviz text { font-family: var(--mono); }
+
+  /* Every colour is a desk token, so the light switch is the only thing that has to know
+     anything. Keyed to `:root[data-theme="light"]` and NOT to prefers-color-scheme: the
+     desk is one document open in two viewers that want different answers, and the OS gives
+     both the same answer. */
+  .trkviz .cell { fill: var(--ink-dim); }
+  .trkviz .band { fill: var(--ink);    opacity: .05; }    /* alternating row stripe */
+  /* The open-issue wash sits under the squares and must never be mistaken for one, so it
+     is the accent at a fraction of the strength the accent is used at anywhere else. */
+  .trkviz .open { fill: var(--accent); opacity: .13; }
+  .trkviz .ax   { fill: var(--ink-dim); }
+  .trkviz .axf  { fill: var(--ink-faint); }
+  .trkviz .msn  { fill: var(--accent); }
+  .trkviz .rule { stroke: var(--rule); stroke-width: 1; fill: none; }
+
+  /* Light needs a little more of everything. `--ink-dim` reflects from L 0.62 to L 0.42
+     and the ground goes 0.155 → 0.985, so a dark square on white holds its edge while the
+     washes behind it lose theirs: ink at 5% on white is fainter than ink at 5% on
+     near-black, and the accent darkens from L 0.84 to L 0.52, which costs the wash most of
+     its presence. Both are lifted rather than recoloured, so the hues stay put. */
+  :root[data-theme="light"] .trkviz .band { opacity: .07; }
+  :root[data-theme="light"] .trkviz .open { opacity: .17; }
+
+  .trk .cap b { color: var(--accent); font-weight: 400; }
+  .trk .cap i { color: var(--ink-dim); font-style: normal; }
+  .trk .cap .trk-out { color: var(--ink-faint); opacity: .8; }

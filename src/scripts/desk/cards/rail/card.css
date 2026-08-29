@@ -1,0 +1,87 @@
+
+  .ck-rail { position: relative; }
+
+  .ck-rail .ck-r-list, .ck-rail .ck-r-bench { list-style: none; margin: 10px 0 0; padding: 0; }
+  .ck-rail .ck-r-bench { margin-top: 4px; }
+  .ck-rail .ck-r-bench[hidden], .ck-rail .ck-r-benchhead[hidden], .ck-rail .ck-r-none[hidden] { display: none; }
+
+  /* Rows, not pills. The desk's tickets wrapped inline and needed a ground of their own to keep
+     an edge across a line break; a rail is one row per line by definition, so a hairline is
+     enough delimiter and costs far less ink at twenty rows. */
+  .ck-rail .ck-r-row {
+    display: flex; align-items: baseline; gap: 7px;
+    padding: 4px 3px; border-bottom: 1px solid var(--hairline);
+    font-size: 12px; color: var(--ink);
+  }
+  /* [hidden] and the display rule above tie on specificity, and this sheet loads after the UA's,
+     so a dismissed row would stay visible without saying so. */
+  .ck-rail .ck-r-row[hidden] { display: none; }
+  .ck-rail .ck-r-row:hover { background: var(--pill); }
+
+  /* The identifier gets its own node so it can carry its own colour: it is a name rather than
+     part of the sentence, and tinting it lets the eye skip past it when reading the list and
+     land on it when hunting for one. */
+  .ck-rail .ck-r-tag {
+    flex: none; font-family: var(--mono); font-size: 11px;
+    color: var(--accent); text-decoration: none;
+  }
+  .ck-rail a.ck-r-tag:hover { text-decoration: underline; }
+
+  .ck-rail .ck-r-text { flex: 1 1 auto; min-width: 0; }
+
+  /* Done says itself twice, and deliberately. The strike is a setting and can be turned off;
+     the mark cannot, because "you have already acted on this" is information the card must not
+     be configurable into hiding. */
+  .ck-rail .ck-r-mark { display: none; flex: none; color: var(--good); line-height: 0; }
+  .ck-rail .ck-r-mark svg { width: 11px; height: 11px; display: block; }
+  .ck-rail .ck-r-is-done { color: var(--ink-faint); }
+  .ck-rail .ck-r-is-done .ck-r-mark { display: inline-flex; align-self: center; }
+  .ck-rail.ck-r-strike .ck-r-is-done .ck-r-text { text-decoration: line-through; }
+
+  .ck-rail .ck-r-verbs { flex: none; display: inline-flex; align-items: center; gap: 2px; }
+  .ck-rail .ck-r-verb, .ck-rail .ck-r-kill {
+    font: inherit; line-height: 1; padding: 0 3px; cursor: pointer;
+    background: transparent; border: none;
+  }
+
+  /* An emoji sits in a cluster of emoji and is muted at rest so the row's words stay the loudest
+     thing on it. A drawn glyph opts out of the grayscale entirely: it would eat exactly the hue
+     the glyph was drawn to carry, and the button would then be a picture of a different icon. */
+  .ck-rail .ck-r-emo { font-size: 12px; filter: grayscale(.55); opacity: .75; }
+  .ck-rail .ck-r-verb:hover .ck-r-emo { filter: none; opacity: 1; }
+
+  /* vertical-align because an inline-flex box has no baseline of its own to offer: an <svg> is
+     not a baseline-bearing child, so the box aligns by its bottom margin edge and the glyph
+     sits a few pixels high of the emoji beside it. The offset is the descender room the emoji
+     occupy and the drawing does not. */
+  .ck-rail .ck-r-ico {
+    display: inline-flex; align-items: center; vertical-align: -2px;
+    opacity: .85; color: var(--ink-dim);
+  }
+  .ck-rail .ck-r-ico svg { width: 13px; height: 13px; display: block; }
+  .ck-rail .ck-r-verb:hover .ck-r-ico { opacity: 1; color: var(--accent); }
+
+  /* A verb with no icon still needs a face, and the key is the truest one available: it is
+     exactly the string the page will receive. */
+  .ck-rail .ck-r-word {
+    font: 700 9px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .ck-rail .ck-r-verb:hover .ck-r-word { color: var(--accent); }
+
+  /* Faint like the card Xes, for the same reason: removal should be available, not advertised. */
+  .ck-rail .ck-r-kill { font-size: 12px; color: var(--ink-faint); opacity: .55; }
+  .ck-rail .ck-r-kill:hover { opacity: 1; color: var(--ink); }
+
+  /* The bench is a preview of what is queued, not a second rail, so it reads quieter than the
+     thing it is behind — and stays fully interactive, because dismissing something on the bench
+     is a real decision about what gets promoted next. */
+  .ck-rail .ck-r-bench .ck-r-row { opacity: .6; border-bottom-style: dashed; }
+  .ck-rail .ck-r-bench .ck-r-row:hover { opacity: 1; }
+
+  .ck-rail .ck-r-none { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin: 10px 0; }
+  .ck-rail .ck-r-count { color: var(--ink-faint); }
+
+  /* A checkbox inherits the panel's full-width input rule and comes out as a stretched box;
+     it wants to be its own size, at the start of its column. */
+  .ck-rail .ck-set input[type="checkbox"] { width: auto; justify-self: start; margin: 0; }

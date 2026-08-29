@@ -1,0 +1,26 @@
+.ck-chart[data-card="chart"] { position: relative; }
+.ck-chart[data-card="chart"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-chart[data-card="chart"] .ck-plot .ck-tk { fill: var(--ink-faint); }
+.ck-chart[data-card="chart"] .ck-plot .ck-val { fill: var(--ink-dim); }
+.ck-chart[data-card="chart"] .ck-plot .ck-cap-ax { fill: var(--ink-faint); font-size: 9.5px; letter-spacing: .04em; }
+.ck-chart[data-card="chart"] .ck-plot .ck-hit { stroke: none; }
+.ck-chart[data-card="chart"] .ck-plot .ck-bar { stroke: none; }
+.ck-chart[data-card="chart"] .ck-key { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); }
+.ck-chart[data-card="chart"] .ck-key:hover { color: var(--ink-dim); }
+.ck-chart[data-card="chart"] .ck-key:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.ck-chart[data-card="chart"] .ck-key[aria-pressed="false"] { opacity: .4; text-decoration: line-through; }
+.ck-chart[data-card="chart"] .ck-key i { width: 7px; height: 7px; display: block; border-radius: 1px; }
+.ck-chart[data-card="chart"] .ck-key i[data-s="1"] { background: var(--ck-s1); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="2"] { background: var(--ck-s2); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="3"] { background: var(--ck-s3); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="4"] { background: var(--ck-s4); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="5"] { background: var(--ck-s5); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="6"] { background: var(--ck-s6); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="7"] { background: var(--ck-s7); }
+.ck-chart[data-card="chart"] .ck-key i[data-s="8"] { background: var(--ck-s8); }
+.ck-chart[data-card="chart"] .ck-plot .ck-ser { transition: opacity .12s linear; }
+.ck-chart[data-card="chart"] .ck-plot:hover .ck-ser { opacity: .45; }
+.ck-chart[data-card="chart"] .ck-plot .ck-ser:hover { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+.ck-chart[data-card="chart"] .ck-plot .ck-ser { transition: none; }
+}

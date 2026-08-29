@@ -1,0 +1,13 @@
+{
+  "ord": 61,
+  "type": "icicle",
+  "title": "the catalogue, banded by module size",
+  "settings": {
+    "orient": "down",
+    "depth": 3,
+    "labels": "fit"
+  },
+  "leaves": 41,
+  "branches": 25,
+  "total": 38748
+}

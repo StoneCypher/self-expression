@@ -1,0 +1,114 @@
+
+  .ck-ledger { position: relative; }
+
+  /* ── the counts line ────────────────────────────────────────────────────────────────── */
+
+  /* The checklist digest's grammar, set as type rather than as character cells: the tally, the
+     noun it counts, then one entry per marker. Tabular figures so the three counts hold their
+     places when the card is rebuilt with different numbers. */
+  .ck-ledger .ck-lg-sum {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 10px;
+    margin: 10px 0 4px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums;
+  }
+  .ck-ledger .ck-lg-tally b { font-weight: 700; }
+  .ck-ledger .ck-lg-tally s { text-decoration: none; color: var(--ink-faint); margin: 0 1px; }
+  .ck-ledger .ck-lg-b-success { color: var(--good); }
+  .ck-ledger .ck-lg-b-active  { color: var(--ink-dim); }
+  .ck-ledger .ck-lg-b-failure { color: var(--ck-s1); }
+  .ck-ledger .ck-lg-noun { color: var(--ink-dim); }
+  .ck-ledger .ck-lg-icons { display: flex; flex-wrap: wrap; gap: 2px 9px; color: var(--ink-faint); }
+  .ck-ledger .ck-lg-ic { display: inline-flex; align-items: baseline; gap: 4px; }
+  .ck-ledger .ck-lg-ic em { font-style: normal; }
+
+  /* ── headings ───────────────────────────────────────────────────────────────────────── */
+
+  /* .ck-h3 carries the look; this only fixes the spacing for a heading that sits inside a
+     list rather than above one, and makes [hidden] actually hide — the kit's rule and the
+     UA's tie on specificity, and this sheet loads later. */
+  .ck-ledger .ck-lg-head { margin: 14px 0 4px; }
+  .ck-ledger .ck-lg-head:first-child { margin-top: 4px; }
+  .ck-ledger .ck-lg-head[hidden] { display: none; }
+
+  /* ── rows ───────────────────────────────────────────────────────────────────────────── */
+
+  .ck-ledger .ck-lg-list { margin-top: 8px; }
+
+  .ck-ledger .ck-lg-row {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 5px 4px; border-bottom: 1px solid var(--hairline);
+  }
+  .ck-ledger .ck-lg-row[hidden] { display: none; }
+  .ck-ledger .ck-lg-row:hover { background: var(--pill); }
+  .ck-ledger.ck-lg-dense .ck-lg-row { padding: 2px 4px; gap: 6px; }
+
+  /* A fixed marker column, kept even when a row has no marker, so the text of every row starts
+     in the same place. A list that does not line up reads as two lists. */
+  .ck-ledger .ck-lg-mark {
+    flex: none; width: 17px; text-align: center;
+    font-size: 12px; line-height: 1.5;
+  }
+  .ck-ledger .ck-lg-bare { border-bottom: 1px solid var(--rule); height: 1px; align-self: center; }
+
+  /* A marker this file's vocabulary does not know still renders — dropping the row to hide our
+     own staleness would be the wrong trade. The dotted rule under it is the flag, and the
+     caption says how many there are. */
+  .ck-ledger .ck-lg-odd { border-bottom: 1px dotted var(--ck-s2); }
+
+  .ck-ledger .ck-lg-body { flex: 1 1 auto; min-width: 0; }
+  .ck-ledger .ck-lg-text { font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+  .ck-ledger .ck-lg-note {
+    display: block; font-size: 11px; line-height: 1.4; color: var(--ink-faint); margin-top: 1px;
+  }
+  .ck-ledger.ck-lg-dense .ck-lg-note { display: none; }
+
+  .ck-ledger .ck-lg-tag {
+    flex: none; font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+    background: var(--pill); border: 1px solid var(--pill-edge); border-radius: 4px;
+    padding: 1px 5px; text-decoration: none; white-space: nowrap;
+  }
+  .ck-ledger a.ck-lg-tag:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── struck rows ────────────────────────────────────────────────────────────────────── */
+
+  /* Struck and dimmed, not gone: the row is the evidence of what was just done, and the verbs
+     stay live so the wrong click can be answered. Only the text is struck — striking the tag
+     would make a link look broken rather than done. */
+  .ck-ledger .ck-lg-struck .ck-lg-text { text-decoration: line-through; }
+  .ck-ledger .ck-lg-struck { opacity: .48; }
+  .ck-ledger .ck-lg-struck:hover { opacity: .8; }
+
+  /* ── verbs ──────────────────────────────────────────────────────────────────────────── */
+
+  .ck-ledger .ck-lg-verbs { flex: none; display: flex; gap: 2px; align-self: center; }
+  .ck-ledger .ck-lg-verb {
+    width: 21px; height: 21px; padding: 0; line-height: 0;
+    background: transparent; color: var(--ink-faint);
+    border: 1px solid transparent; border-radius: 4px; cursor: pointer;
+    opacity: 0; transition: opacity .12s;
+  }
+  .ck-ledger .ck-lg-verb svg { width: 13px; height: 13px; display: block; margin: 0 auto; }
+  .ck-ledger .ck-lg-glyph { font-size: 11px; line-height: 1; display: block; }
+  /* Revealed on hover or focus, never on neither: a row of buttons on every line turns a
+     ledger into a control panel, and the reader came to read. */
+  .ck-ledger .ck-lg-row:hover .ck-lg-verb,
+  .ck-ledger .ck-lg-verb:focus-visible { opacity: 1; }
+  .ck-ledger .ck-lg-verb:hover { color: var(--accent); border-color: var(--pill-edge); }
+  .ck-ledger .ck-lg-verb:focus-visible { outline: 1px solid var(--accent); outline-offset: -2px; }
+
+  /* ── the two empties ────────────────────────────────────────────────────────────────── */
+
+  .ck-ledger .ck-lg-void, .ck-ledger .ck-lg-none {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    padding: 14px 4px; text-align: center;
+  }
+  .ck-ledger .ck-lg-none[hidden] { display: none; }
+  .ck-ledger .ck-lg-void { text-align: left; padding: 10px 0; }
+
+  .ck-ledger .ck-lg-count { color: var(--ink-faint); }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* The verb fade is decoration; hover and focus still reveal them instantly. */
+    .ck-ledger .ck-lg-verb { transition: none; }
+  }

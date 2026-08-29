@@ -1,0 +1,14 @@
+.ck-countdown { position: relative; }
+.ck-countdown .ck-units { display: flex; align-items: baseline; gap: 15px; flex-wrap: wrap; }
+.ck-countdown .ck-u { display: inline-flex; align-items: baseline; gap: 3px; }
+.ck-countdown .ck-u b { font: 400 34px/1 var(--disp); color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+.ck-countdown .ck-u i { font: 400 12px/1 var(--ui); font-style: normal; color: var(--ink-faint); }
+.ck-countdown[data-wide="on"] .ck-u b { font-size: 21px; }
+.ck-countdown[data-state="past"] .ck-u b { color: var(--ink-dim); }
+.ck-countdown[data-state="reached"] .ck-u b { color: var(--ink-dim); }
+.ck-countdown[data-state="now"] .ck-u b { color: var(--accent); }
+.ck-countdown .ck-ago { align-self: center; font: 700 11px/1 var(--ui); letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
+.ck-countdown .ck-bad { font: 400 13px/1.45 var(--ui); color: var(--ink-dim); }
+.ck-countdown .ck-when { margin-top: 10px; font: 400 11.5px/1.4 var(--ui); color: var(--ink-dim); overflow-wrap: anywhere; }
+.ck-countdown .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+.ck-countdown .ck-cap { overflow-wrap: anywhere; }

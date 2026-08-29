@@ -1,0 +1,14 @@
+{
+  "ord": 41,
+  "type": "countdown",
+  "id": "countdown",
+  "title": "to the turn of the year",
+  "target": 1798761600000,
+  "raw": "2027-01-01T00:00:00Z",
+  "label": "UTC new year",
+  "settings": {
+    "unitsShown": "auto",
+    "seconds": true,
+    "past": "up"
+  }
+}

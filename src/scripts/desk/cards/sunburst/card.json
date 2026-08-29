@@ -1,0 +1,13 @@
+{
+  "ord": 60,
+  "type": "sunburst",
+  "title": "the catalogue, split by whether it has a gear",
+  "settings": {
+    "depth": 3,
+    "labels": true,
+    "center": "total"
+  },
+  "leaves": 41,
+  "branches": 19,
+  "total": 38748
+}

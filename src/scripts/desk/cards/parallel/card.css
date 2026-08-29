@@ -1,0 +1,22 @@
+.ck-parallel[data-card="parallel"] { position: relative; }
+.ck-parallel[data-card="parallel"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-parallel[data-card="parallel"] .ck-pc-scroll { margin-top: 2px; }
+.ck-parallel[data-card="parallel"] svg.ck-pc { display: block; width: 100%; height: auto; }
+.ck-parallel[data-card="parallel"] svg.ck-pc text { font-family: var(--mono); font-size: 9px; }
+.ck-parallel[data-card="parallel"] .ck-pc .ax { stroke: var(--rule); stroke-width: 1; }
+.ck-parallel[data-card="parallel"] .ck-pc .tick { stroke: var(--ck-grid); stroke-width: 1; }
+.ck-parallel[data-card="parallel"] .ck-pc .axlab { fill: var(--ink-dim); }
+.ck-parallel[data-card="parallel"] .ck-pc .axval { fill: var(--ink-faint); font-size: 8.5px; }
+.ck-parallel[data-card="parallel"] .ck-pc .wire { fill: none; stroke-width: 1.1; stroke-linejoin: round; stroke-linecap: round; }
+.ck-parallel[data-card="parallel"] .ck-pc .hit { fill: none; stroke: transparent; stroke-width: 7; pointer-events: stroke; }
+.ck-parallel[data-card="parallel"] .ck-pc .ln { transition: opacity .1s linear; }
+.ck-parallel[data-card="parallel"] .ck-pc:hover .ln { opacity: .07; }
+.ck-parallel[data-card="parallel"] .ck-pc .ln:hover { opacity: 1; }
+.ck-parallel[data-card="parallel"] .ck-pc .ln:hover .wire { stroke-width: 2.2; }
+.ck-parallel[data-card="parallel"] .ck-pc .dot { stroke: none; }
+.ck-parallel[data-card="parallel"] .ck-pc-void { color: var(--ink-faint); font-size: 12px; padding: 12px 0 4px; }
+.ck-parallel[data-card="parallel"] .ck-set input[type="number"] { width: 6.5em; }
+.ck-parallel[data-card="parallel"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+@media (prefers-reduced-motion: reduce) {
+.ck-parallel[data-card="parallel"] .ck-pc .ln { transition: none; }
+}

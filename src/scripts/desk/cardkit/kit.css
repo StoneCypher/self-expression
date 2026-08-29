@@ -1,0 +1,120 @@
+  /* ── cardkit ──────────────────────────────────────────────────────────────────────────
+     The idiom every card type shares, so a card is an instance of something rather than a
+     fresh invention. Three cards written by hand tonight each grew a private vocabulary for
+     "caption emphasis" and "small label"; this is the one they should have used.
+
+     Everything here is a token or built from tokens. A card that names a colour literally
+     is a card that will be wrong in one of the two themes, and the desk is one document
+     open in two viewers that want different answers. */
+
+  /* Eight series colours, hue-separated and equal in lightness so nothing reads as louder
+     than its neighbours by accident. Light mode reflects the lightness and lifts chroma
+     slightly: the same hue against white carries less apparent saturation than against
+     near-black, so holding chroma constant would fade the whole set. */
+  :root {
+    --ck-s1: oklch(0.78 0.15 30);    /* coral   */
+    --ck-s2: oklch(0.80 0.15 70);    /* amber   */
+    --ck-s3: oklch(0.80 0.15 110);   /* olive   */
+    --ck-s4: oklch(0.78 0.15 150);   /* green   */
+    --ck-s5: oklch(0.78 0.13 195);   /* teal    */
+    --ck-s6: oklch(0.74 0.14 240);   /* blue    */
+    --ck-s7: oklch(0.74 0.15 285);   /* violet  */
+    --ck-s8: oklch(0.76 0.15 330);   /* magenta */
+    --ck-grid: oklch(0.30 0.010 90); /* plot rules, fainter than --rule */
+    --ck-ink:  var(--ink);
+  }
+  :root[data-theme="light"] {
+    --ck-s1: oklch(0.55 0.17 30);
+    --ck-s2: oklch(0.58 0.16 70);
+    --ck-s3: oklch(0.56 0.16 110);
+    --ck-s4: oklch(0.52 0.16 150);
+    --ck-s5: oklch(0.52 0.14 195);
+    --ck-s6: oklch(0.50 0.16 240);
+    --ck-s7: oklch(0.50 0.17 285);
+    --ck-s8: oklch(0.52 0.17 330);
+    --ck-grid: oklch(0.88 0.005 90);
+  }
+
+  /* The caption: what the card is claiming, in the card's own words. Every card has one,
+     because a visual that cannot say what it shows is a decoration. */
+  .ck-cap { font-size: 12px; color: var(--ink-dim); margin-top: 8px; line-height: 1.5; }
+  .ck-cap b { color: var(--accent); font-weight: 400; }
+  .ck-cap i { color: var(--ink-dim); font-style: normal; }
+  .ck-cap .ck-aside { color: var(--ink-faint); }
+
+  /* A sub-heading inside a card. Weight rather than size: at this scale weight separates
+     better than scale does, and a card is already small. */
+  .ck-h3 {
+    font: 700 11px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-dim); margin: 16px 0 8px;
+  }
+
+  /* Wide content scrolls inside its own box; the desk column never scrolls sideways. */
+  .ck-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+
+  .ck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 4px; }
+
+  .ck-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 8px 2px 6px; border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--ink); cursor: pointer; font: inherit;
+  }
+  .ck-tile:hover { background: var(--pill); border-color: var(--pill-edge); }
+  .ck-tile.on { background: var(--pill); border-color: var(--accent); color: var(--accent); }
+
+  .ck-legend {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 8px;
+    font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint);
+  }
+  .ck-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .ck-legend i { width: 7px; height: 7px; display: block; border-radius: 1px; }
+
+  /* Plot furniture. Named here so a chart card and a graph card agree about what an axis
+     looks like without either of them deciding. */
+  .ck-plot { display: block; width: 100%; height: auto; }
+  .ck-plot text { font-family: var(--mono); font-size: 9px; fill: var(--ink-faint); }
+  .ck-plot .ck-rule { stroke: var(--ck-grid); stroke-width: 1; fill: none; }
+  .ck-plot .ck-axis { stroke: var(--rule); stroke-width: 1; fill: none; }
+
+  /* A drawn glyph, two-tone: the structure an icon acts on, and the part of it that moves.
+     Shared with the inbox buttons so a card and a control never disagree about a shape. */
+  .ck-icon { display: block; color: var(--ic-body); }
+  .ck-icon .m { stroke: var(--ic-move, var(--accent)); }
+
+  /* The gear: a card's own settings, beside its close button.
+     Left of the X and styled to match it — faint until wanted, because a card should not
+     look like it is asking to be configured any more than it looks like it is asking to be
+     closed. The two together read as one small cluster of card-level verbs. */
+  .ck-gear {
+    position: absolute; top: 5px; right: 26px; width: 17px; height: 17px; padding: 0;
+    border: none; background: transparent; color: var(--ink-faint);
+    cursor: pointer; opacity: .5; line-height: 0;
+  }
+  .ck-gear:hover, .ck-gear[aria-expanded="true"] {
+    opacity: 1; color: var(--accent); background: transparent; border: none;
+  }
+  .ck-gear svg { width: 15px; height: 15px; display: block; margin: 0 auto; }
+
+  /* The panel it opens. Inset and recessed so it reads as being *about* the card rather
+     than as more card — the same move the ask box makes on the desk itself. */
+  .ck-set {
+    margin: 10px 0 2px; padding: 10px 12px;
+    background: var(--well); border: 1px solid var(--hairline); border-radius: 6px;
+    display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center;
+    font-size: 12px;
+  }
+  .ck-set[hidden] { display: none; }
+  .ck-set label { color: var(--ink-dim); }
+  .ck-set input, .ck-set select {
+    font: inherit; font-family: var(--mono); font-size: 11px;
+    background: var(--ground); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 4px; padding: 4px 7px; width: 100%;
+  }
+  .ck-set input:focus, .ck-set select:focus { outline: none; border-color: var(--accent); }
+  .ck-set .ck-set-foot { grid-column: 1 / -1; color: var(--ink-faint); font-size: 10.5px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* Animation is a garnish here, never a carrier of meaning, so it is safe to simply
+       stop. `CK.spin` checks the same query and never starts. */
+    .ck-spin { animation: none !important; }
+  }

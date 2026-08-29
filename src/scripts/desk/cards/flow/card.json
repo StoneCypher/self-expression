@@ -1,0 +1,29 @@
+{
+  "ord": 24,
+  "type": "flow",
+  "nodes": 10,
+  "links": 17,
+  "stages": 2,
+  "inferredStages": true,
+  "total": 38748,
+  "balanced": true,
+  "shortfall": [
+    0,
+    0
+  ],
+  "leakyNodes": 0,
+  "crossingsBefore": 48,
+  "crossingsAfter": 26,
+  "orderPasses": 2,
+  "orderSettled": true,
+  "orderReverted": false,
+  "dropped": {
+    "unknown": 0,
+    "zero": 0,
+    "bad": 0,
+    "self": 0,
+    "merged": 0,
+    "backward": 0,
+    "dupeIds": 0
+  }
+}

@@ -1,0 +1,23 @@
+<section data-card="logtail" class="ck-logtail">
+  <h2>the last build</h2>
+  <button type="button" class="ck-gear" title="settings" aria-label="settings"></button>
+  <div class="ck-set" hidden>
+    <label for="logtail-lines">lines</label>
+    <select id="logtail-lines" name="lines"><option value="100">100 lines</option><option value="500" selected>500 lines</option><option value="2000">2000 lines</option></select>
+    <label for="logtail-interval">poll</label>
+    <select id="logtail-interval" name="interval"><option value="2">every 2s</option><option value="3" selected>every 3s</option><option value="10">every 10s</option></select>
+    <label for="logtail-follow">follow</label>
+    <input type="checkbox" id="logtail-follow" name="follow">
+    <label for="logtail-wrap">wrap long lines</label>
+    <input type="checkbox" id="logtail-wrap" name="wrap">
+    <div class="ck-set-foot">following keeps the view at the end only while it is already there. scroll up to read something and it stays where you put it.</div>
+  </div>
+  <div class="ck-lt-tools">
+    <input type="search" class="ck-lt-find" placeholder="filter lines" aria-label="filter lines" autocomplete="off" spellcheck="false" value="">
+    <span class="ck-lt-live"></span>
+  </div>
+  <div class="ck-lt-view" tabindex="0" aria-label="file tail">
+    <div class="ck-lt-rows"></div>
+  </div>
+  <div class="ck-cap"><b class="ck-lt-count">reading</b><i class="ck-lt-note"></i><span class="ck-aside ck-lt-path">C:/Users/john/AppData/Local/Temp/claude/C--Users-john-projects-self-expression/58cf5997-1157-4c50-b520-91d7306fb59b/scratchpad/build.log</span></div>
+</section>

@@ -1,0 +1,15 @@
+{
+  "ord": 55,
+  "type": "ticker",
+  "id": "ticker",
+  "title": "watchlist",
+  "settings": {
+    "showLast": true,
+    "showChange": true,
+    "showPercent": true,
+    "showSpark": true,
+    "sort": "given",
+    "compact": false
+  },
+  "rows": 7
+}

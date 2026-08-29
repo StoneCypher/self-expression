@@ -1,0 +1,18 @@
+.ck-arc[data-card="arc"] { position: relative; }
+.ck-arc[data-card="arc"] h2 { font: 600 13px/1.35 var(--disp), var(--ui); color: var(--ink); margin: 0 0 10px; }
+.ck-arc[data-card="arc"] .ck-arc-scroll { margin-top: 2px; }
+.ck-arc[data-card="arc"] svg.ck-ad { display: block; width: 100%; height: auto; }
+.ck-arc[data-card="arc"] svg.ck-ad text { font-family: var(--mono); font-size: 9px; fill: var(--ink-dim); }
+.ck-arc[data-card="arc"] .ck-ad .rail { stroke: var(--rule); stroke-width: 1; }
+.ck-arc[data-card="arc"] .ck-ad .stem { stroke: var(--ck-grid); stroke-width: 1; }
+.ck-arc[data-card="arc"] .ck-ad .edge { fill: none; stroke-linecap: round; opacity: .7; transition: opacity .12s linear; }
+.ck-arc[data-card="arc"] .ck-ad:hover .edge { opacity: .18; }
+.ck-arc[data-card="arc"] .ck-ad .edge:hover { opacity: 1; }
+.ck-arc[data-card="arc"] .ck-ad .loop { fill: none; stroke-width: 1.4; opacity: .8; }
+.ck-arc[data-card="arc"] .ck-ad .dot { stroke: none; }
+.ck-arc[data-card="arc"] .ck-ad .lab { fill: var(--ink-dim); }
+.ck-arc[data-card="arc"] .ck-ad-void { color: var(--ink-faint); font-size: 12px; padding: 12px 0 4px; }
+.ck-arc[data-card="arc"] .ck-set input[type="checkbox"] { width: auto; justify-self: start; }
+@media (prefers-reduced-motion: reduce) {
+.ck-arc[data-card="arc"] .ck-ad .edge { transition: none; }
+}
