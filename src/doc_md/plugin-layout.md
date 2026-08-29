@@ -17,6 +17,7 @@ step and no per-host branch:
 | Skills | `skills/*/SKILL.md` | `skills/*/SKILL.md` | `skills/*/SKILL.md` |
 | MCP | `.mcp.json` | `.mcp.json` | inline in manifest |
 | Hooks | `hooks/hooks.claude.json` | *(pending)* | *(pending)* |
+| Turn context | the hook observes it | `begin_turn` volunteers it | `begin_turn` volunteers it |
 | Slash commands | `claude-commands/*.md` | *(via skills)* | `commands/*.toml` |
 | Context file | `CLAUDE.md` | `AGENTS.md` | `GEMINI.md` |
 
@@ -37,7 +38,8 @@ self-expression/
 ├── gemini-extension.json    Gemini manifest
 ├── .mcp.json                MCP server registration; read by Claude and Codex
 │
-├── skills/                  SHARED — all three hosts read this verbatim
+├── skills/                  SHARED — all three hosts read this verbatim, and the MCP server
+│                            serves the same files as resources to hosts that read none
 │
 ├── commands/                Gemini slash commands (.toml) — Gemini hardcodes this path
 ├── claude-commands/         Claude slash commands (.md) — Claude's path is configurable
@@ -64,7 +66,10 @@ self-expression/
 │   ├── diagrams/            pure ASCII diagram renderers — structure (invariant contract)
 │   ├── dwelling/            the keepsake dwelling: paths, schema, store/adoption, ops
 │   ├── raster/              pure PNG dashboard renderer (zero-dependency encoder, issue #7)
-│   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands
+│   ├── mcp/                 MCP server + hook handlers, run as `self-expression` subcommands;
+│   │                        resources.ts serves the conventions to hosts with no skills
+│   ├── doc_md/reference/    the checklist marker and visual references — packaged, because
+│   │                        they are served as MCP resources beside the skills
 │   └── tests/               unit and stochastic tests
 ├── src/build_js/            template build pipeline
 ├── src/scripts/             permanent development scripts (leitmotif generation)
@@ -311,6 +316,31 @@ exactly the hosts that host-native prompting misses. The `onboard` tool is regis
 unconditionally so permission caches never see it flicker, and the etiquette is
 offer-not-gate: one offer at a natural pause, never blocking work, an ignored offer simply
 recurring next session.
+
+**Skills are shared across three hosts — and served to the rest.** `skills/*/SKILL.md` reaches
+Claude Code, Codex, and Gemini verbatim, which is the big win at the top of this file. It reaches
+a bare MCP client not at all, and that client then gets `express` with no idea what good use of it
+looks like. So the same files are also served as **MCP resources** at
+`self-expression://conventions/<id>` (`src/ts/channels/conventions.ts` holds the registry,
+`src/ts/mcp/resources.ts` the wiring), read off disk at request time — one copy of every word, no
+build step, no generated duplicate to rot. Resources rather than a longer `instructions` string,
+because `instructions` is delivered unconditionally on every connection and the documents run to
+roughly 88 KB: spending that on the three hosts that already loaded the files would hand the model
+the same text twice from two channels. `instructions` therefore carries only a three-sentence
+pointer, which explicitly tells a skill-having host to read nothing. `src/doc_md/reference/` joins
+`skills/` in `package.json`'s `files` list so the checklist references ship too.
+
+**Hooks are the least portable layer, so nothing may depend on them alone.** Onboarding already
+obeyed this by riding `instructions`; turn context did not, and on a hookless host every row landed
+with `no-hook` for a session. The `begin_turn` tool is the second door: the model volunteers what
+`UserPromptSubmit` would have observed, through the same single `INSERT` in
+`src/ts/channels/context.ts`, idempotent by the (`session`, `prompt_id`) pair so one turn cannot
+acquire two identities and so calling it where a hook already fired is harmless. The row records
+which door it came through in `turn_context.source` (`hook` / `tool`, schema v7) — a volunteered
+fact and an observed one are not the same evidence, and a later study must be able to separate them
+without inference. Rows predating v7 keep NULL and are never backfilled. The read surfaces degrade
+loudly to match: `recall` answers `unknown — …` where it used to answer `null`, following
+`turn_signed`'s existing convention rather than inventing a second one.
 
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ

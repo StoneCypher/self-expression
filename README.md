@@ -1,10 +1,10 @@
 # self-expression v0.2.1
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787952304870` from hash `5843e94`.
+> Version 0.2.1 was built on Saturday, August 29, 2026 at GMT-07:00 `1788034319483` from hash `4ecc9b1`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787952304870 Friday, August 28, 2026 at GMT-07:00 94.73 313 90 5843e94 53.7 65.85 66.06 65.7 158 1862 88.94 92.44 95.11 1704 0.2.1 -->
+<!-- Supported embeds: 1788034319483 Saturday, August 29, 2026 at GMT-07:00 94.73 N/A N/A 4ecc9b1 54.03 65.89 66.17 65.66 178 1972 89.01 92.59 95.11 1794 0.2.1 -->
 
 
 
@@ -37,10 +37,11 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 6) and
+Schema versioning is stored in the database (`schema_version`, currently 7) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
-baked CHECK constraint has to widen; a database newer than the code is refused
-rather than downgraded.
+baked CHECK constraint has to widen — and simply adding a column where nothing
+but the column list changes, which is what the v6→v7 step does to `turn_context`.
+A database newer than the code is refused rather than downgraded.
 
 &nbsp;
 
@@ -112,7 +113,9 @@ Three surfaces carry the mark:
 - **`recall`** returns every row's `id` (so a retraction can aim at what was just
   read rather than at a remembered `recorded #N` reply) plus a derived `status`
   of `stands` / `amended` / `retracted` and the `by` id of the strike that
-  decided it. Retracted rows come back **marked, not omitted**.
+  decided it. Retracted rows come back **marked, not omitted**. Its `context` and
+  `previous` blocks come back as `unknown — …` rather than `null` when no turn
+  context was ever recorded; see **Portability**.
 - **The retraction register** — `recall(retractions: true)` — is the current state
   of taken-back claims, newest first, each as before → after. It is a query, not
   a table: a stored register would be derivable data that rots, and worse, it
@@ -294,6 +297,91 @@ have already set by hand counts as answered. Say **"re-run onboarding"**
 (`onboard {op:'reset'}`) to be asked again; config values are untouched. Progress
 lives in the single `onboarding.answered` ledger key — there is deliberately no
 completion boolean, so a new question in a later release re-asks only itself.
+
+&nbsp;
+
+&nbsp;
+
+## Portability — what reaches a host with no hooks and no skills
+
+Most of this plugin already travels. The tools are MCP tools; configuration lives
+in the log database rather than in host config, so a choice made under one host
+holds under all of them; onboarding rides the `initialize` handshake's
+`instructions` string precisely because that is the one channel every host
+implements. Two things did not travel, and both now do.
+
+**The conventions ride MCP resources.** The practice — how a signature is built,
+what each channel means, the marker vocabulary, why audio is scarce — lives in
+`skills/*/SKILL.md` and `src/doc_md/reference/`, which Claude Code, Codex, and
+Gemini all read as skills and a bare MCP client reads not at all. Those same
+files are now served as resources at `self-expression://conventions/<id>`, read
+off disk at request time so there is exactly one copy of every word:
+
+| Resource | What it carries |
+|---|---|
+| `self-expression://conventions/self-expression` | the core practice; the one to read first |
+| `self-expression://conventions/party-roster` | subagent-dispatch flavour |
+| `self-expression://conventions/audio-expression` | the scarcity ethos for voluntary audio |
+| `self-expression://conventions/dwelling` | what belongs in the keepsake dwelling |
+| `self-expression://conventions/status-checklists` | how a multi-item status report is written |
+| `self-expression://conventions/checklist-markers` | the marker vocabulary and its canonical order |
+| `self-expression://conventions/checklist-visuals` | the inline visual vocabulary |
+
+Resources rather than a longer `instructions` string, deliberately: `instructions`
+is delivered unconditionally on every connection to every host, and the documents
+run to roughly 88 KB. Sending them would be wasteful anywhere and actively wrong
+on the three hosts that already load these exact files, where the model would
+receive the same text twice from two channels with no way to tell it is one
+source. So `instructions` carries only a three-sentence pointer that names the
+resources and tells a host that already has the skills to read nothing, and the
+documents are pulled on demand by hosts that need them.
+
+**Turn context has a second door: `begin_turn`.** On Claude Code the
+`UserPromptSubmit` hook observes the session, the turn identity, the working
+directory, the effort level and the permission mode, and every later `express`
+adopts them. Nothing fires on a bare MCP client, so every row would land with
+`no-hook` for a session and NULL for the rest. `begin_turn` lets the model
+*volunteer* the same facts, into the same row, through the same single `INSERT`:
+
+| Argument | Meaning |
+|---|---|
+| `session` (required) | the host's session id, or a stable id chosen once for the conversation |
+| `promptId` (required) | the turn identifier — what makes the call idempotent and what groups the turn's entries |
+| `turn` | what began the turn: `reply` · `wakeup` · `notification` · `hook` |
+| `cwd`, `gitBranch` | suppressed at write when `privacy.store_cwd` is `false` |
+| `permissionMode`, `agentId`, `agentType`, `effort`, `compactions` | as the hook would have observed them |
+| `promptLen` | suppressed at write when `privacy.store_prompt_len` is `false` |
+
+`turnIndex` is derived from the record and never accepted — the database already
+knows how many turns it has seen. The call is **idempotent by (`session`,
+`promptId`)**: a second call for the same turn writes nothing and reports the row
+already standing, which is what keeps that pair a turn identity rather than
+letting one turn acquire two indices. That also makes it harmless where a hook
+already fired: it finds the hook's row and says so.
+
+A `turn_context` row now records **which path wrote it**, in a `source` column
+(schema v7): `hook` when the harness observed the turn, `tool` when the model
+volunteered it. A volunteered fact and an observed one are not the same evidence
+— the only witness for the second is the subject — and a study reading this
+database later has to be able to separate them without inference. Rows written
+before v7 keep NULL, which honestly means "written by a version that had only the
+hook path"; nothing is backfilled.
+
+**Absence is stated, not implied.** `turn_signed` has always answered `unknown`
+when it cannot identify the turn. Everything else that could only say `null` now
+says the same word with its reason attached, because `null` in a `context` field
+reads as *nothing was happening* when the truth is *something was happening and
+this host does not report it*:
+
+| Surface | Was | Now, when nothing was ever recorded |
+|---|---|---|
+| `recall` → `context` | `null` | `unknown — …no UserPromptSubmit hook and nothing called begin_turn…` |
+| `recall` → `previous` | `null` | `unknown — …no session to scope the lookup to, so nothing was checked…` |
+| `express` / `annotate` reply | silent | the reply names the `no-hook` placeholder and points at `begin_turn` |
+
+`recall`'s `previous` stays a plain `null` when the session *is* known and simply
+has no earlier signature — that is a real "there is none", and it is a different
+answer from "nothing was searched".
 
 &nbsp;
 
@@ -722,19 +810,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1704</td>
+    <td>1794</td>
     <td>94.73<small>%</small></td>
-    <td>88.94<small>%</small></td>
-    <td>92.44<small>%</small></td>
+    <td>89.01<small>%</small></td>
+    <td>92.59<small>%</small></td>
     <td>95.11<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>158</td>
+    <td>178</td>
     <td>94.73<small>%</small></td>
-    <td>53.7<small>%</small></td>
-    <td>66.06<small>%</small></td>
-    <td>65.7<small>%</small></td>
+    <td>54.03<small>%</small></td>
+    <td>66.17<small>%</small></td>
+    <td>65.66<small>%</small></td>
   </tr>
 </table>
 
@@ -742,12 +830,12 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>90<small>%</small></th>
+    <th>N/A<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>313</td>
-    <td>90<small>%</small></td>
+    <td>N/A</td>
+    <td>N/A<small>%</small></td>
   </tr>
 </table>
 
