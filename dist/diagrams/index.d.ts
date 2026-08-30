@@ -14,6 +14,7 @@
  * @see ./grid.js
  * @see ./fsl.js
  * @see ./layout.js
+ * @see ./matrix.js
  * @see ./renderers.js
  * @see ./mermaid.js
  */
@@ -21,6 +22,7 @@ export * from './model.js';
 export * from './grid.js';
 export * from './fsl.js';
 export * from './layout.js';
+export * from './matrix.js';
 export * from './renderers.js';
 export * from './mermaid.js';
 //# sourceMappingURL=index.d.ts.map
