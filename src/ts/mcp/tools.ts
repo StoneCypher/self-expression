@@ -43,7 +43,8 @@ import { QUESTION_IDS, onboardingQuestion, answeredIds,
          pendingQuestions, resolveQuestion, resetOnboarding }                 from '../channels/onboarding.js';
 import type { Question }                                                      from '../channels/onboarding.js';
 import { rejectDwellingWrite, dwellingChangeNotice }                          from '../dwelling/config.js';
-import { latestContext }                                                     from '../channels/context.js';
+import { latestContext, recordContextOnce, noContextNotice, NO_HOOK_SESSION,
+         UNKNOWN_CONTEXT, UNKNOWN_PREVIOUS }                                from '../channels/context.js';
 import { privacyFlags }                                                      from '../channels/privacy.js';
 import { stamp }                                                             from '../channels/time.js';
 import { renderAnnotations }                                                 from '../charts/annotations.js';
@@ -394,6 +395,12 @@ export function adoptAnchorTarget(
  *   needs the store runs here, and a `prompt` anchor with no target adopts the turn the
  *   hook observed.
  *
+ * When there was no context at all to adopt, the row is stamped
+ * {@link ../channels/context.js NO_HOOK_SESSION} as it always has been — and the reply
+ * now **says so**, naming `begin_turn` as the fix. The gap was already legible to whoever
+ * read the database months later; it was invisible to the one participant who could have
+ * closed it.
+ *
  * @example
  *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
  *   // => { content: [{ type: 'text', text: 'recorded #1 …' }] }
@@ -462,10 +469,12 @@ export function handleExpress(
   const targetProblem = anchorTargetProblem(store, anchor.anchorKind, anchor.anchorTarget);
   if (targetProblem !== null) { throw new Error(`cannot record entry:\n  - ${targetProblem}`); }
 
+  const session = args.session ?? str('session') ?? NO_HOOK_SESSION;
+
   const written = recordEntry(store, {
     ...args,
     ...anchor,
-    session        : args.session ?? str('session') ?? 'no-hook',
+    session,
     promptId       : args.promptId ?? str('prompt_id'),
     turn           : args.turn     ?? (str('turn') as never),
     effort         : args.effort   ?? (str('effort') as never),
@@ -485,7 +494,8 @@ export function handleExpress(
 
   return reply(
     `recorded #${String(written.id)} ${written.uuid}` +
-    correctionEcho(args.correctsKind, args.correctsId, link.channel));
+    correctionEcho(args.correctsKind, args.correctsId, link.channel) +
+    noContextNotice(session));
 
 }
 
@@ -531,6 +541,9 @@ export interface AnnotateArgs {
  * the chart renderers. The block renders from the arguments, which is deliberate: a
  * `prompt` quote suppressed by `privacy.store_quotes` still appeared in the transcript
  * once, and it is the *later* recall that degrades to hash-only.
+ *
+ * The no-turn-context notice rides here exactly as it does on `express`: a batch written
+ * with nothing to adopt says so, once for the batch rather than once per note.
  *
  * @param store         the open store to record into
  * @param pluginVersion stamped onto every row, as on every entry
@@ -580,12 +593,14 @@ export function handleAnnotate(
           return typeof v === 'number' ? v : undefined;
         };
 
+  const session = args.session ?? str('session') ?? NO_HOOK_SESSION;
+
   const inputs: EntryInput[] = args.notes.map(note => ({
     channel        : note.channel,
     text           : note.text,
     face           : note.face,
     ...adoptAnchorTarget(note, context),
-    session        : args.session ?? str('session') ?? 'no-hook',
+    session,
     promptId       : str('prompt_id'),
     turn           : str('turn')   as never,
     effort         : str('effort') as never,
@@ -647,7 +662,114 @@ export function handleAnnotate(
     anchorQuote  : note.anchorQuote,
   })));
 
-  return reply(`recorded ${ids.map(id => `#${String(id)}`).join(', ')}\n\n${block}`);
+  return reply(
+    `recorded ${ids.map(id => `#${String(id)}`).join(', ')}` +
+    noContextNotice(session) + `\n\n${block}`);
+
+}
+
+/** What a caller supplies to `begin_turn`, after schema validation. */
+export interface BeginTurnArgs {
+  readonly session         : string;
+  readonly promptId        : string;
+  readonly turn?           : Turn | undefined;
+  readonly cwd?            : string | undefined;
+  readonly gitBranch?      : string | undefined;
+  readonly permissionMode? : string | undefined;
+  readonly agentId?        : string | undefined;
+  readonly agentType?      : string | undefined;
+  readonly effort?         : Effort | undefined;
+  readonly compactions?    : number | undefined;
+  readonly promptLen?      : number | undefined;
+}
+
+/**
+ * Handles `begin_turn`: lets a hookless host's model volunteer what the
+ * `UserPromptSubmit` hook would otherwise have observed.
+ *
+ * On Claude Code a hook fires at turn start, deposits the session, the turn identity, the
+ * working directory, the effort level and the permission mode, and every later `express`
+ * call adopts them. On a bare MCP client nothing fires, so every row lands with `no-hook`
+ * for a session and NULL for the rest — the record survives, but the questions it exists
+ * to answer stop being answerable. This is the second door.
+ *
+ * Three properties make it safe to add a second door at all:
+ *
+ * - **One writer.** It records through {@link ../channels/context.js recordContextOnce},
+ *   which records through `recordContext` — the same single `INSERT` the hook uses, the
+ *   same columns, the same derived `turnIndex`. There is deliberately no second way to
+ *   write a `turn_context` row, so the two paths cannot drift into two shapes.
+ * - **Idempotent by turn identity.** A second call for the same (`session`, `promptId`)
+ *   writes nothing and reports the row already standing. That is what keeps the pair a
+ *   *turn identity*: two rows would give one turn two `turnIndex` values and two
+ *   candidate answers to `latestContext`, which the Stop gate, `turn_signed`, and every
+ *   `express` adoption all read through.
+ * - **Harmless where the hook already fired.** The hook's row matches on the same pair,
+ *   so on Claude Code this finds it, writes nothing, and says the standing row came from
+ *   the hook. Calling it there costs one lookup and changes nothing.
+ *
+ * The row is stamped `source: 'tool'`, and this is the one field the caller cannot set.
+ * A volunteered fact and an observed one are not the same evidence — the only witness
+ * here is the subject — and a study reading this database later must be able to separate
+ * them without inference. `source` is how.
+ *
+ * `turnIndex` is derived, never accepted, exactly as it is for the hook: the database
+ * already knows how many turns it has seen, and taking the model's word for a number the
+ * record can count would be an assertion replacing a fact.
+ *
+ * The path-carrying fields are gated on the privacy config at the point of capture, the
+ * same way the hook gates them, so a suppressed field is never written rather than being
+ * hidden afterwards.
+ *
+ * @param store the open store to record into
+ * @param args  the validated tool arguments
+ * @param when  the moment to stamp the row with; injectable so tests need no clock
+ *
+ * @example
+ *   handleBeginTurn(store, { session: 'sess-1', promptId: 'p-7', turn: 'reply' })
+ *   // => 'turn 1 recorded for session sess-1 (source: tool). …'
+ *
+ * @example
+ *   // second call in the same turn, or any call under Claude Code:
+ *   handleBeginTurn(store, { session: 'sess-1', promptId: 'p-7' })
+ *   // => 'turn 1 was already recorded for session sess-1 (source: tool); nothing written. …'
+ *
+ * @see ../channels/context.js recordContextOnce
+ * @see ./hooks.js onUserPromptSubmit
+ */
+export function handleBeginTurn(store: Store, args: BeginTurnArgs, when: Date = new Date()): ToolReply {
+
+  const privacy = privacyFlags(store),
+        result  = recordContextOnce(store, {
+          session        : args.session,
+          promptId       : args.promptId,
+          turn           : args.turn,
+          cwd            : privacy.storeCwd ? args.cwd : undefined,
+          gitBranch      : privacy.storeCwd ? args.gitBranch : undefined,
+          permissionMode : args.permissionMode,
+          agentId        : args.agentId,
+          agentType      : args.agentType,
+          effort         : args.effort,
+          compactions    : args.compactions,
+          promptLen      : privacy.storePromptLen ? args.promptLen : undefined,
+          // Never from the caller. See the note above on volunteered versus observed.
+          source         : 'tool',
+        }, when);
+
+  const row    = result.row,
+        index  = typeof row?.['turn_index'] === 'number' ? String(row['turn_index']) : '?',
+        source = typeof row?.['source'] === 'string' ? row['source'] : 'unrecorded';
+
+  return reply(result.recorded
+    ? `turn ${index} recorded for session ${args.session} (source: ${source}). ` +
+      'express, recall, and the signature gate will adopt it for this turn; no need to ' +
+      'pass session or promptId to them.'
+    : `turn ${index} was already recorded for session ${args.session} (source: ${source}); ` +
+      'nothing written. ' +
+      (source === 'hook'
+        ? 'This host fires the turn-start hook, which already observed the turn — calling ' +
+          'begin_turn here is harmless and unnecessary.'
+        : 'Turn identity is one row; a second call cannot fork it.'));
 
 }
 
@@ -1171,6 +1293,45 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     },
   }, (args) => handleAnnotate(store, pluginVersion, args, server.server.getClientVersion()));
 
+  server.registerTool('begin_turn', {
+    title       : 'Begin turn',
+    description :
+      'Volunteer what this turn is, at its start, on a host that has no turn-start hook ' +
+      'to observe it. Records the same row the hook records — session, turn identity, ' +
+      'working directory, effort, permission mode — so express, recall, and the signature ' +
+      'gate have a turn to attach to instead of falling back to no-hook. Idempotent by ' +
+      '(session, promptId): a second call for the same turn writes nothing and reports ' +
+      'the row already standing, so it is harmless where a hook already fired. The row is ' +
+      'marked source:tool, because a fact you volunteered and a fact the harness observed ' +
+      'are not the same evidence and the record has to keep them apart. Call it once, at ' +
+      'the top of a turn, before the opening signature.',
+    inputSchema : {
+      session        : z.string().min(1).describe(
+        'the session this turn belongs to — the host\'s own session id where there is ' +
+        'one, else a stable id you choose once and reuse for the whole conversation'),
+      promptId       : z.string().min(1).describe(
+        'the turn identifier, unique within the session and stable for the whole turn. ' +
+        'This is what makes the call idempotent and what groups a turn\'s entries; ' +
+        'inventing a fresh one mid-turn forks the turn'),
+      turn           : z.enum(tuple(TURNS)).optional().describe(
+        "what initiated this turn: reply (a human message), wakeup, notification, hook. " +
+        "Say 'reply' only when a human actually just spoke"),
+      cwd            : z.string().optional().describe(
+        'the working directory, if the host exposes one; suppressed at write when ' +
+        'privacy.store_cwd is false'),
+      gitBranch      : z.string().optional().describe('the checked-out branch; same privacy gate'),
+      permissionMode : z.string().optional().describe('the permission mode in force, if the host has one'),
+      agentId        : z.string().optional().describe('this agent\'s id, when running as a subagent'),
+      agentType      : z.string().optional().describe('this agent\'s type, when running as a subagent'),
+      effort         : z.enum(tuple(EFFORTS)).optional().describe('the reasoning effort in force'),
+      compactions    : z.number().int().min(0).optional().describe(
+        'how many times this session has compacted so far'),
+      promptLen      : z.number().int().min(0).optional().describe(
+        'length of the prompt in characters; suppressed at write when ' +
+        'privacy.store_prompt_len is false'),
+    },
+  }, (args) => handleBeginTurn(store, args));
+
   server.registerTool('recall', {
     title       : 'Recall',
     description :
@@ -1180,7 +1341,10 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'retraction can point at what you are reading instead of at what you remember. ' +
       'Retracted rows come back MARKED, never hidden: you should see that you took ' +
       'something back, not develop amnesia about it. retractions:true adds the register ' +
-      'of currently taken-back claims, before → after.',
+      'of currently taken-back claims, before → after. When no turn context was ever ' +
+      'recorded, context and previous come back as "unknown ..." rather than null — this ' +
+      'host does not report the turn, which is a different fact from nothing having ' +
+      'happened.',
     inputSchema : {
       session     : z.string().optional().describe('omit to use the session the hook observed'),
       limit       : z.number().int().min(1).max(100).optional(),
@@ -1190,10 +1354,22 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     },
   }, (args) => {
 
-    const context  = latestContext(store, args.session),
-          session  = args.session ?? (typeof context?.['session'] === 'string' ? context['session'] : ''),
-          previous = session === '' ? null : previousSignature(store, session),
+    const observed = latestContext(store, args.session),
+          session  = args.session ?? (typeof observed?.['session'] === 'string' ? observed['session'] : ''),
           recent   = recentEntries(store, args.limit ?? 10);
+
+    // Degrade loudly. A null `context` reads as "nothing was happening"; the truth is
+    // that this host fires no turn-start hook and nothing called begin_turn, so nothing
+    // was ever observed. `turn_signed` already answers that condition with the word
+    // `unknown`, and one vocabulary for one condition beats a second convention invented
+    // beside it — so these say `unknown` too, with the reason attached.
+    const context = observed ?? UNKNOWN_CONTEXT;
+
+    // `previous` splits the same way, one question earlier. With no session there was
+    // nothing to scope the lookup to, so no search happened at all — which is not the
+    // same as "this session has no earlier signature", and a delta derived from an
+    // unsearched absence would be a fabrication wearing a measurement's clothes.
+    const previous = session === '' ? UNKNOWN_PREVIOUS : previousSignature(store, session);
 
     // Absent rather than empty when not asked for: an always-present `retractions: []`
     // would spend context on a key nobody requested, every single recall. The register

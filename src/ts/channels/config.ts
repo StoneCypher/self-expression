@@ -25,6 +25,11 @@
 
 import { CHANNELS, describeVocabulary } from './vocabulary.js';
 import { LEITMOTIFS }                   from '../claudio/vocabulary.js';
+import { IMAGE_PROVIDERS }              from '../imagery/providers.js';
+import {
+  DEFAULT_DAILY_CAP, DEFAULT_LOCAL_BASE_URL, DEFAULT_PROVIDER_ID, DEFAULT_SESSION_CAP,
+  DEFAULT_TIMEOUT_SECONDS, providerApiKeyEnvKey,
+} from '../imagery/config.js';
 import { readConfig, allConfig }        from './store.js';
 import type { Store }                   from './store.js';
 
@@ -394,9 +399,15 @@ export function windowPostureKey(surface: string): string {
  * numeric budgets and a TTL, all riding this registry so the consent surface and the
  * facility cannot disagree about a default. `retraction.replay` belongs to issue #16 and
  * is the single key that feature adds — the register itself is always computed; the key
- * governs only whether a session's first turn is handed it. The `window.*` pair is the
- * `enum` kind's first home: two keys, one per window surface, because the cost of an
- * external browser window and the cost of an editor tab are not the same cost.
+ * governs only whether a session's first turn is handed it. The `image.*` family belongs
+ * to issue #78 and carries the registry's one genuinely unusual rule: `image.api_key_env`
+ * and its per-provider siblings store the **name** of an environment variable and never a
+ * credential. A name is not a secret and is printed freely; the value is read from the
+ * environment at call time by `imagery/config.ts` and written nowhere at all. Any future
+ * key that would hold a credential rather than name one does not belong in this registry,
+ * or in this database. The `window.*` pair is the `enum` kind's first home: two keys, one
+ * per window surface, because the cost of an external browser window and the cost of an
+ * editor tab are not the same cost.
  */
 export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
@@ -523,6 +534,51 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
     key: `audio.wav.${leitmotif}`, kind: 'string', fallback: null,
     description: `absolute path to a replacement 16-bit PCM WAV for the '${leitmotif}' leitmotif; unset plays the vendored asset`,
     validate: stringValidator(1024) })),
+  { key: 'image.enabled', kind: 'bool', fallback: 'false',
+    description:
+      "whether the image-generation facility (#78) registers its tool; only exactly 'true' " +
+      'enables, and even then the tool appears only when the named credential variable is ' +
+      'actually holding something — off by default because every call spends the user’s money',
+    validate: validateBool },
+  { key: 'image.provider', kind: 'string', fallback: DEFAULT_PROVIDER_ID,
+    description:
+      'which registered image provider is active; adding a provider is one registry entry ' +
+      'in imagery/providers.ts, and this key learns its name automatically',
+    validate: choiceValidator(IMAGE_PROVIDERS.map(provider => provider.id)) },
+  { key: 'image.api_key_env', kind: 'string', fallback: null,
+    description:
+      'the NAME of the environment variable holding the image credential — never the key ' +
+      'itself, which is read from the environment at call time and never written to this ' +
+      'table, the ledger, a cache, or a log. Unset falls back to the active provider’s own ' +
+      'default variable name, so a shell that already exports one needs no configuration',
+    validate: stringValidator(128) },
+  ...IMAGE_PROVIDERS.map((provider): ConfigKeyDef => ({
+    key: providerApiKeyEnvKey(provider.id), kind: 'string', fallback: null,
+    description:
+      `the NAME of the environment variable holding the ${provider.id} credential, ` +
+      'overriding image.api_key_env for that provider only; exists so two providers can be ' +
+      'configured at once and switched between without rewriting a key name' +
+      (provider.defaultEnvVar === null
+        ? ' — this provider needs no credential, so the key is inert'
+        : `. Unset uses ${provider.defaultEnvVar}`),
+    validate: stringValidator(128) })),
+  { key: 'image.model', kind: 'string', fallback: null,
+    description: 'which of the active provider’s models to ask for; unset takes the provider’s default, and a model the provider does not list is ignored rather than sent',
+    validate: stringValidator(128) },
+  { key: 'image.session_cap', kind: 'int', fallback: String(DEFAULT_SESSION_CAP),
+    description:
+      'generations allowed in one server session; enforced server-side from the ledger, and ' +
+      'named in the refusal when it is what stopped a call. A runaway loop is a bill, not an annoyance',
+    validate: intValidator(0, 1000) },
+  { key: 'image.daily_cap', kind: 'int', fallback: String(DEFAULT_DAILY_CAP),
+    description: 'generations allowed in any rolling 24 hours; rolling rather than calendar-day, so no cap resets at midnight and no retry loop waits for one',
+    validate: intValidator(0, 10000) },
+  { key: 'image.timeout_seconds', kind: 'int', fallback: String(DEFAULT_TIMEOUT_SECONDS),
+    description: 'how long one generation may take before it is abandoned; the ledger keeps the abandoned row as pending, which counts against the caps because an unknown call may still have been billed',
+    validate: intValidator(5, 900) },
+  { key: 'image.local_base_url', kind: 'string', fallback: DEFAULT_LOCAL_BASE_URL,
+    description: 'base URL for a self-hosted image endpoint (the automatic1111 provider); a local provider needs no credential and costs no money, which is why the registry makes needsCredential a per-provider fact rather than an assumption',
+    validate: stringValidator(512) },
   { key: 'share.enabled', kind: 'bool', fallback: 'false',
     description: 'whether public-aggregation export (#31) is available; off by default, and only the exact value true enables — the inverse posture of privacy.*',
     validate: validateBool },
