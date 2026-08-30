@@ -797,6 +797,115 @@ ethos ships in `skills/audio-expression/SKILL.md`.
 
 &nbsp;
 
+## Image generation (issue #78)
+
+Making a picture instead of describing one, behind a credential **the user supplies and
+the plugin never holds.** Same family as voluntary audio: off by default, on only by a
+deliberate act, bounded when on, auditable afterwards. It differs in one way that shapes
+everything else — every invocation spends the user's money.
+
+### The credential rule, which is the point
+
+**Configuration names the environment variable. Configuration never holds the key.**
+
+```ini
+image.api_key_env = "GEMINI_API_KEY"     ; this is what is stored
+```
+
+`process.env[<that name>]` is resolved **at call time and at no other time**. The key is
+never written to the config table, the entries store, either ledger, a cache, or a temp
+file, and never rendered — not in an error, a stack trace, a debug line, a tool reply, or
+a log. The variable *name* is not a secret and is printed freely; that asymmetry is what
+makes this configuration rather than storage.
+
+The shape of the code is the enforcement. `imageConfig()` takes no environment argument at
+all, so it *cannot* read a key; `ImageConfig` has a `credentialEnvVar` field and nowhere a
+value could sit; `resolveCredential()` is the only function that touches the environment,
+and what it returns is used inside one function call and dropped.
+
+Provider clients famously echo the request — headers included — into their error text, so
+there is a scrubber, and **three independent places apply it**: the HTTP client scrubs
+every outcome with the key in hand, the ledger pattern-scrubs every text column while
+holding no key at all, and the tool scrubs its finished reply. Each is tested with the
+other two assumed broken, using both a key that matches a known credential shape and one
+that matches nothing.
+
+### Enablement
+
+Absent a usable credential the tool is **not registered at all** — absent from the tool
+list rather than present and refusing, following the same precedent as `dwell`. Enabled
+with the named variable empty is a legible line on stderr naming the variable, which is
+neither a crash nor silence.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `image.enabled` | bool | `false` | Only exactly `true` enables, and even then the tool appears only if the credential is really there. |
+| `image.provider` | string | `nanobanana` | Which registered provider is active. |
+| `image.api_key_env` | string | *(provider default)* | The **name** of the variable holding the credential. Unset uses the provider's own default (`GEMINI_API_KEY`, `OPENAI_API_KEY`), so a shell that already exports one needs no configuration at all. |
+| `image.<provider>.api_key_env` | string | *(none)* | Per-provider override of the above, for keeping two providers configured at once. |
+| `image.model` | string | *(provider default)* | A model the provider does not list is ignored rather than sent. |
+| `image.session_cap` | int | `6` | Generations per server session. |
+| `image.daily_cap` | int | `20` | Generations per **rolling** 24 hours. |
+| `image.timeout_seconds` | int | `120` | How long one generation may take before it is abandoned. |
+| `image.local_base_url` | string | `http://127.0.0.1:7860` | Endpoint for a self-hosted provider. |
+
+### Providers
+
+A registry, not a hardcoded vendor: adding a fourth provider is one entry in
+`src/ts/imagery/providers.ts` and nothing else — no other module names a vendor.
+
+| Provider | Credential | Cost |
+|---|---|---|
+| `nanobanana` | `GEMINI_API_KEY`, sent as a header | Billed per image; the ledger records the published list price and labels it an estimate. |
+| `openai` | `OPENAI_API_KEY`, sent as a bearer header | Billed per image and quality; same list-price estimate. |
+| `automatic1111` | **none** | A local endpoint. No credential, no money. |
+
+No provider puts the credential in a URL — a URL is the part of a request that everything
+logs by default.
+
+### Money, which makes this different
+
+Per-session and per-day caps are enforced server-side from the ledger, and a refusal names
+the specific cap and the exact `configure` call that raises it. The rolling day avoids a
+cap that resets at midnight and a retry loop that waits for one.
+
+**A row is written before the request, not after.** A process that dies mid-call still
+leaves the evidence of a call that may have been billed, and that `pending` row counts
+against the caps, because a budget that forgives what it cannot see is not a budget.
+`generated` and `policy_refused` count too; `error` and `refused` do not, since a network
+outage is not a purchase.
+
+Each row carries provider, model, timestamp, outcome, byte count, path, cost estimate and
+where the estimate came from, the credential variable's **name**, and the prompt with its
+SHA-256 and its declared provenance. That last part answers the hazard of a prompt
+assembled from a file, a page, or a repository: `source` is a required tool argument, so
+what was forwarded to a third party under the user's credential is reconstructible.
+
+### Content policy
+
+A refusal is reported plainly and **never retried with a reworded prompt** — that would be
+the assistant negotiating with a provider's policy on the user's account and the user's
+money. This is enforced rather than requested: the gate compares each new prompt against
+prompts the provider recently refused and blocks recognisable rewordings locally, before
+any socket opens, so a reworded retry cannot cost money even if it is attempted. A
+genuinely different request passes untouched.
+
+### Where images go
+
+`<dataDir>/images/`, beside the `renders/` directory, honouring `SELF_EXPRESSION_HOME`.
+The reply carries **the path, never the bytes**. Because the bytes are downloaded and
+stored locally, the panel can serve them from its own origin and `img-src 'self'` stays
+intact; hotlinking a provider CDN would have cost a CSP exception per provider.
+
+A generated image is an **artifact with a ledger row**, not an expression channel: it is a
+large binary produced by a third party and billed to the user — evidence of an act rather
+than the content of one. The assistant can still `express` about having made it, and the
+dwelling can `keep` the path.
+
+&nbsp;
+
+&nbsp;
+
 ## Test status
 
 <table>

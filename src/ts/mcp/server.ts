@@ -41,6 +41,11 @@ import { registerShareTools } from './share_tools.js';
 import { maybeOpenDwelling, registerDwellTool } from './dwell_tool.js';
 import { closeDwelling } from '../dwelling/store.js';
 import type { DwellingStore } from '../dwelling/store.js';
+import {
+  closeImageFacility, defaultImageDeps, imageFacility, maybeOpenImageLedger, registerImageTools,
+} from './image_tools.js';
+import type { ImageDeps } from './image_tools.js';
+import type { ImageLedger } from '../imagery/ledger.js';
 
 /** Name advertised to the host during the MCP handshake. */
 export const SERVER_NAME = 'self-expression';
@@ -104,22 +109,33 @@ export function serverInstructions(
  * fatal — a package whose convention files cannot be found registers no resources,
  * omits the pointer, and serves every tool exactly as before.
  *
+ * `generate_image` follows the same rule for a sharper reason: it is registered only
+ * when the facility is enabled **and** the environment variable configuration names is
+ * actually holding a credential. A tool that appears and then refuses every call would
+ * spend the model's attention advertising a facility that cannot run — and, worse, would
+ * invite the model to keep trying. Absent is the honest state, and the stderr note is
+ * where a user who meant to enable it finds out which variable is empty.
+ *
  * @param dwelling - an open dwelling to register, `null` for none, or omit to resolve
  *                   from configuration; a caller who passes one also owns closing it
  * @param root     - the package root the convention documents are read from; omit to
  *                   discover it from the running script and the working directory
+ * @param images   - an open image ledger plus its dependencies, `null` for none, or omit
+ *                   to resolve from configuration; a caller who passes one owns closing it
  *
  * @example
  *   const server = buildServer(store, '0.2.0');
  *
  * @see serverInstructions
  * @see ./resources.js registerConventionResources
+ * @see ./image_tools.js imageFacility
  */
 export function buildServer(
   store    : Store,
   version  : string,
   dwelling?: DwellingStore | null,
   root?    : string | null,
+  images?  : { readonly ledger: ImageLedger; readonly deps: ImageDeps } | null,
 ): McpServer {
 
   const where   = root === undefined ? defaultConventionsRoot() : root,
@@ -142,7 +158,30 @@ export function buildServer(
   const house = dwelling === undefined ? maybeOpenDwelling(store) : dwelling;
   if (house !== null) { registerDwellTool(server, store, house); }
 
+  const picture = images === undefined ? resolveImageFacility(store) : images;
+  if (picture !== null) { registerImageTools(server, store, picture.ledger, picture.deps, version); }
+
   return server;
+
+}
+
+/**
+ * Open the image facility from configuration, or `null` when it is not usable.
+ *
+ * Split out of {@link buildServer} so the resolution — enabled, credentialed, ledger
+ * openable — happens in exactly one place and can be exercised without a transport.
+ *
+ * @example
+ *   resolveImageFacility(store)   // => null until the user enables it and names a live variable
+ */
+export function resolveImageFacility(
+  store : Store,
+  env   : Record<string, string | undefined> = process.env,
+): { readonly ledger: ImageLedger; readonly deps: ImageDeps } | null {
+
+  const ledger = maybeOpenImageLedger(store, env);
+
+  return ledger === null ? null : { ledger, deps: defaultImageDeps(env) };
 
 }
 
@@ -174,8 +213,15 @@ export async function startStdio(version: string, dbFile?: string, bundleDir?: s
   const store     = dbFile === undefined ? openStore() : openStore(dbFile),
         house     = maybeOpenDwelling(store),
         root      = bundleDir === undefined ? undefined : packageRoot(bundleDir),
-        server    = buildServer(store, version, house, root),
+        picture   = resolveImageFacility(store),
+        server    = buildServer(store, version, house, root, picture),
         transport = new StdioServerTransport();
+
+  // The image facility's one legible line (issue #78): silent when off, a warning
+  // naming the empty variable when configured but unavailable, and a confirmation
+  // naming the provider and the variable — never the key — when live.
+  const imageNote = imageFacility(store).note;
+  if (imageNote !== null) { process.stderr.write(`${SERVER_NAME}: ${imageNote}\n`); }
 
   // Startup retention (issue #30, D6): prune rows past the configured horizon, once
   // per server process, before any turn's reads. A pruning failure must not keep the
@@ -207,5 +253,6 @@ export async function startStdio(version: string, dbFile?: string, bundleDir?: s
 
   closeStore(store);
   if (house !== null) { closeDwelling(house); }
+  closeImageFacility(picture === null ? null : picture.ledger);
 
 }
