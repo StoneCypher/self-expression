@@ -1,6 +1,6 @@
 {
   "name": "self-expression",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "self-expression plugin for agents like claude opus, codex, gemini, and deepseek",
   "keywords": [
     "self-expression",

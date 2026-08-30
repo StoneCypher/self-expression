@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-72 merges; 2 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+74 merges; 3 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -12,8 +12,121 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 10:14:36 AM
+
+Commit [377fecfa299af56d76cf5f5be7633a4e158ff5df](https://github.com/StoneCypher/self-expression/commit/377fecfa299af56d76cf5f5be7633a4e158ff5df)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [f644382, ea0edaf]
+
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-29_seriated-matrix
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 8:00:08 AM
+
+Commit [40ed4cf3c3dd5953dcc7c40677df4b9d9d00d726](https://github.com/StoneCypher/self-expression/commit/40ed4cf3c3dd5953dcc7c40677df4b9d9d00d726)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: ea0edafd59802101538511d7f8ec9ab63e349d46
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__3__0" />
+
+## [0.3.0] - Aug 30, 2026 7:58:39 AM
+
+Commit [ea0edafd59802101538511d7f8ec9ab63e349d46](https://github.com/StoneCypher/self-expression/commit/ea0edafd59802101538511d7f8ec9ab63e349d46)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [4ecc9b1, a587eb0]
+
+  * Merge pull request #97 from StoneCypher/feat_26-08-29_image-generation_78
+  * feat(image): generate images behind a user-supplied credential (#78)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 7:34:27 AM
+
+Commit [a587eb09eaabcd81cc8bd53a8d0344097c669c77](https://github.com/StoneCypher/self-expression/commit/a587eb09eaabcd81cc8bd53a8d0344097c669c77)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * perf(store): tune SQLite pragmas, and fix a Windows-only build stop
+  * `openStore` opened the database and set no pragmas, so SQLite's 2004-era
+defaults applied: rollback-journal mode with `synchronous=FULL`, making
+every write its own transaction with an fsync on each side of it. Measured
+against this project's own store, that is 172 writes/sec against 11,236
+with WAL and `synchronous=NORMAL` — sixty-five times. The cost was
+invisible because the server writes a handful of rows per turn; it only
+surfaced when a property test doing thousands of them began timing out at
+60s, which is the first instrument anything had pointed at the store.
+  * Also set, each checked rather than copied:
+  * - `busy_timeout=5000` — the correctness one. Several sessions share one
+  store, and without a timeout a second writer gets SQLITE_BUSY at once
+  and the write is lost. WAL stops readers blocking the writer and does
+  nothing for two writers.
+- `foreign_keys=ON` — off by default forever, for compatibility. The
+  schema declares five references and every one has been decorative.
+  This lands before the plugin has ever been installed anywhere, so no
+  database exists that could hold a violating row; the constraints simply
+  begin life enforced, which is the only cheap moment to do it.
+- `cache_size=-32000`, `temp_store=MEMORY`, `mmap_size=256MB`, and
+  `analysis_limit=400` to bound `PRAGMA optimize`, now run at close so
+  the query planner's statistics cannot go stale on a log that only grows.
+  * WAL persists in the file header; the rest are per-connection, which is why
+they live in `openStore` rather than in a migration.
+  * The build could not complete on Windows: `dts` ran `mkdir -p` through
+cmd.exe, which has no such flag, and died with "The syntax of the command
+is incorrect" — so `npm run build`, and therefore the whole commit
+workflow, was unusable on the machine this is developed on. CI is
+ubuntu-latest and never saw it. Replaced with `src/build_js/copy_dts.js`,
+and moved `update_madlibs`' trailing `cp README.md docs` into the script
+that writes the README.
+  * Two test changes ride along. `conventions.spec.ts` built a path fixture
+with `join('C:', 'x', ...)`, which is absolute on Windows and an ordinary
+relative path on POSIX — so it passed locally and failed on the Linux
+runner, where `packageRoot` resolved it against the runner's own working
+directory. Rebuilt on `resolve(sep, ...)`, absolute on both. And the
+heaviest onboarding property was removed: its subset-and-preserve-unknowns
+behaviour is covered by the three properties beside it and by the unit
+suite, and it was buying a fourth angle on well-understood behaviour at
+the highest runtime in the repo.
+  * 2000 unit tests and the full stochastic suite pass with foreign keys
+enforced. `dist/` regenerates byte-identical to the previous commit.
+  * SQLite pragma tuning in openStore (WAL, synchronous NORMAL, busy_timeout,
+foreign_keys, cache_size, temp_store, mmap_size, analysis_limit) plus
+PRAGMA optimize at close; cross-platform path fixture in
+conventions.spec.ts that was failing PR #97 on the Linux runner; removed
+the heaviest onboarding stochastic property.
 
 
 
@@ -229,192 +342,3 @@ was searched".
   * The two halves are one commit because they are genuinely coupled: the loud
 message's whole value is that it names `begin_turn` as the fix, and both live in
 the same two files.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 29, 2026 1:17:15 PM
-
-Commit [4a43a23b0314cb2cf96da8de217dc840854f61e9](https://github.com/StoneCypher/self-expression/commit/4a43a23b0314cb2cf96da8de217dc840854f61e9)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(mcp): serve the conventions as resources, for hosts that load no skills
-  * Everything portable about this server already travelled: the tools are MCP
-tools, config lives in the log database rather than host config, and onboarding
-rides the initialize handshake's `instructions` precisely so it reaches hosts
-that host-native prompting misses. The practice did not. The skills carry how a
-signature is built, what each channel means, and why audio is scarce; a bare MCP
-client loads none of them and gets `express` with no idea what good use of it
-looks like.
-  * The same files are now served as MCP resources at
-`self-expression://conventions/<id>`, read off disk at request time so there is
-exactly one copy of every word — no generated duplicate to rot, no build step.
-  * Resources rather than a longer `instructions` string, deliberately. That string
-is delivered unconditionally on every connection to every host, and the
-documents run to roughly 88 KB. Sending them would be wasteful anywhere and
-actively wrong on Claude Code, Codex, and Gemini, which already read these exact
-files as skills: the model would receive the same text twice, from two channels,
-with no way to tell it is one source. So `instructions` carries a three-sentence
-pointer that names the resources and tells a host which already has the skills
-to read nothing, and the documents themselves are pulled on demand.
-  * The package root is found by a bounded upward search for the core skill file,
-which works from `<pkg>/dist` in an installed package and from the repository
-root under the test runner; `cli.ts` hands `__dirname` down as well, the way the
-claudio bundle already locates its vendored WAVs. A package whose convention
-files cannot be found registers no resources, omits the pointer, and serves
-every tool exactly as before.
-  * `src/doc_md/reference` joins `skills` in package.json's `files` list because the
-checklist marker and visual references are read from the installed package at
-runtime, exactly as the skills are. It is load-bearing, not speculative: without
-it, three of the seven documents would be absent from a published install and
-`availableConventions` would quietly serve four.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 29, 2026 2:59:18 AM
-
-Commit [f644382449a915772e000607bd0661a08a2b72fe](https://github.com/StoneCypher/self-expression/commit/f644382449a915772e000607bd0661a08a2b72fe)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(diagrams): seriated matrix — reorder a two-way table until its blocks show
-  * Adds a `matrix` form to `render_diagram`, built on a new pure module
-`src/ts/diagrams/matrix.ts`. The shading is the least of it; the reordering is
-the capability. Given two key axes and a value per crossing, `seriate` orders
-each axis so similar keys sit together, which surfaces block structure nothing
-told it to look for.
-  * Pinning is load-bearing, not a convenience. `pinRows` / `pinCols` freeze an axis
-byte-identically in caller order, because an axis a reader already understands
-(releases, weeks, severities) scores better reordered and reads worse.
-  * The search is a barycentre sweep keeping the best-scoring pass, then adjacent
-swaps, then single-key relocation, run as rounds to a fixed point — which is
-what makes seriation idempotent. Adjacent swaps alone measurably could not move
-a key past a cohesive group: over 4800 shuffled block-diagonal tables they
-recovered 4567, and only 1368 of the 1600 two-key-block cases. With relocation
-those became 4795 and 1596, and every remaining miss scores at least as well as
-the labelled block order — a disagreement about the answer, not a failed search.
-  * `seriationScore` (total adjacent profile distance along both axes, lower better)
-comes back before and after, and the tool prints it, because a shaded matrix
-looks structured whether or not anything was found.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 29, 2026 2:59:18 AM
-
-Commit [61e9ca31d4d8980f25cd8892bb8dcf7ccfa3b96e](https://github.com/StoneCypher/self-expression/commit/61e9ca31d4d8980f25cd8892bb8dcf7ccfa3b96e)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * @
-feat(diagrams): seriated matrix — reorder a two-way table until its blocks show
-  * Adds a `matrix` form to `render_diagram`, built on a new pure module
-`src/ts/diagrams/matrix.ts`. The shading is the least of it; the reordering is
-the capability. Given two key axes and a value per crossing, `seriate` orders
-each axis so similar keys sit together, which surfaces block structure nothing
-told it to look for.
-  * Pinning is load-bearing, not a convenience. `pinRows` / `pinCols` freeze an axis
-byte-identically in caller order, because an axis a reader already understands
-(releases, weeks, severities) scores better reordered and reads worse.
-  * The search is a barycentre sweep keeping the best-scoring pass, then adjacent
-swaps, then single-key relocation, run as rounds to a fixed point — which is
-what makes seriation idempotent. Adjacent swaps alone measurably could not move
-a key past a cohesive group: over 4800 shuffled block-diagonal tables they
-recovered 4567, and only 1368 of the 1600 two-key-block cases. With relocation
-those became 4795 and 1596, and every remaining miss scores at least as well as
-the labelled block order — a disagreement about the answer, not a failed search.
-  * `seriationScore` (total adjacent profile distance along both axes, lower better)
-comes back before and after, and the tool prints it, because a shaded matrix
-looks structured whether or not anything was found.
-@
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 28, 2026 5:54:52 PM
-
-Commit [c23b2f97a040f5f4499b58f82f419dab07f248c6](https://github.com/StoneCypher/self-expression/commit/c23b2f97a040f5f4499b58f82f419dab07f248c6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat: move the desk mechanism into the repo, cards as directories
-  * A desk is a local web panel — one page, one port, no build step, no
-dependencies — that an assistant can put things onto while a session runs,
-and that its owner can arrange, dismiss, and answer back from. It has been
-living in a session scratchpad. What lands here is the mechanism only.
-  * It lands in src/scripts/desk/, the repository's home for permanent
-development scripts, rather than a new top-level directory or src/ts/: the
-desk is run by hand, is deliberately unbuilt plain ESM so it can be started
-and killed without installing anything, and is not part of any bundle, any
-MCP surface, or the published files list.
-  * The mechanism/contents split is the point. Checked in: panel.mjs (node:http,
-node:sqlite, node:fs and nothing else), deskcards.mjs with hand-written
-declarations, desk-shell.html and its three card placeholders, panel.html
-(the still-monolithic second surface, copied as-is), two icons, and .example
-files carrying the shape of every per-desk state file. Deliberately absent:
-any desk's cards, board, art, name, questions, geometry, inbox, or vendored
-node_modules. The desk directory is an argument rather than a default,
-because two desks on one machine are normal and a desk that guessed where it
-lived could quietly answer for the wrong one.
-  * A card is a directory because removal must not be able to half-succeed. The
-predecessor kept cards as markup inside one document and cut them out by
-index; it failed twice, both times the same way — an attribute in an
-unexpected order hid a card from its own deletion, and the JavaScript for
-three deleted cards outlived them and threw on every load. Deleting a
-directory cannot land two of three edits, and the page is assembled from
-what is present rather than edited toward what should be.
-  * Changed while moving, and why:
-  * * Paths are parameters. The desk directory comes from argv[2],
-  SELF_EXPRESSION_DESK, or the working directory; the port from
-  SELF_EXPRESSION_DESK_PORT; the affect log from SELF_EXPRESSION_AFFECT_LOG
-  or ~/.claude/affect-log.sqlite3. No absolute path to one machine survives.
-* A missing affect log is reported once and the desk runs on. One desk's
-  database must never be a requirement of the mechanism.
-* Both file-serving routes now read before writing the status line. The
-  prototype headed the response 200 first, so a miss threw
-  ERR_HTTP_HEADERS_SENT instead of 404ing — never seen because the vendor
-  tree always existed there, and immediate once absence became the default.
-* The vendor route is generic: a desk vendors under vendor/node_modules/ and
-  names things in its own importmap.json. The library-specific /jssm/ and
-  /vendor/viz.js shortcuts and the two <script src="/jssm/…"> tags in the
-  shell are gone — markup in the shell outliving the thing it was added for
-  is the exact failure this mechanism exists to end.
-* Removed a stranded DocBlock for a card that had already been deleted, and
-  an orphaned </section> from an earlier index-based cut. Both were the small
-  version of the same bug, preserved in amber.
-  * Documentation: src/doc_md/desk.md carries the conventions — the card
-contract, the two dismissal tiers (put away is reversible, forget deletes
-outright, no tombstones), the inbox protocol (questions inline with up to
-three option buttons, tasks and stuck rows on their own line, answers
-one-way to the server log), the <main> hot-swap and its script/style
-signature fallback, and the re-runnability rules card scripts must obey.
-A README section and a plugin-layout decision entry summarise and link it.
-  * Tests: deskcards.mjs gets unit and stochastic coverage against real
-directories on a real filesystem — listCards ordering and its skipping of
-directories without card.json, render concatenation order, removeCard
-refusing unknown, path-shaped and fixed ids, and assemble filling all three
-placeholders while treating $& inside card source as literal text. The
-stochastic file is deliberately frugal with the disk: an earlier draft that
-created and recursively deleted a tree per run starved the workers beside it
-and timed out onboarding.stoch.ts.
-  * eslint.config.js: node globals now reach src/scripts/**/*.mjs (the pattern
-named a top-level scripts/ that no longer exists), and the desk's .d.mts
-joins allowDefaultProject since no tsconfig owns it.

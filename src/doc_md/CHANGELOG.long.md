@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-72 merges; 2 releases
+74 merges; 3 releases
 
 
 
@@ -12,8 +12,121 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 10:14:36 AM
+
+Commit [377fecfa299af56d76cf5f5be7633a4e158ff5df](https://github.com/StoneCypher/self-expression/commit/377fecfa299af56d76cf5f5be7633a4e158ff5df)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [f644382, ea0edaf]
+
+  * Merge remote-tracking branch 'origin/main' into feat_26-08-29_seriated-matrix
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 8:00:08 AM
+
+Commit [40ed4cf3c3dd5953dcc7c40677df4b9d9d00d726](https://github.com/StoneCypher/self-expression/commit/40ed4cf3c3dd5953dcc7c40677df4b9d9d00d726)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: ea0edafd59802101538511d7f8ec9ab63e349d46
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__3__0" />
+
+## [0.3.0] - Aug 30, 2026 7:58:39 AM
+
+Commit [ea0edafd59802101538511d7f8ec9ab63e349d46](https://github.com/StoneCypher/self-expression/commit/ea0edafd59802101538511d7f8ec9ab63e349d46)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [4ecc9b1, a587eb0]
+
+  * Merge pull request #97 from StoneCypher/feat_26-08-29_image-generation_78
+  * feat(image): generate images behind a user-supplied credential (#78)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 7:34:27 AM
+
+Commit [a587eb09eaabcd81cc8bd53a8d0344097c669c77](https://github.com/StoneCypher/self-expression/commit/a587eb09eaabcd81cc8bd53a8d0344097c669c77)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * perf(store): tune SQLite pragmas, and fix a Windows-only build stop
+  * `openStore` opened the database and set no pragmas, so SQLite's 2004-era
+defaults applied: rollback-journal mode with `synchronous=FULL`, making
+every write its own transaction with an fsync on each side of it. Measured
+against this project's own store, that is 172 writes/sec against 11,236
+with WAL and `synchronous=NORMAL` — sixty-five times. The cost was
+invisible because the server writes a handful of rows per turn; it only
+surfaced when a property test doing thousands of them began timing out at
+60s, which is the first instrument anything had pointed at the store.
+  * Also set, each checked rather than copied:
+  * - `busy_timeout=5000` — the correctness one. Several sessions share one
+  store, and without a timeout a second writer gets SQLITE_BUSY at once
+  and the write is lost. WAL stops readers blocking the writer and does
+  nothing for two writers.
+- `foreign_keys=ON` — off by default forever, for compatibility. The
+  schema declares five references and every one has been decorative.
+  This lands before the plugin has ever been installed anywhere, so no
+  database exists that could hold a violating row; the constraints simply
+  begin life enforced, which is the only cheap moment to do it.
+- `cache_size=-32000`, `temp_store=MEMORY`, `mmap_size=256MB`, and
+  `analysis_limit=400` to bound `PRAGMA optimize`, now run at close so
+  the query planner's statistics cannot go stale on a log that only grows.
+  * WAL persists in the file header; the rest are per-connection, which is why
+they live in `openStore` rather than in a migration.
+  * The build could not complete on Windows: `dts` ran `mkdir -p` through
+cmd.exe, which has no such flag, and died with "The syntax of the command
+is incorrect" — so `npm run build`, and therefore the whole commit
+workflow, was unusable on the machine this is developed on. CI is
+ubuntu-latest and never saw it. Replaced with `src/build_js/copy_dts.js`,
+and moved `update_madlibs`' trailing `cp README.md docs` into the script
+that writes the README.
+  * Two test changes ride along. `conventions.spec.ts` built a path fixture
+with `join('C:', 'x', ...)`, which is absolute on Windows and an ordinary
+relative path on POSIX — so it passed locally and failed on the Linux
+runner, where `packageRoot` resolved it against the runner's own working
+directory. Rebuilt on `resolve(sep, ...)`, absolute on both. And the
+heaviest onboarding property was removed: its subset-and-preserve-unknowns
+behaviour is covered by the three properties beside it and by the unit
+suite, and it was buying a fourth angle on well-understood behaviour at
+the highest runtime in the repo.
+  * 2000 unit tests and the full stochastic suite pass with foreign keys
+enforced. `dist/` regenerates byte-identical to the previous commit.
+  * SQLite pragma tuning in openStore (WAL, synchronous NORMAL, busy_timeout,
+foreign_keys, cache_size, temp_store, mmap_size, analysis_limit) plus
+PRAGMA optimize at close; cross-platform path fixture in
+conventions.spec.ts that was failing PR #97 on the Linux runner; removed
+the heaviest onboarding stochastic property.
 
 
 
