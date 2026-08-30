@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-80 merges; 4 releases
+81 merges; 6 releases
 
 
 
@@ -12,8 +12,78 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:47:31 AM
+
+Commit [e6a6a3819ca6caf3da29318d12720c9613e0dde2](https://github.com/StoneCypher/self-expression/commit/e6a6a3819ca6caf3da29318d12720c9613e0dde2)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: ed16981de20124be481c047daa4279345fb9b9d4
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__6__0" />
+
+## [0.6.0] - Aug 30, 2026 11:45:44 AM
+
+Commit [ed16981de20124be481c047daa4279345fb9b9d4](https://github.com/StoneCypher/self-expression/commit/ed16981de20124be481c047daa4279345fb9b9d4)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [f2b034a, 88090b0]
+
+  * Merge pull request #85 from StoneCypher/feat_26-08-28_desk-mechanism
+  * feat: move the desk mechanism into the repo, cards as directories
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:42:36 AM
+
+Commit [88090b0739c33030e2ccb4282e6f42f33a4ae97f](https://github.com/StoneCypher/self-expression/commit/88090b0739c33030e2ccb4282e6f42f33a4ae97f)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * build: bump to 0.6.0 and regenerate artifacts after merging main
+  * The second merge left this branch carrying main's 0.5.0, which main's own
+release job will tag on its next push, so shipping it here would fail with
+"422 tag_name already exists". git ls-remote --tags is the authority and
+shows 0.2.0, 0.2.1, 0.3.0, 0.4.0 tagged; 0.6.0 is unused. Feature branch,
+so MINOR with PATCH reset.
+  * Regenerates every tracked build output against the merged tree: dist/,
+coverage-stoch/, coverage-typedoc/, README.md, CHANGELOG.md,
+CHANGELOG.long.md and their src/doc_md/ copies. The merge commit had reset
+all of these to main wholesale, so this is a clean rebuild rather than a
+patch over a textual hybrid of two branches' outputs.
+  * The full canonical build passes — not the ci profile: 2135 unit tests
+across 78 files, 234 stochastic tests across 37 files, and all four attw
+resolution modes green.
+  * One note for whoever hits it next: deskcards.stoch.ts "carries card source
+through verbatim" timed out at 5000ms on the first attempt and passed on
+re-run, taking 2.67s of test time in isolation. It does a mkdir plus four
+file writes per property run across 24 runs, so it is I/O-bound and
+sensitive to machine load rather than flaky in its logic. Worth a longer
+timeout if it recurs.
+  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
 
 
 
@@ -56,7 +126,9 @@ of a merge in the normal direction of history.
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:33:12 AM
+<a name="0__5__0" />
+
+## [0.5.0] - Aug 30, 2026 11:33:12 AM
 
 Commit [f2b034aa991ea344296e1b4f38289a584fa45d77](https://github.com/StoneCypher/self-expression/commit/f2b034aa991ea344296e1b4f38289a584fa45d77)
 
