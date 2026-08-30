@@ -1020,7 +1020,7 @@ dwelling can `keep` the path.
   <tr>
     <th>Stochastic</th>
     <td>{{stochtestcount}}</td>
-    <td>{{coverage}}<small>%</small></td>
+    <td>{{stochcoverage}}<small>%</small></td>
     <td>{{stochbranch}}<small>%</small></td>
     <td>{{stochfunc}}<small>%</small></td>
     <td>{{stochline}}<small>%</small></td>

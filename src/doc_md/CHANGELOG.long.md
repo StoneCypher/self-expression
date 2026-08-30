@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-81 merges; 6 releases
+82 merges; 7 releases
 
 
 
@@ -12,8 +12,85 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__6__1">0.6.1</a>, <a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 1:55:45 PM
+
+Commit [a04d0eaab046d7e0584455f12229aaa5e1bf7b39](https://github.com/StoneCypher/self-expression/commit/a04d0eaab046d7e0584455f12229aaa5e1bf7b39)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 9dc6f0b4821016d7886dc86294cd3fb71c5857d6
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__6__1" />
+
+## [0.6.1] - Aug 30, 2026 1:54:07 PM
+
+Commit [9dc6f0b4821016d7886dc86294cd3fb71c5857d6](https://github.com/StoneCypher/self-expression/commit/9dc6f0b4821016d7886dc86294cd3fb71c5857d6)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [ed16981, 5a4d554]
+
+  * Merge pull request #103 from StoneCypher/chore_26-08-30_untrack-coverage-stoch_90
+  * chore: untrack coverage-stoch and add it to .gitignore
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 1:50:52 PM
+
+Commit [5a4d55453a2f01c3521ee282536b56230a0992c3](https://github.com/StoneCypher/self-expression/commit/5a4d55453a2f01c3521ee282536b56230a0992c3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: untrack coverage-stoch and add it to .gitignore
+  * The stochastic-test coverage report was tracked in git: 110 files and
+about 93,700 lines, rewritten wholesale by every build. Because it is a
+generated HTML report over the whole source tree, essentially every
+branch touched every file in it, so it manufactured merge conflicts on
+work that had nothing to do with coverage.
+  * Nothing consumes it. The only references outside the directory itself
+are prose in CONTRIBUTING.md and a spec doc, an ignores entry in
+eslint.config.js, and reportsDirectory: './coverage-stoch' in
+vitest-stoch.config.ts, which is what writes it.
+  * git rm -r --cached leaves the report on disk, so the build keeps
+regenerating it and developers keep their local copy. The pre-existing
+`coverage` ignore rule did not cover this path: it matches an entry
+named exactly `coverage`.
+  * The README badges are unaffected. update_madlibs.js parses the unit and
+stochastic coverage numbers out of build/test_output.txt, the captured
+console output, and never reads coverage-stoch/. Verified end to end
+with a full build: stochcoverage 65.31, stochbranch 52.77, stochfunc
+64.58, stochline 64.9, stochtestcount 234 - all real values, no N/A.
+  * Deliberately left tracked:
+  *   * coverage-typedoc/ - one file, and update_madlibs.js genuinely reads
+    coverage-typedoc/coverage-typedoc.json for the {{doccoverage}}
+    badge. Untracking it would change fresh-clone behaviour to save a
+    single file of conflict surface.
+  * dist/ - installing from a git URL with no build step depends on it.
+    That is a separate decision.
+  * Refs #90
+  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
 
 
 
