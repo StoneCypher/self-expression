@@ -9,6 +9,11 @@
  * forever and silently rejects the new terms — passing on fresh installs and failing
  * on existing ones, the exact environment-dependent bug a migration step prevents.
  *
+ * The rebuild is the expensive path, not the only one. A table that bakes no `CHECK`
+ * clause can simply be widened: `turn_context` carries none, so the v6→v7 step is a
+ * single `ALTER TABLE … ADD COLUMN`. Reach for the rebuild when a constraint has to
+ * change, and for the `ALTER` when nothing but the column list does.
+ *
  * The machinery is deliberately reusable rather than a one-off: each version step is a
  * `MigrationStep`, {@link migrate} walks whatever chain exists, and the rebuild recipe
  * itself is one shared function three steps already call. #41, #18, #43, and #16 all
@@ -24,6 +29,7 @@ import {
   entriesDdl, INDEX_DDL,
   MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
   NOTES_DDL, NOTE_EVENTS_DDL, NOTE_INDEX_DDL,
+  TURN_CONTEXT_SOURCE_COLUMN,
 } from './schema.js';
 
 /**
@@ -259,6 +265,64 @@ function migrateV5toV6(db: DatabaseSync): void {
 }
 
 /**
+ * Whether `table` already has a column named `column`.
+ *
+ * The `ADD COLUMN` half of the idempotence every other step gets free from
+ * `IF NOT EXISTS`: SQLite has no `ADD COLUMN IF NOT EXISTS`, and a second `ALTER` for a
+ * column that is already there is an outright error rather than a no-op. Asking first
+ * keeps a re-run of a step — or a step reached on a database some other path already
+ * widened — as harmless as re-running `CREATE TABLE IF NOT EXISTS`.
+ *
+ * @param table  the table to inspect
+ * @param column the column name to look for, compared exactly
+ *
+ * @example
+ *   hasColumn(db, 'turn_context', 'source')   // => false on a v6 database
+ *
+ * @see migrateV6toV7
+ */
+export function hasColumn(db: DatabaseSync, table: string, column: string): boolean {
+  return db.prepare(`PRAGMA table_info(${table})`).all()
+    .some(row => String(row['name']) === column);
+}
+
+/**
+ * The v6→v7 step: give `turn_context` its nullable `source` column, so a reader can tell
+ * a hook-observed row from one a hookless host's model volunteered through `begin_turn`.
+ *
+ * The first step in this chain that is **not** a table rebuild, and the reason is worth
+ * stating: every earlier widening touched `entries`, whose vocabularies are baked into
+ * `CHECK` constraints SQLite cannot alter in place. `turn_context` has never carried a
+ * `CHECK` — not even on `turn`, which is a closed vocabulary everywhere else — so adding
+ * a column to it is exactly the one-statement operation SQLite does support.
+ *
+ * Existing rows keep NULL. That is not a hole to backfill: before this version there was
+ * only one writer, so NULL means "the hook, from a version that had no other path", and
+ * writing `'hook'` onto rows nobody observed writing it onto would be manufacturing
+ * evidence in a table whose entire purpose is to hold observations.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v6 database exactly as it was.
+ *
+ * @see hasColumn
+ * @see ./schema.js TURN_CONTEXT_DDL
+ */
+function migrateV6toV7(db: DatabaseSync): void {
+
+  if (hasColumn(db, 'turn_context', TURN_CONTEXT_SOURCE_COLUMN)) { return; }
+
+  db.exec('BEGIN');
+  try {
+    db.exec(`ALTER TABLE turn_context ADD COLUMN ${TURN_CONTEXT_SOURCE_COLUMN} TEXT`);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
@@ -268,6 +332,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 3, to: 4, apply: migrateV3toV4 },
   { from: 4, to: 5, apply: migrateV4toV5 },
   { from: 5, to: 6, apply: migrateV5toV6 },
+  { from: 6, to: 7, apply: migrateV6toV7 },
 ];
 
 /**
