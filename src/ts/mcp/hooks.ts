@@ -18,7 +18,9 @@ import { recordContext, latestContext, turnCount } from '../channels/context.js'
 import { hasClosingSignature, register }           from '../channels/entries.js';
 import type { RegisterRow }                        from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
-import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS } from '../channels/config.js';
+import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS,
+         windowPosture, WINDOW_SURFACES }        from '../channels/config.js';
+import type { WindowPosture, WindowSurface }     from '../channels/config.js';
 import { CHANNELS }                                from '../channels/vocabulary.js';
 import { unreadCounts, readMessages }              from '../channels/messages.js';
 import { offerRipeNotes, renderHeldNote }          from '../channels/notes.js';
@@ -173,6 +175,93 @@ export function channelLengths(store: Store): string {
     ? `lengths: ${String(base)} all`
     : `lengths: ${String(base)} except ` +
       exceptions.map(entry => `${entry.channel}:${String(entry.limit)}`).join(' ');
+
+}
+
+/**
+ * How each window surface is named in the posture line.
+ *
+ * Short noun phrases rather than the config key names, because the line is read by a
+ * model deciding what to do next, not by someone editing configuration — and because
+ * the two nouns are the whole argument for two keys: "an external browser window" and
+ * "an editor tab" are visibly different impositions on whoever is at the machine.
+ *
+ * @see windowPostureLine
+ * @see ../channels/config.js WINDOW_SURFACES
+ */
+export const WINDOW_SURFACE_NOUNS: Readonly<Record<WindowSurface, string>> = {
+  browser : 'an external browser window',
+  editor  : 'an editor tab',
+};
+
+/**
+ * One surface's posture, rendered as an English clause.
+ *
+ * Each posture gets its own sentence shape rather than a shared `label:value` pair,
+ * because the line has to survive being skimmed: `browser:never` is a fact the reader
+ * must then interpret, while "never open an external browser window" is already the
+ * instruction. All three shapes are grammatical with either noun, so the six
+ * combinations need no special cases.
+ *
+ * @param posture the posture in force for the surface
+ * @param noun    the surface's noun phrase, e.g. `'an editor tab'`
+ * @returns the clause, with no leading or trailing punctuation
+ *
+ * @example
+ *   windowClause('ask',    'an editor tab')                // => 'ask before opening an editor tab'
+ *   windowClause('never',  'an external browser window')   // => 'never open an external browser window'
+ *   windowClause('always', 'an editor tab')                // => 'opening an editor tab is pre-approved'
+ *
+ * @see windowPostureLine
+ */
+export function windowClause(posture: WindowPosture, noun: string): string {
+
+  if (posture === 'never')  { return `never open ${noun}`; }
+  if (posture === 'always') { return `opening ${noun} is pre-approved`; }
+
+  return `ask before opening ${noun}`;
+
+}
+
+/**
+ * The context line's window-posture segment, e.g.
+ * `windows: ask before opening an external browser window; ask before opening an editor tab`.
+ *
+ * The same transport {@link conventionFlags} and {@link channelLengths} ride, for the
+ * same reason: this is a preference the model must know *before* it acts, and the
+ * turn-start context line is the one place it reliably sees anything. Both surfaces are
+ * always named, including at the default, because `ask` is itself an instruction — a
+ * silent line would read as "no opinion", which is the opposite of what `ask` means.
+ *
+ * **Advisory, and deliberately not enforcement.** No tool in this plugin gates window
+ * opening, and none is planned: a shell command can open a browser with no MCP call at
+ * all, so a gate would be a lock on one of several doors, and a lock that can be walked
+ * around is worse than an honest request — it invites the belief that the door is shut.
+ * What the plugin can do is make sure the user's stated wish is in front of the model at
+ * the moment the choice is made, and that is exactly what this line is.
+ *
+ * Reads through {@link ../channels/config.js windowPosture}, so a hand-edited or
+ * newer-vocabulary row renders as `ask` (D5) rather than as a permission nobody granted.
+ *
+ * @param store the open store to resolve postures against
+ * @returns the segment text, without trailing punctuation
+ *
+ * @example
+ *   windowPostureLine(store)
+ *   // => 'windows: ask before opening an external browser window; ask before opening an editor tab'
+ *   writeConfig(store, 'window.browser', 'never');
+ *   windowPostureLine(store)
+ *   // => 'windows: never open an external browser window; ask before opening an editor tab'
+ *
+ * @see windowClause
+ * @see onUserPromptSubmit
+ */
+export function windowPostureLine(store: Store): string {
+
+  const clauses = WINDOW_SURFACES.map(surface =>
+    windowClause(windowPosture(store, surface), WINDOW_SURFACE_NOUNS[surface]));
+
+  return `windows: ${clauses.join('; ')}`;
 
 }
 
@@ -415,7 +504,13 @@ export const OPEN_REMINDER_CLOCKLESS =
  * that same transport, carrying the configured per-channel text ceilings to a skill
  * that cannot read config. It fails open on its own terms too.
  *
- * After the lengths comes the messagebox count line ({@link mailboxLine}, issue #41),
+ * After the lengths comes the window-posture segment ({@link windowPostureLine}), which
+ * states what the user has said about opening an external browser window and about
+ * opening an editor tab — two keys, because the two impositions are not the same size.
+ * It is advisory by construction: no tool gates window opening, so the line is the whole
+ * mechanism, and it fails open on its own terms like every other segment.
+ *
+ * After that comes the messagebox count line ({@link mailboxLine}, issue #41),
  * present only when something is actually unread and both `messages.*` keys allow it.
  * It fails open separately too: a mailbox error costs the count line and nothing else.
  *
@@ -485,12 +580,18 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: the clock, flags, and reminder still get delivered */ }
   }
 
+  let windows = '';
+  if (store !== null) {
+    try { windows = ` ${windowPostureLine(store)}.`; }
+    catch { /* fail open: the clock, flags, lengths, and reminder still get delivered */ }
+  }
+
   let mail = '';
   if (store !== null) {
     try {
       const line = mailboxLine(store, payload.session_id, now);
       if (line !== null) { mail = ` ${line}`; }
-    } catch { /* fail open: the clock, flags, lengths, and reminder still get delivered */ }
+    } catch { /* fail open: the clock, flags, lengths, windows, and reminder still get delivered */ }
   }
 
   // The retraction replay (#16), on the first turn this store has seen of this session
@@ -529,8 +630,8 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: keep the clock */ }
   }
 
-  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${mail}`
-                         : `${flags}${lengths}${mail}`.trimStart(),
+  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${windows}${mail}`
+                         : `${flags}${lengths}${windows}${mail}`.trimStart(),
         reminder = clock ? OPEN_REMINDER : OPEN_REMINDER_CLOCKLESS;
 
   return {
