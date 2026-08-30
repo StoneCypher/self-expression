@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-81 merges; 6 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+82 merges; 7 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -12,8 +12,85 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__6__1">0.6.1</a>, <a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 1:55:45 PM
+
+Commit [a04d0eaab046d7e0584455f12229aaa5e1bf7b39](https://github.com/StoneCypher/self-expression/commit/a04d0eaab046d7e0584455f12229aaa5e1bf7b39)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 9dc6f0b4821016d7886dc86294cd3fb71c5857d6
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__6__1" />
+
+## [0.6.1] - Aug 30, 2026 1:54:07 PM
+
+Commit [9dc6f0b4821016d7886dc86294cd3fb71c5857d6](https://github.com/StoneCypher/self-expression/commit/9dc6f0b4821016d7886dc86294cd3fb71c5857d6)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [ed16981, 5a4d554]
+
+  * Merge pull request #103 from StoneCypher/chore_26-08-30_untrack-coverage-stoch_90
+  * chore: untrack coverage-stoch and add it to .gitignore
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 1:50:52 PM
+
+Commit [5a4d55453a2f01c3521ee282536b56230a0992c3](https://github.com/StoneCypher/self-expression/commit/5a4d55453a2f01c3521ee282536b56230a0992c3)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * chore: untrack coverage-stoch and add it to .gitignore
+  * The stochastic-test coverage report was tracked in git: 110 files and
+about 93,700 lines, rewritten wholesale by every build. Because it is a
+generated HTML report over the whole source tree, essentially every
+branch touched every file in it, so it manufactured merge conflicts on
+work that had nothing to do with coverage.
+  * Nothing consumes it. The only references outside the directory itself
+are prose in CONTRIBUTING.md and a spec doc, an ignores entry in
+eslint.config.js, and reportsDirectory: './coverage-stoch' in
+vitest-stoch.config.ts, which is what writes it.
+  * git rm -r --cached leaves the report on disk, so the build keeps
+regenerating it and developers keep their local copy. The pre-existing
+`coverage` ignore rule did not cover this path: it matches an entry
+named exactly `coverage`.
+  * The README badges are unaffected. update_madlibs.js parses the unit and
+stochastic coverage numbers out of build/test_output.txt, the captured
+console output, and never reads coverage-stoch/. Verified end to end
+with a full build: stochcoverage 65.31, stochbranch 52.77, stochfunc
+64.58, stochline 64.9, stochtestcount 234 - all real values, no N/A.
+  * Deliberately left tracked:
+  *   * coverage-typedoc/ - one file, and update_madlibs.js genuinely reads
+    coverage-typedoc/coverage-typedoc.json for the {{doccoverage}}
+    badge. Untracking it would change fresh-clone behaviour to save a
+    single file of conflict surface.
+  * dist/ - installing from a git URL with no build step depends on it.
+    That is a separate decision.
+  * Refs #90
+  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
 
 
 
@@ -204,70 +281,4 @@ and src/ts/tests/diagram_matrix.stoch.ts; this branch touches channels/config.ts
 mcp/hooks.ts and their tests, so the two never met. base_README.md and
 src/doc_md/plugin-layout.md auto-merged and were checked by hand afterwards.
   * This is issue #90 for the second time in one afternoon on one PR.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 11:22:22 AM
-
-Commit [612ba8977dbd0adaec7dd6402cf543790a43e9d6](https://github.com/StoneCypher/self-expression/commit/612ba8977dbd0adaec7dd6402cf543790a43e9d6)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 69c3830a384ee4dca8562826968ae30dbef636a7
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-<a name="0__4__0" />
-
-## [0.4.0] - Aug 30, 2026 11:20:54 AM
-
-Commit [69c3830a384ee4dca8562826968ae30dbef636a7](https://github.com/StoneCypher/self-expression/commit/69c3830a384ee4dca8562826968ae30dbef636a7)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [ea0edaf, aa0beac]
-
-  * Merge pull request #86 from StoneCypher/feat_26-08-29_seriated-matrix
-  * feat(diagrams): seriated matrix — reorder a two-way table until its blocks show
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:39:33 AM
-
-Commit [9e15f20c7c2cbd1d3ee4c2e974c177daf2d17063](https://github.com/StoneCypher/self-expression/commit/9e15f20c7c2cbd1d3ee4c2e974c177daf2d17063)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: bump to 0.4.0 and regenerate artifacts after merging main
-  * The merge left this branch carrying main's 0.3.0, and tag 0.3.0 already
-exists on the remote (confirmed via git ls-remote --tags), so the release
-job would have failed with "422 tag_name already exists" once merged.
-0.4.0 is unused. This is a feature branch, so MINOR with PATCH reset.
-  * Regenerates every tracked build output against the merged tree: dist/,
-coverage-stoch/, README.md, CHANGELOG.md, CHANGELOG.long.md and their
-src/doc_md/ copies.
-  * The full canonical build passes — not the ci profile: 2025 unit tests
-across 77 files, 213 stochastic tests across 36 files, and all four attw
-resolution modes green.
-  * Note for future work in this worktree: node_modules was empty here, and
-because the worktree is nested inside the main checkout, Node resolution
-climbed to the outer repo and ran its vitest. That made process.argv[1]
-point at the main checkout and failed the conventions.spec.ts package-root
-assertion. npm ci in the worktree fixed it; no source change was needed.
   * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
