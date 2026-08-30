@@ -1,10 +1,10 @@
 # self-expression v0.4.0
 
-> Version 0.4.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788110230992` from hash `377fecf`.
+> Version 0.4.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788110819129` from hash `6d711f1`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788110230992 Sunday, August 30, 2026 at GMT-07:00 95.02 358 91 377fecf 52.7 64.91 63.87 64.47 228 2292 89.26 93.5 95.38 2064 0.4.0 -->
+<!-- Supported embeds: 1788110819129 Sunday, August 30, 2026 at GMT-07:00 95.03 358 91 6d711f1 52.65 65.04 63.97 64.64 228 2293 89.28 93.5 95.39 2065 0.4.0 -->
 
 
 
@@ -947,19 +947,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2064</td>
-    <td>95.02<small>%</small></td>
-    <td>89.26<small>%</small></td>
+    <td>2065</td>
+    <td>95.03<small>%</small></td>
+    <td>89.28<small>%</small></td>
     <td>93.5<small>%</small></td>
-    <td>95.38<small>%</small></td>
+    <td>95.39<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
     <td>228</td>
-    <td>95.02<small>%</small></td>
-    <td>52.7<small>%</small></td>
-    <td>63.87<small>%</small></td>
-    <td>64.47<small>%</small></td>
+    <td>95.03<small>%</small></td>
+    <td>52.65<small>%</small></td>
+    <td>63.97<small>%</small></td>
+    <td>64.64<small>%</small></td>
   </tr>
 </table>
 

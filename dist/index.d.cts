@@ -2315,8 +2315,9 @@ interface SeriationOptions {
      */
     maxPasses?: number | undefined;
     /**
-     * Sweep-then-hill-climb rounds, default {@link DEFAULT_SERIATION_ROUNDS}. Rounds stop
-     * early at a fixed point, which is what makes seriation idempotent.
+     * Sweep-then-hill-climb rounds, default {@link DEFAULT_SERIATION_ROUNDS}. A round is
+     * kept only when it lowers the recomputed objective, so rounds stop at a fixed point
+     * rather than at this cap — which is what makes seriation idempotent.
      */
     maxRounds?: number | undefined;
 }
@@ -2418,9 +2419,12 @@ declare function seriationScore(data: MatrixData): number;
  * The search is a barycentre sweep (order each axis by the value-weighted mean position
  * of the other, alternating until nothing moves) followed by a local search on
  * {@link seriationScore} — adjacent swaps, then single-key relocation, which the swaps
- * alone measurably cannot substitute for — repeated as rounds until a round changes
- * nothing. Terminating at a fixed point is deliberate: it makes seriation idempotent,
- * so a table can be seriated twice without drifting.
+ * alone measurably cannot substitute for — repeated as rounds until a round fails to
+ * lower the objective, which is then recomputed from scratch on the reordered table
+ * rather than tracked incrementally. Terminating at a fixed point is deliberate: it
+ * makes seriation idempotent, so a table can be seriated twice without drifting. The
+ * recomputation is what makes that true even when the values span enough orders of
+ * magnitude that a local gain rounds away to nothing in the total.
  *
  * It is a heuristic, not a solver, and it is not told what any key *means*. It can
  * settle on an order that scores better than the one a human would have drawn, and on

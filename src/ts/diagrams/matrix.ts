@@ -112,8 +112,9 @@ export interface SeriationOptions {
    */
   maxPasses?: number | undefined;
   /**
-   * Sweep-then-hill-climb rounds, default {@link DEFAULT_SERIATION_ROUNDS}. Rounds stop
-   * early at a fixed point, which is what makes seriation idempotent.
+   * Sweep-then-hill-climb rounds, default {@link DEFAULT_SERIATION_ROUNDS}. A round is
+   * kept only when it lowers the recomputed objective, so rounds stop at a fixed point
+   * rather than at this cap — which is what makes seriation idempotent.
    */
   maxRounds?: number | undefined;
 }
@@ -522,8 +523,13 @@ function hillClimb(order: number[], dist: readonly (readonly number[])[]): numbe
  * leaving it as an anecdote.
  *
  * Reinserting a key where it already was scores a gain of exactly zero, and only
- * strictly positive gains are taken, so a settled order is left alone — which is what
- * keeps {@link seriate} idempotent.
+ * strictly positive gains are taken, so a settled order is left alone.
+ *
+ * The gain is an incremental one — three edge lengths against three others, never the
+ * whole path — so it is positive whenever those six numbers say so, even on a table
+ * where the difference is far too small to survive being added back into the total.
+ * That is why {@link seriate} does not treat "this pass moved something" as progress:
+ * it keeps a round only when the recomputed objective really fell.
  *
  * @returns how many relocations were accepted; zero means the order arrived settled
  */
@@ -600,9 +606,12 @@ function requirePositiveInteger(value: number, what: string): void {
  * The search is a barycentre sweep (order each axis by the value-weighted mean position
  * of the other, alternating until nothing moves) followed by a local search on
  * {@link seriationScore} — adjacent swaps, then single-key relocation, which the swaps
- * alone measurably cannot substitute for — repeated as rounds until a round changes
- * nothing. Terminating at a fixed point is deliberate: it makes seriation idempotent,
- * so a table can be seriated twice without drifting.
+ * alone measurably cannot substitute for — repeated as rounds until a round fails to
+ * lower the objective, which is then recomputed from scratch on the reordered table
+ * rather than tracked incrementally. Terminating at a fixed point is deliberate: it
+ * makes seriation idempotent, so a table can be seriated twice without drifting. The
+ * recomputation is what makes that true even when the values span enough orders of
+ * magnitude that a local gain rounds away to nothing in the total.
  *
  * It is a heuristic, not a solver, and it is not told what any key *means*. It can
  * settle on an order that scores better than the one a human would have drawn, and on
@@ -666,23 +675,38 @@ export function seriate(data: MatrixData, options?: SeriationOptions): Seriation
   const colDist = colDistances(source);
 
   let rowOrder = identity(rowCount), colOrder = identity(colCount);
+  let bestScore = scoreBefore;
   let rounds = 0, passes = 0, swaps = 0;
 
   for (let round = 0; round < maxRounds; round++) {
 
-    const priorRows = [...rowOrder], priorCols = [...colOrder];
-
     const swept = sweep(source, rowOrder, colOrder, rowDist, colDist, pinnedRows, pinnedCols, maxPasses);
-    rowOrder = swept.rows;
-    colOrder = swept.cols;
+    const tryRows = swept.rows, tryCols = swept.cols;
     passes += swept.passes;
 
-    if (!pinnedRows) { swaps += hillClimb(rowOrder, rowDist) + relocate(rowOrder, rowDist); }
-    if (!pinnedCols) { swaps += hillClimb(colOrder, colDist) + relocate(colOrder, colDist); }
+    let moved = 0;
+    if (!pinnedRows) { moved += hillClimb(tryRows, rowDist) + relocate(tryRows, rowDist); }
+    if (!pinnedCols) { moved += hillClimb(tryCols, colDist) + relocate(tryCols, colDist); }
 
     rounds = round + 1;
 
-    if (sameOrder(rowOrder, priorRows) && sameOrder(colOrder, priorCols)) { break; }
+    // A round is kept only when the objective, recomputed from scratch on the
+    // reordered table, actually fell. The sweep and the two local searches all decide
+    // in *incremental* arithmetic — a handful of edge lengths, never the whole path —
+    // and on a table whose values span enough orders of magnitude a strictly positive
+    // local gain can round away to nothing once it is added back into the total. Such
+    // a round rearranges keys without improving anything, so the search never settles
+    // and only the round cap stops it, leaving an order that depends on how many
+    // rounds were allowed. Requiring a real improvement makes the accepted rounds
+    // strictly monotone, so the search stops at a fixed point instead of a cap — which
+    // is what makes seriating an already-seriated table a no-op.
+    const roundScore = seriationScore(permute(source, tryRows, tryCols));
+    if (!(roundScore < bestScore)) { break; }
+
+    rowOrder  = tryRows;
+    colOrder  = tryCols;
+    bestScore = roundScore;
+    swaps    += moved;
 
   }
 

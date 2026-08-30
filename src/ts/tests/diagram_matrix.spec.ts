@@ -327,6 +327,29 @@ describe('seriate — idempotence', () => {
     expect(twice.matrix).toEqual(once.matrix);
   });
 
+  /**
+   * Regression, found by the stochastic suite. These seven values span 140 orders of
+   * magnitude, so the squared distances between the small ones underflow to zero
+   * beside the large ones: the local searches kept finding "improvements" worth less
+   * than one unit in the last place of a total near 12545, the search never settled,
+   * and the round cap decided the answer. Seriating three times gave three orders.
+   */
+  test('a table spanning 140 orders of magnitude still settles', () => {
+    const degenerate = normalizeMatrix(
+      ['r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6'],
+      ['c0'],
+      [[113], [113], [2.687150443026836e-138], [1.5717277847026288e-162],
+        [0], [3.1434555694052576e-162], [1]],
+    );
+    const once   = seriate(degenerate);
+    const twice  = seriate(once.matrix);
+    const thrice = seriate(twice.matrix);
+    expect(twice.matrix).toEqual(once.matrix);
+    expect(thrice.matrix).toEqual(once.matrix);
+    expect(twice.swaps).toBe(0);
+    expect(twice.rounds).toBe(1);
+  });
+
 });
 
 describe('seriate — refusals', () => {
