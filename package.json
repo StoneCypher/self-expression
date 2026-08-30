@@ -1,6 +1,6 @@
 {
   "name": "self-expression",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "self-expression plugin for agents like claude opus, codex, gemini, and deepseek",
   "keywords": [
     "self-expression",
@@ -60,10 +60,10 @@
   "scripts": {
     "prepublishOnly": "npm run build",
     "clean": "node src/build_js/clean.js",
-    "update_madlibs": "node src/build_js/update_madlibs.js && cp README.md docs",
+    "update_madlibs": "node src/build_js/update_madlibs.js --copy-readme-to docs",
     "typescript": "tsc --build tsconfig.json",
     "terser": "node src/build_js/minify_bundles.js && cp dist/index.iife.js dist/index.iife.js.map docs",
-    "dts": "cp build/ts/*.d.ts build/ts/*.d.ts.map dist/ && mkdir -p dist/charts && cp build/ts/charts/*.d.ts build/ts/charts/*.d.ts.map dist/charts/ && mkdir -p dist/diagrams && cp build/ts/diagrams/*.d.ts build/ts/diagrams/*.d.ts.map dist/diagrams/ && mkdir -p dist/raster && cp build/ts/raster/*.d.ts build/ts/raster/*.d.ts.map dist/raster/",
+    "dts": "node src/build_js/copy_dts.js",
     "rollup": "rollup -c",
     "site": "cp src/html/* docs && cp src/html/.nojekyll docs && cp README.md docs/ && cp dist/index.mjs docs/docs/ && cp src/html/*.png docs/docs",
     "docs": "typedoc src/ts/index.ts --options typedoc-options.cjs --out docs/docs",

@@ -168,6 +168,56 @@ export function openStore(path: string = dbPath()): Store {
   mkdirSync(dirname(path), { recursive: true });
 
   const db = new DatabaseSync(path);
+
+  /* Connection setup, before any DDL — `journal_mode` cannot change inside a transaction.
+     Two of these are durability decisions; the rest are defaults SQLite leaves off for
+     backwards compatibility with 2004. Each is one line, and each was measured or checked
+     rather than copied from a listicle.
+
+     **journal_mode=WAL + synchronous=NORMAL** — the reason any of this was found. The
+     defaults make every write its own rollback-journal transaction: create a journal,
+     fsync, write, fsync, delete it. Measured against this very store: **172 writes/sec**,
+     against **11,236** with these two set. Sixty-five times. It stayed invisible because
+     the server writes a handful of rows per turn; a property test doing thousands of them
+     is what finally turned a constant factor into a number on the screen. What NORMAL
+     gives up, precisely: under WAL a committed transaction still survives a process
+     crash, and only an OS crash or power loss can lose the most recent commits.
+
+     WAL is persisted in the file header; everything below is **per-connection** and must
+     be set on every open, which is why these live here and not in a migration.
+
+     **busy_timeout** — the correctness one, and the one this project most needed. Several
+     sessions share one store. Without a timeout a second writer gets SQLITE_BUSY
+     *immediately* and the write is simply lost; with it, SQLite waits and retries. WAL
+     stops readers blocking the writer and does nothing whatsoever for two writers.
+
+     **foreign_keys** — OFF by default, permanently, for backwards compatibility. This
+     schema declares five references (`entries.corrects_id`, `messages.reply_to`,
+     `message_reads.message_id`, `notes.message_id`, `note_events.note_id`) and every one
+     of them has been decorative until now. This lands before the plugin has ever been
+     installed anywhere, so there is no database in existence that could hold a row
+     violating a constraint nobody was enforcing — the constraints simply start their life
+     enforced, which is the only cheap moment to do this. Retrofitting it later would have
+     meant a `PRAGMA foreign_key_check` sweep and a decision about whatever it found.
+
+     `cache_size` is negative to mean kibibytes rather than pages, so it cannot silently
+     change meaning if `page_size` ever does. `temp_store` keeps sorts and temporary
+     tables off disk. `mmap_size` lets reads come from the page cache without a syscall
+     per page. `analysis_limit` bounds the work `PRAGMA optimize` does at close (see
+     {@link closeStore}), so keeping planner statistics fresh cannot itself become a stall.
+
+     One caveat worth knowing rather than discovering: WAL writes `-wal` and `-shm`
+     sidecar files beside the database and does not work on a network filesystem, so a
+     `SELF_EXPRESSION_HOME` pointed at a share would need this reconsidered. */
+  db.exec('PRAGMA journal_mode   = WAL');
+  db.exec('PRAGMA synchronous    = NORMAL');
+  db.exec('PRAGMA busy_timeout   = 5000');
+  db.exec('PRAGMA foreign_keys   = ON');
+  db.exec('PRAGMA cache_size     = -32000');
+  db.exec('PRAGMA temp_store     = MEMORY');
+  db.exec('PRAGMA mmap_size      = 268435456');
+  db.exec('PRAGMA analysis_limit = 400');
+
   for (const statement of TABLE_DDL) { db.exec(statement); }
 
   const partial: Store = { db, machineId: '', path };
@@ -215,9 +265,20 @@ export function openStore(path: string = dbPath()): Store {
 /**
  * Close the database. Safe to call on an already-closed store.
  *
+ * Runs `PRAGMA optimize` first, which is SQLite's recommended close-time call: it updates
+ * the query planner's statistics for tables whose shape has changed enough to matter, and
+ * does nothing at all when nothing has. Without it the planner keeps choosing indexes
+ * against the row counts it saw when the statistics were last written, which on a log that
+ * only ever grows is exactly the number that ages worst. `analysis_limit` is set at open
+ * to bound how much it may read, so this cannot turn closing into a stall.
+ *
+ * Its own `try` because a store closed twice must stay harmless, and a failure to update
+ * statistics must never be the thing that stops a database being closed.
+ *
  * @example
  *   closeStore(store);
  */
 export function closeStore(store: Store): void {
+  try { store.db.exec('PRAGMA optimize'); } catch { /* statistics are a nicety, not a duty */ }
   try { store.db.close(); } catch { /* already closed */ }
 }

@@ -14,7 +14,7 @@
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir }                 from 'node:os';
-import { join, sep }              from 'node:path';
+import { join, resolve, sep }     from 'node:path';
 import { describe, test, expect } from 'vitest';
 
 import { openStore, closeStore } from '../channels/store.js';
@@ -122,9 +122,17 @@ describe('finding the package root — the installed layout and the checked-out 
     expect(findPackageRoot(join(ROOT ?? '', 'src', 'ts', 'mcp'), 4)).toBe(ROOT);
   });
 
+  /* Built from the filesystem root rather than written as a literal path.
+     `join('C:', 'x', …)` is absolute on Windows and, on POSIX, an ordinary RELATIVE path
+     whose first segment happens to be named `C:` — `path` has no reason to think otherwise.
+     So this passed on the machine it was written on and failed on the Linux runner, where
+     `packageRoot` resolved it against the runner's own working directory and produced
+     `/home/runner/work/self-expression/self-expression/C:/x/self-expression`. A drive letter
+     is a platform's syntax, not a portable way to say "absolute"; `resolve(sep, …)` is
+     absolute on both, and the expectation is built the same way so the two cannot drift. */
   test('packageRoot is the bundle-dir shortcut, one level up and no search', () => {
-    expect(packageRoot(join('C:', 'x', 'self-expression', 'dist')))
-      .toBe(join('C:', 'x', 'self-expression'));
+    expect(packageRoot(resolve(sep, 'x', 'self-expression', 'dist')))
+      .toBe(resolve(sep, 'x', 'self-expression'));
   });
 
   test('the default prefers the running script and falls back to the working directory', () => {
