@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-80 merges; 4 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+81 merges; 6 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -12,8 +12,78 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:47:31 AM
+
+Commit [e6a6a3819ca6caf3da29318d12720c9613e0dde2](https://github.com/StoneCypher/self-expression/commit/e6a6a3819ca6caf3da29318d12720c9613e0dde2)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: ed16981de20124be481c047daa4279345fb9b9d4
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__6__0" />
+
+## [0.6.0] - Aug 30, 2026 11:45:44 AM
+
+Commit [ed16981de20124be481c047daa4279345fb9b9d4](https://github.com/StoneCypher/self-expression/commit/ed16981de20124be481c047daa4279345fb9b9d4)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [f2b034a, 88090b0]
+
+  * Merge pull request #85 from StoneCypher/feat_26-08-28_desk-mechanism
+  * feat: move the desk mechanism into the repo, cards as directories
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:42:36 AM
+
+Commit [88090b0739c33030e2ccb4282e6f42f33a4ae97f](https://github.com/StoneCypher/self-expression/commit/88090b0739c33030e2ccb4282e6f42f33a4ae97f)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * build: bump to 0.6.0 and regenerate artifacts after merging main
+  * The second merge left this branch carrying main's 0.5.0, which main's own
+release job will tag on its next push, so shipping it here would fail with
+"422 tag_name already exists". git ls-remote --tags is the authority and
+shows 0.2.0, 0.2.1, 0.3.0, 0.4.0 tagged; 0.6.0 is unused. Feature branch,
+so MINOR with PATCH reset.
+  * Regenerates every tracked build output against the merged tree: dist/,
+coverage-stoch/, coverage-typedoc/, README.md, CHANGELOG.md,
+CHANGELOG.long.md and their src/doc_md/ copies. The merge commit had reset
+all of these to main wholesale, so this is a clean rebuild rather than a
+patch over a textual hybrid of two branches' outputs.
+  * The full canonical build passes — not the ci profile: 2135 unit tests
+across 78 files, 234 stochastic tests across 37 files, and all four attw
+resolution modes green.
+  * One note for whoever hits it next: deskcards.stoch.ts "carries card source
+through verbatim" timed out at 5000ms on the first attempt and passed on
+re-run, taking 2.67s of test time in isolation. It does a mkdir plus four
+file writes per property run across 24 runs, so it is I/O-bound and
+sensitive to machine load rather than flaky in its logic. Worth a longer
+timeout if it recurs.
+  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
 
 
 
@@ -56,7 +126,9 @@ of a merge in the normal direction of history.
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:33:12 AM
+<a name="0__5__0" />
+
+## [0.5.0] - Aug 30, 2026 11:33:12 AM
 
 Commit [f2b034aa991ea344296e1b4f38289a584fa45d77](https://github.com/StoneCypher/self-expression/commit/f2b034aa991ea344296e1b4f38289a584fa45d77)
 
@@ -198,110 +270,4 @@ because the worktree is nested inside the main checkout, Node resolution
 climbed to the outer repo and ran its vitest. That made process.argv[1]
 point at the main checkout and failed the conventions.spec.ts package-root
 assertion. npm ci in the worktree fixed it; no source change was needed.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:28:17 AM
-
-Commit [aa0beac1f4b18b3b03e7b231cd0f9baabbc2afda](https://github.com/StoneCypher/self-expression/commit/aa0beac1f4b18b3b03e7b231cd0f9baabbc2afda)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * fix(diagrams): make seriation settle instead of stopping at the round cap
-  * The stochastic suite caught seriate breaking its own idempotence claim, and it was
-a real defect rather than a flaky property. Counterexample, shrunk by fast-check:
-a 7x1 table holding 113, 113, 2.7e-138, 1.6e-162, 0, 3.1e-162, 1. Seriating it
-three times gave three different row orders, all scoring exactly 12545.
-  * Cause: the barycentre sweep and both local searches decide in incremental
-arithmetic - a few edge lengths, never the whole path. When the values span 140
-orders of magnitude the squared distances between the small rows are subnormal, so
-a gain that is strictly positive on its own is worth less than one ulp of a total
-near 12545. The search kept accepting moves that improved nothing, never reached a
-fixed point, and ran until maxRounds - which made the answer a function of how many
-rounds were allowed, and so of where the caller started.
-  * Fix: a round is kept only when seriationScore, recomputed from scratch on the
-reordered table, actually fell. Accepted rounds are then strictly monotone in the
-real objective, so the search stops at a fixed point rather than at the cap, and
-seriating an already-seriated table is a no-op again. Well-conditioned tables are
-unaffected: rounds that improve them improve the recomputed score too. Only
-zero-net churn is now rejected.
-  * Adds the shrunk counterexample as a unit test, and corrects the DocBlocks on
-seriate, relocate, and maxRounds that asserted the old, weaker termination
-argument.
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:26:38 AM
-
-Commit [6f2fc802ca1dfb210b4c5f47141d410bc9ad4924](https://github.com/StoneCypher/self-expression/commit/6f2fc802ca1dfb210b4c5f47141d410bc9ad4924)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * feat(config): window.browser and window.editor postures, and an enum kind
-  * Adds two configuration keys, `window.browser` and `window.editor`, each taking
-`never`, `ask`, or `always`, and the `enum` config kind they are the first users
-of. `share.time_granularity` moves onto that kind as well, so a closed two-word
-domain reports itself as a choice set instead of as the word "string".
-  * The keys are two rather than one because the costs differ: an external browser
-window steals focus and can land while nobody is at the machine, while an editor
-tab appears in the window the user is already sitting in. A single key would
-force the expensive answer onto the cheap case.
-  * They are advisory by construction, and say so. Nothing in this plugin gates
-window opening — a shell command can open a browser with no MCP call at all, so
-a gate would be a lock on one of several doors. What the plugin can do is put
-the user's stated wish in front of the model at the moment the choice is made,
-which is the new `windows:` segment on the turn-start context line. It fails
-open on its own terms like every other segment.
-  * This commit also carries the merge of origin/main (#97, image generation for
-#78), which this branch had gone CONFLICTING against without anyone touching
-it. The conflicts were almost entirely tracked build output, which is issue #90:
-because dist/, coverage-stoch/ and the generated changelogs are committed, every
-merge to main re-conflicts every open PR on files nobody edited. Those took
-main's side and were regenerated by the build. The two genuine source conflicts
-were both prose — the CONFIG_KEYS docblock and the settled-surface test title —
-and each side's sentence was kept; the registry array and the asserted key list
-had already merged cleanly with both the image and window families present.
-  * Version bumped 0.3.0 -> 0.4.0. The release job creates a GitHub release for
-whatever version package.json holds on every push to main, so landing without a
-bump re-breaks main with `422 tag_name already exists`.
-  * Merge main into PR #84 and restore green: window.browser/window.editor postures
-plus the enum config kind, rebased onto the #78 image-generation work
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:26:16 AM
-
-Commit [6ea843ab78b5ee548f2a908229a420b0fd535e88](https://github.com/StoneCypher/self-expression/commit/6ea843ab78b5ee548f2a908229a420b0fd535e88)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [c23b2f9, ea0edaf]
-
-  * merge: origin/main into desk-mechanism
-  * Generated artifacts (coverage-stoch/, README.md) taken from main wholesale;
-the build regenerates them. Two genuine source conflicts hand-integrated,
-both of the same shape — each side added a different new section at the same
-point, and both intents are preserved:
-  * - base_README.md: kept "The desk" (this branch) and "Image generation
-  (issue #78)" (main), separated by the house divider.
-- src/doc_md/plugin-layout.md: kept the desk mechanism paragraphs (this
-  branch) and the skills-as-MCP-resources / begin_turn paragraphs (main).
-  * src/scripts/desk/ is untouched by the merge; main carries no copy of it.
   * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L

@@ -22,6 +22,14 @@ lib-cov
 coverage
 *.lcov
 
+# Stochastic-test coverage report (vitest-stoch.config.ts writes it here).
+# Purely a local artifact: nothing in the build or the docs reads it, and every
+# build rewrites all ~110 files, so tracking it only manufactured merge
+# conflicts. The `coverage` rule above does not cover this — it matches a path
+# named exactly `coverage`. coverage-typedoc/ stays tracked on purpose:
+# update_madlibs.js reads coverage-typedoc/coverage-typedoc.json.
+coverage-stoch/
+
 # nyc test coverage
 .nyc_output
 

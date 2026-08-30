@@ -1,10 +1,10 @@
-# self-expression v0.6.0
+# self-expression v0.6.1
 
-> Version 0.6.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788115279492` from hash `5b15973`.
+> Version 0.6.1 was built on Sunday, August 30, 2026 at GMT-07:00 `1788122911045` from hash `ed16981`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788115279492 Sunday, August 30, 2026 at GMT-07:00 95.04 358 91 5b15973 52.69 65.18 64.27 64.79 234 2369 89.31 93.54 95.4 2135 0.6.0 -->
+<!-- Supported embeds: 1788122911045 Sunday, August 30, 2026 at GMT-07:00 95.04 358 91 ed16981 52.77 65.31 64.58 64.9 234 2369 89.31 93.54 95.4 2135 0.6.1 -->
 
 
 
@@ -1021,9 +1021,9 @@ dwelling can `keep` the path.
     <th>Stochastic</th>
     <td>234</td>
     <td>95.04<small>%</small></td>
-    <td>52.69<small>%</small></td>
-    <td>64.27<small>%</small></td>
-    <td>64.79<small>%</small></td>
+    <td>52.77<small>%</small></td>
+    <td>64.58<small>%</small></td>
+    <td>64.9<small>%</small></td>
   </tr>
 </table>
 
