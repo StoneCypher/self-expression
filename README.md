@@ -1,10 +1,10 @@
-# self-expression v0.3.0
+# self-expression v0.4.0
 
-> Version 0.3.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788100370482` from hash `0cb73a1`.
+> Version 0.4.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788110819129` from hash `6d711f1`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788100370482 Sunday, August 30, 2026 at GMT-07:00 94.77 313 90 0cb73a1 51.33 63.26 62.05 62.97 210 2210 88.96 92.96 95.18 2000 0.3.0 -->
+<!-- Supported embeds: 1788110819129 Sunday, August 30, 2026 at GMT-07:00 95.03 358 91 6d711f1 52.65 65.04 63.97 64.64 228 2293 89.28 93.5 95.39 2065 0.4.0 -->
 
 
 
@@ -482,23 +482,51 @@ transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issu
 
 | Tool | Forms | Purpose |
 |---|---|---|
-| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, or a sequence diagram (actors, lifelines, one arrow row per message). |
+| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` \| `matrix` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, a sequence diagram (actors, lifelines, one arrow row per message), or a **seriated matrix** (a two-way table shaded by cell magnitude, both axes reordered so similar keys sit together). |
 
 When to reach for it: **quantities** (how much, how many, trend) → a chart tool;
 **linear order** (a pipeline, one path through states) → `render_timeline`'s inline
 forms; **topology** — the moment structure branches, merges, cycles, or fans in or
-out — → `render_diagram`. Output is framed, single-width, at most 78 columns, and
-meant to sit inside a ```` ```text ```` fence. A graph too large or too tangled to
-draw legibly is refused with the fallbacks named in the error text (the FSL
-one-liner, an adjacency list, or the mermaid export). `emit: 'mermaid'` /
-`emit: 'both'` serialize the graph as `stateDiagram-v2` or `flowchart` source — an
-opt-in export for destinations that render mermaid (GitHub PR bodies, READMEs),
-never the in-transcript form, since the transcript surface shows mermaid as raw text.
+out — → `render_diagram`; **two categorical axes crossing**, where the question is
+whether they cluster → `render_diagram` form `matrix`. Output is framed,
+single-width, at most 78 columns, and meant to sit inside a ```` ```text ````
+fence. A diagram too large or too tangled to draw legibly is refused with the
+fallbacks named in the error text (for graphs: the FSL one-liner, an adjacency list,
+or the mermaid export; for matrices: a narrower slice, a ranked list of the largest
+cells, or one axis at a time as labeled bars). `emit: 'mermaid'` / `emit: 'both'`
+serialize the graph as `stateDiagram-v2` or `flowchart` source — an opt-in export for
+destinations that render mermaid (GitHub PR bodies, READMEs), never the in-transcript
+form, since the transcript surface shows mermaid as raw text. The `sequence` and
+`matrix` forms have no mermaid emission and say so.
 
-The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`),
-the FSL-subset parser (`parseFsl`, round-trip compatible with `renderFsl`), and the
-mermaid serializer (`toMermaid`) are all exported from the library
-(`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
+### Seriation
+
+The `matrix` form's point is not the shading, it is the **reordering**. Given two key
+axes and a value per crossing, it orders each axis so that similar rows sit beside
+similar rows and similar columns beside similar columns, which turns a scattered table
+into visible blocks — structure nothing told it to look for. The search is a barycentre
+sweep (each axis ordered by the value-weighted mean position of the other, alternating
+to convergence) followed by a local search — adjacent swaps, then single-key
+relocation — on a profile-distance objective, run as rounds to a fixed point, so
+seriating twice is a no-op.
+
+`pinRows` / `pinCols` freeze an axis in the order it was given, exactly. This is the
+option that makes the form usable rather than merely clever: when the rows are release
+milestones, a reader already knows what order they come in, and reordering them scores
+better while reading worse. Pin any axis whose order already carries meaning.
+
+Because a shaded matrix looks structured whether or not anything was found, the reply
+carries one line reporting the objective before and after (`seriation: profile distance
+5863 -> 1709 (71% tighter); both axes reordered`). Compare the two numbers; the picture
+alone is not evidence. The marginal totals are drawn alongside for the same reason —
+shading shows proportion and hides magnitude, and a bright cell holding three items
+should not read like a bright cell holding three hundred.
+
+The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`,
+`renderMatrix`), the seriation (`normalizeMatrix`, `seriate`, `seriationScore`,
+`matrixTotals`, `describeSeriation`), the FSL-subset parser (`parseFsl`, round-trip
+compatible with `renderFsl`), and the mermaid serializer (`toMermaid`) are all exported
+from the library (`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
 
 &nbsp;
 
@@ -919,19 +947,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2000</td>
-    <td>94.77<small>%</small></td>
-    <td>88.96<small>%</small></td>
-    <td>92.96<small>%</small></td>
-    <td>95.18<small>%</small></td>
+    <td>2065</td>
+    <td>95.03<small>%</small></td>
+    <td>89.28<small>%</small></td>
+    <td>93.5<small>%</small></td>
+    <td>95.39<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>210</td>
-    <td>94.77<small>%</small></td>
-    <td>51.33<small>%</small></td>
-    <td>62.05<small>%</small></td>
-    <td>62.97<small>%</small></td>
+    <td>228</td>
+    <td>95.03<small>%</small></td>
+    <td>52.65<small>%</small></td>
+    <td>63.97<small>%</small></td>
+    <td>64.64<small>%</small></td>
   </tr>
 </table>
 
@@ -939,12 +967,12 @@ dwelling can `keep` the path.
   <tr>
     <th></th>
     <th>Docblock count</th>
-    <th>90<small>%</small></th>
+    <th>91<small>%</small></th>
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>313</td>
-    <td>90<small>%</small></td>
+    <td>358</td>
+    <td>91<small>%</small></td>
   </tr>
 </table>
 

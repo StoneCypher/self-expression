@@ -20,8 +20,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z }         from 'zod';
 
 import {
-  renderStateDiagram, renderDigraph, renderTree, renderSequence,
-  normalizeGraph, parseFsl, toMermaid,
+  renderStateDiagram, renderDigraph, renderTree, renderSequence, renderMatrix,
+  normalizeGraph, normalizeMatrix, seriate, describeSeriation, parseFsl, toMermaid,
 } from '../diagrams/index.js';
 import type {
   Digraph, DiagramEdge, DiagramNode, SequenceMessage, MermaidDialect,
@@ -107,7 +107,7 @@ function toSequenceMessage(m: { from: string; to: string; label?: string | undef
 }
 
 /** The forms {@link handleRenderDiagram} accepts. */
-export const DIAGRAM_FORMS = ['state', 'digraph', 'tree', 'sequence'] as const;
+export const DIAGRAM_FORMS = ['state', 'digraph', 'tree', 'sequence', 'matrix'] as const;
 
 /** The three emissions `render_diagram` can produce. */
 const DIAGRAM_EMITS = ['ascii', 'mermaid', 'both'] as const;
@@ -117,8 +117,10 @@ const DIAGRAM_SHAPE = {
   form: z.enum(tuple(DIAGRAM_FORMS)).describe(
     "which diagram form to render: 'state' (a state machine: boxes, labeled transition "
     + "arrows, cycles as return arrows), 'digraph' (a directed graph: dependencies, call "
-    + "flows, lineage), 'tree' (a strict hierarchy as a connector tree), or 'sequence' "
-    + '(actors, lifelines, and one arrow row per message)'),
+    + "flows, lineage), 'tree' (a strict hierarchy as a connector tree), 'sequence' "
+    + "(actors, lifelines, and one arrow row per message), or 'matrix' (a two-way table "
+    + 'shaded by cell magnitude, with both axes reordered so similar keys sit together '
+    + 'and block structure becomes visible)'),
   edges: z.array(z.object({
     from: z.string().describe('the node this edge leaves'),
     to: z.string().describe('the node this edge enters'),
@@ -151,6 +153,33 @@ const DIAGRAM_SHAPE = {
     label: z.string().optional().describe('text drawn on its own row above the arrow'),
   })).optional().describe(
     "'sequence' form only, required: the messages in time order"),
+  rowKeys: z.array(z.string()).optional().describe(
+    "'matrix' form only, required: the row keys, top to bottom; unique, non-empty. Pair "
+    + "with 'pinRows' when this axis already has an order a reader knows (releases, weeks, "
+    + 'severity levels) — reordering it scores better and reads worse'),
+  colKeys: z.array(z.string()).optional().describe(
+    "'matrix' form only, required: the column keys, left to right; unique, non-empty. "
+    + 'Drawn rotated into a vertical header, so long keys cost header rows, not width'),
+  cells: z.array(z.array(z.number())).optional().describe(
+    "'matrix' form only, required: the values, row-major — one array per rowKeys entry, "
+    + 'each holding one finite non-negative number per colKeys entry. Counts, shares, '
+    + 'durations, anything comparable; magnitude drives the shading and the totals'),
+  seriate: z.boolean().optional().describe(
+    "'matrix' form only (default true): reorder the axes so similar rows and similar "
+    + 'columns sit together, which is what turns a scattered table into visible blocks. '
+    + 'The reply appends one line reporting the objective before and after, so you can '
+    + 'tell whether structure was found rather than assuming the picture proves it'),
+  pinRows: z.boolean().optional().describe(
+    "'matrix' form only (default false): freeze the row axis in the order given, exactly. "
+    + 'Set this whenever row order already carries meaning — a milestone axis sorted by '
+    + 'similarity improves the score and destroys the reading'),
+  pinCols: z.boolean().optional().describe(
+    "'matrix' form only (default false): freeze the column axis in the order given, "
+    + "exactly; the column-axis twin of 'pinRows'"),
+  totals: z.boolean().optional().describe(
+    "'matrix' form only (default true): draw the marginal totals — a row-total column on "
+    + 'the right and a stacked column-total block underneath. Shading carries proportion '
+    + 'and hides magnitude, so the margins are what keep a bright three-item cell honest'),
   frame: z.boolean().optional().describe(
     'frame the diagram in a visible box (default true); the frame guarantees a rectangle '
     + 'out of visible characters that editors cannot strip'),
@@ -160,7 +189,7 @@ const DIAGRAM_SHAPE = {
   emit: z.enum(tuple(DIAGRAM_EMITS)).optional().describe(
     "'ascii' (default: the drawn diagram — place it in a ```text fence), 'mermaid' (source "
     + "for a destination with a mermaid renderer, e.g. a GitHub PR body; not available for "
-    + "the 'sequence' form), or 'both' (ascii, a blank line, then mermaid)"),
+    + "the 'sequence' or 'matrix' forms), or 'both' (ascii, a blank line, then mermaid)"),
 };
 
 /**
@@ -172,7 +201,7 @@ const DIAGRAM_SHAPE = {
  * `registerDiagramTools`'s call site.
  */
 export interface DiagramArgs {
-  form: 'state' | 'digraph' | 'tree' | 'sequence';
+  form: 'state' | 'digraph' | 'tree' | 'sequence' | 'matrix';
   edges?: { from: string; to: string; label?: string | undefined }[] | undefined;
   nodes?: { id: string; label?: string | undefined }[] | undefined;
   fsl?: string | undefined;
@@ -180,6 +209,13 @@ export interface DiagramArgs {
   root?: string | undefined;
   actors?: string[] | undefined;
   messages?: { from: string; to: string; label?: string | undefined }[] | undefined;
+  rowKeys?: string[] | undefined;
+  colKeys?: string[] | undefined;
+  cells?: number[][] | undefined;
+  seriate?: boolean | undefined;
+  pinRows?: boolean | undefined;
+  pinCols?: boolean | undefined;
+  totals?: boolean | undefined;
   frame?: boolean | undefined;
   width?: number | undefined;
   emit?: 'ascii' | 'mermaid' | 'both' | undefined;
@@ -206,8 +242,14 @@ function emitted(emit: DiagramArgs['emit'], ascii: () => string, mermaid: () => 
 }
 
 /**
- * Handles `render_diagram`: one of the four structure forms, as drawn ASCII, mermaid
+ * Handles `render_diagram`: one of the five structure forms, as drawn ASCII, mermaid
  * source, or both.
+ *
+ * The `'matrix'` form is the one that answers with more than a drawing: unless
+ * `seriate` is false it appends `describeSeriation`'s one-line verdict after a blank
+ * line, the same shape `emit: 'both'` uses to append mermaid. A shaded table looks
+ * structured whether or not the reordering found anything, so the number that says
+ * which travels with the picture rather than being available on request.
  *
  * @param args the validated tool arguments; `store` is unused by every form, but the
  *             parameter is kept for a uniform handler signature with the chart tools
@@ -218,6 +260,13 @@ function emitted(emit: DiagramArgs['emit'], ascii: () => string, mermaid: () => 
  *     fsl: "locked 'coin' -> unlocked 'push' -> locked;",
  *   })
  *   // => { content: [{ type: 'text', text: '┌─...the framed drawing...─┘' }] }
+ *
+ * @example
+ *   handleRenderDiagram(store, {
+ *     form: 'matrix', pinRows: true,
+ *     rowKeys: ['v0.1', 'v0.2'], colKeys: ['infra', 'docs'], cells: [[12, 1], [2, 9]],
+ *   })
+ *   // => { content: [{ type: 'text', text: '┌─...the shaded table...─┘\n\nseriation: …' }] }
  */
 export function handleRenderDiagram(_store: Store, args: DiagramArgs): ToolReply {
   return guarded(() => {
@@ -296,6 +345,32 @@ export function handleRenderDiagram(_store: Store, args: DiagramArgs): ToolReply
         return reply(renderSequence(args.actors, args.messages.map(toSequenceMessage), shared));
       }
 
+      case 'matrix': {
+        const { rowKeys, colKeys, cells } = args;
+        if (rowKeys === undefined || rowKeys.length === 0
+            || colKeys === undefined || colKeys.length === 0
+            || cells === undefined) {
+          return reply(
+            "error: render_diagram form 'matrix' is missing 'rowKeys', 'colKeys', and/or "
+            + "'cells'; requires 'rowKeys' (non-empty string[]), 'colKeys' (non-empty "
+            + "string[]), and 'cells' (one array per row key, each holding one finite "
+            + "non-negative number per column key, row-major); 'seriate', 'pinRows', "
+            + "'pinCols', 'totals', 'frame', 'width' optional; 'emit' must be 'ascii'"
+          );
+        }
+        if (args.emit !== undefined && args.emit !== 'ascii') {
+          return reply(
+            "error: render_diagram form 'matrix' has no mermaid emission (toMermaid "
+            + "covers state machines and digraphs only); use emit 'ascii'"
+          );
+        }
+        const table = normalizeMatrix(rowKeys, colKeys, cells);
+        const drawn = { ...shared, totals: args.totals };
+        if (args.seriate === false) { return reply(renderMatrix(table, drawn)); }
+        const found = seriate(table, { pinRows: args.pinRows, pinCols: args.pinCols });
+        return reply(`${renderMatrix(found.matrix, drawn)}\n\n${describeSeriation(found)}`);
+      }
+
     }
 
   });
@@ -316,16 +391,21 @@ export function registerDiagramTools(server: McpServer, store: Store): void {
   server.registerTool('render_diagram', {
     title: 'Render diagram',
     description:
-      'Render structure — topology, relationships, transitions — as an exact ASCII '
-      + 'box-and-arrow diagram: a state machine (from edges or FSL source), a directed '
-      + 'graph, a strict-hierarchy tree, or a sequence diagram. Reach for this the moment '
-      + 'structure branches, merges, cycles, or fans in or out — a state machine with more '
-      + 'than one path, a dependency graph with shared dependencies, a call flow with a '
-      + 'decision point; quantities belong to the render_* chart tools, and a straight '
-      + "line to render_timeline's inline forms. Output is framed and single-width; place "
-      + 'it inside a ```text fence. A graph too large or tangled to draw legibly is '
-      + 'refused with the fallbacks named in the error text; emit \'mermaid\' or '
-      + "'both' only when the destination (e.g. a GitHub PR body) actually renders mermaid.",
+      'Render structure — topology, relationships, transitions, cross-tabulations — as '
+      + 'an exact ASCII diagram: a state machine (from edges or FSL source), a directed '
+      + 'graph, a strict-hierarchy tree, a sequence diagram, or a seriated matrix. Reach '
+      + 'for the graph forms the moment structure branches, merges, cycles, or fans in or '
+      + 'out — a state machine with more than one path, a dependency graph with shared '
+      + "dependencies, a call flow with a decision point. Reach for 'matrix' when two "
+      + 'categorical axes cross and you want to know whether they cluster: it shades every '
+      + 'cell by magnitude and reorders both axes so similar keys sit together, which '
+      + 'surfaces blocks nothing told it to look for (pin an axis whose order already '
+      + 'means something). Quantities along one axis belong to the render_* chart tools, '
+      + "and a straight line to render_timeline's inline forms. Output is framed and "
+      + 'single-width; place it inside a ```text fence. A diagram too large or tangled to '
+      + "draw legibly is refused with the fallbacks named in the error text; emit 'mermaid' "
+      + "or 'both' only when the destination (e.g. a GitHub PR body) actually renders "
+      + 'mermaid.',
     inputSchema: DIAGRAM_SHAPE,
   }, (args) => handleRenderDiagram(store, args));
 

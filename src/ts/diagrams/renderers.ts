@@ -1,20 +1,22 @@
 /**
- * The public diagram forms: state diagram, digraph, tree, and sequence — data in,
- * exact framed ASCII string out, the error class of hand-drawn diagrams (misaligned
- * edges, arrows touching the wrong box, ragged margins) prevented rather than
- * detected.
+ * The public diagram forms: state diagram, digraph, tree, sequence, and seriated
+ * matrix — data in, exact framed ASCII string out, the error class of hand-drawn
+ * diagrams (misaligned edges, arrows touching the wrong box, ragged margins)
+ * prevented rather than detected.
  *
- * All four share the rendering-compatibility constraints from the design spec:
- * single-width glyphs only (light box-drawing set plus `▶ ◀ ▲ ▼` arrowheads), a
- * width budget defaulting to {@link DEFAULT_DIAGRAM_WIDTH} columns, framed output by
- * default, no trailing whitespace ever, and refusal — naming fallbacks — over an
- * illegible or wrapped drawing. Emit the result inside a ` ```text ` fence; outside
- * one, proportional fonts destroy the alignment these renderers guarantee.
+ * All five share the rendering-compatibility constraints from the design spec:
+ * single-width glyphs only (light box-drawing set plus `▶ ◀ ▲ ▼` arrowheads and the
+ * `░▒▓█` shade ramp), a width budget defaulting to {@link DEFAULT_DIAGRAM_WIDTH}
+ * columns, framed output by default, no trailing whitespace ever, and refusal —
+ * naming fallbacks — over an illegible or wrapped drawing. Emit the result inside a
+ * ` ```text ` fence; outside one, proportional fonts destroy the alignment these
+ * renderers guarantee.
  *
  * Pure: no I/O, no store access, no clock, no randomness.
  *
  * @see ./layout.js
  * @see ./grid.js
+ * @see ./matrix.js
  * @see ../../superpowers/spec/2026-08-27-diagrams-design.md
  */
 
@@ -27,6 +29,8 @@ import type { RoutedEdge } from './layout.js';
 import { normalizeGraph, requireGridSafe } from './model.js';
 import type { Digraph }    from './model.js';
 import { parseFsl }        from './fsl.js';
+import { normalizeMatrix, matrixTotals, MATRIX_FALLBACKS } from './matrix.js';
+import type { MatrixData } from './matrix.js';
 
 /**
  * The default maximum output width in columns, frame included: fits an 80-column
@@ -509,5 +513,250 @@ export function renderSequence(
   }
 
   return renderGrid(grid, { frame });
+
+}
+
+/**
+ * The density ramp {@link renderMatrix} maps cell magnitude onto, emptiest to fullest.
+ *
+ * Index 0 is reserved for an exactly-zero cell and is a dot rather than a space on
+ * purpose: a blank cell reads as *missing*, while `·` reads as *present and empty*,
+ * which is a different claim and usually the true one. The remaining four are the
+ * house shade ramp the chart renderers use, kept in step with them by eye rather than
+ * by import — `diagrams/` is a sibling of `charts/`, not a dependent.
+ *
+ * @example
+ *   MATRIX_RAMP[0]   // => '·'  (exactly zero)
+ *   MATRIX_RAMP[4]   // => '█'  (the largest cell in the table)
+ *
+ * @see ../charts/scale.js
+ * @see renderMatrix
+ */
+export const MATRIX_RAMP: readonly string[] = ['·', '░', '▒', '▓', '█'];
+
+/**
+ * The legibility threshold for matrix rows: past this, a shaded table stops being a
+ * shape one can see at a glance and becomes a spreadsheet, which the terminal is the
+ * wrong surface for. Columns need no separate cap — each costs two columns of width,
+ * so the width budget refuses them first.
+ */
+export const MAX_MATRIX_ROWS = 40;
+
+/** The fewest columns a row-label gutter may be squeezed to before rendering refuses. */
+export const MIN_MATRIX_LABEL = 3;
+
+/** How many characters of a column key the rotated header shows, by default. */
+export const DEFAULT_COL_LABEL_HEIGHT = 12;
+
+/** The gutter label and header word marking the marginal totals. */
+const TOTAL_LABEL = 'total';
+
+/** Options for {@link renderMatrix}. */
+export interface MatrixRenderOptions extends DiagramRenderOptions {
+  /**
+   * Draw the marginal totals — a row-total column on the right and a column-total
+   * block underneath; default true. Turn them off only when the shape alone is the
+   * point, since shading shows proportion and hides magnitude.
+   */
+  totals?: boolean | undefined;
+  /**
+   * The density ramp, emptiest to fullest, at least two single-width glyphs; default
+   * {@link MATRIX_RAMP}. Index 0 draws an exactly-zero cell; every non-zero cell maps
+   * into the rest by its fraction of the table's largest cell.
+   */
+  ramp?: readonly string[] | undefined;
+  /**
+   * Cap the row-label gutter at this many columns, truncating longer keys; default is
+   * the longest key, shrunk automatically if the width budget demands it.
+   */
+  labelWidth?: number | undefined;
+  /**
+   * Cap the rotated column header at this many rows, truncating longer keys; default
+   * {@link DEFAULT_COL_LABEL_HEIGHT}. Header height costs vertical space only, so this
+   * is a legibility choice rather than a fitting one.
+   */
+  colLabelHeight?: number | undefined;
+}
+
+/** Formats one marginal total: exact when integral, one decimal otherwise. */
+function formatQuantity(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/** Picks a cell's ramp glyph: index 0 for exactly zero, else by fraction of `max`. */
+function densityGlyph(value: number, max: number, ramp: readonly string[]): string {
+  const empty = ramp[0] ?? ' ';
+  if (value === 0 || max === 0) { return empty; }
+  const levels = ramp.length - 1;
+  const step = Math.min(levels - 1, Math.floor((value / max) * levels));
+  return ramp[1 + step] ?? empty;
+}
+
+/** Validates a caller-supplied density ramp: enough glyphs, each drawable and single-width. */
+function requireRampDrawable(ramp: readonly string[]): void {
+  if (ramp.length < 2) {
+    throw new RangeError(
+      `renderMatrix needs a ramp of at least two glyphs (empty and full); received ${String(ramp.length)}`
+    );
+  }
+  for (const glyph of ramp) {
+    // Code points, not UTF-16 units: '█'.length is 1 but an astral glyph's is 2, and it
+    // is the code-point count that decides whether one cell holds it.
+    const points = Array.from(glyph).length;
+    if (points !== 1) {
+      throw new RangeError(
+        `the ramp entry '${glyph}' is ${String(points)} characters; each ramp entry must `
+        + 'be exactly one single-width character so the cells stay aligned'
+      );
+    }
+    requireGridSafe(glyph, `the ramp entry '${glyph}'`);
+  }
+}
+
+/**
+ * Renders a two-way table as a shaded matrix: row keys down the left, column keys
+ * rotated into a vertical header, one density glyph per cell, and the marginal totals
+ * alongside — the form a seriated table is meant to be read in.
+ *
+ * The drawing does **not** reorder anything. Pass it whatever order you want read, and
+ * pass it `seriate(...).matrix` when you want the order that shows blocks; keeping the
+ * two apart is what lets an axis be pinned, and what keeps this function a pure
+ * display of the data it was handed.
+ *
+ * Cells are one column wide with a single space between them, which keeps the shaded
+ * field tight enough to read as a shape rather than as a grid of separate marks. That
+ * is also why the column totals are stacked vertically underneath rather than laid out
+ * in a row: a horizontal total row would force every cell as wide as the widest number
+ * and blow the pattern apart. Row keys are truncated, and the rotated header capped,
+ * when the width budget requires it; only when even a three-column gutter will not fit
+ * does the render refuse.
+ *
+ * Like {@link renderTree} and unlike the graph forms, this builds its lines directly
+ * rather than drawing on a `CharGrid` — a table has fixed columns and nothing to route,
+ * so the grid's junction resolution would buy nothing.
+ *
+ * @param data    the table to draw, in the order it should be read
+ * @param options totals, ramp, label caps, plus the shared frame/width options
+ *
+ * @example
+ *   renderMatrix(normalizeMatrix(
+ *     ['v0.1', 'v0.2'],
+ *     ['infra', 'docs'],
+ *     [[12, 1], [2, 9]],
+ *   ))
+ *   // => a framed table: 'infra' and 'docs' rotated into a vertical header, a
+ *   //    '█ ░' / '░ █' shaded 2×2 field, a right-hand column reading 13 and 11, and
+ *   //    a stacked 'total' block underneath reading 14 and 10, grand total 24
+ *
+ * @throws {RangeError} If `data` fails {@link normalizeMatrix}, the table has more than
+ *                        {@link MAX_MATRIX_ROWS} rows, a ramp entry is not a single
+ *                        grid-safe character, a label cap is not a positive integer, or
+ *                        the drawing cannot fit the width budget even with the row
+ *                        labels squeezed to {@link MIN_MATRIX_LABEL} columns; refusals
+ *                        name the fallbacks.
+ * @see ./matrix.js
+ * @see renderTree
+ */
+export function renderMatrix(data: MatrixData, options?: MatrixRenderOptions): string {
+
+  const matrix = normalizeMatrix(data.rows, data.cols, data.values);
+  const rowCount = matrix.rows.length, colCount = matrix.cols.length;
+
+  if (rowCount > MAX_MATRIX_ROWS) {
+    throw new RangeError(
+      `a matrix of ${String(rowCount)} rows is past the legibility threshold of `
+      + `${String(MAX_MATRIX_ROWS)}; ${MATRIX_FALLBACKS}`
+    );
+  }
+
+  const frame  = options?.frame ?? true;
+  const budget = surfaceBudget(options?.width, frame, 'renderMatrix');
+  const totals = options?.totals ?? true;
+  const ramp   = options?.ramp ?? MATRIX_RAMP;
+
+  requireRampDrawable(ramp);
+
+  const headerCap = options?.colLabelHeight ?? DEFAULT_COL_LABEL_HEIGHT;
+  if (!Number.isInteger(headerCap) || headerCap < 1) {
+    throw new RangeError(
+      `renderMatrix's colLabelHeight must be a positive integer; received ${String(headerCap)}`
+    );
+  }
+  const labelCap = options?.labelWidth;
+  if (labelCap !== undefined && (!Number.isInteger(labelCap) || labelCap < 1)) {
+    throw new RangeError(
+      `renderMatrix's labelWidth must be a positive integer; received ${String(labelCap)}`
+    );
+  }
+
+  // ---- sizes ------------------------------------------------------------------------
+  const margins    = matrixTotals(matrix);
+  const rowMargins = margins.rowTotals.map(formatQuantity);
+  const colMargins = margins.colTotals.map(formatQuantity);
+  const grand      = formatQuantity(margins.grand);
+
+  const marginWidth = totals
+    ? Math.max(TOTAL_LABEL.length, grand.length, ...rowMargins.map(text => text.length))
+    : 0;
+
+  const fieldWidth = colCount * 2 - 1;                       // one glyph, one space between
+  const overhead   = 3 + fieldWidth + (totals ? 3 + marginWidth : 0);
+  const room       = budget - overhead;
+
+  if (room < MIN_MATRIX_LABEL) {
+    throw new RangeError(
+      `this ${String(rowCount)}×${String(colCount)} matrix needs at least `
+      + `${String(overhead + MIN_MATRIX_LABEL + (frame ? 4 : 0))} columns but the width budget `
+      + `allows ${String(budget + (frame ? 4 : 0))}; ${MATRIX_FALLBACKS}`
+    );
+  }
+
+  const natural    = Math.max(...matrix.rows.map(key => key.length), totals ? TOTAL_LABEL.length : 1);
+  const labelWidth = Math.min(labelCap ?? natural, natural, room);
+
+  const colLabels   = matrix.cols.map(key => key.slice(0, headerCap));
+  const headerRows  = Math.max(...colLabels.map(label => label.length));
+  const marginRows  = totals ? Math.max(...colMargins.map(text => text.length)) : 0;
+
+  // ---- line assembly ------------------------------------------------------------------
+  const line = (label: string, field: string, margin: string): string => {
+    const left = `${label.slice(0, labelWidth).padEnd(labelWidth)} │ ${field}`;
+    return totals ? `${left} │ ${margin.padStart(marginWidth)}` : left;
+  };
+
+  const rule = totals
+    ? `${'─'.repeat(labelWidth + 1)}┼${'─'.repeat(fieldWidth + 2)}┼${'─'.repeat(marginWidth + 1)}`
+    : `${'─'.repeat(labelWidth + 1)}┼${'─'.repeat(fieldWidth + 1)}`;
+
+  const lines: string[] = [];
+
+  // Rotated column keys, bottom-aligned so every key ends against the rule below it.
+  for (let k = 0; k < headerRows; k++) {
+    const glyphs = colLabels.map(label => label[k - (headerRows - label.length)] ?? ' ');
+    lines.push(line('', glyphs.join(' '), k === headerRows - 1 ? TOTAL_LABEL : ''));
+  }
+
+  lines.push(rule);
+
+  const peak = Math.max(...matrix.values.map(row => Math.max(...row)));
+  matrix.values.forEach((row, r) => {
+    const glyphs = row.map(value => densityGlyph(value, peak, ramp));
+    lines.push(line(
+      matrix.rows[r] ?? '',
+      glyphs.join(' '),
+      rowMargins[r] ?? '',
+    ));
+  });
+
+  // Column totals stacked vertically, top-aligned so every number starts at the rule.
+  if (totals) {
+    lines.push(rule);
+    for (let k = 0; k < marginRows; k++) {
+      const digits = colMargins.map(text => text[k] ?? ' ');
+      lines.push(line(k === 0 ? TOTAL_LABEL : '', digits.join(' '), k === 0 ? grand : ''));
+    }
+  }
+
+  return renderLines(lines, { frame });
 
 }

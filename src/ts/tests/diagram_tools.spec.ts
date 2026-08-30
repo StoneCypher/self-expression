@@ -3,11 +3,17 @@ import { tmpdir }              from 'node:os';
 import { join }                from 'node:path';
 import { z }                   from 'zod';
 import { McpServer }           from '@modelcontextprotocol/sdk/server/mcp.js';
+import { Client }              from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport }   from '@modelcontextprotocol/sdk/inMemory.js';
 
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
+import { buildServer }           from '../mcp/server.js';
 import { handleRenderDiagram, registerDiagramTools, DIAGRAM_FORMS } from '../mcp/diagram_tools.js';
-import { renderStateDiagram, renderDigraph, renderTree, renderSequence, toMermaid, normalizeGraph } from '../diagrams/index.js';
+import {
+  renderStateDiagram, renderDigraph, renderTree, renderSequence, renderMatrix,
+  toMermaid, normalizeGraph, normalizeMatrix, seriate, describeSeriation,
+} from '../diagrams/index.js';
 
 /** The same file-private tuple helper the tool file uses, rebuilt for schema tests. */
 function tuple<T extends string>(values: readonly T[]): [T, ...T[]] {
@@ -20,6 +26,13 @@ function withStore<T>(fn: (s: Store) => T): T {
   const dir = mkdtempSync(join(tmpdir(), 'se-diagram-tools-')),
         s   = openStore(join(dir, 'log.sqlite3'));
   try { return fn(s); } finally { closeStore(s); rmSync(dir, { recursive: true, force: true }); }
+}
+
+/** {@link withStore} for the server-driven tests, which have to await before closing. */
+async function withStoreAsync<T>(fn: (s: Store) => Promise<T>): Promise<T> {
+  const dir = mkdtempSync(join(tmpdir(), 'se-diagram-tools-')),
+        s   = openStore(join(dir, 'log.sqlite3'));
+  try { return await fn(s); } finally { closeStore(s); rmSync(dir, { recursive: true, force: true }); }
 }
 
 /** Pulls the plain text out of a tool reply, the shape every assertion below checks. */
@@ -179,6 +192,168 @@ describe('form is a closed schema vocabulary', () => {
     for (const form of DIAGRAM_FORMS) {
       expect(z.enum(tuple(DIAGRAM_FORMS)).safeParse(form).success).toBe(true);
     }
+  });
+
+});
+
+describe('handleRenderDiagram — matrix form', () => {
+
+  const ROW_KEYS = ['v0.1', 'v0.2', 'v0.3'];
+  const COL_KEYS = ['infra', 'tests', 'docs', 'refactor'];
+  const CELLS    = [[12, 3, 1, 0], [2, 20, 6, 0], [0, 5, 30, 9]];
+  const TABLE    = normalizeMatrix(ROW_KEYS, COL_KEYS, CELLS);
+
+  test('seriates by default and appends the verdict after a blank line', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, { form: 'matrix', rowKeys: ROW_KEYS, colKeys: COL_KEYS, cells: CELLS }));
+    const found = seriate(TABLE, { pinRows: undefined, pinCols: undefined });
+    expect(out).toBe(`${renderMatrix(found.matrix)}\n\n${describeSeriation(found)}`);
+    expect(out).toContain('seriation: profile distance ');
+  }));
+
+  test("seriate: false draws the caller's order and says nothing about seriation", () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix', rowKeys: ROW_KEYS, colKeys: COL_KEYS, cells: CELLS, seriate: false,
+    }));
+    expect(out).toBe(renderMatrix(TABLE));
+    expect(out).not.toContain('seriation:');
+  }));
+
+  test('pinRows reaches the search, and the drawing shows the caller order', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix', rowKeys: ROW_KEYS, colKeys: COL_KEYS, cells: CELLS, pinRows: true,
+    }));
+    expect(out).toBe(`${renderMatrix(seriate(TABLE, { pinRows: true }).matrix)}\n\n${describeSeriation(seriate(TABLE, { pinRows: true }))}`);
+    expect(out).toContain('rows pinned to caller order');
+    const drawn = out.split('\n\n')[0] ?? '';
+    expect(drawn.indexOf('v0.1')).toBeLessThan(drawn.indexOf('v0.3'));
+  }));
+
+  test('totals, frame, and width pass through', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix', rowKeys: ROW_KEYS, colKeys: COL_KEYS, cells: CELLS,
+      seriate: false, totals: false, frame: false, width: 40,
+    }));
+    expect(out).toBe(renderMatrix(TABLE, { totals: false, frame: false, width: 40 }));
+  }));
+
+  test('missing rowKeys, colKeys, or cells names the full requirement', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, { form: 'matrix', rowKeys: ROW_KEYS }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain("'colKeys'");
+    expect(out).toContain("'cells'");
+    expect(out).toContain("'pinRows'");
+  }));
+
+  test('the mermaid emission is explicitly unavailable for matrices', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix', rowKeys: ROW_KEYS, colKeys: COL_KEYS, cells: CELLS, emit: 'both',
+    }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('no mermaid emission');
+  }));
+
+  test('a ragged cell grid surfaces as error text, not a protocol fault', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix', rowKeys: ['a', 'b'], colKeys: ['x', 'y'], cells: [[1, 2], [3]],
+    }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('rectangular');
+  }));
+
+  test('a negative value surfaces as error text and says why it is refused', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix', rowKeys: ['a'], colKeys: ['x'], cells: [[-3]],
+    }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('non-negative');
+  }));
+
+  test('a table too wide for the budget refuses with the fallbacks', () => withStore(s => {
+    const out = text(handleRenderDiagram(s, {
+      form: 'matrix',
+      rowKeys: ['a'],
+      colKeys: Array.from({ length: 30 }, (_v, i) => `c${String(i)}`),
+      cells: [Array.from({ length: 30 }, () => 1)],
+      width: 40,
+    }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('fall back');
+  }));
+
+});
+
+describe('render_diagram through the real server', () => {
+
+  /**
+   * Drives the tool the way a host does: a real {@link buildServer} on one end of an
+   * in-memory transport pair, a real MCP client on the other. Nothing here is a
+   * hand-built stand-in, so registration, schema validation, and dispatch are all
+   * exercised rather than assumed.
+   */
+  async function callTool(store: Store, args: Record<string, unknown>): Promise<string> {
+    const server = buildServer(store, '0.0.0', null);
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'diagram-tools-spec', version: '0.0.0' });
+    await Promise.all([client.connect(clientSide), server.connect(serverSide)]);
+    try {
+      const result = await client.callTool({ name: 'render_diagram', arguments: args });
+      const blocks = result.content as { type: string; text?: string }[] | undefined;
+      return blocks?.[0]?.text ?? '';
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  }
+
+  test('the matrix form draws and reports, end to end', async () => {
+    await withStoreAsync(async s => {
+      const out = await callTool(s, {
+        form: 'matrix',
+        rowKeys: ['v0.1', 'v0.2', 'v0.3'],
+        colKeys: ['infra', 'tests', 'docs', 'refactor'],
+        cells: [[12, 3, 1, 0], [2, 20, 6, 0], [0, 5, 30, 9]],
+        pinRows: true,
+      });
+      expect(out.startsWith('┌')).toBe(true);
+      expect(out).toContain('seriation: profile distance ');
+      expect(out).toContain('rows pinned to caller order');
+      // The margins the renderer promises, carried all the way through the protocol.
+      expect(out).toContain('88');
+    });
+  });
+
+  test('the state form still works alongside it, end to end', async () => {
+    await withStoreAsync(async s => {
+      const out = await callTool(s, { form: 'state', fsl: FSL });
+      expect(out).toBe(renderStateDiagram(FSL));
+    });
+  });
+
+  test('a misspelled form is refused by the schema, naming the closed vocabulary', async () => {
+    await withStoreAsync(async s => {
+      const out = await callTool(s, { form: 'seriated-matrix' });
+      expect(out).toContain('Invalid option');
+      for (const form of DIAGRAM_FORMS) { expect(out).toContain(`"${form}"`); }
+    });
+  });
+
+  test("the registered tool advertises 'matrix' among its forms", async () => {
+    await withStoreAsync(async s => {
+      const server = buildServer(s, '0.0.0', null);
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'diagram-tools-spec', version: '0.0.0' });
+      await Promise.all([client.connect(clientSide), server.connect(serverSide)]);
+      try {
+        const listed = await client.listTools();
+        const tool = listed.tools.find(candidate => candidate.name === 'render_diagram');
+        expect(tool).toBeDefined();
+        expect(JSON.stringify(tool?.inputSchema)).toContain('matrix');
+        expect(tool?.description).toContain('seriated matrix');
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
   });
 
 });

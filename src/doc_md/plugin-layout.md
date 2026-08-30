@@ -360,9 +360,18 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
   charts pin exact strings across dense threshold bands, diagrams pin invariants (topology
   survives, frames are rectangles, edges trace) plus a small golden canon. Same purity rules.
   `src/ts/mcp/diagram_tools.ts` exposes `render_diagram` (`state` · `digraph` · `tree` ·
-  `sequence`), with a small FSL-subset parser round-trip compatible with `renderFsl` and an
-  opt-in `toMermaid` export — see the README's Diagrams section and
+  `sequence` · `matrix`), with a small FSL-subset parser round-trip compatible with `renderFsl`
+  and an opt-in `toMermaid` export — see the README's Diagrams section and
   `src/superpowers/spec/2026-08-27-diagrams-design.md`.
+- **Seriation is the `matrix` form's actual capability.** `src/ts/diagrams/matrix.ts` holds the
+  two-way-table model and the reordering — a barycentre sweep plus an adjacent-swap and
+  relocation hill-climb on a profile-distance objective, run to a fixed point so it is
+  idempotent — and `renderMatrix` in `renderers.ts` draws the result as a shaded table with
+  rotated column keys and both margins. `pinRows` / `pinCols` freeze an axis in caller order
+  and are load-bearing rather than optional: an axis whose order a reader already understands
+  (releases, weeks, severities) scores better reordered and reads worse. The objective is
+  returned before and after, and the tool prints it, because a shaded matrix is persuasive
+  whether or not the search found anything.
 - **Codex hooks.** Codex documents `hooks/hooks.json`, but its event names and plugin-root
   variable are not verified. The `hooks` field is deliberately absent from the Codex manifest
   rather than pointing at a guess.
