@@ -9,7 +9,7 @@ import { defineConfig } from "eslint/config";
 export default defineConfig([
   { ignores: ["src/**/*.spec.*", "src/**/*.stoch.*", "src/**/*.mutat.*", "build/**", "coverage/**", "coverage-stoch/**", "dist/**", "docs/**", ".stryker-tmp/**", "typedoc-options.cjs", "**/CHANGELOG.md", "**/CHANGELOG.long.md", "src/doc_md/tasklist.md", "_incoming/**", ".superpowers/**"] },
   { files: ["**/*.{js,mjs,cjs,ts,mts,cts}"], plugins: { js }, extends: ["js/recommended"], languageOptions: { globals: globals.browser } },
-  { files: ["src/build_js/**/*.js", "scripts/**/*.mjs"], languageOptions: { globals: globals.node } },
+  { files: ["src/build_js/**/*.js", "src/scripts/**/*.mjs"], languageOptions: { globals: globals.node } },
   ...tseslint.configs.strictTypeChecked.map(cfg => ({ ...cfg, files: ["**/*.{ts,mts,cts}"] })),
   ...tseslint.configs.stylisticTypeChecked.map(cfg => ({ ...cfg, files: ["**/*.{ts,mts,cts}"] })),
   {
@@ -17,7 +17,10 @@ export default defineConfig([
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["*.config.ts"],
+          // The desk's hand-written declarations sit beside a .mjs that no tsconfig owns
+          // (tsconfig's rootDir is src/ts, and the desk deliberately runs unbuilt), so they
+          // need the default project to be type-aware-lintable at all.
+          allowDefaultProject: ["*.config.ts", "src/scripts/desk/deskcards.d.mts"],
         },
         tsconfigRootDir: import.meta.dirname,
       },

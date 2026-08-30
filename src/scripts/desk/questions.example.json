@@ -1,0 +1,44 @@
+{
+  "questions": [
+    {
+      "id": "rename-the-deck",
+      "text": "Rename the deck directory to `cards/` before I write the loader?",
+      "options": ["rename it", "leave it"],
+      "asked": "2026-08-28T22:15:00.000Z"
+    },
+    {
+      "id": "retention-window",
+      "text": "How long should the desk keep answered questions?",
+      "asked": "2026-08-28T22:20:00.000Z"
+    },
+    {
+      "id": "stuck-vendor-copy",
+      "stuck": true,
+      "text": "You said \"vendor it\" at 3:18. The copy was refused and it never happened.",
+      "options": ["you ran it", "drop it"],
+      "asked": "2026-08-28T22:52:00.000Z"
+    },
+    {
+      "id": "task-convert-panel",
+      "kind": "task",
+      "text": "convert the second surface to cards",
+      "asked": "2026-08-28T23:49:00.000Z"
+    },
+    {
+      "id": "task-vendor-charts",
+      "kind": "task",
+      "text": "vendor the charting library into the desk",
+      "asked": "2026-08-28T23:49:00.000Z",
+      "queued": "agents",
+      "queuedAt": "2026-08-28T23:51:51.007Z"
+    },
+    {
+      "id": "answered-example",
+      "text": "Answered rows stay in the file and stop being offered.",
+      "options": ["ok"],
+      "asked": "2026-08-28T22:10:00.000Z",
+      "answer": "ok",
+      "answeredAt": "2026-08-28T22:11:04.000Z"
+    }
+  ]
+}

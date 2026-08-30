@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>Claude's desk</title>
+<!-- The white flash on reload is the browser painting its default canvas before any CSS
+     has parsed. This is the only thing that fixes it, because it is the only signal the
+     browser has that early — a stylesheet, inline or not, arrives too late. -->
+<meta name="color-scheme" content="dark">
+<link rel="icon" type="image/svg+xml" href="/icon-claude.svg">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ink:      oklch(0.93 0.01 250);
+    --ink-dim:  oklch(0.62 0.01 250);
+    --ink-faint:oklch(0.42 0.01 250);
+    --ground:   oklch(0.16 0.012 260);
+    --ground-2: oklch(0.20 0.014 260);
+    --rule:     oklch(0.30 0.012 260);
+    --ui:   'Space Grotesk', system-ui, sans-serif;
+    --disp: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--ui); font-size: 13px; line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    flex: 0 0 auto; background: var(--ground);
+    border-bottom: 1px solid var(--rule); padding: 12px 16px 0;
+  }
+
+  /* a docked panel is a fixed frame, not a page: one pane at a time, each scrolling itself */
+  .tabs { display: flex; gap: 0; margin-top: 11px; }
+  .tabs button {
+    background: transparent; border: 0; border-bottom: 2px solid transparent;
+    color: var(--ink-faint); font-family: var(--mono); font-size: 10px;
+    letter-spacing: .12em; text-transform: uppercase; padding: 6px 10px 7px;
+    cursor: pointer;
+  }
+  .tabs button:hover { color: var(--ink-dim); }
+  .tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: oklch(0.70 0.13 235); }
+  .panes { flex: 1 1 auto; overflow: hidden; position: relative; }
+  .pane  { position: absolute; inset: 0; overflow-y: auto; display: none; }
+  .pane[data-on] { display: block; }
+
+  /* the frame is the user's to resize; these are the adaptations that matter */
+  body.narrow .now .said { font-size: 16px; }
+  body.narrow .row { grid-template-columns: 50px 24px 1fr; gap: 7px; padding: 7px 12px; }
+  body.narrow .tabs button { padding: 6px 7px 7px; letter-spacing: .08em; }
+  body.narrow .ttt { grid-template-columns: repeat(3, 52px); }
+  body.narrow .ttt b { width: 52px; height: 52px; font-size: 25px; }
+  body.short .ribbon { display: none; }
+  body.short header { padding-bottom: 0; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-faint); display: flex;
+    justify-content: space-between; align-items: baseline;
+  }
+  .live { color: oklch(0.78 0.16 150); transition: color .4s; }
+  .now { display: flex; gap: 12px; align-items: flex-start; margin-top: 10px; }
+  .glyphs {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    flex: 0 0 auto; line-height: 1;
+  }
+  .glyphs .face { font-size: 26px; }
+  .glyphs .ctx  { font-size: 14px; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+  .now .said {
+    font-family: var(--disp); font-size: 18px; line-height: 1.34;
+    font-weight: 300; font-optical-sizing: auto;
+    font-variation-settings: 'SOFT' 40, 'WONK' 1;
+    color: oklch(0.90 0.008 250);
+  }
+  .now .meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-dim); margin-top: 6px; }
+  .ribbon { display: flex; gap: 2px; margin-top: 12px; height: 24px; align-items: flex-end; }
+  .ribbon i { flex: 1; display: block; }
+  main { padding: 0 0 40px; }
+  .row {
+    display: grid; grid-template-columns: 58px 26px 1fr;
+    gap: 9px; padding: 8px 16px; border-bottom: 1px solid oklch(0.235 0.012 260);
+    align-items: start;
+  }
+  .row:hover { background: var(--ground-2); }
+  .t { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); padding-top: 3px; }
+  .g { font-size: 15px; line-height: 1.15; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .g .c { font-size: 10px; }
+  .s {
+    font-family: var(--disp); font-size: 14px; font-weight: 300;
+    font-optical-sizing: auto; font-variation-settings: 'SOFT' 30;
+  }
+  .tag {
+    font-family: var(--mono); font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--ink-faint); margin-left: 7px; white-space: nowrap;
+  }
+  .need {
+    display: block; margin-top: 4px; font-family: var(--mono); font-size: 11px;
+    color: oklch(0.75 0.13 30); border-left: 2px solid oklch(0.55 0.15 30); padding-left: 8px;
+  }
+  .stemdot { display: inline-block; width: 6px; height: 6px; margin-right: 5px; vertical-align: 1px; }
+
+
+  /* gamut — a small game */
+  .game { border-top: 1px solid var(--rule); padding: 12px 16px 16px; }
+  .game h2 {
+    font-family: var(--disp); font-weight: 300; font-size: 17px; margin: 0 0 2px;
+    font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  }
+  .game .rule { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); margin-bottom: 9px; line-height: 1.6; }
+  .game .goal { display: block; font-size: 11.5px; color: var(--ink); margin-bottom: 3px; letter-spacing: .01em; }
+  .game .waste { color: oklch(0.70 0.14 30); }
+  .game canvas { display: block; cursor: crosshair; background: oklch(0.13 0.008 260); width: 100%; height: auto; }
+  .game .hud {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-top: 8px;
+  }
+  .game .score { font-family: var(--disp); font-size: 22px; font-weight: 300; color: var(--ink); }
+  .game .you { color: oklch(0.86 0.15 95); }
+  .game .me  { color: oklch(0.80 0.14 250); }
+
+  .ttt { display: grid; grid-template-columns: repeat(3, 64px); gap: 1px; background: var(--rule); width: max-content; }
+  .ttt b {
+    width: 64px; height: 64px; background: oklch(0.19 0.013 260); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--disp); font-weight: 300; font-size: 30px; line-height: 1;
+    user-select: none; transition: background .12s;
+  }
+  .ttt b:hover { background: oklch(0.24 0.016 260); }
+  .ttt b.x { color: oklch(0.86 0.15 95); cursor: default; }
+  .ttt b.o { color: oklch(0.80 0.14 250); cursor: default; }
+  .ttt b.win { background: oklch(0.28 0.03 150); }
+  .game .verdict { font-family: var(--disp); font-size: 14px; font-weight: 300; color: oklch(0.80 0.12 90); min-height: 20px; margin-top: 4px; }
+</style></head>
+<body>
+<script>
+/* Self-renewal, deliberately first and deliberately not a module: this is the page's
+   own repair mechanism, so it must survive any error in everything below it. If the
+   rest of the page throws, editing the file still fixes the open tab. */
+(function () {
+  var born = null;
+  setInterval(function () {
+    fetch('/edition', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var p = document.getElementById('pulse');
+        if (born === null) born = d.edition;
+        else if (d.edition !== born) { if (p) p.textContent = 'renewing'; location.reload(); }
+      })
+      .catch(function () {});
+  }, 1200);
+})();
+</script>
+<header>
+  <div class="eyebrow">
+    <span><b style="color:oklch(0.80 0.13 235); font-weight:400">my desk</b> &mdash; affect</span>
+    <span><span id="geom" style="opacity:.55"></span> <span class="live" id="pulse">live</span></span>
+  </div>
+  <div class="now" id="now"></div>
+  <div class="ribbon" id="ribbon"></div>
+  <nav class="tabs" id="tabs">
+    <button data-pane="feed"  aria-selected="true">log</button>
+    <button data-pane="gamut" aria-selected="false">gamut</button>
+    <button data-pane="ttt"   aria-selected="false">t&middot;t&middot;t</button>
+  </nav>
+</header>
+
+<div class="panes">
+
+
+<section class="game pane" data-pane="gamut">
+  <h2>Gamut</h2>
+  <div class="rule">
+    <b class="goal">Goal: hold more vivid colour than I do. Five claims each, alternating.</b>
+    &middot; the middle is grey and worthless; colour gets richer outward, then <em>stops existing</em> at the black edge<br>
+    &middot; reaching further out shrinks your circle<br>
+    &middot; <b>every circle that overlaps another mixes with it &mdash; yours or mine.</b> a contested patch goes
+      toward grey, and belongs to whoever has more circles on it. so I can sit beside your best claim
+      and ruin it, and you can do that to me.
+  </div>
+  <canvas id="gm" width="320" height="320"></canvas>
+  <div class="hud">
+    <span id="left">your move</span>
+    <span><span class="score you" id="s0">0</span> <span style="opacity:.4">/</span> <span class="score me" id="s1">0</span></span>
+  </div>
+  <div class="verdict" id="verdict"></div>
+  <div class="line" style="margin-top:8px"><button id="again">new game</button></div>
+</section>
+
+<section class="game pane" data-pane="ttt">
+  <h2>Tic tac toe</h2>
+  <div class="rule">
+    three in a row. I play perfectly, so this is always a draw unless you err &mdash;
+    which is exactly the point you just made about solvable games.
+  </div>
+  <div id="ttt" class="ttt"></div>
+  <div class="verdict" id="tverdict">your move &mdash; you are &times;</div>
+  <div class="line" style="margin-top:8px"><button id="tagain">new game</button></div>
+</section>
+
+<main id="feed" class="pane" data-pane="feed" data-on></main>
+
+</div>
+<script>
+/* ── Geometry ─────────────────────────────────────────────────────────────────
+   The frame belongs to John and he can resize it at will, so the panel measures
+   itself and reports back. Two readers: the page, which adapts, and the server,
+   which writes it down so that whoever is authoring the next revision knows how
+   much room there actually is instead of guessing at it.                        */
+
+let geomTimer = null, lastGeom = '';
+
+function reportGeometry() {
+  const panes = document.querySelector('.panes'),
+        g = { w: Math.round(document.documentElement.clientWidth),
+              h: Math.round(document.documentElement.clientHeight),
+              paneW: Math.round(panes?.clientWidth  ?? 0),
+              paneH: Math.round(panes?.clientHeight ?? 0),
+              dpr: Number((window.devicePixelRatio || 1).toFixed(2)) };
+
+  document.getElementById('geom').textContent = `${g.w}×${g.h}`;
+  document.body.classList.toggle('narrow', g.w < 420);
+  document.body.classList.toggle('short',  g.h < 520);
+
+  const key = JSON.stringify(g);
+  if (key === lastGeom) return;
+  lastGeom = key;
+
+  clearTimeout(geomTimer);
+  geomTimer = setTimeout(() => {
+    fetch('/geometry', { method: 'POST', headers: { 'content-type': 'application/json' },
+                         body: key }).catch(() => {});
+  }, 250);
+}
+
+new ResizeObserver(reportGeometry).observe(document.documentElement);
+reportGeometry();
+
+/* One pane at a time, so the panel always fits its frame however small that frame is. */
+for (const tab of document.getElementById('tabs').children) {
+  tab.onclick = () => {
+    for (const t of document.getElementById('tabs').children)
+      t.setAttribute('aria-selected', String(t === tab));
+    for (const p of document.querySelectorAll('.pane'))
+      p.toggleAttribute('data-on', p.dataset.pane === tab.dataset.pane);
+  };
+}
+
+const HUE = { flow:235, spark:75, drag:35, fog:290, strain:20, still:165 };
+const col = s => s ? `oklch(0.70 0.13 ${HUE[s]})` : 'oklch(0.45 0.01 260)';
+const esc = t => String(t ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/** Split a context field into its individual emoji, so they can stack vertically. */
+const ctxParts = c => Array.from(String(c ?? '').trim().split(/\s+/)).filter(Boolean);
+
+function render(d) {
+  const top = d.rows[0];
+  if (top) {
+    document.getElementById('now').innerHTML =
+      `<div class="glyphs"><span class="face">${esc(top.face)}</span>` +
+      `<span class="ctx">${ctxParts(top.context).map(p => `<span>${esc(p)}</span>`).join('')}</span></div>` +
+      `<div><div class="said">${esc(top.text)}</div>` +
+      `<div class="meta">${esc(top.ts_local)} ${esc(top.tz)} &nbsp;·&nbsp; ${esc(top.position)}` +
+      (top.delta  ? ' &nbsp;·&nbsp; ' + esc(top.delta)  : '') +
+      (top.cctype ? ' &nbsp;·&nbsp; ' + esc(top.cctype) : '') +
+      ` &nbsp;·&nbsp; ${esc(top.project ?? '')}</div></div>`;
+  }
+
+  const buckets = Array.from({length:24}, () => ({n:0, stem:null}));
+  for (const t of d.today) { const b = buckets[t.hour % 24]; b.n++; if (t.stem) b.stem = t.stem; }
+  const peak = Math.max(1, ...buckets.map(b => b.n));
+  document.getElementById('ribbon').innerHTML = buckets.map(b =>
+    `<i style="height:${Math.max(2, Math.round(24*b.n/peak))}px;background:${b.n?col(b.stem):'oklch(0.235 0.012 260)'}"></i>`).join('');
+
+  document.getElementById('feed').innerHTML = d.rows.map(r =>
+    `<div class="row">
+       <div class="t">${esc(r.ts_local)}</div>
+       <div class="g"><span>${esc(r.face)}${r.uncertain ? '<span style="opacity:.6">?</span>' : ''}</span>` +
+      ctxParts(r.context).map(p => `<span class="c">${esc(p)}</span>`).join('') +
+      `</div>
+       <div><span class="s"><span class="stemdot" style="background:${col(r.stem)}"></span>${esc(r.text)}</span>
+         <span class="tag">${esc(r.project ?? '')}${r.cctype ? ' · ' + esc(r.cctype) : ''}</span>
+         ${r.need ? `<span class="need">need: ${esc(r.need)}</span>` : ''}
+       </div>
+     </div>`).join('');
+}
+
+/* ── Gamut ────────────────────────────────────────────────────────────────────
+   A slice of OKLCH at fixed lightness. Hue is angle, chroma is radius, and the
+   edge of play is the real sRGB gamut boundary rather than a drawn circle.     */
+
+const G = { L: 0.68, R: 150, CMAX: 0.20, PER: 5,
+            claims: [], turn: 0, hover: null, busy: false };
+
+/** Claim radius shrinks as you reach outward: big and dull, or small and vivid. */
+const claimR = r => 46 - 24 * (r / G.R);
+
+/** OKLab to sRGB bytes. Returns null when the colour is outside sRGB. */
+function oklabToRgb(L, a, b) {
+  const l_ = L + 0.3963377774*a + 0.2158037573*b,
+        m_ = L - 0.1055613458*a - 0.0638541728*b,
+        s_ = L - 0.0894841775*a - 1.2914855480*b,
+        l = l_*l_*l_, m = m_*m_*m_, s = s_*s_*s_;
+  const lin = [ 4.0767416621*l - 3.3077115913*m + 0.2309699292*s,
+               -1.2684380046*l + 2.6097574011*m - 0.3413193965*s,
+               -0.0041960863*l - 0.7034186147*m + 1.7076147010*s ];
+  const out = [];
+  for (const v of lin) {
+    if (v < -0.001 || v > 1.001) return null;
+    const c = Math.min(1, Math.max(0, v));
+    out.push(Math.round(255 * (c <= 0.0031308 ? 12.92*c : 1.055*Math.pow(c, 1/2.4) - 0.055)));
+  }
+  return out;
+}
+
+const gm  = document.getElementById('gm'),
+      gtx = gm.getContext('2d');
+
+/**
+ * Score both players over the whole disc.
+ *
+ * Every circle covering a point mixes into it, mine and yours alike, so contested
+ * ground desaturates toward grey. The resulting colour belongs to whoever has more
+ * circles on it; an even split is held by nobody. That is what makes blocking real.
+ */
+function tally(claims, step = 2) {
+  const s = [0, 0], w = step * step;
+  for (let y = 0; y < 320; y += step) {
+    for (let x = 0; x < 320; x += step) {
+      if (Math.hypot(x - 160, y - 160) > G.R) continue;
+      let n0 = 0, n1 = 0, sa = 0, sb = 0;
+      for (const cl of claims) {
+        if (Math.hypot(x - cl.x, y - cl.y) <= cl.r) {
+          if (cl.who === 0) n0++; else n1++;
+          sa += cl.a; sb += cl.b;
+        }
+      }
+      const n = n0 + n1;
+      if (n === 0 || n0 === n1) continue;
+      const a = sa / n, b = sb / n;
+      if (oklabToRgb(G.L, a, b)) s[n0 > n1 ? 0 : 1] += Math.hypot(a, b) * w;
+    }
+  }
+  return [s[0] / 8, s[1] / 8];
+}
+
+/** Build the claim a placement at (x,y) would make, or null if outside the disc. */
+function claimAt(x, y, who) {
+  const dx = x - 160, dy = y - 160, r = Math.hypot(dx, dy);
+  if (r > G.R) return null;
+  const hue = Math.atan2(dy, dx), c = (r / G.R) * G.CMAX;
+  return { x, y, who, r: claimR(r), a: Math.cos(hue)*c, b: Math.sin(hue)*c };
+}
+
+/**
+ * My move: the placement maximising my gain minus your loss, so grabbing good ground
+ * and spoiling yours are weighed on one scale. A little noise in the choice keeps me
+ * from being a lookup table.
+ */
+function myMove() {
+  const [b0, b1] = tally(G.claims, 4), options = [];
+  for (let y = 24; y < 296; y += 16) {
+    for (let x = 24; x < 296; x += 16) {
+      const c = claimAt(x + (Math.random()*8 - 4), y + (Math.random()*8 - 4), 1);
+      if (!c) continue;
+      const [a0, a1] = tally([...G.claims, c], 4);
+      options.push({ c, v: (a1 - b1) + (b0 - a0) * 0.85 });
+    }
+  }
+  options.sort((p, q) => q.v - p.v);
+  return options.length ? options[Math.floor(Math.random() * Math.min(3, options.length))].c : null;
+}
+
+function paint() {
+  const img = gtx.createImageData(320, 320), d = img.data;
+
+  for (let y = 0; y < 320; y++) {
+    for (let x = 0; x < 320; x++) {
+      const dx = x - 160, dy = y - 160, r = Math.hypot(dx, dy), i = (y*320 + x) * 4;
+      if (r > G.R) continue;
+
+      const hue = Math.atan2(dy, dx), c = (r / G.R) * G.CMAX;
+      let a = Math.cos(hue) * c, b = Math.sin(hue) * c;
+
+      let n0 = 0, n1 = 0, sa = 0, sb = 0;
+      for (const cl of G.claims) {
+        if (Math.hypot(x - cl.x, y - cl.y) <= cl.r) {
+          if (cl.who === 0) n0++; else n1++;
+          sa += cl.a; sb += cl.b;
+        }
+      }
+      const n = n0 + n1;
+
+      let rgb, dim = 1;
+      if (n > 0) {
+        a = sa / n; b = sb / n;
+        if (n0 === n1) dim = 0.72;             // contested evenly: held by nobody
+        rgb = oklabToRgb(G.L * dim, a, b);
+      } else {
+        rgb = oklabToRgb(G.L * 0.55, a * 0.45, b * 0.45);
+      }
+      if (!rgb) continue;                      // out of gamut: leave it black
+
+      d[i] = rgb[0]; d[i+1] = rgb[1]; d[i+2] = rgb[2]; d[i+3] = 255;
+    }
+  }
+  gtx.putImageData(img, 0, 0);
+
+  for (const cl of G.claims) {
+    gtx.beginPath(); gtx.arc(cl.x, cl.y, cl.r, 0, Math.PI*2);
+    gtx.strokeStyle = cl.who === 0 ? 'rgba(255,228,150,0.85)' : 'rgba(150,200,255,0.85)';
+    gtx.lineWidth = cl.who === 0 ? 1.6 : 1.2;
+    if (cl.who === 1) gtx.setLineDash([5,4]);
+    gtx.stroke(); gtx.setLineDash([]);
+  }
+
+  if (G.hover && !G.busy && G.turn === 0 && G.claims.length < G.PER*2) {
+    gtx.beginPath(); gtx.arc(G.hover.x, G.hover.y, G.hover.r, 0, Math.PI*2);
+    gtx.strokeStyle = 'rgba(255,255,255,0.8)'; gtx.lineWidth = 1.5; gtx.setLineDash([3,4]);
+    gtx.stroke(); gtx.setLineDash([]);
+  }
+
+  const [s0, s1] = tally(G.claims);
+  document.getElementById('s0').textContent = Math.round(s0);
+  document.getElementById('s1').textContent = Math.round(s1);
+  return [s0, s1];
+}
+
+/** Repaint and say whose turn it is, or what the hovered spot would win and cost me. */
+function preview() {
+  const [s0, s1] = paint(),
+        placed   = G.claims.length,
+        el       = document.getElementById('left');
+
+  if (placed >= G.PER * 2) { el.textContent = 'game over'; return; }
+  if (G.busy)              { el.textContent = 'thinking…'; return; }
+  if (!G.hover)            { el.textContent = `your move · ${G.PER - G.claims.filter(c => c.who===0).length} left each`; return; }
+
+  const [a0, a1] = tally([...G.claims, G.hover], 3),
+        gain     = Math.round(a0 - s0),
+        cost     = Math.round(s1 - a1);
+  el.innerHTML = `this spot: <b>+${gain}</b> you` +
+                 (cost > 3 ? ` · <span class="waste">−${cost}</span> me` : '');
+}
+
+/** Place my claim after a beat, then hand the turn back. */
+function respond() {
+  G.busy = true; G.hover = null; preview();
+  setTimeout(() => {
+    const c = myMove();
+    if (c) G.claims.push(c);
+    G.busy = false; G.turn = 0;
+    const [s0, s1] = paint();
+    if (G.claims.length >= G.PER * 2) finish(s0, s1); else preview();
+  }, 260);
+}
+
+function finish(s0, s1) {
+  const v = document.getElementById('verdict'), d = Math.round(s0 - s1);
+  v.textContent = d > 40  ? `you win by ${d}. you took the rich band and I never got it back.`
+                : d > 0   ? `you win by ${d}. close — a couple of contested patches decided it.`
+                : d === 0 ? `dead even. neither of us could hold the good ground.`
+                : d > -40 ? `I win by ${-d}. narrow; you were one placement from it.`
+                          : `I win by ${-d}. I spoiled more of yours than you spoiled of mine.`;
+  document.getElementById('left').textContent = 'game over';
+  post('gamut', { you: Math.round(s0), me: Math.round(s1) });
+}
+
+gm.onmousemove = e => {
+  if (G.busy || G.turn !== 0 || G.claims.length >= G.PER*2) return;
+  const b = gm.getBoundingClientRect();
+  G.hover = claimAt((e.clientX - b.left) * (320 / b.width),
+                    (e.clientY - b.top)  * (320 / b.height), 0);
+  preview();
+};
+gm.onmouseleave = () => { G.hover = null; preview(); };
+
+gm.onclick = e => {
+  if (G.busy || G.turn !== 0 || G.claims.length >= G.PER*2) return;
+  const b = gm.getBoundingClientRect(),
+        c = claimAt((e.clientX - b.left) * (320 / b.width),
+                    (e.clientY - b.top)  * (320 / b.height), 0);
+  if (!c) return;
+
+  G.claims.push(c); G.hover = null; G.turn = 1;
+  paint();
+  respond();
+};
+
+document.getElementById('again').onclick = () => {
+  G.claims = []; G.hover = null; G.turn = 0; G.busy = false;
+  document.getElementById('verdict').textContent = '';
+  preview();
+};
+
+preview();
+
+/* ── Tic tac toe ──────────────────────────────────────────────────────────────
+   Full minimax, so play is perfect. A solved game is a demonstration rather than
+   a contest: against perfect play the best you can reach is a draw.             */
+
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+let T = Array(9).fill(0), tOver = false;
+
+/** The winning line for `p`, or null. */
+const lineFor = (b, p) => LINES.find(L => L.every(i => b[i] === p)) ?? null;
+const full    = b => b.every(v => v !== 0);
+
+/** Minimax value for the side to move: +1 me, −1 you, 0 draw. */
+function score(b, me) {
+  if (lineFor(b, 2)) return  1;
+  if (lineFor(b, 1)) return -1;
+  if (full(b))       return  0;
+  let best = me ? -2 : 2;
+  for (let i = 0; i < 9; i++) {
+    if (b[i]) continue;
+    b[i] = me ? 2 : 1;
+    const v = score(b, !me);
+    b[i] = 0;
+    best = me ? Math.max(best, v) : Math.min(best, v);
+  }
+  return best;
+}
+
+/** My best reply — among equally perfect moves, one at random, for variety. */
+function bestMove(b) {
+  let best = -2, picks = [];
+  for (let i = 0; i < 9; i++) {
+    if (b[i]) continue;
+    b[i] = 2;
+    const v = score(b, false);
+    b[i] = 0;
+    if (v > best) { best = v; picks = [i]; } else if (v === best) picks.push(i);
+  }
+  return picks[Math.floor(Math.random() * picks.length)];
+}
+
+function drawT() {
+  const host = document.getElementById('ttt'), win = lineFor(T, 1) ?? lineFor(T, 2);
+  host.innerHTML = T.map((v, i) =>
+    `<b data-i="${i}" class="${v === 1 ? 'x' : v === 2 ? 'o' : ''}${win && win.includes(i) ? ' win' : ''}">` +
+    `${v === 1 ? '×' : v === 2 ? '○' : ''}</b>`).join('');
+  for (const cell of host.children) cell.onclick = () => playT(Number(cell.dataset.i));
+}
+
+function playT(i) {
+  if (tOver || T[i]) return;
+  T[i] = 1;
+  const v = document.getElementById('tverdict');
+
+  if (lineFor(T, 1)) { tOver = true; drawT(); v.textContent = 'you win. I made a mistake, which should not happen.'; return; }
+  if (full(T))       { tOver = true; drawT(); v.textContent = 'a draw, as it must be.'; return; }
+
+  T[bestMove(T)] = 2;
+
+  if (lineFor(T, 2)) { tOver = true; drawT(); v.textContent = 'I win. that means there was a slip.'; return; }
+  if (full(T))       { tOver = true; drawT(); v.textContent = 'a draw, as it must be.'; return; }
+
+  drawT();
+  v.textContent = 'your move';
+}
+
+document.getElementById('tagain').onclick = () => {
+  T = Array(9).fill(0); tOver = false;
+  document.getElementById('tverdict').textContent = 'your move — you are ×';
+  drawT();
+};
+
+drawT();
+
+const es = new EventSource('/stream');
+es.onmessage = e => {
+  render(JSON.parse(e.data));
+  const p = document.getElementById('pulse');
+  p.style.color = 'oklch(0.95 0.20 150)';
+  setTimeout(() => { p.style.color = ''; }, 700);
+};
+es.onerror = () => { document.getElementById('pulse').textContent = 'reconnecting'; };
+
+/* The page can be revised while it is open. Two paths on purpose: the SSE event is
+   instant, and the poll is what actually works inside embedded browsers that buffer
+   streaming responses. Whichever arrives first wins. */
+function renew() {
+  document.getElementById('pulse').textContent = 'renewing';
+  setTimeout(() => location.reload(), 100);
+}
+
+es.addEventListener('reload', renew);
+
+/* the poll itself lives in the standalone script at the top of the page, where an
+   error down here cannot silence it */
+</script></body></html>

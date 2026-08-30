@@ -1,10 +1,10 @@
-# self-expression v0.5.0
+# self-expression v0.6.0
 
-> Version 0.5.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788114474061` from hash `c919413`.
+> Version 0.6.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788115279492` from hash `5b15973`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788114474061 Sunday, August 30, 2026 at GMT-07:00 95.04 358 91 c919413 52.67 65.18 64.27 64.81 231 2341 89.31 93.54 95.4 2110 0.5.0 -->
+<!-- Supported embeds: 1788115279492 Sunday, August 30, 2026 at GMT-07:00 95.04 358 91 5b15973 52.69 65.18 64.27 64.79 234 2369 89.31 93.54 95.4 2135 0.6.0 -->
 
 
 
@@ -851,6 +851,44 @@ ethos ships in `skills/audio-expression/SKILL.md`.
 
 &nbsp;
 
+## The desk
+
+A **local web panel** — one page, one port, no build step, no dependencies — that an
+assistant can put things onto while a session runs, and that its owner can arrange,
+dismiss, and answer back from. Started by hand and killed when it is no longer wanted:
+
+```text
+node src/scripts/desk/panel.mjs <desk directory>
+```
+
+**The mechanism ships; a desk's contents do not.** `src/scripts/desk/` holds the server
+(`node:http`, `node:sqlite`, `node:fs`, and nothing else), the card module, the structural
+shell, and two icons — identical for every desk. A desk's cards, name, questions, board,
+and vendored libraries live in a desk directory named on the command line, which this
+repository knows nothing about. The state files carry `.example` siblings for their shape
+and never any data. Full conventions in `src/doc_md/desk.md`.
+
+**A card is a directory, because removal must not be able to half-succeed.** One card is
+one directory holding `card.json` (`{ "ord": 30 }`, optionally `"fixed": true`) plus an
+optional `card.html`, `card.css`, and `card.js`; the page is assembled from what is present
+rather than edited toward what should be. The predecessor kept cards as markup inside one
+document and cut them out by index, which failed twice: an attribute in an unexpected order
+hid a card from its own deletion, and the JavaScript for three deleted cards outlived them
+and threw on every load. Removing a directory cannot miss two of three edits.
+
+| Concern | Rule |
+|---|---|
+| Unfinished card | A directory with no `card.json` is skipped, never guessed at |
+| Put away | Reversible; the id joins `hidden` in `desk-config.json` and the tray offers it back |
+| Forget | Deletes the directory outright — no tombstones, no shadow copies |
+| Card JS | Must be safe to re-run, and must return early when its own element is absent |
+| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log |
+| Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
+
+&nbsp;
+
+&nbsp;
+
 ## Image generation (issue #78)
 
 Making a picture instead of describing one, behind a credential **the user supplies and
@@ -973,7 +1011,7 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2110</td>
+    <td>2135</td>
     <td>95.04<small>%</small></td>
     <td>89.31<small>%</small></td>
     <td>93.54<small>%</small></td>
@@ -981,11 +1019,11 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>231</td>
+    <td>234</td>
     <td>95.04<small>%</small></td>
-    <td>52.67<small>%</small></td>
+    <td>52.69<small>%</small></td>
     <td>64.27<small>%</small></td>
-    <td>64.81<small>%</small></td>
+    <td>64.79<small>%</small></td>
   </tr>
 </table>
 

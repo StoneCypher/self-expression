@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-78 merges; 3 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+80 merges; 4 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -12,8 +12,97 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:36:32 AM
+
+Commit [5b15973dcea1095d20772a49ad2536553a007b74](https://github.com/StoneCypher/self-expression/commit/5b15973dcea1095d20772a49ad2536553a007b74)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [9e15f20, f2b034a]
+
+  * merge: origin/main into desk-mechanism (second pass, after #86 and #84)
+  * Every tracked generated artifact is reset to main's side wholesale rather
+than textually merged — dist/, coverage-stoch/, coverage-typedoc/,
+CHANGELOG.md, CHANGELOG.long.md, src/doc_md/CHANGELOG*.md and README.md —
+including the ones that did not conflict. A line-by-line merge of two
+branches' build output is a hybrid of neither build; the following build
+regenerates all of it from the merged sources anyway. (docs/ and coverage/
+are untracked and need no handling.)
+  * The only non-generated conflict was package.json's version line, resolved
+to main's 0.5.0; the version bump follows in the next commit.
+  * base_README.md and src/doc_md/plugin-layout.md, hand-integrated in the
+previous pass, auto-merged cleanly this time — "The desk" and "Image
+generation" both survive alongside main's newer sections.
+  * src/scripts/desk/ is untouched: verified empty diff against the branch's
+own HEAD. Landing this branch's desk copy as it stands is deliberate, so
+that feat_26-08-29_cardkit's newer copy later arrives as the incoming side
+of a merge in the normal direction of history.
+  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:33:12 AM
+
+Commit [f2b034aa991ea344296e1b4f38289a584fa45d77](https://github.com/StoneCypher/self-expression/commit/f2b034aa991ea344296e1b4f38289a584fa45d77)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+Merges [69c3830, 00334f8]
+
+  * Merge pull request #84 from StoneCypher/feat_26-08-28_window-posture-keys
+  * feat(config): window.browser and window.editor postures, and an enum kind
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Aug 30, 2026 11:29:51 AM
+
+Commit [00334f89cbbb61d9672906e56f6d1aa3292b9fae](https://github.com/StoneCypher/self-expression/commit/00334f89cbbb61d9672906e56f6d1aa3292b9fae)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * feat(config): window.browser and window.editor postures, and an enum kind
+  * Adds two configuration keys, `window.browser` and `window.editor`, each taking
+`never`, `ask`, or `always`, and the `enum` config kind they are the first users
+of. `share.time_granularity` moves onto that kind as well, so a closed two-word
+domain reports itself as a choice set instead of as the word "string".
+  * The keys are two rather than one because the costs differ: an external browser
+window steals focus and can land while nobody is at the machine, while an editor
+tab appears in the window the user is already sitting in. A single key would
+force the expensive answer onto the cheap case.
+  * They are advisory by construction, and say so. Nothing in this plugin gates
+window opening — a shell command can open a browser with no MCP call at all, so
+a gate would be a lock on one of several doors. What the plugin can do is put
+the user's stated wish in front of the model at the moment the choice is made,
+which is the new `windows:` segment on the turn-start context line. It fails
+open on its own terms like every other segment.
+  * Version bumped 0.4.0 -> 0.5.0. Main reached 0.4.0 while this branch was open, so
+that number is spoken for; `git ls-remote --tags` is the authority on what has
+shipped, since the Verify version bump job compares against the npm registry and
+this package is unpublished, so it passes for any version at all (issue #99).
+  * Rebuilt against main twice today, once for #97 and once for #86, both times
+because tracked build output re-conflicts every open PR on files nobody edited
+(issue #90).
+  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
 
 
 
@@ -52,7 +141,24 @@ src/doc_md/plugin-layout.md auto-merged and were checked by hand afterwards.
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:20:54 AM
+## [Untagged] - Aug 30, 2026 11:22:22 AM
+
+Commit [612ba8977dbd0adaec7dd6402cf543790a43e9d6](https://github.com/StoneCypher/self-expression/commit/612ba8977dbd0adaec7dd6402cf543790a43e9d6)
+
+Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
+
+  * deploy: 69c3830a384ee4dca8562826968ae30dbef636a7
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+<a name="0__4__0" />
+
+## [0.4.0] - Aug 30, 2026 11:20:54 AM
 
 Commit [69c3830a384ee4dca8562826968ae30dbef636a7](https://github.com/StoneCypher/self-expression/commit/69c3830a384ee4dca8562826968ae30dbef636a7)
 
@@ -199,98 +305,3 @@ point, and both intents are preserved:
   branch) and the skills-as-MCP-resources / begin_turn paragraphs (main).
   * src/scripts/desk/ is untouched by the merge; main carries no copy of it.
   * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:19:19 AM
-
-Commit [09082948df9b97120e204f01a5b6052a88d64af6](https://github.com/StoneCypher/self-expression/commit/09082948df9b97120e204f01a5b6052a88d64af6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [1403aa6, ea0edaf]
-
-  * Merge origin/main into feat_26-08-28_window-posture-keys
-  * Brings in #97 (image generation, #78) plus the Windows `dts` build fix and
-the conventions.spec.ts path fixture fix.
-  * Conflicts were almost entirely tracked build output (issue #90): every merge
-to main re-conflicts every open PR on files nobody edited. Those took main's
-side wholesale and are regenerated by the build that follows:
-  *   - dist/, coverage-stoch/, coverage-typedoc/
-  - CHANGELOG.md, CHANGELOG.long.md, src/doc_md/CHANGELOG*.md
-  - README.md (generated from base_README.md by update_madlibs)
-  * Two genuine source conflicts, both prose-only, both resolved by keeping each
-side's sentence:
-  *   - src/ts/channels/config.ts — the CONFIG_KEYS docblock, where main added the
-    image.* paragraph and this branch added the window.* one. The registry
-    array itself merged cleanly and carries both families.
-  - src/ts/tests/config.spec.ts — the settled-surface test title, which now
-    names the eleven #78 image keys and the two window-posture keys. The
-    asserted key list had already merged cleanly with both sets present.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:18:52 AM
-
-Commit [6d711f1ca0fe0778cbced3f947bbeb2153c376a6](https://github.com/StoneCypher/self-expression/commit/6d711f1ca0fe0778cbced3f947bbeb2153c376a6)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-  * build: bump to 0.4.0 and regenerate artifacts after merging main
-  * Brings origin/main (through #97, the image-generation door and the SQLite
-pragma tuning) onto the seriated-matrix branch, then rebuilds so the tracked
-outputs match the merged source.
-  * The merge itself was textual only: base_README.md and src/doc_md/plugin-layout.md
-auto-merged because the two branches wrote different sections of each, and no
-other file conflicted. No source was hand-edited to reconcile the two features.
-  * Version goes 0.3.0 -> 0.4.0 rather than a patch because the branch carries a
-feature (render_diagram form 'matrix'). The bump is load-bearing: the release
-job tags whatever package.json holds on a push to main, and reusing a shipped
-version fails the run with a duplicate tag.
-  * Regenerated: dist/, coverage-stoch/, coverage-typedoc/, README.md, CHANGELOG.md,
-CHANGELOG.long.md, and their src/doc_md/ copies. dist/diagrams/matrix.d.ts and
-coverage-stoch/ts/diagrams/matrix.ts.html are new outputs for the new module.
-  * Refs #90
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 10:14:36 AM
-
-Commit [377fecfa299af56d76cf5f5be7633a4e158ff5df](https://github.com/StoneCypher/self-expression/commit/377fecfa299af56d76cf5f5be7633a4e158ff5df)
-
-Author: `John Haugeland <stonecypher@gmail.com>`
-
-Merges [f644382, ea0edaf]
-
-  * Merge remote-tracking branch 'origin/main' into feat_26-08-29_seriated-matrix
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-## [Untagged] - Aug 30, 2026 8:00:08 AM
-
-Commit [40ed4cf3c3dd5953dcc7c40677df4b9d9d00d726](https://github.com/StoneCypher/self-expression/commit/40ed4cf3c3dd5953dcc7c40677df4b9d9d00d726)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: ea0edafd59802101538511d7f8ec9ab63e349d46
