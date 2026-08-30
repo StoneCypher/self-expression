@@ -5,8 +5,9 @@ import { join }   from 'node:path';
 import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js';
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
 import {
-  migrate, MIGRATIONS, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS, V5_ENTRY_COLUMNS,
+  migrate, MIGRATIONS, hasColumn, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS, V5_ENTRY_COLUMNS,
 } from '../channels/migrate.js';
+import { latestContext, recordContext, recordContextOnce } from '../channels/context.js';
 import { standingOf, register, recentEntries } from '../channels/entries.js';
 import { buildV5, insertV5 }                   from './helpers/v5_fixture.js';
 import { SCHEMA_VERSION, ALL_INDEX_DDL, entriesDdl } from '../channels/schema.js';
@@ -18,6 +19,7 @@ import { buildV1, insertV1 }                          from './helpers/v1_fixture
 import { buildV2, insertV2 }                          from './helpers/v2_fixture.js';
 import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
 import { buildV4, insertV4, insertV4Message, V4_ENTRIES_DDL } from './helpers/v4_fixture.js';
+import { buildV6, insertV6Context }                          from './helpers/v6_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -530,6 +532,103 @@ describe('openStore on a v5 database (#16)', () => {
 
 });
 
+describe('openStore on a v6 database (MCP portability: turn_context.source)', () => {
+
+  /** Column names of one table, as the database actually holds them. */
+  function columns(db: { prepare: (sql: string) => { all: () => Record<string, unknown>[] } },
+                   table: string): string[] {
+    return db.prepare(`SELECT name FROM pragma_table_info('${table}')`)
+             .all().map(r => String(r['name']));
+  }
+
+  test('the fixture really is v6: turn_context has no source column', () => {
+    const dir = tmp(), db = buildV6(join(dir, 'log.sqlite3'));
+    expect(columns(db, 'turn_context')).not.toContain('source');
+    expect(() => {
+      db.prepare("INSERT INTO turn_context (ts_utc, session, source) VALUES ('t','s','hook')").run();
+    }).toThrow();
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('opening it migrates to the current version and the column exists', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v6  = buildV6(path);
+    insertV6Context(v6, 's1', 'p-1', 1);
+    v6.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    expect(columns(s.db, 'turn_context')).toContain('source');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('pre-existing rows keep NULL — nothing is backfilled onto a row nobody observed', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v6  = buildV6(path);
+    insertV6Context(v6, 's1', 'p-1', 1);
+    v6.close();
+
+    const s   = openStore(path),
+          row = s.db.prepare('SELECT * FROM turn_context WHERE prompt_id = ?').get('p-1');
+    expect(row?.['source']).toBeNull();
+    // and every value it did carry survived the step untouched
+    expect(row?.['session']).toBe('s1');
+    expect(row?.['turn_index']).toBe(1);
+    expect(row?.['turn']).toBe('reply');
+    expect(row?.['cwd']).toBe('/repo');
+    expect(row?.['effort']).toBe('high');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('after the step both writers land their own source, beside the legacy NULL', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v6  = buildV6(path);
+    insertV6Context(v6, 's1', 'p-1', 1);
+    v6.close();
+
+    const s = openStore(path);
+    recordContext(s, { session: 's1', promptId: 'p-2', turnIndex: 2, source: 'hook' });
+    recordContextOnce(s, { session: 's1', promptId: 'p-3', source: 'tool' });
+
+    const sources = s.db.prepare('SELECT prompt_id, source FROM turn_context ORDER BY id').all()
+      .map(r => [String(r['prompt_id']), r['source']]);
+    expect(sources).toEqual([['p-1', null], ['p-2', 'hook'], ['p-3', 'tool']]);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('latestContext still answers across the step, old row and new alike', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v6  = buildV6(path);
+    insertV6Context(v6, 's1', 'p-1', 1);
+    v6.close();
+
+    const s = openStore(path);
+    expect(latestContext(s, 's1')?.['prompt_id']).toBe('p-1');
+    recordContextOnce(s, { session: 's1', promptId: 'p-2', source: 'tool' });
+    expect(latestContext(s, 's1')?.['prompt_id']).toBe('p-2');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('re-running the step is a no-op, not a duplicate-column error', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v6  = buildV6(path);
+    v6.close();
+
+    const s = openStore(path);                 // 6 → 7 once, through openStore
+    expect(() => { migrate(s.db, 6, 7); }).not.toThrow();   // and again, by hand
+    expect(columns(s.db, 'turn_context').filter(name => name === 'source')).toHaveLength(1);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('hasColumn answers honestly in both directions', () => {
+    const dir = tmp(), db = buildV6(join(dir, 'log.sqlite3'));
+    expect(hasColumn(db, 'turn_context', 'source')).toBe(false);
+    expect(hasColumn(db, 'turn_context', 'session')).toBe(true);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
 describe('a v1 database walks the whole chain', () => {
 
   test('1 → current in one open: old rows intact, anchors, messagebox, and notes all usable', () => {
@@ -552,6 +651,11 @@ describe('a v1 database walks the whole chain', () => {
 
     expect(anchoredEntries(s, 'entry', String(written.id))).toHaveLength(1);
     expect(listNotes(s)).toHaveLength(1);
+
+    // …and the newest step's column arrived with the rest of the chain, usable at once
+    recordContextOnce(s, { session: 's1', promptId: 'p-1', source: 'tool' });
+    expect(latestContext(s, 's1')?.['source']).toBe('tool');
+
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 

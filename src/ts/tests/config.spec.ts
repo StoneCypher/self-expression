@@ -21,7 +21,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, and the #16 replay key', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, and the #16 replay key', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -37,6 +37,10 @@ describe('CONFIG_KEYS registry', () => {
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
       'gifts.enabled',
+      'image.api_key_env', 'image.automatic1111.api_key_env', 'image.daily_cap',
+      'image.enabled', 'image.local_base_url', 'image.model',
+      'image.nanobanana.api_key_env', 'image.openai.api_key_env', 'image.provider',
+      'image.session_cap', 'image.timeout_seconds',
       'mailbox.daily_cap', 'mailbox.default_ttl_days', 'mailbox.enabled',
       'mailbox.max_pending', 'mailbox.offer_cap', 'mailbox.surface_budget',
       'messages.enabled', 'messages.notify', 'onboarding.answered',

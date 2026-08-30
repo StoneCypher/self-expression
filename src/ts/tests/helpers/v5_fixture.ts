@@ -18,10 +18,11 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import {
-  TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
+  META_DDL, CONFIG_DDL,
   MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
   NOTES_DDL, NOTE_EVENTS_DDL, NOTE_INDEX_DDL,
 } from '../../channels/schema.js';
+import { V1_TURN_CONTEXT_DDL }          from './v1_fixture.js';
 import { V4_ENTRIES_DDL, V4_INDEX_DDL } from './v4_fixture.js';
 
 /**
@@ -52,7 +53,7 @@ export const V5_INDEX_DDL: readonly string[] = [...V4_INDEX_DDL, ...NOTE_INDEX_D
 export function buildV5(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   const statements = [
-    V5_ENTRIES_DDL, TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
+    V5_ENTRIES_DDL, V1_TURN_CONTEXT_DDL, META_DDL, CONFIG_DDL,
     MESSAGES_DDL, MESSAGE_READS_DDL, NOTES_DDL, NOTE_EVENTS_DDL,
     ...V5_INDEX_DDL, ...MESSAGE_INDEX_DDL,
   ];

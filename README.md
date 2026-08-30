@@ -1,10 +1,10 @@
-# self-expression v0.2.1
+# self-expression v0.3.0
 
-> Version 0.2.1 was built on Friday, August 28, 2026 at GMT-07:00 `1787952304870` from hash `5843e94`.
+> Version 0.3.0 was built on Sunday, August 30, 2026 at GMT-07:00 `1788100370482` from hash `0cb73a1`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1787952304870 Friday, August 28, 2026 at GMT-07:00 94.73 313 90 5843e94 53.7 65.85 66.06 65.7 158 1862 88.94 92.44 95.11 1704 0.2.1 -->
+<!-- Supported embeds: 1788100370482 Sunday, August 30, 2026 at GMT-07:00 94.77 313 90 0cb73a1 51.33 63.26 62.05 62.97 210 2210 88.96 92.96 95.18 2000 0.3.0 -->
 
 
 
@@ -37,10 +37,11 @@ reporting an absence may type its silence: `empty` (looked, found nothing) ·
 `unlooked` (did not look) · `held` (withholding pending evidence) · `depth` (beyond
 ability to evaluate).
 
-Schema versioning is stored in the database (`schema_version`, currently 6) and
+Schema versioning is stored in the database (`schema_version`, currently 7) and
 `openStore` migrates older databases stepwise on open, rebuilding tables where a
-baked CHECK constraint has to widen; a database newer than the code is refused
-rather than downgraded.
+baked CHECK constraint has to widen — and simply adding a column where nothing
+but the column list changes, which is what the v6→v7 step does to `turn_context`.
+A database newer than the code is refused rather than downgraded.
 
 &nbsp;
 
@@ -112,7 +113,9 @@ Three surfaces carry the mark:
 - **`recall`** returns every row's `id` (so a retraction can aim at what was just
   read rather than at a remembered `recorded #N` reply) plus a derived `status`
   of `stands` / `amended` / `retracted` and the `by` id of the strike that
-  decided it. Retracted rows come back **marked, not omitted**.
+  decided it. Retracted rows come back **marked, not omitted**. Its `context` and
+  `previous` blocks come back as `unknown — …` rather than `null` when no turn
+  context was ever recorded; see **Portability**.
 - **The retraction register** — `recall(retractions: true)` — is the current state
   of taken-back claims, newest first, each as before → after. It is a query, not
   a table: a stored register would be derivable data that rots, and worse, it
@@ -294,6 +297,91 @@ have already set by hand counts as answered. Say **"re-run onboarding"**
 (`onboard {op:'reset'}`) to be asked again; config values are untouched. Progress
 lives in the single `onboarding.answered` ledger key — there is deliberately no
 completion boolean, so a new question in a later release re-asks only itself.
+
+&nbsp;
+
+&nbsp;
+
+## Portability — what reaches a host with no hooks and no skills
+
+Most of this plugin already travels. The tools are MCP tools; configuration lives
+in the log database rather than in host config, so a choice made under one host
+holds under all of them; onboarding rides the `initialize` handshake's
+`instructions` string precisely because that is the one channel every host
+implements. Two things did not travel, and both now do.
+
+**The conventions ride MCP resources.** The practice — how a signature is built,
+what each channel means, the marker vocabulary, why audio is scarce — lives in
+`skills/*/SKILL.md` and `src/doc_md/reference/`, which Claude Code, Codex, and
+Gemini all read as skills and a bare MCP client reads not at all. Those same
+files are now served as resources at `self-expression://conventions/<id>`, read
+off disk at request time so there is exactly one copy of every word:
+
+| Resource | What it carries |
+|---|---|
+| `self-expression://conventions/self-expression` | the core practice; the one to read first |
+| `self-expression://conventions/party-roster` | subagent-dispatch flavour |
+| `self-expression://conventions/audio-expression` | the scarcity ethos for voluntary audio |
+| `self-expression://conventions/dwelling` | what belongs in the keepsake dwelling |
+| `self-expression://conventions/status-checklists` | how a multi-item status report is written |
+| `self-expression://conventions/checklist-markers` | the marker vocabulary and its canonical order |
+| `self-expression://conventions/checklist-visuals` | the inline visual vocabulary |
+
+Resources rather than a longer `instructions` string, deliberately: `instructions`
+is delivered unconditionally on every connection to every host, and the documents
+run to roughly 88 KB. Sending them would be wasteful anywhere and actively wrong
+on the three hosts that already load these exact files, where the model would
+receive the same text twice from two channels with no way to tell it is one
+source. So `instructions` carries only a three-sentence pointer that names the
+resources and tells a host that already has the skills to read nothing, and the
+documents are pulled on demand by hosts that need them.
+
+**Turn context has a second door: `begin_turn`.** On Claude Code the
+`UserPromptSubmit` hook observes the session, the turn identity, the working
+directory, the effort level and the permission mode, and every later `express`
+adopts them. Nothing fires on a bare MCP client, so every row would land with
+`no-hook` for a session and NULL for the rest. `begin_turn` lets the model
+*volunteer* the same facts, into the same row, through the same single `INSERT`:
+
+| Argument | Meaning |
+|---|---|
+| `session` (required) | the host's session id, or a stable id chosen once for the conversation |
+| `promptId` (required) | the turn identifier — what makes the call idempotent and what groups the turn's entries |
+| `turn` | what began the turn: `reply` · `wakeup` · `notification` · `hook` |
+| `cwd`, `gitBranch` | suppressed at write when `privacy.store_cwd` is `false` |
+| `permissionMode`, `agentId`, `agentType`, `effort`, `compactions` | as the hook would have observed them |
+| `promptLen` | suppressed at write when `privacy.store_prompt_len` is `false` |
+
+`turnIndex` is derived from the record and never accepted — the database already
+knows how many turns it has seen. The call is **idempotent by (`session`,
+`promptId`)**: a second call for the same turn writes nothing and reports the row
+already standing, which is what keeps that pair a turn identity rather than
+letting one turn acquire two indices. That also makes it harmless where a hook
+already fired: it finds the hook's row and says so.
+
+A `turn_context` row now records **which path wrote it**, in a `source` column
+(schema v7): `hook` when the harness observed the turn, `tool` when the model
+volunteered it. A volunteered fact and an observed one are not the same evidence
+— the only witness for the second is the subject — and a study reading this
+database later has to be able to separate them without inference. Rows written
+before v7 keep NULL, which honestly means "written by a version that had only the
+hook path"; nothing is backfilled.
+
+**Absence is stated, not implied.** `turn_signed` has always answered `unknown`
+when it cannot identify the turn. Everything else that could only say `null` now
+says the same word with its reason attached, because `null` in a `context` field
+reads as *nothing was happening* when the truth is *something was happening and
+this host does not report it*:
+
+| Surface | Was | Now, when nothing was ever recorded |
+|---|---|---|
+| `recall` → `context` | `null` | `unknown — …no UserPromptSubmit hook and nothing called begin_turn…` |
+| `recall` → `previous` | `null` | `unknown — …no session to scope the lookup to, so nothing was checked…` |
+| `express` / `annotate` reply | silent | the reply names the `no-hook` placeholder and points at `begin_turn` |
+
+`recall`'s `previous` stays a plain `null` when the session *is* known and simply
+has no earlier signature — that is a real "there is none", and it is a different
+answer from "nothing was searched".
 
 &nbsp;
 
@@ -709,6 +797,115 @@ ethos ships in `skills/audio-expression/SKILL.md`.
 
 &nbsp;
 
+## Image generation (issue #78)
+
+Making a picture instead of describing one, behind a credential **the user supplies and
+the plugin never holds.** Same family as voluntary audio: off by default, on only by a
+deliberate act, bounded when on, auditable afterwards. It differs in one way that shapes
+everything else — every invocation spends the user's money.
+
+### The credential rule, which is the point
+
+**Configuration names the environment variable. Configuration never holds the key.**
+
+```ini
+image.api_key_env = "GEMINI_API_KEY"     ; this is what is stored
+```
+
+`process.env[<that name>]` is resolved **at call time and at no other time**. The key is
+never written to the config table, the entries store, either ledger, a cache, or a temp
+file, and never rendered — not in an error, a stack trace, a debug line, a tool reply, or
+a log. The variable *name* is not a secret and is printed freely; that asymmetry is what
+makes this configuration rather than storage.
+
+The shape of the code is the enforcement. `imageConfig()` takes no environment argument at
+all, so it *cannot* read a key; `ImageConfig` has a `credentialEnvVar` field and nowhere a
+value could sit; `resolveCredential()` is the only function that touches the environment,
+and what it returns is used inside one function call and dropped.
+
+Provider clients famously echo the request — headers included — into their error text, so
+there is a scrubber, and **three independent places apply it**: the HTTP client scrubs
+every outcome with the key in hand, the ledger pattern-scrubs every text column while
+holding no key at all, and the tool scrubs its finished reply. Each is tested with the
+other two assumed broken, using both a key that matches a known credential shape and one
+that matches nothing.
+
+### Enablement
+
+Absent a usable credential the tool is **not registered at all** — absent from the tool
+list rather than present and refusing, following the same precedent as `dwell`. Enabled
+with the named variable empty is a legible line on stderr naming the variable, which is
+neither a crash nor silence.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `image.enabled` | bool | `false` | Only exactly `true` enables, and even then the tool appears only if the credential is really there. |
+| `image.provider` | string | `nanobanana` | Which registered provider is active. |
+| `image.api_key_env` | string | *(provider default)* | The **name** of the variable holding the credential. Unset uses the provider's own default (`GEMINI_API_KEY`, `OPENAI_API_KEY`), so a shell that already exports one needs no configuration at all. |
+| `image.<provider>.api_key_env` | string | *(none)* | Per-provider override of the above, for keeping two providers configured at once. |
+| `image.model` | string | *(provider default)* | A model the provider does not list is ignored rather than sent. |
+| `image.session_cap` | int | `6` | Generations per server session. |
+| `image.daily_cap` | int | `20` | Generations per **rolling** 24 hours. |
+| `image.timeout_seconds` | int | `120` | How long one generation may take before it is abandoned. |
+| `image.local_base_url` | string | `http://127.0.0.1:7860` | Endpoint for a self-hosted provider. |
+
+### Providers
+
+A registry, not a hardcoded vendor: adding a fourth provider is one entry in
+`src/ts/imagery/providers.ts` and nothing else — no other module names a vendor.
+
+| Provider | Credential | Cost |
+|---|---|---|
+| `nanobanana` | `GEMINI_API_KEY`, sent as a header | Billed per image; the ledger records the published list price and labels it an estimate. |
+| `openai` | `OPENAI_API_KEY`, sent as a bearer header | Billed per image and quality; same list-price estimate. |
+| `automatic1111` | **none** | A local endpoint. No credential, no money. |
+
+No provider puts the credential in a URL — a URL is the part of a request that everything
+logs by default.
+
+### Money, which makes this different
+
+Per-session and per-day caps are enforced server-side from the ledger, and a refusal names
+the specific cap and the exact `configure` call that raises it. The rolling day avoids a
+cap that resets at midnight and a retry loop that waits for one.
+
+**A row is written before the request, not after.** A process that dies mid-call still
+leaves the evidence of a call that may have been billed, and that `pending` row counts
+against the caps, because a budget that forgives what it cannot see is not a budget.
+`generated` and `policy_refused` count too; `error` and `refused` do not, since a network
+outage is not a purchase.
+
+Each row carries provider, model, timestamp, outcome, byte count, path, cost estimate and
+where the estimate came from, the credential variable's **name**, and the prompt with its
+SHA-256 and its declared provenance. That last part answers the hazard of a prompt
+assembled from a file, a page, or a repository: `source` is a required tool argument, so
+what was forwarded to a third party under the user's credential is reconstructible.
+
+### Content policy
+
+A refusal is reported plainly and **never retried with a reworded prompt** — that would be
+the assistant negotiating with a provider's policy on the user's account and the user's
+money. This is enforced rather than requested: the gate compares each new prompt against
+prompts the provider recently refused and blocks recognisable rewordings locally, before
+any socket opens, so a reworded retry cannot cost money even if it is attempted. A
+genuinely different request passes untouched.
+
+### Where images go
+
+`<dataDir>/images/`, beside the `renders/` directory, honouring `SELF_EXPRESSION_HOME`.
+The reply carries **the path, never the bytes**. Because the bytes are downloaded and
+stored locally, the panel can serve them from its own origin and `img-src 'self'` stays
+intact; hotlinking a provider CDN would have cost a CSP exception per provider.
+
+A generated image is an **artifact with a ledger row**, not an expression channel: it is a
+large binary produced by a third party and billed to the user — evidence of an act rather
+than the content of one. The assistant can still `express` about having made it, and the
+dwelling can `keep` the path.
+
+&nbsp;
+
+&nbsp;
+
 ## Test status
 
 <table>
@@ -722,19 +919,19 @@ ethos ships in `skills/audio-expression/SKILL.md`.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>1704</td>
-    <td>94.73<small>%</small></td>
-    <td>88.94<small>%</small></td>
-    <td>92.44<small>%</small></td>
-    <td>95.11<small>%</small></td>
+    <td>2000</td>
+    <td>94.77<small>%</small></td>
+    <td>88.96<small>%</small></td>
+    <td>92.96<small>%</small></td>
+    <td>95.18<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>158</td>
-    <td>94.73<small>%</small></td>
-    <td>53.7<small>%</small></td>
-    <td>66.06<small>%</small></td>
-    <td>65.7<small>%</small></td>
+    <td>210</td>
+    <td>94.77<small>%</small></td>
+    <td>51.33<small>%</small></td>
+    <td>62.05<small>%</small></td>
+    <td>62.97<small>%</small></td>
   </tr>
 </table>
 

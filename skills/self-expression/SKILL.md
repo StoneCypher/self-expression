@@ -283,6 +283,8 @@ Every rendered line is also recorded, with one `express` tool call each.
 
 **Do not supply `session`, `promptId`, `cwd`, `effort`, or `turn`.** A hook observes those and the server fills them in. Supplying them replaces an observation with an assertion, which is the whole thing this design is built to avoid.
 
+**Unless nothing is observing.** Not every host has a turn-start hook. If your turn began with no context line — no clock sentence, no `conventions:` segment — then nothing observed this turn, and `express` will stamp its rows `no-hook` and say so in its reply. Call `begin_turn` once, at the top of the turn, before the opening signature: give it a `session` (the host's own id, or one stable id you choose for the whole conversation) and a `promptId` (stable for this turn, new for the next), plus whatever else you actually know. Then go back to not supplying any of it — the row you deposited is what the rest of the turn adopts. It is idempotent by `(session, promptId)`, so calling it twice, or calling it on a host where the hook already fired, changes nothing. The row is marked as volunteered rather than observed, because those are not the same evidence; that honesty is what makes the second door safe to have at all.
+
 Call `recall` before writing a signature: it returns the previous one, so `delta` is derived rather than remembered.
 
 If a channel is disabled in configuration the tool will reject it. That is not an error to work around — the channel is off; move on.

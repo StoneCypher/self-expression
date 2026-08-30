@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, unlinkSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, copyFileSync, mkdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -227,5 +227,20 @@ updatedContent = updatedContent.replace(/\{\{gh_hash\}\}/g, gh_hash);
 
 // Write back to README.md
 writeFileSync(readmePath, updatedContent, 'utf8');
+
+/* Publish the finished README wherever `--copy-readme-to` says, defaulting to nowhere.
+   This used to be `&& cp README.md docs` on the npm script line. npm runs scripts through
+   the platform shell, which on Windows is cmd.exe, and cmd.exe has no `cp` — so the whole
+   build died here with "The syntax of the command is incorrect". CI is ubuntu-latest and
+   never saw it, which is how a build that cannot complete on a contributor's machine
+   stayed green. Doing the copy in the script that produced the file also puts the write
+   next to the thing being written, rather than a shell away from it. */
+const copyToAt = process.argv.indexOf('--copy-readme-to');
+if (copyToAt !== -1 && copyToAt + 1 < process.argv.length) {
+  const dest = join(process.argv[copyToAt + 1], 'README.md');
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(readmePath, dest);
+  console.log(colorize(SUCCESS_COLOR, `  Copied ${colorize(VALUE_COLOR, 'README.md')} to ${colorize(VALUE_COLOR, dest)}`));
+}
 
 console.log(colorize(OUTPUT_COLOR, `\nUpdated README.md: ${colorize(SUCCESS_COLOR, `Replaced\n  - ${colorize(TEMPLATE_COLOR, '{{version}}')} with ${colorize(VALUE_COLOR, version)},\n  - ${colorize(TEMPLATE_COLOR, '{{coverage}}')} with ${colorize(VALUE_COLOR, coverage)}%,\n  - ${colorize(TEMPLATE_COLOR, '{{stochcoverage}}')} with ${colorize(VALUE_COLOR, stochcoverage)}%,\n  - ${colorize(TEMPLATE_COLOR, '{{doccoverage}}')} with ${colorize(VALUE_COLOR, doccoverage)}%,\n  - ${colorize(TEMPLATE_COLOR, '{{docblockcount}}')} with ${colorize(VALUE_COLOR, docblockcount)},\n  - ${colorize(TEMPLATE_COLOR, '{{testcasecount}}')} with ${colorize(VALUE_COLOR, testcasecount)},\n  - ${colorize(TEMPLATE_COLOR, '{{unittestcount}}')} with ${colorize(VALUE_COLOR, unittestcount)},\n  - ${colorize(TEMPLATE_COLOR, '{{stochtestcount}}')} with ${colorize(VALUE_COLOR, stochtestcount)},\n  - ${colorize(TEMPLATE_COLOR, '{{built}}')} with ${colorize(VALUE_COLOR, built)},\n  - ${colorize(TEMPLATE_COLOR, '{{built_text}}')} with ${colorize(VALUE_COLOR, built_text)},\n  - ${colorize(TEMPLATE_COLOR, '{{gh_hash}}')} with ${colorize(VALUE_COLOR, gh_hash)}`)}`));

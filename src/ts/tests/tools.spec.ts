@@ -4,7 +4,9 @@ import { join }                from 'node:path';
 
 import { openStore, closeStore, writeConfig, readConfig } from '../channels/store.js';
 import type { Store } from '../channels/store.js';
-import { recordContext }  from '../channels/context.js';
+import {
+  recordContext, latestContext, NO_HOOK_SESSION, UNKNOWN_CONTEXT, UNKNOWN_PREVIOUS,
+} from '../channels/context.js';
 import { recentEntries, register } from '../channels/entries.js';
 import { pruneExpired }  from '../channels/retention.js';
 import {
@@ -12,7 +14,8 @@ import {
 } from '../channels/config.js';
 import { CHANNELS, CONFIDENCE_GROUNDS } from '../channels/vocabulary.js';
 import {
-  handleConfigure, handleExpress, handleAnnotate, enabledChannels, enabledConfidenceGrounds,
+  handleConfigure, handleExpress, handleAnnotate, handleBeginTurn,
+  enabledChannels, enabledConfidenceGrounds,
   registerTools, ENABLED_KEY, FORECAST_KEY, ANNOTATE_MAX_NOTES,
 } from '../mcp/tools.js';
 import { buildServer } from '../mcp/server.js';
@@ -584,6 +587,15 @@ describe('handleExpress — #16 retraction', () => {
   }));
 
   test('an ordinary entry gets no echo at all', () => withStore(s => {
+    // The no-turn-context notice may follow the uuid; the claim here is that no
+    // *correction* echo does, which is what `retracts` / `amends` / `corrects` would be.
+    const out = text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
+    expect(out).toMatch(/^recorded #1 [0-9a-f-]{36}(?: —|$)/);
+    expect(out).not.toMatch(/retracts|amends|corrects/);
+  }));
+
+  test('with a turn begun, the reply for an ordinary entry is the bare confirmation', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
     expect(text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' })))
       .toMatch(/^recorded #1 [0-9a-f-]{36}$/);
   }));
@@ -778,6 +790,198 @@ describe('handleExpress — #76 per-channel text length', () => {
     expect(text(handleExpress(s, VERSION, { channel: 'dissent', text: chars(200) })))
       .toMatch(/^recorded #\d+ /);
     expect(() => handleExpress(s, VERSION, { channel: 'dissent', text: chars(201) })).toThrow();
+  }));
+
+});
+
+describe('handleBeginTurn — the hookless host volunteers what the hook would have observed', () => {
+
+  test('a first call records the turn and says which path wrote it', () => withStore(s => {
+    const out = text(handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1', turn: 'reply' }));
+    expect(out).toContain('turn 1 recorded');
+    expect(out).toContain('sess-1');
+    expect(out).toContain('source: tool');
+  }));
+
+  test('the row it writes has the hook row\'s shape, only marked tool', () => withStore(s => {
+    handleBeginTurn(s, {
+      session: 'sess-1', promptId: 'p-1', turn: 'reply', cwd: '/repo', gitBranch: 'main',
+      permissionMode: 'plan', agentId: 'a1', agentType: 'general', effort: 'high',
+      compactions: 1, promptLen: 84,
+    });
+    const row = latestContext(s, 'sess-1');
+    expect(row?.['prompt_id']).toBe('p-1');
+    expect(row?.['turn_index']).toBe(1);
+    expect(row?.['turn']).toBe('reply');
+    expect(row?.['cwd']).toBe('/repo');
+    expect(row?.['git_branch']).toBe('main');
+    expect(row?.['permission_mode']).toBe('plan');
+    expect(row?.['agent_id']).toBe('a1');
+    expect(row?.['agent_type']).toBe('general');
+    expect(row?.['effort']).toBe('high');
+    expect(row?.['compactions']).toBe(1);
+    expect(row?.['prompt_len']).toBe(84);
+    expect(row?.['source']).toBe('tool');
+  }));
+
+  test('a second call for the same turn writes nothing and reports the standing row', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' }));
+    expect(out).toContain('was already recorded');
+    expect(out).toContain('nothing written');
+    expect(Number(s.db.prepare('SELECT COUNT(*) c FROM turn_context').get()?.['c'])).toBe(1);
+  }));
+
+  test('where the hook already fired it is harmless, and says so', () => withStore(s => {
+    recordContext(s, { session: 'sess-1', promptId: 'p-1', turnIndex: 1, source: 'hook' });
+    const out = text(handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' }));
+    expect(out).toContain('source: hook');
+    expect(out).toContain('harmless');
+    expect(Number(s.db.prepare('SELECT COUNT(*) c FROM turn_context').get()?.['c'])).toBe(1);
+    expect(latestContext(s, 'sess-1')?.['source']).toBe('hook');
+  }));
+
+  test('the caller cannot claim to be the hook — source is stamped, never accepted', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' } as never);
+    expect(latestContext(s, 'sess-1')?.['source']).toBe('tool');
+  }));
+
+  test('express adopts what it recorded, instead of falling back to no-hook', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1', turn: 'reply', effort: 'high' });
+    const id  = recordedId(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' })),
+          row = s.db.prepare('SELECT * FROM entries WHERE id = ?').get(id);
+    expect(row?.['session']).toBe('sess-1');
+    expect(row?.['prompt_id']).toBe('p-1');
+    expect(row?.['turn']).toBe('reply');
+    expect(row?.['effort']).toBe('high');
+  }));
+
+  test('the turn index counts turns, and a repeated call does not advance it', () => withStore(s => {
+    expect(text(handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' }))).toContain('turn 1');
+    expect(text(handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' }))).toContain('turn 1');
+    expect(text(handleBeginTurn(s, { session: 'sess-1', promptId: 'p-2' }))).toContain('turn 2');
+  }));
+
+  test('privacy.store_cwd suppresses the path fields at capture, not afterwards', () => withStore(s => {
+    writeConfig(s, 'privacy.store_cwd', 'false');
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1', cwd: '/repo', gitBranch: 'main' });
+    const row = latestContext(s, 'sess-1');
+    expect(row?.['cwd']).toBeNull();
+    expect(row?.['git_branch']).toBeNull();
+    expect(row?.['session']).toBe('sess-1');   // everything else still lands
+  }));
+
+  test('privacy.store_prompt_len suppresses the length the same way', () => withStore(s => {
+    writeConfig(s, 'privacy.store_prompt_len', 'false');
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1', promptLen: 84 });
+    expect(latestContext(s, 'sess-1')?.['prompt_len']).toBeNull();
+  }));
+
+  test('it is registered as a tool, with session and promptId required', () => withStore(s => {
+    const stub = {
+      registerTool: (name: string, config: { inputSchema: Record<string, { isOptional: () => boolean }> }): void => {
+        if (name !== 'begin_turn') { return; }
+        expect(config.inputSchema['session']?.isOptional()).toBe(false);
+        expect(config.inputSchema['promptId']?.isOptional()).toBe(false);
+        expect(config.inputSchema['cwd']?.isOptional()).toBe(true);
+        expect(config.inputSchema).not.toHaveProperty('source');
+      },
+      server: { getClientVersion: (): undefined => undefined },
+    };
+    registerTools(stub as unknown as Parameters<typeof registerTools>[0], s, VERSION);
+  }));
+
+});
+
+describe('recall — degrading loudly where no turn context was ever recorded', () => {
+
+  /** The tool handlers `registerTools` installs, captured without a transport. */
+  function recall(s: Store, args: Record<string, unknown> = {}): Record<string, unknown> {
+    const found = new Map<string, (a: Record<string, unknown>) => {
+      content: { type: 'text'; text: string }[] }>();
+    const stub = {
+      registerTool: (name: string, _config: unknown, handler: unknown): void => {
+        found.set(name, handler as (a: Record<string, unknown>) => {
+          content: { type: 'text'; text: string }[] });
+      },
+      server: { getClientVersion: (): undefined => undefined },
+    };
+    registerTools(stub as unknown as Parameters<typeof registerTools>[0], s, VERSION);
+    const handler = found.get('recall');
+    if (handler === undefined) { throw new Error('recall was not registered'); }
+    return JSON.parse(text(handler(args))) as Record<string, unknown>;
+  }
+
+  test('context says unknown, with the reason, rather than a silent null', () => withStore(s => {
+    const out = recall(s);
+    expect(out['context']).toBe(UNKNOWN_CONTEXT);
+    expect(String(out['context'])).toContain('nothing was happening');
+  }));
+
+  test('previous says unknown too — nothing was searched, which is not "there is none"', () => withStore(s => {
+    expect(recall(s)['previous']).toBe(UNKNOWN_PREVIOUS);
+  }));
+
+  test('once a turn is recorded, both answer with real values again', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1', turn: 'reply' });
+    const id = recordedId(handleExpress(s, VERSION, {
+      channel: 'signature', text: 'still', position: 'close', face: '🙂', stem: 'still' }));
+    const out = recall(s);
+    expect(out['context']).not.toBe(UNKNOWN_CONTEXT);
+    expect((out['context'] as Record<string, unknown>)['session']).toBe('sess-1');
+    expect(out['previous']).not.toBe(UNKNOWN_PREVIOUS);
+    expect((out['previous'] as Record<string, unknown>)['id']).toBe(id);
+    expect((out['previous'] as Record<string, unknown>)['stem']).toBe('still');
+  }));
+
+  test('a known session with no signature yet is null — genuinely none, not unsearched', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    expect(recall(s)['previous']).toBeNull();
+  }));
+
+  test('a caller-supplied session is enough to search, even with no context row', () => withStore(s => {
+    expect(recall(s, { session: 'sess-9' })['previous']).toBeNull();
+    expect(recall(s, { session: 'sess-9' })['context']).toBe(UNKNOWN_CONTEXT);
+  }));
+
+});
+
+describe('express and annotate — saying the gap out loud, not only recording it', () => {
+
+  test('a write with nothing to adopt names the placeholder and the fix', () => withStore(s => {
+    const out = text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
+    expect(out).toMatch(/^recorded #\d+ /);
+    expect(out).toContain(NO_HOOK_SESSION);
+    expect(out).toContain('begin_turn');
+  }));
+
+  test('a write with context says nothing extra', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
+    expect(out).not.toContain(NO_HOOK_SESSION);
+    expect(out).not.toContain('begin_turn');
+  }));
+
+  test('a caller-supplied session counts as context and silences the notice', () => withStore(s => {
+    const out = text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if', session: 'mine' }));
+    expect(out).not.toContain(NO_HOOK_SESSION);
+  }));
+
+  test('annotate says it once for the batch, before the rendered block', () => withStore(s => {
+    const out = text(handleAnnotate(s, VERSION, { notes: [
+      { channel: 'dissent', text: 'one', anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1' },
+      { channel: 'dissent', text: 'two', anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L2' },
+    ]}));
+    expect(out.split(NO_HOOK_SESSION)).toHaveLength(2);
+    expect(out.indexOf(NO_HOOK_SESSION)).toBeLessThan(out.indexOf('⚓'));
+  }));
+
+  test('annotate is silent about it once a turn has been begun', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleAnnotate(s, VERSION, { notes: [
+      { channel: 'dissent', text: 'one', anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1' },
+    ]}));
+    expect(out).not.toContain(NO_HOOK_SESSION);
   }));
 
 });

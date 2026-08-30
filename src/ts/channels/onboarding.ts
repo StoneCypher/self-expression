@@ -223,6 +223,10 @@ export function resetOnboarding(store: Store): boolean {
  * part of the detection path, because they are the least portable layer and
  * onboarding must reach the hosts host-native prompting misses.
  *
+ * One of two things riding that transport; {@link ../mcp/server.js serverInstructions}
+ * joins this to the conventions pointer. They are independent — either can be absent
+ * without disturbing the other — so neither knows about the other here.
+ *
  * @example
  *   onboardingInstructions(store)
  *   // => "Onboarding pending (8 questions). At a natural pause, …" on a fresh store

@@ -464,6 +464,10 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
         agentType      : payload.agent_type,
         effort         : payload.effort?.level,
         promptLen      : privacy.storePromptLen ? payload.user_input?.length : undefined,
+        // The harness observed this turn; nothing here is the model's word for itself.
+        // `begin_turn` writes the same shape with 'tool', and the column is what keeps
+        // the two distinguishable to anyone reading the database later.
+        source         : 'hook',
       }, now);
       turnIndex = index;
     } catch { /* fail open: the clock still gets delivered */ }

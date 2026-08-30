@@ -48,44 +48,16 @@ const opArb: fc.Arbitrary<Op> = fc.oneof(
 
 describe('ledger invariants under arbitrary op interleavings', () => {
 
-  it('the ledger stays a subset of known ids plus preserved unknowns, and unknowns never drop', () => {
-    withStore(s => {
-      fc.assert(fc.property(
-        fc.array(opArb, { maxLength: 12 }),
-        fc.constantFrom('a-future-question', 'q-from-v9', 'zeta'),
-        (ops, unknown) => {
-
-          // A newer version left an id this version does not know.
-          writeConfig(s, ANSWERED_KEY, unknown);
-
-          let resetSeen = false;
-          for (const op of ops) {
-            if (op.kind === 'answer')      { handleOnboard(s, { op: 'answer', id: op.id, value: op.value }); }
-            else if (op.kind === 'skip')   { handleOnboard(s, { op: 'skip' }); }
-            else                           { handleOnboard(s, { op: 'reset' }); resetSeen = true; }
-          }
-
-          const ledger  = answeredIds(s),
-                allowed = new Set([...QUESTION_IDS, unknown]);
-
-          for (const id of ledger) { expect(allowed.has(id)).toBe(true); }
-          expect(new Set(ledger).size).toBe(ledger.length);   // no duplicate appends
-
-          // The unknown id survives every op except a deliberate reset, which clears
-          // the whole ledger — including it — by design.
-          if (!resetSeen) { expect(ledger).toContain(unknown); }
-
-          // Restore a blank slate for the next property run.
-          handleOnboard(s, { op: 'reset' });
-          for (const key of Object.keys(allConfig(s))) {
-            s.db.prepare('DELETE FROM config WHERE key = ?').run(key);
-          }
-
-        }));
-    });
-    // Store-backed property: 100 runs write through a real database file, so the
-    // default 5s vitest timeout is a flake margin under a concurrent build.
-  }, 60_000);
+  /* REMOVED: 'the ledger stays a subset of known ids plus preserved unknowns'.
+     The heaviest property in the suite — twelve store round-trips per run, a hundred runs,
+     then a full config wipe each time — and it was the reason the whole build stalled. It
+     was slow for a reason that turned out not to be its own: `openStore` set no pragmas, so
+     every write cost an fsync at 172/sec. WAL took the file from 43s to 2.4s.
+     Removed anyway, on John's call, and the reasoning is worth keeping: the ledger's
+     subset-and-preserve-unknowns behaviour is exercised by the three properties below and
+     by the unit suite, so this was buying a fourth angle on well-understood behaviour at
+     the highest price in the repo. A test earns its runtime by the chance it fails, not by
+     the number of cases it enumerates. */
 
   it('a hand-configured key counts as answered no matter what the ledger went through', () => {
     withStore(s => {
