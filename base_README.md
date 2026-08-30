@@ -255,24 +255,50 @@ The registered keys:
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
-| `share.time_granularity` | string | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
+| `share.time_granularity` | enum | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
 | `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
+| `window.browser` | enum | `ask` | May a page be opened in your **external browser**: `never`, `ask`, or `always`. Advisory, not enforced — see below. |
+| `window.editor` | enum | `ask` | May a page be opened as an **editor tab**: `never`, `ask`, or `always`. A separate key from `window.browser` on purpose. |
 
-Two of those families reach the *skills*, which are static Markdown and cannot read
-configuration at all. The turn-start hook carries them on the context line it already
-injects: a `conventions:` segment for the prose toggles, and a `lengths:` segment for
+Three of those families reach the *skills* and the model directly, neither of which can
+read configuration. The turn-start hook carries them on the context line it already
+injects: a `conventions:` segment for the prose toggles, a `lengths:` segment for
 the per-channel text ceilings — rendered against whichever limit the most channels
 share, so `lengths: 200 all` is the usual cost and `lengths: 200 except signature:70`
-names only genuine deviations. The skill states its *recommended* length (≤70, because
-a signature that has to be read has stopped being a glance) as a constant, and takes
-its *ceiling* from that segment; a raised ceiling is headroom for the occasional line
-that earns it, never an invitation to fill it.
+names only genuine deviations — and a `windows:` segment for the two window postures.
+The skill states its *recommended* length (≤70, because a signature that has to be read
+has stopped being a glance) as a constant, and takes its *ceiling* from that segment; a
+raised ceiling is headroom for the occasional line that earns it, never an invitation
+to fill it.
+
+### Window postures — two keys, and honestly advisory
+
+`window.browser` and `window.editor` say whether a page may be put on your screen, and
+each takes `never`, `ask`, or `always`. They default to `ask`, because a plugin cannot
+know whose machine it is on, whether anyone is watching it, or what else is on that
+screen.
+
+**They are two keys because the costs differ.** An external browser window steals focus
+and may land while you are away from the machine entirely; an editor tab appears in the
+window you are already sitting in and waits to be noticed. A single key would force the
+expensive answer onto the cheap case — someone happy with tabs and hostile to browser
+windows could only ever express the stricter of the two.
+
+**They are advisory, and there is deliberately no tool enforcing them.** Nothing here
+can stop a shell command from opening a window; a gate would be a lock on one of several
+doors, and a lock you can walk around is worse than an honest request, because it invites
+the belief that the door is shut. What the plugin can do is put your stated wish in front
+of the model at the moment the choice is made, every turn, on the `windows:` segment of
+the context line. That is the whole mechanism, and it is stated plainly rather than
+dressed up as enforcement.
 
 Readers are tolerant: a stored value that fails validation behaves as unset, so a
-hand-edited database or a downgrade can never wedge the server or the gates. The
-privacy and `time.hook` switches additionally act only on the exact string `false` —
-an ambiguous value records rather than silently suppressing. `share.enabled` inverts
-that: only the exact string `true` enables, and anything else means no.
+hand-edited database or a downgrade can never wedge the server or the gates. For the
+window keys that direction is `ask` — the safe one; an unreadable posture is never
+read as permission. The privacy and `time.hook` switches additionally act only on the
+exact string `false` — an ambiguous value records rather than silently suppressing.
+`share.enabled` inverts that: only the exact string `true` enables, and anything else
+means no.
 
 &nbsp;
 
@@ -482,23 +508,51 @@ transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issu
 
 | Tool | Forms | Purpose |
 |---|---|---|
-| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, or a sequence diagram (actors, lifelines, one arrow row per message). |
+| `render_diagram` | `state` \| `digraph` \| `tree` \| `sequence` \| `matrix` | A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked `▶`), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, a sequence diagram (actors, lifelines, one arrow row per message), or a **seriated matrix** (a two-way table shaded by cell magnitude, both axes reordered so similar keys sit together). |
 
 When to reach for it: **quantities** (how much, how many, trend) → a chart tool;
 **linear order** (a pipeline, one path through states) → `render_timeline`'s inline
 forms; **topology** — the moment structure branches, merges, cycles, or fans in or
-out — → `render_diagram`. Output is framed, single-width, at most 78 columns, and
-meant to sit inside a ```` ```text ```` fence. A graph too large or too tangled to
-draw legibly is refused with the fallbacks named in the error text (the FSL
-one-liner, an adjacency list, or the mermaid export). `emit: 'mermaid'` /
-`emit: 'both'` serialize the graph as `stateDiagram-v2` or `flowchart` source — an
-opt-in export for destinations that render mermaid (GitHub PR bodies, READMEs),
-never the in-transcript form, since the transcript surface shows mermaid as raw text.
+out — → `render_diagram`; **two categorical axes crossing**, where the question is
+whether they cluster → `render_diagram` form `matrix`. Output is framed,
+single-width, at most 78 columns, and meant to sit inside a ```` ```text ````
+fence. A diagram too large or too tangled to draw legibly is refused with the
+fallbacks named in the error text (for graphs: the FSL one-liner, an adjacency list,
+or the mermaid export; for matrices: a narrower slice, a ranked list of the largest
+cells, or one axis at a time as labeled bars). `emit: 'mermaid'` / `emit: 'both'`
+serialize the graph as `stateDiagram-v2` or `flowchart` source — an opt-in export for
+destinations that render mermaid (GitHub PR bodies, READMEs), never the in-transcript
+form, since the transcript surface shows mermaid as raw text. The `sequence` and
+`matrix` forms have no mermaid emission and say so.
 
-The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`),
-the FSL-subset parser (`parseFsl`, round-trip compatible with `renderFsl`), and the
-mermaid serializer (`toMermaid`) are all exported from the library
-(`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
+### Seriation
+
+The `matrix` form's point is not the shading, it is the **reordering**. Given two key
+axes and a value per crossing, it orders each axis so that similar rows sit beside
+similar rows and similar columns beside similar columns, which turns a scattered table
+into visible blocks — structure nothing told it to look for. The search is a barycentre
+sweep (each axis ordered by the value-weighted mean position of the other, alternating
+to convergence) followed by a local search — adjacent swaps, then single-key
+relocation — on a profile-distance objective, run as rounds to a fixed point, so
+seriating twice is a no-op.
+
+`pinRows` / `pinCols` freeze an axis in the order it was given, exactly. This is the
+option that makes the form usable rather than merely clever: when the rows are release
+milestones, a reader already knows what order they come in, and reordering them scores
+better while reading worse. Pin any axis whose order already carries meaning.
+
+Because a shaded matrix looks structured whether or not anything was found, the reply
+carries one line reporting the objective before and after (`seriation: profile distance
+5863 -> 1709 (71% tighter); both axes reordered`). Compare the two numbers; the picture
+alone is not evidence. The marginal totals are drawn alongside for the same reason —
+shading shows proportion and hides magnitude, and a bright cell holding three items
+should not read like a bright cell holding three hundred.
+
+The renderers (`renderStateDiagram`, `renderDigraph`, `renderTree`, `renderSequence`,
+`renderMatrix`), the seriation (`normalizeMatrix`, `seriate`, `seriationScore`,
+`matrixTotals`, `describeSeriation`), the FSL-subset parser (`parseFsl`, round-trip
+compatible with `renderFsl`), and the mermaid serializer (`toMermaid`) are all exported
+from the library (`self-expression`'s `src/ts/diagrams/index.ts`), for use outside MCP.
 
 &nbsp;
 

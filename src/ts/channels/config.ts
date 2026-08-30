@@ -80,8 +80,60 @@ export const MAX_TEXT_CEILING = 2000;
  */
 export const MIN_CHANNEL_MAX_CHARS = 1;
 
-/** The value shapes a registered key can take. */
-export type ConfigKind = 'bool' | 'int' | 'list' | 'string';
+/**
+ * The value shapes a registered key can take.
+ *
+ * `enum` is the closed-choice shape: a key whose whole domain is a handful of words,
+ * carrying those words in {@link ConfigKeyDef.choices}. It exists as its own kind
+ * rather than riding `string` because the kind is user-facing — `configure set`'s
+ * rejection names it — and "is not a valid string" is exactly the unhelpful half of
+ * that sentence, where "is not a valid enum … expected one of 'never', 'ask',
+ * 'always'" answers the question the user actually has.
+ */
+export type ConfigKind = 'bool' | 'enum' | 'int' | 'list' | 'string';
+
+/**
+ * The window surfaces a posture key governs: the user's external browser, and an
+ * editor tab.
+ *
+ * Two surfaces rather than one key for "may Claude open a window" **because the costs
+ * differ.** An external browser window steals focus and may land while the user is away
+ * from the machine entirely; an editor tab appears in the window they are already
+ * sitting in and waits to be noticed. A single key would force the expensive answer
+ * onto the cheap case — a user who is happy with tabs and hostile to browser windows
+ * could only express the stricter of the two.
+ *
+ * @see WINDOW_POSTURES
+ * @see windowPostureKey
+ */
+export const WINDOW_SURFACES = ['browser', 'editor'] as const;
+
+/** One window surface: `'browser'` or `'editor'`. */
+export type WindowSurface = typeof WINDOW_SURFACES[number];
+
+/**
+ * The three answers a window-posture key accepts, in escalating permissiveness.
+ *
+ * Three states, which is why the keys are `enum` and not `bool`: "ask" is neither yes
+ * nor no, and it is the only honest default for a plugin that cannot know whose machine
+ * it is on, whether anyone is watching it, or what else is on that screen.
+ *
+ * @see WINDOW_SURFACES
+ * @see windowPosture
+ */
+export const WINDOW_POSTURES = ['never', 'ask', 'always'] as const;
+
+/** One window posture: `'never'`, `'ask'`, or `'always'`. */
+export type WindowPosture = typeof WINDOW_POSTURES[number];
+
+/**
+ * The posture in force when nothing valid is stored — the conservative middle.
+ *
+ * `ask` rather than `always` because a window is an interruption of someone else's
+ * machine, and rather than `never` because refusing outright would make the feature
+ * unreachable for the many users who would simply have said yes.
+ */
+export const DEFAULT_WINDOW_POSTURE: WindowPosture = 'ask';
 
 /**
  * The outcome of validating one proposed config value: either the canonical text to
@@ -108,6 +160,14 @@ export interface ConfigKeyDef {
   readonly description : string;
   /** Canonicalizes a proposed value, or names what would have been accepted. */
   readonly validate    : (raw: string) => Validation;
+  /**
+   * The permitted values, present on and only on `enum` keys — the closed set the
+   * validator canonicalizes into and rejects outside of. Carried on the definition, not
+   * merely captured inside the validator's closure, so a caller that needs to *offer*
+   * the choices (a prompt, a listing, a test) can read them without parsing a
+   * rejection message.
+   */
+  readonly choices?    : readonly string[] | undefined;
 }
 
 /**
@@ -210,14 +270,21 @@ export function stringValidator(maxLength: number): (raw: string) => Validation 
  * Build a validator for a small closed-choice key: the value, trimmed and lowercased,
  * must be exactly one of `choices`.
  *
- * Exists for keys whose domain is a handful of words (`share.time_granularity`) —
- * a free string validator would admit prose into a field other code switches on.
+ * This is the validator every `enum` key uses. It exists for keys whose domain is a
+ * handful of words (`share.time_granularity`, the `window.*` postures) — a free string
+ * validator would admit prose into a field other code switches on. The rejection names
+ * the whole set in the same `describeVocabulary` shape {@link validateChannelList}
+ * uses, so a mistyped value is answered with what would have worked rather than only
+ * that it did not.
  *
- * @param choices the accepted canonical values, already lowercase
+ * @param choices the accepted canonical values, already lowercase; also what the key's
+ *                {@link ConfigKeyDef.choices} should carry, so the two cannot disagree
  *
  * @example
  *   choiceValidator(['hour', 'day'])(' Hour ')  // => { ok: true, canonical: 'hour' }
  *   choiceValidator(['hour', 'day'])('minute')  // => { ok: false, expected: "one of 'hour', 'day'" }
+ *
+ * @see WINDOW_POSTURES
  */
 export function choiceValidator(choices: readonly string[]): (raw: string) => Validation {
   const expected = `one of ${describeVocabulary(choices)}`;
@@ -294,6 +361,28 @@ export function channelMaxCharsKey(channel: string): string {
 }
 
 /**
+ * The registry key naming one window surface's posture.
+ *
+ * A builder rather than two bare strings for the same reason
+ * {@link channelMaxCharsKey} is one: the key is stable public surface users type, and
+ * deriving it in one place means the registry entry, the tolerant reader, and the
+ * turn-start hook cannot drift apart on a spelling.
+ *
+ * @param surface the window surface; a member of {@link WINDOW_SURFACES} in practice,
+ *                though the function is total so callers need not narrow first
+ * @returns the config key
+ *
+ * @example
+ *   windowPostureKey('browser')  // => 'window.browser'
+ *   windowPostureKey('editor')   // => 'window.editor'
+ *
+ * @see windowPosture
+ */
+export function windowPostureKey(surface: string): string {
+  return `window.${surface}`;
+}
+
+/**
  * Every key this version of the plugin knows about.
  *
  * A key a newer version writes is still stored and preserved (D3) — this registry is
@@ -316,7 +405,9 @@ export function channelMaxCharsKey(channel: string): string {
  * credential. A name is not a secret and is printed freely; the value is read from the
  * environment at call time by `imagery/config.ts` and written nowhere at all. Any future
  * key that would hold a credential rather than name one does not belong in this registry,
- * or in this database.
+ * or in this database. The `window.*` pair is the `enum` kind's first home: two keys, one
+ * per window surface, because the cost of an external browser window and the cost of an
+ * editor tab are not the same cost.
  */
 export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'channels.enabled', kind: 'list', fallback: CHANNELS.join(','),
@@ -494,12 +585,28 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'share.opted_in_utc', kind: 'string', fallback: null,
     description: 'the most recent opt-in moment; only rows recorded at or after it are ever exported — stamped automatically when share.enabled is set true, cleared on opt-out, never retroactive',
     validate: validateIsoUtc },
-  { key: 'share.time_granularity', kind: 'string', fallback: 'hour',
+  { key: 'share.time_granularity', kind: 'enum', choices: ['hour', 'day'], fallback: 'hour',
     description: 'how far exported timestamps are coarsened: hour keeps time-of-day questions answerable, day destroys them for a smaller residual',
     validate: choiceValidator(['hour', 'day']) },
   { key: 'onboarding.answered', kind: 'list', fallback: null,
     description: 'ids of onboarding questions resolved — answered or skipped (#40); unknown ids are preserved, and unsetting this re-runs onboarding',
     validate: validateTokenList },
+  { key: windowPostureKey('browser'), kind: 'enum', choices: WINDOW_POSTURES,
+    fallback: DEFAULT_WINDOW_POSTURE,
+    description:
+      "whether a page may be opened in the user's external browser: never, ask, or always. " +
+      'Separate from window.editor because an external window steals focus and may land ' +
+      'while nobody is at the machine. Advisory — carried on the turn-start context line, ' +
+      'not enforced, because nothing can stop a shell command from opening a window',
+    validate: choiceValidator(WINDOW_POSTURES) },
+  { key: windowPostureKey('editor'), kind: 'enum', choices: WINDOW_POSTURES,
+    fallback: DEFAULT_WINDOW_POSTURE,
+    description:
+      'whether a page may be opened as an editor tab: never, ask, or always. The cheaper ' +
+      'of the two surfaces — a tab appears in the window the user is already sitting in — ' +
+      'which is exactly why it gets its own key rather than inheriting the browser answer. ' +
+      'Advisory on the same terms as window.browser',
+    validate: choiceValidator(WINDOW_POSTURES) },
 ];
 
 /**
@@ -586,6 +693,44 @@ export function channelMaxChars(store: Store, channel: string): number {
       && parsed <= MAX_TEXT_CEILING
     ? parsed
     : DEFAULT_CHANNEL_MAX_CHARS;
+
+}
+
+/**
+ * The posture in force for one window surface.
+ *
+ * Reads through {@link effectiveValue}, so a hand-edited row, a value from a newer
+ * version's larger vocabulary, or a downgrade all land on
+ * {@link DEFAULT_WINDOW_POSTURE} — `ask`, which is the safe direction (D5). The return
+ * type is narrowed to {@link WindowPosture} so callers can switch exhaustively instead
+ * of re-checking a string.
+ *
+ * **This value is advisory, and deliberately so.** Nothing in this plugin can prevent a
+ * shell command from opening a window, and no tool here tries to; the key exists to put
+ * the user's stated wish somewhere the model reliably sees it, every turn, which is the
+ * only mechanism honestly available.
+ *
+ * @param store   the open store to resolve against
+ * @param surface which window surface's posture to read
+ * @returns the posture in force, never null and never outside {@link WINDOW_POSTURES}
+ *
+ * @example
+ *   windowPosture(store, 'browser')   // => 'ask' on a fresh install
+ *   writeConfig(store, 'window.editor', 'always');
+ *   windowPosture(store, 'editor')    // => 'always'
+ *   writeConfig(store, 'window.editor', 'sometimes');
+ *   windowPosture(store, 'editor')    // => 'ask' — an invalid row behaves as unset
+ *
+ * @see windowPostureKey
+ * @see ../mcp/hooks.js windowPostureLine
+ */
+export function windowPosture(store: Store, surface: string): WindowPosture {
+
+  const raw = effectiveValue(store, windowPostureKey(surface));
+
+  return (WINDOW_POSTURES as readonly string[]).includes(raw ?? '')
+    ? raw as WindowPosture
+    : DEFAULT_WINDOW_POSTURE;
 
 }
 

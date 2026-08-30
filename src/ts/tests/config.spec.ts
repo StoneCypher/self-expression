@@ -8,8 +8,10 @@ import {
   FORMAT_VERSION, CONFIG_KEYS, configKey,
   DEFAULT_CHANNEL_MAX_CHARS, MAX_TEXT_CEILING, MIN_CHANNEL_MAX_CHARS,
   channelMaxChars, channelMaxCharsKey,
-  validateBool, intValidator, validateChannelList, stringValidator,
+  validateBool, intValidator, validateChannelList, stringValidator, choiceValidator,
   effectiveValue, effectiveConfig,
+  WINDOW_SURFACES, WINDOW_POSTURES, DEFAULT_WINDOW_POSTURE,
+  windowPosture, windowPostureKey,
 } from '../channels/config.js';
 import { CHANNELS } from '../channels/vocabulary.js';
 
@@ -21,7 +23,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, and the #16 replay key', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -49,6 +51,7 @@ describe('CONFIG_KEYS registry', () => {
       'revision.enabled', 'roster.enabled', 'salience.enabled',
       'share.enabled', 'share.opted_in_utc', 'share.time_granularity',
       'time.hook',
+      'window.browser', 'window.editor',
     ]);
   });
 
@@ -78,7 +81,10 @@ describe('CONFIG_KEYS registry', () => {
   test('the share keys carry the #31 semantics: off by default, no default opt-in moment, hour granularity', () => {
     expect(configKey('share.enabled')).toMatchObject({ kind: 'bool', fallback: 'false' });
     expect(configKey('share.opted_in_utc')).toMatchObject({ kind: 'string', fallback: null });
-    expect(configKey('share.time_granularity')).toMatchObject({ kind: 'string', fallback: 'hour' });
+    // A closed two-word domain, so it carries the enum kind and its choices: the
+    // rejection a user sees names 'hour' and 'day', not the word "string".
+    expect(configKey('share.time_granularity'))
+      .toMatchObject({ kind: 'enum', choices: ['hour', 'day'], fallback: 'hour' });
   });
 
   test('the #42 keys carry the spec defaults: forecast and salience on, the rest off', () => {
@@ -189,6 +195,148 @@ describe('channels.<name>.max_chars — the #76 length family', () => {
     for (const entry of listed) {
       expect(entry).toMatchObject({ value: '200', source: 'default', known: true });
     }
+  }));
+
+});
+
+describe('the enum kind', () => {
+
+  test('every enum key carries a non-empty choice set, and no other kind does', () => {
+    for (const def of CONFIG_KEYS) {
+      if (def.kind === 'enum') {
+        expect(def.choices).toBeDefined();
+        expect(def.choices?.length ?? 0).toBeGreaterThan(0);
+      } else {
+        expect(def.choices).toBeUndefined();
+      }
+    }
+  });
+
+  test('an enum key accepts exactly its own choices and nothing else', () => {
+    for (const def of CONFIG_KEYS.filter(d => d.kind === 'enum')) {
+      for (const choice of def.choices ?? []) {
+        expect(def.validate(choice)).toEqual({ ok: true, canonical: choice });
+      }
+      expect(def.validate('not-a-choice-any-key-has').ok).toBe(false);
+    }
+  });
+
+  test("an enum key's every choice is already canonical — no choice needs rewriting to be stored", () => {
+    for (const def of CONFIG_KEYS.filter(d => d.kind === 'enum')) {
+      for (const choice of def.choices ?? []) {
+        expect(choice).toBe(choice.trim().toLowerCase());
+      }
+    }
+  });
+
+  test('the rejection names the whole set, not the kind — that is why enum exists', () => {
+    const outcome = choiceValidator(WINDOW_POSTURES)('maybe');
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      for (const posture of WINDOW_POSTURES) { expect(outcome.expected).toContain(`'${posture}'`); }
+      expect(outcome.expected).toContain('one of');
+    }
+  });
+
+});
+
+describe('the window posture keys', () => {
+
+  test('one key per surface, each an enum over the three postures, defaulting to ask', () => {
+    for (const surface of WINDOW_SURFACES) {
+      expect(configKey(windowPostureKey(surface))).toMatchObject({
+        kind: 'enum', choices: WINDOW_POSTURES, fallback: DEFAULT_WINDOW_POSTURE,
+      });
+    }
+    expect(DEFAULT_WINDOW_POSTURE).toBe('ask');
+  });
+
+  test('the key names are the stable shape a user types', () => {
+    expect(windowPostureKey('browser')).toBe('window.browser');
+    expect(windowPostureKey('editor')).toBe('window.editor');
+  });
+
+  test('both keys validate their own defaults, which is what makes ask reachable by unset', () => {
+    for (const surface of WINDOW_SURFACES) {
+      const def = configKey(windowPostureKey(surface));
+      expect(def?.validate(def.fallback ?? '')).toEqual({ ok: true, canonical: 'ask' });
+    }
+  });
+
+  test.each([
+    ['never', 'NEVER'], ['never', ' Never '], ['ask', 'Ask'], ['ask', 'aSk'],
+    ['always', 'ALWAYS'], ['always', ' always'],
+  ])('canonicalises %s from the mixed case %s', (canonical, raw) => {
+    for (const surface of WINDOW_SURFACES) {
+      expect(configKey(windowPostureKey(surface))?.validate(raw)).toEqual({ ok: true, canonical });
+    }
+  });
+
+  test.each(['sometimes', 'yes', 'true', '1', '', 'never ask always', 'nevermore'])(
+    'rejects %s with a message naming the whole set', (raw) => {
+      const outcome = configKey('window.browser')?.validate(raw);
+      expect(outcome?.ok).toBe(false);
+      if (outcome !== undefined && !outcome.ok) {
+        expect(outcome.expected).toContain("'never'");
+        expect(outcome.expected).toContain("'ask'");
+        expect(outcome.expected).toContain("'always'");
+      }
+    });
+
+  test('a fresh store answers ask for both surfaces', () => withStore(s => {
+    for (const surface of WINDOW_SURFACES) {
+      expect(windowPosture(s, surface)).toBe('ask');
+    }
+  }));
+
+  test('the two keys are genuinely independent — that is the entire reason there are two', () => withStore(s => {
+    writeConfig(s, 'window.browser', 'never');
+    writeConfig(s, 'window.editor', 'always');
+    expect(windowPosture(s, 'browser')).toBe('never');
+    expect(windowPosture(s, 'editor')).toBe('always');
+  }));
+
+  test.each(['never', 'ask', 'always'])('a stored %s reaches the reader intact', (posture) => withStore(s => {
+    for (const surface of WINDOW_SURFACES) {
+      writeConfig(s, windowPostureKey(surface), posture);
+      expect(windowPosture(s, surface)).toBe(posture);
+    }
+  }));
+
+  test('an invalid stored value behaves as unset — ask, the safe direction (D5)', () => withStore(s => {
+    for (const bad of ['sometimes', 'TRUE', '', '  ', 'ask always', 'occasionally']) {
+      for (const surface of WINDOW_SURFACES) {
+        writeConfig(s, windowPostureKey(surface), bad);
+        expect(windowPosture(s, surface)).toBe('ask');
+      }
+    }
+  }));
+
+  test('an unregistered surface resolves to ask rather than throwing', () => withStore(s => {
+    expect(windowPosture(s, 'terminal')).toBe('ask');
+  }));
+
+  test('unset returns a surface to ask', () => withStore(s => {
+    writeConfig(s, 'window.browser', 'always');
+    expect(windowPosture(s, 'browser')).toBe('always');
+    deleteConfig(s, 'window.browser');
+    expect(windowPosture(s, 'browser')).toBe('ask');
+  }));
+
+  test('both keys appear in the effective listing, at their defaults, on a fresh store', () => withStore(s => {
+    const listed = effectiveConfig(s).filter(e => e.key.startsWith('window.'));
+    expect(listed.map(e => e.key).sort()).toEqual(['window.browser', 'window.editor']);
+    for (const entry of listed) {
+      expect(entry).toMatchObject({ value: 'ask', source: 'default', known: true });
+    }
+  }));
+
+  test('an invalid stored posture is listed at ask with a note, matching what the reader does', () => withStore(s => {
+    writeConfig(s, 'window.editor', 'whenever');
+    const entry = effectiveConfig(s).find(e => e.key === 'window.editor');
+    expect(entry).toMatchObject({ value: 'ask', source: 'default', known: true });
+    expect(entry?.note).toContain("'whenever'");
+    expect(windowPosture(s, 'editor')).toBe('ask');
   }));
 
 });

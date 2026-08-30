@@ -165,6 +165,27 @@ tracking the code default, and `list` reports the effective configuration rather
 the override rows. Retention (`retention.days`) prunes `entries` and `turn_context` at
 server startup — it never archives, and never touches `meta` or `config`.
 
+The kinds are `bool`, `enum`, `int`, `list`, and `string`. `enum` is the closed-choice
+kind: the definition carries its permitted values, and the validator canonicalizes
+case-insensitively to lowercase and rejects anything outside the set, naming the whole set
+in the same `describeVocabulary` shape the channel list uses. It is its own kind rather
+than a `string` with a stricter validator because the kind is user-facing — `configure
+set`'s rejection names it — and "is not a valid string" is the unhelpful half of that
+sentence where "expected one of `'never'`, `'ask'`, `'always'`" is the answer.
+
+**Window postures are two advisory keys (`window.browser`, `window.editor`).** Each is an
+`enum` over `never` / `ask` / `always`, defaulting to `ask` — the conservative answer for a
+plugin that cannot know whose machine it is on. Two keys rather than one because the costs
+differ: an external browser window steals focus and may land while nobody is at the
+machine, while an editor tab appears in the window the user is already sitting in, and one
+key would force the expensive answer onto the cheap case. The consumer is
+`onUserPromptSubmit`, which appends a `windows:` segment to the context line beside #42's
+`conventions:` flags and #76's `lengths:` — the same transport, on the D9 mechanism, not a
+second one. **There is deliberately no enforcing tool**: nothing can stop a shell command
+from opening a window, so a gate would be a lock on one of several doors, and a lock that
+can be walked around is worse than an honest request. An invalid stored posture reads as
+`ask` (D5), so an unreadable row is never read as permission.
+
 **Text length is per-channel and configurable (issue #76).** One
 `channels.<name>.max_chars` key per channel, generated from `CHANNELS` so a new channel
 arrives with its limit already registered, each defaulting to 200. The `express` zod
@@ -395,9 +416,18 @@ there is no sharing to be had, so Claude is pointed at `claude-commands/` and Ge
   charts pin exact strings across dense threshold bands, diagrams pin invariants (topology
   survives, frames are rectangles, edges trace) plus a small golden canon. Same purity rules.
   `src/ts/mcp/diagram_tools.ts` exposes `render_diagram` (`state` · `digraph` · `tree` ·
-  `sequence`), with a small FSL-subset parser round-trip compatible with `renderFsl` and an
-  opt-in `toMermaid` export — see the README's Diagrams section and
+  `sequence` · `matrix`), with a small FSL-subset parser round-trip compatible with `renderFsl`
+  and an opt-in `toMermaid` export — see the README's Diagrams section and
   `src/superpowers/spec/2026-08-27-diagrams-design.md`.
+- **Seriation is the `matrix` form's actual capability.** `src/ts/diagrams/matrix.ts` holds the
+  two-way-table model and the reordering — a barycentre sweep plus an adjacent-swap and
+  relocation hill-climb on a profile-distance objective, run to a fixed point so it is
+  idempotent — and `renderMatrix` in `renderers.ts` draws the result as a shaded table with
+  rotated column keys and both margins. `pinRows` / `pinCols` freeze an axis in caller order
+  and are load-bearing rather than optional: an axis whose order a reader already understands
+  (releases, weeks, severities) scores better reordered and reads worse. The objective is
+  returned before and after, and the tool prints it, because a shaded matrix is persuasive
+  whether or not the search found anything.
 - **Codex hooks.** Codex documents `hooks/hooks.json`, but its event names and plugin-root
   variable are not verified. The `hooks` field is deliberately absent from the Codex manifest
   rather than pointing at a guess.

@@ -18,6 +18,7 @@ import { openStore, closeStore, writeConfig, readConfig } from '../channels/stor
 import type { Store } from '../channels/store.js';
 import {
   intValidator, validateBool, validateChannelList, stringValidator, effectiveValue,
+  choiceValidator, WINDOW_POSTURES, WINDOW_SURFACES, windowPosture, windowPostureKey,
 } from '../channels/config.js';
 import { CHANNELS } from '../channels/vocabulary.js';
 import { handleConfigure } from '../mcp/tools.js';
@@ -94,6 +95,39 @@ describe('canonicalization is a fixed point', () => {
       }));
   });
 
+  it('window postures: any case permutation, however padded, round-trips store→read→posture', () => {
+    withStore(s => {
+      fc.assert(fc.property(
+        fc.constantFrom(...WINDOW_SURFACES),
+        fc.constantFrom(...WINDOW_POSTURES),
+        fc.array(fc.boolean(), { minLength: 6, maxLength: 6 }),
+        fc.constantFrom('', ' ', '  ', '\t'),
+        fc.constantFrom('', ' ', '  '),
+        (surface, posture, upper, lead, trail) => {
+
+          const cased   = [...posture]
+                            .map((ch, i) => (upper[i % 6] ?? false) ? ch.toUpperCase() : ch).join(''),
+                raw     = `${lead}${cased}${trail}`,
+                outcome = choiceValidator(WINDOW_POSTURES)(raw);
+
+          // Canonicalization lands on the lowercase word regardless of case or padding …
+          expect(outcome).toEqual({ ok: true, canonical: posture });
+          if (!outcome.ok) { return; }
+
+          // … it is a fixed point …
+          expect(choiceValidator(WINDOW_POSTURES)(outcome.canonical)).toEqual(outcome);
+
+          // … and the real store round-trips it back through the real reader.
+          writeConfig(s, windowPostureKey(surface), outcome.canonical);
+          expect(readConfig(s, windowPostureKey(surface))).toBe(posture);
+          expect(windowPosture(s, surface)).toBe(posture);
+
+        }));
+    });
+    // Store-backed like the ints property above: the default 5s vitest timeout is a
+    // flake margin under a concurrent build, not a correctness bound.
+  }, 60_000);
+
 });
 
 describe('invalid values never write', () => {
@@ -129,6 +163,40 @@ describe('invalid values never write', () => {
           expect(out.content[0]?.text).toMatch(/^error: /);
           expect(readConfig(s, key)).toBeNull();
 
+        }));
+    });
+    // Store-backed like the ints property above; same flake margin, same widening.
+  }, 60_000);
+
+  it('arbitrary strings outside the posture vocabulary are rejected and never write', () => {
+    withStore(s => {
+      fc.assert(fc.property(
+        fc.string({ maxLength: 16 })
+          .filter(v => !(WINDOW_POSTURES as readonly string[]).includes(v.trim().toLowerCase())),
+        fc.constantFrom(...WINDOW_SURFACES),
+        (raw, surface) => {
+
+          const key = windowPostureKey(surface),
+                out = handleConfigure(s, { op: 'set', key, value: raw });
+
+          expect(out.content[0]?.text).toMatch(/^error: /);
+          expect(readConfig(s, key)).toBeNull();
+          expect(windowPosture(s, surface)).toBe('ask');   // and the safe default still holds
+
+        }));
+    });
+    // Store-backed like the ints property above; same flake margin, same widening.
+  }, 60_000);
+
+  it('a stored garbage posture never leaks through as permission — it always reads as ask', () => {
+    withStore(s => {
+      fc.assert(fc.property(
+        fc.string({ maxLength: 20 })
+          .filter(v => !(WINDOW_POSTURES as readonly string[]).includes(v.trim().toLowerCase())),
+        fc.constantFrom(...WINDOW_SURFACES),
+        (raw, surface) => {
+          writeConfig(s, windowPostureKey(surface), raw);   // simulate a hand-edited database
+          expect(windowPosture(s, surface)).toBe('ask');
         }));
     });
     // Store-backed like the ints property above; same flake margin, same widening.
