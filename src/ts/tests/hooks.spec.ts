@@ -59,7 +59,7 @@ describe('onUserPromptSubmit', () => {
   test('records what the harness observed', () => withStore(s => {
     onUserPromptSubmit(s, {
       session_id: 'sess-1', prompt_id: 'p1', cwd: '/w/x',
-      permission_mode: 'default', effort: { level: 'high' }, user_input: 'hello there',
+      permission_mode: 'default', effort: { level: 'high' }, prompt: 'hello there',
     }, NOW);
     const c = latestContext(s);
     expect(c?.['session']).toBe('sess-1');
@@ -72,7 +72,7 @@ describe('onUserPromptSubmit', () => {
   test('privacy.store_cwd = false keeps cwd out of the record at capture', () => withStore(s => {
     writeConfig(s, 'privacy.store_cwd', false);
     onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', cwd: '/w/x',
-      user_input: 'hello there' }, NOW);
+      prompt: 'hello there' }, NOW);
     const c = latestContext(s);
     expect(c?.['cwd']).toBeNull();
     expect(c?.['prompt_len']).toBe(11);        // a separate switch, still recorded
@@ -81,10 +81,30 @@ describe('onUserPromptSubmit', () => {
   test('privacy.store_prompt_len = false keeps the length out of the record', () => withStore(s => {
     writeConfig(s, 'privacy.store_prompt_len', false);
     onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', cwd: '/w/x',
-      user_input: 'hello there' }, NOW);
+      prompt: 'hello there' }, NOW);
     const c = latestContext(s);
     expect(c?.['prompt_len']).toBeNull();
     expect(c?.['cwd']).toBe('/w/x');           // a separate switch, still recorded
+  }));
+
+  test('the length is measured on `prompt`, the field the harness actually sends', () => withStore(s => {
+    // The regression this pins: reading a field Claude Code never sends recorded NULL on
+    // every turn while looking correct, which made privacy.store_prompt_len govern nothing.
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', prompt: 'x'.repeat(37) }, NOW);
+    expect(latestContext(s)?.['prompt_len']).toBe(37);
+  }));
+
+  test('a turn carrying no prompt text records no length', () => withStore(s => {
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    expect(latestContext(s)?.['prompt_len']).toBeNull();
+  }));
+
+  test('the fields declared as never-stored are never stored', () => withStore(s => {
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1', prompt: 'hi',
+                            session_title: 'Fixing the hooks', last_assistant_message: 'done' }, NOW);
+    expect(JSON.stringify(latestContext(s))).not.toContain('Fixing the hooks');
+    expect(JSON.stringify(latestContext(s))).not.toContain('done');
+    expect(latestContext(s)?.['prompt_len']).toBe(2);
   }));
 
   test('turn_index counts up within a session', () => withStore(s => {
@@ -575,6 +595,53 @@ describe('onStop', () => {
     recordEntry(s, { channel: 'signature', text: 'closed only', session: 'sess-1',
                      promptId: 'p1', position: 'close' }, VERSION);
     expect(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })).toBeNull();
+  }));
+
+});
+
+describe('onStop — the stop_hook_active loop breaker', () => {
+
+  /** An unsigned turn, ready to be stopped. Returns the payload naming it. */
+  function unsignedTurn(s: Store): { session_id: string; prompt_id: string } {
+    const payload = { session_id: 'sess-1', prompt_id: 'p1' };
+    onUserPromptSubmit(s, payload, NOW);
+    return payload;
+  }
+
+  test('an unsigned turn blocks when the flag is absent', () => withStore(s => {
+    expect(onStop(s, unsignedTurn(s))?.['decision']).toBe('block');
+  }));
+
+  test('an unsigned turn blocks when the flag is explicitly false', () => withStore(s => {
+    expect(onStop(s, { ...unsignedTurn(s), stop_hook_active: false })?.['decision']).toBe('block');
+  }));
+
+  test('the same unsigned turn allows once the flag is set — one block per turn is the ceiling', () => withStore(s => {
+    const turn = unsignedTurn(s);
+    expect(onStop(s, turn)?.['decision']).toBe('block');            // the gate's one say
+    expect(onStop(s, { ...turn, stop_hook_active: true })).toBeNull();   // and never a second
+  }));
+
+  test('the flag wins even with the gate on, a store, a known turn, and no signature', () => withStore(s => {
+    // Every other condition points at "block"; only the flag is asked to hold the session
+    // open, because that is exactly the wedge — an express tool that cannot answer would
+    // otherwise repeat the same refusal forever.
+    writeConfig(s, 'gate.signature', true);
+    expect(onStop(s, { ...unsignedTurn(s), stop_hook_active: true })).toBeNull();
+  }));
+
+  test('it routes through handleHook too, not only the direct call', () => withStore(s => {
+    const turn = unsignedTurn(s);
+    expect(handleHook('stop', s, turn)?.['decision']).toBe('block');
+    expect(handleHook('stop', s, { ...turn, stop_hook_active: true })).toBeNull();
+  }));
+
+  test('a signed turn allows either way — the flag changes nothing already allowed', () => withStore(s => {
+    const turn = unsignedTurn(s);
+    recordEntry(s, { channel: 'signature', text: 'done', session: 'sess-1',
+                     promptId: 'p1', position: 'close' }, VERSION);
+    expect(onStop(s, turn)).toBeNull();
+    expect(onStop(s, { ...turn, stop_hook_active: true })).toBeNull();
   }));
 
 });
