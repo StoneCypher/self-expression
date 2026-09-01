@@ -20,7 +20,7 @@ export default defineConfig([
           // The desk's hand-written declarations sit beside a .mjs that no tsconfig owns
           // (tsconfig's rootDir is src/ts, and the desk deliberately runs unbuilt), so they
           // need the default project to be type-aware-lintable at all.
-          allowDefaultProject: ["*.config.ts", "src/scripts/desk/deskcards.d.mts"],
+          allowDefaultProject: ["*.config.ts", "src/scripts/desk/deskcards.d.mts", "src/scripts/desk/deskguard.d.mts"],
         },
         tsconfigRootDir: import.meta.dirname,
       },
