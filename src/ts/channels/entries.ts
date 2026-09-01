@@ -785,11 +785,50 @@ export interface RegisterRow {
   readonly kind        : 'retracts' | 'amends';
   /** The strike's UTC timestamp — when the claim was taken back, not when it was made. */
   readonly at          : string;
-  /** The struck row, or `null` for a prose-only retraction of something never recorded. */
+  /**
+   * The struck row, or `null` when there is none to show: a prose-only retraction of
+   * something never recorded, or a target that retention has since pruned out from
+   * under a strike that survived it.
+   */
   readonly original    : RegisterOriginal | null;
   /** The exact words being withdrawn, when the strike quoted them. */
   readonly verbatim    : string | null;
   readonly replacement : RegisterReplacement;
+}
+
+/**
+ * The struck row as the register presents it, or `null` when the `LEFT JOIN` found none.
+ *
+ * Two histories reach here with no original: a prose-only retraction, which never had a
+ * `corrects_id` to begin with, and a strike whose target was pruned by retention while
+ * the strike itself — being newer — stayed. Both are honestly "there is no original row
+ * to show"; the alternative, reading the join's NULLs as columns, would render an
+ * original numbered `0` whose every field was the literal string `'null'`.
+ *
+ * @param row one joined register row, with the original's columns aliased `original_*`
+ *
+ * @example
+ *   registerOriginal({ original_id: 171, original_channel: 'checklist',
+ *                      original_ts: '2026-08-01T…', original_text: 'Atlas 31%' })
+ *   // => { id: 171, channel: 'checklist', tsUtc: '2026-08-01T…', text: 'Atlas 31%' }
+ *   registerOriginal({ original_id: null })  // => null
+ *
+ * @see register
+ * @see ./retention.js pruneExpired
+ */
+function registerOriginal(row: Record<string, unknown>): RegisterOriginal | null {
+
+  const id = row['original_id'];
+
+  if (id === null || id === undefined) { return null; }
+
+  return {
+    id      : Number(id),
+    channel : String(row['original_channel']),
+    tsUtc   : String(row['original_ts']),
+    text    : String(row['original_text']),
+  };
+
 }
 
 /** How the register may be narrowed. Every field is optional; all of them combine. */
@@ -827,6 +866,11 @@ export const REGISTER_DEFAULT_LIMIT = 20;
  *   whole anchor. These are `divergence` entries carrying a quote and no link; they are
  *   reported as `retracts`, because a quote withdrawn with no target to still stand is
  *   exactly what the design calls a prose-only retraction.
+ *
+ * A row-backed strike can *become* originalless: retention prunes by age, and a strike is
+ * always newer than what it strikes, so a horizon can take the original and leave the
+ * strike. Such a row keeps its link and its `verbatim` and reports `original: null` —
+ * see {@link registerOriginal}.
  *
  * Strikes that have themselves been retracted do not appear — the register is the
  * *current* state of taken-back claims — but they remain in the table, reachable by
@@ -872,7 +916,7 @@ export function register(store: Store, options: RegisterOptions = {}): RegisterR
 
   // Resolve each row's meaning once, here, so the kind filter, the standing check, and
   // the rendering below can never disagree about what a given strike is.
-  const candidates: { row: Record<string, unknown>; target: number | null; kind: 'retracts' | 'amends' }[] = [];
+  const candidates: { row: Record<string, unknown>; kind: 'retracts' | 'amends' }[] = [];
 
   for (const row of rows) {
 
@@ -889,7 +933,7 @@ export function register(store: Store, options: RegisterOptions = {}): RegisterR
     if (kind !== 'retracts' && kind !== 'amends')                { continue; }
     if (options.kind !== undefined && options.kind !== kind)     { continue; }
 
-    candidates.push({ row, target, kind });
+    candidates.push({ row, kind });
 
   }
 
@@ -901,15 +945,10 @@ export function register(store: Store, options: RegisterOptions = {}): RegisterR
   return candidates
     .filter(entry => !gone.has(Number(entry.row['strike_id'])))
     .slice(0, options.limit ?? REGISTER_DEFAULT_LIMIT)
-    .map(({ row, target, kind }): RegisterRow => ({
+    .map(({ row, kind }): RegisterRow => ({
       kind,
       at          : String(row['strike_ts']),
-      original    : target === null ? null : {
-        id      : Number(row['original_id']),
-        channel : String(row['original_channel']),
-        tsUtc   : String(row['original_ts']),
-        text    : String(row['original_text']),
-      },
+      original    : registerOriginal(row),
       verbatim    : text(row['verbatim']),
       replacement : {
         id      : Number(row['strike_id']),
