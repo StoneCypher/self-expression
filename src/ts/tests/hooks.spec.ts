@@ -583,11 +583,36 @@ describe('onStop', () => {
     expect(onStop(s, {})).toBeNull();
   }));
 
-  test('an open alone does not satisfy the gate; only a close or mid does', () => withStore(s => {
+  test('an open alone does not satisfy the gate; only a close does', () => withStore(s => {
     onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
     recordEntry(s, { channel: 'signature', text: 'opened', session: 'sess-1',
                      promptId: 'p1', position: 'open' }, VERSION);
     expect(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })?.['decision']).toBe('block');
+  }));
+
+  test('a mid alone does not satisfy the gate — a lurch is not an ending', () => withStore(s => {
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    recordEntry(s, { channel: 'signature', text: 'lurched', session: 'sess-1',
+                     promptId: 'p1', position: 'mid' }, VERSION);
+    expect(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })?.['decision']).toBe('block');
+  }));
+
+  test("another session's close on the same prompt id does not satisfy this turn", () => withStore(s => {
+    // A host with no turn-start hook is told to invent a turn id, so two sessions both
+    // calling their first turn `p1` is ordinary rather than a coincidence.
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    recordEntry(s, { channel: 'signature', text: 'theirs', session: 'sess-2',
+                     promptId: 'p1', position: 'close' }, VERSION);
+    expect(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })?.['decision']).toBe('block');
+  }));
+
+  test('the session comes from the observed turn context when the payload omits it', () => withStore(s => {
+    // The hookless-host path: begin_turn recorded the session, the Stop payload carries
+    // no session_id, and the gate still recognises the turn that signed.
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    recordEntry(s, { channel: 'signature', text: 'done', session: 'sess-1',
+                     promptId: 'p1', position: 'close' }, VERSION);
+    expect(onStop(s, { prompt_id: 'p1' })).toBeNull();
   }));
 
   test('a missing open never blocks — a backdated before-measurement is worse than none', () => withStore(s => {

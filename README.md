@@ -128,10 +128,14 @@ Three surfaces carry the mark:
   there is nothing to say, governed by `retraction.replay`. Amendments are never
   replayed — an amended claim stood.
 
-Analytics exclude retracted rows and keep amended ones: `seriesPercents` drops a
-withdrawn checklist snapshot so a sparkline cannot replay a number its author
-took back, and `previousSignature` skips a retracted signature rather than making
-it the delta baseline. Public export is deliberately **not** an analytics path —
+Analytics exclude retracted rows and keep amended ones — every reader of them,
+not only the one you happen to call. `seriesPercents` and `checklistSeriesTop`
+share one standing filter, so a sparkline cannot replay a number its author took
+back whichever path drew it; `signatureHistory` keeps a withdrawn reading out of
+the stem, delta, and uncertainty panels while `previousSignature` keeps it out of
+the delta baseline; and `forecastOutcomes` drops a resolution whose forecast or
+whose outcome was taken back, so calibration is never scored on a claim its
+author disowned. Public export is deliberately **not** an analytics path —
 retracted rows still export, with their (blinded) link and their kind, because
 dropping them would delete the correction edge along with the claim and make
 retraction-rate-by-confidence-ground impossible to compute downstream.
@@ -570,7 +574,7 @@ Two invocation surfaces wrap one renderer:
 
 | Surface | Invocation | Result |
 |---|---|---|
-| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. `out`, if given, must be a bare filename (no path separators, no `..`, must end in `.png`) naming the render inside that same `renders/` directory — anything else is refused with a clear message, and an existing file is refused unless `overwrite: true`. |
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` | `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text**. `out` is a bare `.png` filename inside that `renders/` directory (no path, no `..`); an existing file is refused unless `overwrite` is true\| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. `out`, if given, must be a bare filename (no path separators, no `..`, must end in `.png`) naming the render inside that same `renders/` directory — anything else is refused with a clear message, and an existing file is refused unless `overwrite: true`. |
 | CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
 
 The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel

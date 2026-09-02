@@ -679,9 +679,11 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
 /**
  * `Stop`: refuse to end a turn that never signed off.
  *
- * The question is answered exactly, by turn identity, replacing a three-minute
- * freshness window that passed a slow turn on the *previous* turn's signature and
- * blocked a long turn that had done the right thing.
+ * The question is answered exactly, by turn identity — the pair (`session`,
+ * `prompt_id`) — replacing a three-minute freshness window that passed a slow turn on
+ * the *previous* turn's signature and blocked a long turn that had done the right thing.
+ * Only a `close` satisfies it: a `mid` signature marks a mid-turn lurch and does not end
+ * the turn. See {@link ../channels/entries.js hasClosingSignature}.
  *
  * Returns `null` — meaning allow — whenever the answer is not confidently no: gate
  * disabled, no store, no turn context, no known turn. Enforcing on a guess is worse
@@ -711,12 +713,17 @@ export function onStop(store: Store | null, payload: HookPayload): HookOutput {
 
     if (readConfig(store, 'gate.signature') === 'false') { return null; }
 
+    // The turn's identity is the pair (session, prompt_id), so both halves are recovered:
+    // the payload's when the host supplies them, else the observed turn-context row's.
+    // A `p1` invented by a hookless host in one session must not close a `p1` in another.
     const context  = latestContext(store, payload.session_id),
           promptId = payload.prompt_id
-            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined);
+            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined),
+          session  = payload.session_id
+            ?? (typeof context?.['session']   === 'string' ? context['session']   : undefined);
 
-    if (promptId === undefined || promptId === '') { return null; }
-    if (hasClosingSignature(store, promptId))      { return null; }
+    if (promptId === undefined || promptId === '')     { return null; }
+    if (hasClosingSignature(store, session, promptId)) { return null; }
 
     return {
       decision: 'block',

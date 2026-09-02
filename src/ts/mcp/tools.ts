@@ -1501,10 +1501,17 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     description : 'Whether this turn already carries a closing signature. Exact, by turn identity.',
     inputSchema : { promptId: z.string().optional() },
   }, (args) => {
+    // Turn identity is the pair (session, prompt_id), so the observed session rides along
+    // with the prompt id — but only when the context row is about the turn being asked
+    // about. A caller-named promptId may belong to a session other than the newest
+    // context row's, and pairing the two would ask about a turn nobody mentioned; there
+    // the session stays undefined and narrows nothing, which is the fail-open reading.
     const context  = latestContext(store),
-          promptId = args.promptId
-            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : '');
-    return reply(promptId === '' ? 'unknown' : String(hasClosingSignature(store, promptId)));
+          observed = typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : '',
+          promptId = args.promptId ?? observed,
+          session  = promptId === observed && typeof context?.['session'] === 'string'
+            ? context['session'] : undefined;
+    return reply(promptId === '' ? 'unknown' : String(hasClosingSignature(store, session, promptId)));
   });
 
   server.registerTool('configure', {
