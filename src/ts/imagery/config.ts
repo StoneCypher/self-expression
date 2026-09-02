@@ -122,6 +122,7 @@ export const DEFAULT_PROVIDER_ID: ImageProviderId = DEFAULT_IMAGE_PROVIDER.id;
  * one — a key with spaces in it, a lowercase word, a URL — and the honest answer to
  * that is a rejection naming what was expected, not a lookup that quietly misses.
  */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
 export const CREDENTIAL_ENV_NAME_PATTERN: RegExp = /^[A-Z][A-Z0-9_]{2,127}$/;
 
 /**
