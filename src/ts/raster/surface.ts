@@ -158,13 +158,21 @@ export function subRegion(region: Region, x: number, y: number, width: number, h
  * Set one pixel, region-relative. Coordinates outside the region are silently
  * skipped — clipping, not clamping, so a stray coordinate never smears the edge.
  *
+ * The in-bounds test is written to fail closed: every comparison with `NaN` is
+ * `false`, so a positive `x < region.width`-style test would let a non-finite
+ * coordinate slip through and corrupt the index arithmetic below. Negating a
+ * conjunction of the in-bounds comparisons instead means any `NaN` component
+ * makes the conjunction `false`, so the negation is `true` and the pixel is
+ * skipped, exactly like a coordinate that is simply out of range.
+ *
  * @example
  *   pixel(fullRegion(s), 0, 0, INK);
+ *   pixel(fullRegion(s), NaN, 0, INK);   // silently skipped, not written as index 0
  */
 export function pixel(region: Region, x: number, y: number, color: Rgba): void {
 
   const px = Math.round(x), py = Math.round(y);
-  if (px < 0 || py < 0 || px >= region.width || py >= region.height) { return; }
+  if (!(px >= 0 && px < region.width && py >= 0 && py < region.height)) { return; }
 
   const sx = region.x + px, sy = region.y + py;
   const i  = 4 * (sy * region.surface.width + sx);
@@ -219,7 +227,17 @@ export function rect(region: Region, x: number, y: number, width: number, height
   vline(region, x + width - 1, y,  height, color);
 }
 
-/** Bresenham segment between two points, endpoints included. File-private: callers use {@link polyline}. */
+/**
+ * Bresenham segment between two points, endpoints included. File-private: callers use
+ * {@link polyline}, which filters non-finite points before ever calling this.
+ *
+ * The step count is capped at `|dx| + |dy| + 1` — the exact number of steps a Bresenham
+ * walk between two finite integer points takes — as a belt-and-braces guard: the
+ * natural termination test (`cx === tx && cy === ty`) is never true for a non-finite
+ * coordinate, so without a cap a caller that slipped one past `polyline`'s filter would
+ * hang the (synchronous, server-blocking) raster pipeline instead of just drawing
+ * nothing past the cap.
+ */
 function segment(region: Region, x0: number, y0: number, x1: number, y1: number, color: Rgba): void {
 
   let cx = Math.round(x0), cy = Math.round(y0);
@@ -229,8 +247,9 @@ function segment(region: Region, x0: number, y0: number, x1: number, y1: number,
         dy = -Math.abs(ty - cy), sy = cy < ty ? 1 : -1;
 
   let err = dx + dy;
+  const maxSteps = dx + Math.abs(dy) + 1;
 
-  for (;;) {
+  for (let step = 0; step <= maxSteps; step++) {
     pixel(region, cx, cy, color);
     if (cx === tx && cy === ty) { break; }
     const doubled = 2 * err;
@@ -240,24 +259,40 @@ function segment(region: Region, x0: number, y0: number, x1: number, y1: number,
 
 }
 
+/** Whether both coordinates of a point are finite — the non-finite points {@link polyline} drops. */
+function isFinitePoint(point: readonly [number, number]): boolean {
+  return Number.isFinite(point[0]) && Number.isFinite(point[1]);
+}
+
 /**
  * Connected line segments through `points`, drawn with Bresenham's algorithm.
  * A single point draws one pixel; an empty list draws nothing.
+ *
+ * A point with a non-finite coordinate (`NaN`, `Infinity`, `-Infinity` — upstream data
+ * gaps or a bad computation) is dropped rather than drawn: neither the segment leading
+ * into it nor the segment leading out of it is drawn, so the line shows a gap instead
+ * of hanging. Without this, a Bresenham walk toward a non-finite target never satisfies
+ * its `cx === tx && cy === ty` termination test and loops forever — synchronous code
+ * that blocks the whole (single-threaded) MCP server, not just the one render.
  *
  * @param points region-relative `[x, y]` vertices, in drawing order
  *
  * @example
  *   polyline(region, [[0, 10], [5, 2], [10, 8]], BLUE);
+ *   polyline(region, [[0, 0], [NaN, 5], [10, 10]], BLUE);  // draws nothing near the NaN point
  */
 export function polyline(region: Region, points: readonly (readonly [number, number])[], color: Rgba): void {
 
   const [first] = points;
   if (first === undefined) { return; }
-  if (points.length === 1) { pixel(region, first[0], first[1], color); return; }
+  if (points.length === 1) {
+    if (isFinitePoint(first)) { pixel(region, first[0], first[1], color); }
+    return;
+  }
 
   for (let i = 1; i < points.length; i++) {
     const from = points[i - 1], to = points[i];
-    if (from !== undefined && to !== undefined) {
+    if (from !== undefined && to !== undefined && isFinitePoint(from) && isFinitePoint(to)) {
       segment(region, from[0], from[1], to[0], to[1], color);
     }
   }

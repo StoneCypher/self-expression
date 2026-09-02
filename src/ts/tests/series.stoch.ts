@@ -20,6 +20,12 @@ const shortSeriesArb = fc.array(valueArb, { minLength: 0, maxLength: 3 });
 const outcomeArb = fc.constantFrom(...(OUTCOMES as readonly Outcome[]));
 const outcomesArb = fc.array(outcomeArb, { minLength: 0, maxLength: 30 });
 
+// Includes NaN and ±Infinity on purpose — the regression this suite guards is a
+// non-finite point silently shortening the rendered strip instead of rendering as a
+// placeholder glyph.
+const anyDoubleArb    = fc.double({ noNaN: false, noDefaultInfinity: false, min: -1e6, max: 1e6 });
+const anySeriesArb    = fc.array(anyDoubleArb, { minLength: 4, maxLength: 40 });
+
 describe('renderSparkline — stochastic invariants', () => {
 
   it('emits exactly one glyph per data point', () => {
@@ -48,6 +54,16 @@ describe('renderSparkline — stochastic invariants', () => {
         expect(() => renderSparkline(series, scale)).toThrow(RangeError);
       }),
       { numRuns: 200 }
+    );
+  });
+
+  it('the strip length always equals the input length, NaN/Infinity points included', () => {
+    fc.assert(
+      fc.property(anySeriesArb, scaleArb, (series, scale) => {
+        const rendered = renderSparkline(series, scale);
+        expect([...rendered]).toHaveLength(series.length);
+      }),
+      { numRuns: 250 }
     );
   });
 
@@ -81,6 +97,16 @@ describe('renderBraille — stochastic invariants', () => {
         expect(() => renderBraille(series, scale)).toThrow(RangeError);
       }),
       { numRuns: 200 }
+    );
+  });
+
+  it('the strip length always equals the input length, NaN/Infinity points included', () => {
+    fc.assert(
+      fc.property(anySeriesArb, scaleArb, (series, scale) => {
+        const rendered = renderBraille(series, scale);
+        expect([...rendered]).toHaveLength(series.length);
+      }),
+      { numRuns: 250 }
     );
   });
 

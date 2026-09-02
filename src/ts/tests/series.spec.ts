@@ -1,5 +1,5 @@
 import {
-  OUTCOMES,
+  OUTCOMES, MISSING_GLYPH,
   renderSparkline, renderBraille, renderWinLoss,
 } from '../charts/series.js';
 import { EIGHTHS, BRAILLE } from '../charts/scale.js';
@@ -47,6 +47,28 @@ describe('renderSparkline', () => {
 
   test('a flat relative series renders every point as the first glyph', () => {
     expect(renderSparkline([5, 5, 5, 5], 'relative')).toBe('▁▁▁▁');
+  });
+
+  test('a trailing Infinity renders as the missing-point glyph, not a dropped glyph', () => {
+    // Confirmed bug: used to return '▁▁▁' — three glyphs for four points — because
+    // relativeIndex(Infinity, ...) is NaN, ramp[NaN] is undefined, and join('') erases it.
+    expect(renderSparkline([1, 2, 3, Infinity], 'relative')).toBe(`▁▅█${MISSING_GLYPH}`);
+  });
+
+  test('a leading -Infinity is excluded from the min/max, not just erased', () => {
+    // Confirmed bug: used to return '' — Math.min(...) with -Infinity collapsed the
+    // whole domain to NaN, blanking every glyph, not just the bad point's own.
+    expect(renderSparkline([-Infinity, 2, 3, 4], 'relative')).toBe(`${MISSING_GLYPH}▁▅█`);
+  });
+
+  test('a NaN point on the absolute scale also renders as the missing-point glyph', () => {
+    expect(renderSparkline([0, Number.NaN, 25, 100], 'absolute')).toBe(`▁${MISSING_GLYPH}▃█`);
+  });
+
+  test('the rendered strip always has one glyph per input point, even all-missing', () => {
+    const rendered = renderSparkline([Number.NaN, Infinity, -Infinity, Number.NaN], 'relative');
+    expect([...rendered]).toHaveLength(4);
+    expect(rendered).toBe(MISSING_GLYPH.repeat(4));
   });
 
 });
