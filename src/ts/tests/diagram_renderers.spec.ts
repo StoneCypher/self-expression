@@ -32,26 +32,31 @@ function count(haystack: string, needle: string): number {
 
 const TOGGLE = "locked 'coin' -> unlocked 'push' -> locked;";
 
+/** The pinned golden rendering of {@link TOGGLE}, shared by the golden test and the
+ *  determinism check below it — both anchor against this one hand-verified string
+ *  rather than against each other. */
+const TOGGLE_GOLDEN = [
+  '┌────────────────┐',
+  '│     ┌─ push ─┐ │',
+  '│     ▼        │ │',
+  '│ ┌────────┐   │ │',
+  '│ │ locked │   │ │',
+  '│ └───┬────┘   │ │',
+  '│     │ coin   │ │',
+  '│     └┐       │ │',
+  '│      ▼       │ │',
+  '│ ┌──────────┐ │ │',
+  '│ │ unlocked │ │ │',
+  '│ └────┬─────┘ │ │',
+  '│      │       │ │',
+  '│      └───────┘ │',
+  '└────────────────┘',
+].join('\n');
+
 describe('renderStateDiagram — goldens (the pinned canon)', () => {
 
   test('the two-state toggle', () => {
-    expect(renderStateDiagram(TOGGLE)).toBe([
-      '┌────────────────┐',
-      '│     ┌─ push ─┐ │',
-      '│     ▼        │ │',
-      '│ ┌────────┐   │ │',
-      '│ │ locked │   │ │',
-      '│ └───┬────┘   │ │',
-      '│     │ coin   │ │',
-      '│     └┐       │ │',
-      '│      ▼       │ │',
-      '│ ┌──────────┐ │ │',
-      '│ │ unlocked │ │ │',
-      '│ └────┬─────┘ │ │',
-      '│      │       │ │',
-      '│      └───────┘ │',
-      '└────────────────┘',
-    ].join('\n'));
+    expect(renderStateDiagram(TOGGLE)).toBe(TOGGLE_GOLDEN);
   });
 
   test('the traffic light', () => {
@@ -132,8 +137,12 @@ describe('renderStateDiagram — behavior', () => {
     expect(() => renderStateDiagram(TOGGLE, { width: 30.5 })).toThrow(RangeError);
   });
 
-  test('deterministic: two calls, identical strings', () => {
-    expect(renderStateDiagram(TOGGLE)).toBe(renderStateDiagram(TOGGLE));
+  test('deterministic: two independent calls both match the pinned golden, not just each other', () => {
+    // Comparing the two calls to each other would pass for any pure function, including
+    // a broken or constant one — anchoring both against TOGGLE_GOLDEN actually exercises
+    // renderStateDiagram's real output, twice.
+    expect(renderStateDiagram(TOGGLE)).toBe(TOGGLE_GOLDEN);
+    expect(renderStateDiagram(TOGGLE)).toBe(TOGGLE_GOLDEN);
   });
 
 });

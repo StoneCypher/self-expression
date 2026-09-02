@@ -45,10 +45,34 @@ function withStore<T>(fn: (s: Store) => T): T {
 /** A string of exactly `n` characters, which is the unit every limit is measured in. */
 function chars(n: number): string { return 'x'.repeat(n); }
 
-/** Whether the real handler accepted this text on this channel. */
+/**
+ * The exact shape of the rejection {@link handleExpress} throws for the per-channel
+ * length check (`tools.ts` around the `channelMaxChars` guard) — `cannot record
+ * entry:\n  - text is <n> characters; the '<channel>' channel allows at most <limit> …`.
+ * Matched against, rather than assumed, so `accepts` cannot mistake an unrelated
+ * failure for a length refusal.
+ */
+const LENGTH_LIMIT_REJECTION = /^cannot record entry:\n\s*- text is \d+ characters; the '[^']+' channel allows at most \d+/;
+
+/**
+ * Whether the real handler accepted this text on this channel.
+ *
+ * Only the length-limit rejection counts as "refused" — every property in this file is
+ * about that one boundary. Any other thrown error (a validation bug unrelated to length,
+ * a `TypeError` from a coding mistake, a store failure) is a real problem with the code
+ * under test and must propagate, so the property fails loudly instead of quietly
+ * counting a crash as a pass.
+ *
+ * @throws The original error, unchanged, when it is not the length-limit rejection.
+ */
 function accepts(store: Store, channel: Channel, text: string): boolean {
-  try { handleExpress(store, VERSION, { channel, text }); return true; }
-  catch { return false; }
+  try {
+    handleExpress(store, VERSION, { channel, text });
+    return true;
+  } catch (err) {
+    if (err instanceof Error && LENGTH_LIMIT_REJECTION.test(err.message)) { return false; }
+    throw err;
+  }
 }
 
 const channelArb = fc.constantFrom(...CHANNELS);
