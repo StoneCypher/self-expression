@@ -820,12 +820,12 @@ ride the ordinary `configure` tool:
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `audio.enabled` | bool | `false` | Only exactly `true` enables. Read at claudio startup for the tool schema, and re-checked on every strike. |
-| `audio.volume_ceiling` | int | `50` | Loudest volume (0–100) the assistant may choose. The `CLAUDIO_VOLUME_CEILING` environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. |
+| `audio.volume_ceiling` | int | `50` | Loudest volume (0–100) the assistant may choose. The `CLAUDIO_VOLUME_CEILING` environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. A variable that is set but does not parse as an integer in 0–100 fails **closed** to 0 with one stderr line, never open. |
 | `audio.tts_local` | bool | `false` | The local offline TTS tier's own consent gate. Cloud TTS tiers deliberately do not exist in this build. |
 | `audio.min_gap_seconds` | int | `30` | Minimum spacing between audible strikes. |
 | `audio.hourly_budget` | int | `6` | Audible strikes per rolling hour. |
 | `audio.hourly_budget_attention` | int | `8` | The slightly larger budget `attention` draws from. |
-| `audio.wav.<leitmotif>` | string | *(none)* | Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. |
+| `audio.wav.<leitmotif>` | string | *(none)* | Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. Must be an absolute, non-UNC path ending in `.wav`; anything else is treated as unset. |
 
 The palette is a closed vocabulary of five meanings, capped at six —
 `session-open` (at most once per session), `quiet-completion`, `attention`,

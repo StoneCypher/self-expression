@@ -28,14 +28,14 @@ import { audioConfig, motifWavPath }        from './config.js';
 import { decideStrike }                     from './gate.js';
 import type { StrikeAsk }                   from './gate.js';
 import { playedSince, recordStrike }        from './ledger.js';
-import type { AudioLedger, WrittenStrike }  from './ledger.js';
+import type { AudioLedger, RecentStrike, WrittenStrike } from './ledger.js';
 import {
   HARD_CAP_MS, MAX_SAY_CHARS, MAX_WAV_MS, sapiSpeakCommand, soundPlayerCommand,
 } from './player.js';
 import type { PlayerCommand, PlayOutcome }  from './player.js';
 import { parseWav, scaleWavGain }           from './wav.js';
 import { LEITMOTIFS }                       from './vocabulary.js';
-import type { Leitmotif }                   from './vocabulary.js';
+import type { Leitmotif, StrikeKind }       from './vocabulary.js';
 
 /**
  * The shape every claudio tool replies with.
@@ -50,14 +50,25 @@ export interface AudioToolReply {
   content: { type: 'text'; text: string }[];
 }
 
-/** Per-process session state; `session-open`'s at-most-once rule lives here. */
+/**
+ * Per-process session state; `session-open`'s at-most-once rule lives here,
+ * alongside the in-flight rate-limit reservations {@link reserveSlot} makes.
+ */
 export interface AudioSession {
   sessionOpenStruck: boolean;
+  /**
+   * Rate-limit slots reserved for a play attempt that is still in flight — not yet
+   * a ledger row, because the ledger only gains one once `play()` resolves. Merged
+   * with `playedSince` before every gate decision so concurrent calls cannot all
+   * read the same pre-play ledger state and all pass.
+   * @see reserveSlot
+   */
+  readonly reservations: RecentStrike[];
 }
 
 /** A fresh session for one server process. */
 export function newAudioSession(): AudioSession {
-  return { sessionOpenStruck: false };
+  return { sessionOpenStruck: false, reservations: [] };
 }
 
 /**
@@ -87,6 +98,60 @@ const CAP_MARGIN_MS = 2000;
 /** ISO stamp one hour before `now` — the rate limiter's window. */
 function hourBefore(now: Date): string {
   return new Date(now.getTime() - 3_600_000).toISOString();
+}
+
+/**
+ * Reserve a rate-limit slot synchronously, before the only `await` in a strike
+ * handler runs. This is the fix for a concurrency bug: the ledger only gains a row
+ * once `play()` resolves, so without a reservation, N simultaneous calls all read
+ * the identical pre-play ledger snapshot inside `decideStrike` and all pass the
+ * gate — JavaScript runs each call's synchronous prefix to completion before
+ * yielding at its first `await`, so nothing here can race a plain synchronous read.
+ * Reserving on the shared `session` object closes that window: every call after
+ * this one, even one already in flight, sees the reservation the moment it next
+ * reads `session.reservations`.
+ *
+ * @returns the reservation; pass it to {@link releaseSlot} once `play()` resolves
+ *          without throwing. Deliberately *not* released on a throw — an exception
+ *          means the caller cannot be sure sound never reached the speaker, so the
+ *          slot stays spent rather than becoming a way to dodge the limiter by
+ *          retrying into an exception.
+ *
+ * @example
+ *   const slot = reserveSlot(session, 'strike', 'spark', now.toISOString());
+ *   const outcome = await deps.play(command, capMs);
+ *   releaseSlot(session, slot);   // only reached if `play` didn't throw
+ */
+function reserveSlot(
+  session   : AudioSession,
+  kind      : StrikeKind,
+  leitmotif : Leitmotif | null,
+  nowUtc    : string,
+): RecentStrike {
+  const slot: RecentStrike = { utc: nowUtc, kind, leitmotif };
+  session.reservations.push(slot);
+  return slot;
+}
+
+/** Release a reservation {@link reserveSlot} made, once its outcome is ledgered. */
+function releaseSlot(session: AudioSession, slot: RecentStrike): void {
+  const index = session.reservations.indexOf(slot);
+  if (index !== -1) { session.reservations.splice(index, 1); }
+}
+
+/**
+ * Ledgered history plus any reservations still in flight, oldest first — the gate's
+ * complete view of what already counts against the rolling window, closing the race
+ * where a concurrent call's `play()` has not resolved (and so has not reached the
+ * ledger) yet.
+ *
+ * @param sinceUtc - the rate limiter's window start, as {@link hourBefore} answers
+ */
+function recentIncludingReserved(ledger: AudioLedger, session: AudioSession, sinceUtc: string): RecentStrike[] {
+  return [
+    ...playedSince(ledger, sinceUtc),
+    ...session.reservations.filter(slot => slot.utc >= sinceUtc),
+  ].sort((a, b) => a.utc.localeCompare(b.utc));
 }
 
 /** Ledger a refusal and phrase it in the house `error:` style. */
@@ -132,12 +197,13 @@ export async function handleStrike(
   args    : { readonly leitmotif: Leitmotif; readonly volume?: number | undefined },
 ): Promise<AudioToolReply> {
 
-  const now    = deps.now?.() ?? new Date(),
-        config = audioConfig(store, deps.env ?? process.env),
+  const now      = deps.now?.() ?? new Date(),
+        config   = audioConfig(store, deps.env ?? process.env),
+        sinceUtc = hourBefore(now),
         ask: StrikeAsk = { kind, leitmotif: args.leitmotif, requestedVolume: args.volume ?? null };
 
   const decision = decideStrike(
-    ask, config, playedSince(ledger, hourBefore(now)), session.sessionOpenStruck, now.toISOString());
+    ask, config, recentIncludingReserved(ledger, session, sinceUtc), session.sessionOpenStruck, now.toISOString());
 
   if (!decision.allowed) {
     return refuse(ledger, version, ask, config.ceiling, decision.reason, now);
@@ -174,10 +240,15 @@ export async function handleStrike(
 
   const tempPath = join(tmpdir(), `claudio-${randomUUID()}.wav`);
 
+  // Reserve the rate-limit slot now, synchronously and immediately before the only
+  // `await` below — see reserveSlot for why this closes the concurrency race.
+  const slot = reserveSlot(session, kind, args.leitmotif, now.toISOString());
+
   let outcome: PlayOutcome;
   try {
     writeFileSync(tempPath, scaled);
     outcome = await deps.play(soundPlayerCommand(tempPath), durationMs + CAP_MARGIN_MS);
+    releaseSlot(session, slot);   // resolved without throwing; the ledger row below takes over
   } finally {
     try { unlinkSync(tempPath); } catch { /* already gone or never written */ }
   }
@@ -225,9 +296,10 @@ export async function handleSay(
   args    : { readonly text: string; readonly volume?: number | undefined },
 ): Promise<AudioToolReply> {
 
-  const now    = deps.now?.() ?? new Date(),
-        config = audioConfig(store, deps.env ?? process.env),
-        text   = args.text.trim(),
+  const now      = deps.now?.() ?? new Date(),
+        config   = audioConfig(store, deps.env ?? process.env),
+        sinceUtc = hourBefore(now),
+        text     = args.text.trim(),
         ask: StrikeAsk = { kind: 'say', leitmotif: null, requestedVolume: args.volume ?? null };
 
   if (text === '') {
@@ -241,13 +313,18 @@ export async function handleSay(
   }
 
   const decision = decideStrike(
-    ask, config, playedSince(ledger, hourBefore(now)), session.sessionOpenStruck, now.toISOString());
+    ask, config, recentIncludingReserved(ledger, session, sinceUtc), session.sessionOpenStruck, now.toISOString());
 
   if (!decision.allowed) {
     return refuse(ledger, version, ask, config.ceiling, decision.reason, now, text);
   }
 
+  // Reserve the rate-limit slot now, synchronously and immediately before the only
+  // `await` below — see reserveSlot for why this closes the concurrency race.
+  const slot = reserveSlot(session, 'say', null, now.toISOString());
+
   const outcome = await deps.play(sapiSpeakCommand(text, decision.volume), HARD_CAP_MS);
+  releaseSlot(session, slot);   // resolved without throwing; the ledger row below takes over
 
   const written = recordStrike(ledger, {
     kind: 'say', leitmotif: null, requestedVolume: ask.requestedVolume,
