@@ -13,13 +13,14 @@ import { join }                from 'node:path';
 
 import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store }          from '../channels/store.js';
-import { recordContext }       from '../channels/context.js';
+import { recordContext, latestContext } from '../channels/context.js';
 import { composeNote, noteView, listNotes } from '../channels/notes.js';
 import {
   handlePostNote, handleWithdrawNote, handleSurfaceNote, handleListNotes, noteReport,
   NOTES_DISABLED_REPLY,
 } from '../mcp/note_tools.js';
 import { heldNotesLine, onUserPromptSubmit } from '../mcp/hooks.js';
+import { handleBeginTurn }     from '../mcp/tools.js';
 import { buildServer }         from '../mcp/server.js';
 
 const VERSION = '0.2.1';
@@ -35,9 +36,12 @@ function withMailbox<T>(fn: (s: Store) => T): T {
   return withStore(s => { writeConfig(s, 'mailbox.enabled', 'true'); return fn(s); });
 }
 
-/** Write the turn context the `UserPromptSubmit` hook would have written. */
-function turnContext(s: Store, promptId: string, turn = 'reply'): void {
-  recordContext(s, { session: 'sess-1', promptId, turn: turn as never }, NOW);
+/**
+ * Write the turn context the `UserPromptSubmit` hook would have written — `source: 'hook'`
+ * included, because that is precisely the field the delivery gate reads.
+ */
+function turnContext(s: Store, promptId: string, turn = 'reply', session = 'sess-1'): void {
+  recordContext(s, { session, promptId, turn: turn as never, source: 'hook' }, NOW);
 }
 
 function text(out: { content: { text?: string }[] }): string {
@@ -134,6 +138,57 @@ describe('surface_note through the real gate', () => {
     composeNote(s, { text: 'held', reason: 'r', session: 'sess-1' }, VERSION, NOW);
     expect(() => handleSurfaceNote(s, { id: 1 })).toThrow(/no turn at all/);
   }));
+
+  test('begin_turn cannot reconstitute a lapsed offer, however it names the turn', () =>
+    withMailbox(s => {
+
+      composeNote(s, { text: 'held', reason: 'r', session: 'sess-1' }, VERSION, NOW);
+
+      // The real hook offers it on p-2, and nothing is rendered.
+      onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p-2' }, NOW);
+      expect(noteView(s, 1, NOW)?.state).toBe('offered');
+
+      // p-3 arrives; the offer lapses, and the honest attempt is refused.
+      writeConfig(s, 'mailbox.surface_budget', '0');
+      onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p-3' }, NOW);
+      expect(() => handleSurfaceNote(s, { id: 1 })).toThrow();
+
+      // Now the forgery: volunteer a turn context for a session of the model's own
+      // choosing, carrying the prompt id p-2 that a tool reply already handed back, then
+      // surface against it. Two entirely legal calls; before the fix, a `surfaced` row.
+      handleBeginTurn(s, { session: 'ghost', promptId: 'p-2' }, NOW);
+      expect(() => handleSurfaceNote(s, { id: 1, session: 'ghost' })).toThrow();
+
+      // And the same trick aimed at the real session, which begin_turn will also record.
+      handleBeginTurn(s, { session: 'sess-1', promptId: 'p-9' }, NOW);
+      expect(() => handleSurfaceNote(s, { id: 1 })).toThrow();
+
+      expect(s.db.prepare("SELECT COUNT(*) n FROM note_events WHERE event = 'surfaced'")
+              .get()?.['n']).toBe(0);
+
+    }));
+
+  test('a session argument is checked against the observed turn, never obeyed', () =>
+    withMailbox(s => {
+      composeNote(s, { text: 'held', reason: 'r', session: 'sess-1' }, VERSION, NOW);
+      onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p-1' }, NOW);
+      expect(() => handleSurfaceNote(s, { id: 1, session: 'somebody-else' }))
+        .toThrow(/not the session the turn-start hook observed/);
+      // The same call with the truth in it, or with nothing in it, still works.
+      expect(text(handleSurfaceNote(s, { id: 1, session: 'sess-1' }))).toContain('surfaced note #1');
+    }));
+
+  test('a tool-sourced context row is not an observed turn, so it supplies no turn at all', () =>
+    withMailbox(s => {
+      composeNote(s, { text: 'held', reason: 'r', session: 'sess-1' }, VERSION, NOW);
+      // begin_turn records a real row for a real session — and the tool reads only what
+      // the harness saw, so on this host there is still nothing to surface against. The
+      // matching gate one layer down, where an offer against a volunteered turn genuinely
+      // exists, lives in notes.spec.ts.
+      handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' }, NOW);
+      expect(latestContext(s)?.['source']).toBe('tool');
+      expect(() => handleSurfaceNote(s, { id: 1 })).toThrow(/no turn at all/);
+    }));
 
 });
 

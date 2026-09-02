@@ -698,9 +698,15 @@ never a comfortable fiction.
 
 That guarantee is structural rather than promised. Offers are recorded by the hook, with
 the turn type the harness supplied, and `surface_note` refuses unless the note carries an
-offer stamped `reply` on that same turn. No sequence of tool calls, retries, or wakeups
-manufactures a delivery claim the hook did not authorize; a property test asserts exactly
-that over arbitrary operation sequences.
+offer that is **still outstanding**, stamped `reply`, matching on the whole pair
+*(session, prompt id)* — and unless the `UserPromptSubmit` hook is what observed that turn.
+A prompt id on its own is a token the assistant can read out of an ordinary reply and quote
+back, and `begin_turn` will record any turn it names, so neither one is evidence: the turn
+identity comes from what the harness saw, and a `session` argument that disagrees is refused
+rather than believed. No sequence of tool calls, retries, or wakeups manufactures a delivery
+claim the hook did not authorize; a property test asserts exactly that over arbitrary
+operation sequences, against an adversary that replays real offers, forges turn context, and
+names sessions of its own choosing.
 
 Four MCP tools:
 

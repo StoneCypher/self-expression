@@ -28,7 +28,7 @@ import {
 import { NOTE_STATES }        from '../channels/vocabulary.js';
 import type { NoteState, Turn } from '../channels/vocabulary.js';
 import { MESSAGE_TEXT_MAX }   from '../channels/messages.js';
-import { latestContext }      from '../channels/context.js';
+import { latestContext, latestHookContext } from '../channels/context.js';
 import type { Store }         from '../channels/store.js';
 import type { ToolReply }     from './chart_tools.js';
 
@@ -164,31 +164,53 @@ export function handleWithdrawNote(store: Store, args: NoteIdArgs): ToolReply {
  * reply — and refuses every other claim.
  *
  * This is the enforcement point of the entire design. The turn identity comes from the
- * hook-observed context, never from an argument, and the note must carry an `offered`
- * event stamped `reply` on that same `prompt_id`. A turn with no observed context can
- * therefore surface nothing at all, which is correct: with nothing observed, there is
- * nothing to prove.
+ * **hook-observed** context and from nowhere else: not from `args.session`, and not from
+ * the newest context row of any kind. A turn with no observed context can therefore
+ * surface nothing at all, which is correct — with nothing observed, there is nothing to
+ * prove.
+ *
+ * The distinction is not pedantry. `latestContext(store, args.session)` took a session
+ * name from the model and handed back whatever turn that session last recorded — and
+ * `begin_turn` will record a turn for any `(session, promptId)` the model cares to name,
+ * while prompt ids travel out to the model in ordinary tool replies. So the pair "call
+ * `begin_turn` naming a prompt id you were offered on an hour ago, then surface against
+ * it" reconstituted an expired offer from two legal calls. {@link latestHookContext}
+ * closes that by asking a question the model cannot answer for itself: which turn did the
+ * harness see most recently?
+ *
+ * `args.session` survives only as an assertion to be *checked*. Supplying one that
+ * disagrees with the observed turn is refused rather than obeyed, because the two readings
+ * of such a call — a subagent being helpful, and a claim being aimed at another session's
+ * turn — are indistinguishable from here, and only one of them is safe.
  *
  * @example
  *   handleSurfaceNote(store, { id: 1 })
  *   // => { content: [{ type: 'text', text: "surfaced note #1 …" }] }
  *
- * @throws {Error} If the note was not offered on this turn, does not exist, or is
- *                 already terminal — never a comfortable fiction.
+ * @throws {Error} If `args.session` contradicts the turn the hook observed, or if the
+ *                 note was not offered on that turn, does not exist, or is already
+ *                 terminal — never a comfortable fiction.
  *
  * @see ../channels/notes.js surfaceNote
+ * @see ../channels/context.js latestHookContext
  */
 export function handleSurfaceNote(store: Store, args: NoteIdArgs): ToolReply {
 
   if (!mailboxEnabled(store)) { return reply(NOTES_DISABLED_REPLY); }
 
-  const context  = latestContext(store, args.session),
+  const context  = latestHookContext(store),
         promptId = ctxStr(context, 'prompt_id') ?? '',
-        view     = surfaceNote(store, args.id, {
-          turn     : 'reply',
-          promptId,
-          session  : args.session ?? ctxStr(context, 'session'),
-        });
+        session  = ctxStr(context, 'session')   ?? '';
+
+  if (args.session !== undefined && args.session !== session) {
+    throw new Error(
+      `cannot surface note:\n  - session '${args.session}' is not the session the ` +
+      `turn-start hook observed (${session === '' ? 'none was observed at all' : `'${session}'`}). ` +
+      'Surfacing is reported for the turn the harness saw, never for one named in an ' +
+      'argument; omit session and the observed turn is used.');
+  }
+
+  const view = surfaceNote(store, args.id, { turn: 'reply', promptId, session });
 
   return reply(
     `surfaced note #${String(view.id)} into turn ${promptId}. That is the ceiling: the ` +
@@ -307,7 +329,10 @@ export function registerNoteTools(server: McpServer, store: Store, pluginVersion
       'rendered into a reply your partner prompted.',
     inputSchema : {
       id      : z.number().int().describe('the note id from the turn-start offer'),
-      session : z.string().optional().describe('usually omit — the hook supplies it'),
+      session : z.string().optional().describe(
+        'omit. Unlike every other tool here, this one does not adopt a supplied session: ' +
+        'the turn comes from what the hook observed, and a session given here is only ' +
+        'checked against it, so a mismatch is refused rather than believed'),
     },
   }, (args) => handleSurfaceNote(store, args));
 

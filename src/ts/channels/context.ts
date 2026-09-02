@@ -135,6 +135,66 @@ export function contextForTurn(
 
 }
 
+/**
+ * Whether the **harness itself** observed one turn — a `turn_context` row for that exact
+ * `(session, prompt_id)` whose `source` is `'hook'`.
+ *
+ * The distinction the `source` column exists to keep readable becomes load-bearing here.
+ * `begin_turn` will happily record a turn the model names, which is right for a hookless
+ * host and fatal for anything that treats a context row as *evidence*: a caller that
+ * asked {@link contextForTurn} alone would accept a turn the model invented one call
+ * earlier. So the held-note delivery gate asks this narrower question instead — "did the
+ * harness see this turn?" — and a volunteered row truthfully answers no.
+ *
+ * @param session  the session the turn belongs to
+ * @param promptId the turn identifier; empty or absent is never an identity, so never a match
+ *
+ * @example
+ *   recordContext(store, { session: 's1', promptId: 'p-1', source: 'tool' });
+ *   hookObservedTurn(store, 's1', 'p-1')   // => false — volunteered, not observed
+ *   recordContext(store, { session: 's1', promptId: 'p-1', source: 'hook' });
+ *   hookObservedTurn(store, 's1', 'p-1')   // => true
+ *
+ * @see latestHookContext
+ * @see ../channels/notes.js surfaceNote
+ */
+export function hookObservedTurn(
+  store    : Store,
+  session  : string,
+  promptId : string | undefined,
+): boolean {
+
+  if (session === '' || promptId === undefined || promptId === '') { return false; }
+
+  const row = store.db.prepare(`
+    SELECT 1 AS found FROM turn_context
+     WHERE session = ? AND prompt_id = ? AND source = 'hook' LIMIT 1`).get(session, promptId);
+
+  return row !== undefined;
+
+}
+
+/**
+ * The newest turn the harness itself observed, or `null` on a host where no hook has
+ * ever fired.
+ *
+ * {@link latestContext} answers "what turn are we in?" and is content to be told; this
+ * answers "what turn was *observed*?" and cannot be. That is the difference between a
+ * convenience and a gate, so the delivery path uses this one and takes no turn identity
+ * from a tool argument at all.
+ *
+ * @example
+ *   latestHookContext(store)   // => null on a bare MCP client, whatever begin_turn wrote
+ *
+ * @see hookObservedTurn
+ * @see ../mcp/note_tools.js handleSurfaceNote
+ */
+export function latestHookContext(store: Store): Record<string, unknown> | null {
+  const row = store.db.prepare(
+    "SELECT * FROM turn_context WHERE source = 'hook' ORDER BY id DESC LIMIT 1").get();
+  return row ?? null;
+}
+
 /** What {@link recordContextOnce} did, and the row that stands for the turn afterwards. */
 export interface RecordOnceResult {
   /** Whether this call wrote the row; `false` means the turn was already recorded. */
