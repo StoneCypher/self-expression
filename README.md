@@ -570,7 +570,7 @@ Two invocation surfaces wrap one renderer:
 
 | Surface | Invocation | Result |
 |---|---|---|
-| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. `out`, if given, must be a bare filename (no path separators, no `..`, must end in `.png`) naming the render inside that same `renders/` directory — anything else is refused with a clear message, and an existing file is refused unless `overwrite: true`. |
 | CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
 
 The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
@@ -932,14 +932,27 @@ neither a crash nor silence.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `image.enabled` | bool | `false` | Only exactly `true` enables, and even then the tool appears only if the credential is really there. |
-| `image.provider` | string | `nanobanana` | Which registered provider is active. |
+| `image.provider` | enum | `nanobanana` | Which registered provider is active: `nanobanana`, `openai`, `automatic1111`. |
 | `image.api_key_env` | string | *(provider default)* | The **name** of the variable holding the credential. Unset uses the provider's own default (`GEMINI_API_KEY`, `OPENAI_API_KEY`), so a shell that already exports one needs no configuration at all. |
 | `image.<provider>.api_key_env` | string | *(none)* | Per-provider override of the above, for keeping two providers configured at once. |
 | `image.model` | string | *(provider default)* | A model the provider does not list is ignored rather than sent. |
 | `image.session_cap` | int | `6` | Generations per server session. |
 | `image.daily_cap` | int | `20` | Generations per **rolling** 24 hours. |
-| `image.timeout_seconds` | int | `120` | How long one generation may take before it is abandoned. |
-| `image.local_base_url` | string | `http://127.0.0.1:7860` | Endpoint for a self-hosted provider. |
+| `image.timeout_seconds` | int | `120` | How long one generation may take before it is abandoned. The abandoned row stays `pending` and keeps counting against the caps. |
+| `image.local_base_url` | string | `http://127.0.0.1:7860` | Endpoint for a self-hosted provider. Loopback and private-network hosts only. |
+
+Because `configure` is a tool the **model** can call, the two keys that decide where
+something leaves the machine are bounded rather than free text. A credential-variable name
+must look like one — SCREAMING_SNAKE_CASE, reading as a key — and may not name a famous
+secret belonging to something else (`ANTHROPIC_API_KEY`, `AWS_SECRET_ACCESS_KEY`,
+`GITHUB_TOKEN`, the `AZURE_*` and `SSH_*` families, `PATH`), because
+`image.api_key_env = ANTHROPIC_API_KEY` plus `image.provider = openai` would ship one
+vendor's secret to another in an authorization header with nothing in the request looking
+wrong. `image.local_base_url` must be loopback or an RFC 1918 address, since the local
+provider posts the user's prompt with no credential and no cost accounting on the
+understanding that the endpoint is the user's own machine. Both rules are applied twice:
+at `configure set`, and again when the value is read, so a row written before the rule
+existed is not honoured for being old.
 
 ### Providers
 
@@ -965,7 +978,11 @@ cap that resets at midnight and a retry loop that waits for one.
 leaves the evidence of a call that may have been billed, and that `pending` row counts
 against the caps, because a budget that forgives what it cannot see is not a budget.
 `generated` and `policy_refused` count too; `error` and `refused` do not, since a network
-outage is not a purchase.
+outage is not a purchase. A **timed-out** generation is left `pending` for the same
+reason and is never settled as an error: an abandoned request may well have been received,
+run, and billed, and filing it as a failure would mean a merely slow provider silently
+switched the budget off. A policy refusal is priced at the list price of one image, since
+that is what the vendor generally charges for the call that produced it.
 
 Each row carries provider, model, timestamp, outcome, byte count, path, cost estimate and
 where the estimate came from, the credential variable's **name**, and the prompt with its
@@ -978,9 +995,11 @@ what was forwarded to a third party under the user's credential is reconstructib
 A refusal is reported plainly and **never retried with a reworded prompt** — that would be
 the assistant negotiating with a provider's policy on the user's account and the user's
 money. This is enforced rather than requested: the gate compares each new prompt against
-prompts the provider recently refused and blocks recognisable rewordings locally, before
-any socket opens, so a reworded retry cannot cost money even if it is attempted. A
-genuinely different request passes untouched.
+the prompts **that same provider** recently refused and blocks recognisable rewordings
+locally, before any socket opens, so a reworded retry cannot cost money even if it is
+attempted. A genuinely different request passes untouched, and so does the same request on
+a different provider — a content policy belongs to a vendor, and a hosted model's refusal
+says nothing about a local endpoint that has no content policy at all.
 
 ### Where images go
 

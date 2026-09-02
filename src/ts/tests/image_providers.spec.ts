@@ -284,9 +284,19 @@ describe('estimateCost', () => {
     expect(estimateCost(local, oneImage)).toEqual({ usd: 0, source: 'list-price' });
   });
 
-  test('a non-image outcome has no cost at all', () => {
-    expect(estimateCost(openai, { kind: 'policy', detail: 'no' })).toEqual({ usd: null, source: 'none' });
-    expect(estimateCost(openai, { kind: 'error',  detail: 'no' })).toEqual({ usd: null, source: 'none' });
+  test('a policy refusal is priced at one image, because the call reached the provider', () => {
+    // Refusals count against the caps precisely because vendors commonly bill for them;
+    // pricing them at null would let every refusal vanish from the spend total.
+    expect(estimateCost(openai, { kind: 'policy', detail: 'no' }))
+      .toEqual({ usd: 0.04, source: 'list-price' });
+  });
+
+  test('a refusal from a free provider still costs nothing', () => {
+    expect(estimateCost(local, { kind: 'policy', detail: 'no' })).toEqual({ usd: 0, source: 'list-price' });
+  });
+
+  test('an error bought nothing and is priced at nothing', () => {
+    expect(estimateCost(openai, { kind: 'error', detail: 'no' })).toEqual({ usd: null, source: 'none' });
   });
 
 });

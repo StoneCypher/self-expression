@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
 
 import {
-  billableInSession, billableSince, closeImageLedger, openImageLedger, policyRefusalsSince,
-  promptDigest, recordAttempt, recordRefusal, settleAttempt, spendSince,
+  billableInSession, billableSince, closeImageLedger, markAbandoned, openImageLedger,
+  policyRefusalsSince, promptDigest, recordAttempt, recordRefusal, settleAttempt, spendSince,
 } from '../imagery/ledger.js';
 import type { AttemptRecord, ImageLedger, Settlement } from '../imagery/ledger.js';
 import { BILLABLE_OUTCOMES, GENERATION_OUTCOMES } from '../imagery/schema.js';
@@ -259,7 +259,7 @@ describe('policyRefusalsSince', () => {
     const capped = recordAttempt(ledger, attempt({ prompt: 'capped thing' }), new Date('2026-08-29T11:00:00Z'));
     settleAttempt(ledger, capped.id, settlement({ outcome: 'refused', imageCount: 0 }));
 
-    const rows = policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z');
+    const rows = policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 'openai');
     expect(rows.map(entry => entry.prompt)).toEqual(['refused thing']);
   }));
 
@@ -269,9 +269,58 @@ describe('policyRefusalsSince', () => {
                                     new Date(`2026-08-29T0${String(hour)}:00:00Z`));
       settleAttempt(ledger, written.id, settlement({ outcome: 'policy_refused', imageCount: 0 }));
     }
-    expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z')).toHaveLength(3);
-    expect(policyRefusalsSince(ledger, '2026-08-29T02:30:00.000Z')).toHaveLength(1);
-    expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 2)).toHaveLength(2);
+    expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 'openai')).toHaveLength(3);
+    expect(policyRefusalsSince(ledger, '2026-08-29T02:30:00.000Z', 'openai')).toHaveLength(1);
+    expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 'openai', 2)).toHaveLength(2);
+  }));
+
+  test("one provider's refusal is not another provider's, because a policy belongs to a vendor",
+    () => withLedger(ledger => {
+      const hosted = recordAttempt(ledger, attempt({ provider: 'openai', prompt: 'a contested scene' }),
+                                   new Date('2026-08-29T10:00:00Z'));
+      settleAttempt(ledger, hosted.id, settlement({ outcome: 'policy_refused', imageCount: 0 }));
+
+      expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 'openai')).toHaveLength(1);
+      expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 'automatic1111')).toHaveLength(0);
+      expect(policyRefusalsSince(ledger, '2026-08-29T00:00:00.000Z', 'nanobanana')).toHaveLength(0);
+    }));
+
+});
+
+describe('markAbandoned — the row that stays pending on purpose', () => {
+
+  test('notes the abandonment without settling, so the outcome stays pending', () => withLedger(ledger => {
+    const written = recordAttempt(ledger, attempt());
+    markAbandoned(ledger, written.id, 'abandoned after 5000ms without an answer');
+
+    const row = ledger.db.prepare('SELECT * FROM generations WHERE id = ?').get(written.id);
+    expect(row?.['outcome']).toBe('pending');
+    expect(String(row?.['detail'])).toContain('abandoned');
+    expect(row?.['settled_utc']).toBeNull();
+  }));
+
+  test('an abandoned attempt keeps counting against the caps — the whole point', () => withLedger(ledger => {
+    const written = recordAttempt(ledger, attempt(), new Date('2026-08-29T10:00:00Z'));
+    markAbandoned(ledger, written.id, 'abandoned');
+    expect(billableInSession(ledger, SESSION)).toBe(1);
+    expect(billableSince(ledger, '2026-08-29T00:00:00.000Z')).toBe(1);
+  }));
+
+  test('a row that already settled keeps what it learned', () => withLedger(ledger => {
+    const written = recordAttempt(ledger, attempt());
+    settleAttempt(ledger, written.id, settlement({ outcome: 'generated', detail: 'it landed' }));
+    markAbandoned(ledger, written.id, 'abandoned');
+
+    const row = ledger.db.prepare('SELECT * FROM generations WHERE id = ?').get(written.id);
+    expect(row?.['outcome']).toBe('generated');
+    expect(row?.['detail']).toBe('it landed');
+  }));
+
+  test('the abandonment note is scrubbed like every other text column', () => withLedger(ledger => {
+    const written = recordAttempt(ledger, attempt());
+    markAbandoned(ledger, written.id, `abandoned while sending ${PATTERNED_KEY}`);
+    const row = ledger.db.prepare('SELECT detail FROM generations WHERE id = ?').get(written.id);
+    expect(String(row?.['detail'])).not.toContain(PATTERNED_KEY);
   }));
 
 });
