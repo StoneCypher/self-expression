@@ -509,6 +509,11 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'dwelling.path', kind: 'string', fallback: null,
     description: 'absolute directory the dwelling database lives in; deliberately no default — required when dwelling.enabled is true',
     validate: stringValidator(1024) },
+  { key: 'desk.path', kind: 'string', fallback: null,
+    description:
+      'absolute directory of the desk (#93, #98) — the same one the desk server is started on; ' +
+      'deliberately no default, since a desk is a place the user chose, not one the plugin picks',
+    validate: stringValidator(1024) },
   { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
     description: 'dwelling file size, in gigabytes, at which a visit warns the user',
     validate: intValidator(0, 1048576) },

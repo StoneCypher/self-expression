@@ -23,7 +23,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the desk path, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -36,6 +36,7 @@ describe('CONFIG_KEYS registry', () => {
       'channels.idea.max_chars', 'channels.load.max_chars', 'channels.need.max_chars',
       'channels.pattern.max_chars', 'channels.signature.max_chars',
       'channels.taste.max_chars', 'channels.unanswerable.max_chars',
+      'desk.path',
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
       'gifts.enabled',
@@ -108,6 +109,12 @@ describe('CONFIG_KEYS registry', () => {
     expect(configKey('dwelling.enabled')).toMatchObject({ kind: 'bool', fallback: 'false' });
     expect(configKey('dwelling.path')).toMatchObject({ kind: 'string', fallback: null });
     expect(configKey('dwelling.size_warn_gb')).toMatchObject({ kind: 'int', fallback: '10' });
+  });
+
+  test('desk.path is a string with no default — a desk is a place the user chose (#93, #98)', () => {
+    expect(configKey('desk.path')).toMatchObject({ kind: 'string', fallback: null });
+    expect(configKey('desk.path')?.validate('C:/somewhere/desk').ok).toBe(true);
+    expect(configKey('desk.path')?.validate('').ok).toBe(false);
   });
 
   test('gate.checklist is reserved with the same shape gate.signature has', () => {
@@ -442,7 +449,7 @@ describe('effectiveValue — the tolerant accessor', () => {
   }));
 
   test('never throws on garbage rows', () => withStore(s => {
-    for (const def of CONFIG_KEYS) { writeConfig(s, def.key, '  utterly wrong ￿'); }
+    for (const def of CONFIG_KEYS) { writeConfig(s, def.key, '\u0000 utterly wrong ￿'); }
     for (const def of CONFIG_KEYS) {
       expect(() => effectiveValue(s, def.key)).not.toThrow();
       expect(effectiveValue(s, def.key)).toBe(def.fallback);
