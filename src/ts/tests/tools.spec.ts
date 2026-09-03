@@ -13,6 +13,7 @@ import {
   FORMAT_VERSION, CONFIG_KEYS, MAX_TEXT_CEILING, channelMaxCharsKey,
 } from '../channels/config.js';
 import { CHANNELS, CONFIDENCE_GROUNDS } from '../channels/vocabulary.js';
+import { writeQuestions } from '../channels/desk_questions.js';
 import {
   handleConfigure, handleExpress, handleAnnotate, handleBeginTurn,
   enabledChannels, enabledConfidenceGrounds,
@@ -983,5 +984,85 @@ describe('express and annotate — saying the gap out loud, not only recording i
     ]}));
     expect(out).not.toContain(NO_HOOK_SESSION);
   }));
+
+});
+
+describe('the pending notice rides the reply carriers (#98)', () => {
+
+  /** A desk directory the store is pointed at, with one queued, unclaimed intent. */
+  function withQueuedIntent<T>(s: Store, at: Date, fn: () => T): T {
+    const dir = mkdtempSync(join(tmpdir(), 'se-tools-desk-'));
+    writeConfig(s, 'desk.path', dir);
+    writeQuestions(dir, [
+      { id: 'q1', text: 'merge #21?', asked: at.toISOString(), queued: 'next', queuedAt: at.toISOString() },
+    ]);
+    try { return fn(); } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+
+  test('express ends with the pending line, and the next express does not', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+
+      const first = text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if', session: 'S' }));
+      expect(first).toMatch(/\n\n— pending: 1 desk request \(self-expression claim_pending\)$/);
+
+      const second = text(handleExpress(s, VERSION, { channel: 'idea', text: 'and also', session: 'S' }));
+      expect(second).not.toContain('pending:');
+
+    })));
+
+  test('the line lands after the no-context notice, not before it', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+      const out = text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if' }));
+      expect(out.indexOf(NO_HOOK_SESSION)).toBeLessThan(out.indexOf('pending:'));
+    })));
+
+  test('annotate carries it after the rendered block', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+      const out = text(handleAnnotate(s, VERSION, { notes: [
+        { channel: 'dissent', text: 'one', anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1' },
+      ], session: 'S' }));
+      expect(out).toMatch(/\n\n— pending: 1 desk request \(self-expression claim_pending\)$/);
+      expect(out.indexOf('⚓')).toBeLessThan(out.indexOf('pending:'));
+    })));
+
+  test('begin_turn carries it for the session it just recorded', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+      const out = text(handleBeginTurn(s, { session: 'S', promptId: 'p-1' }));
+      expect(out).toMatch(/— pending: 1 desk request/);
+    })));
+
+  test('recall carries it after the JSON, and the JSON still parses on its own', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+      const found = new Map<string, (a: Record<string, unknown>) => {
+        content: { type: 'text'; text: string }[] }>();
+      const stub = {
+        registerTool: (name: string, _config: unknown, handler: unknown): void => {
+          found.set(name, handler as (a: Record<string, unknown>) => {
+            content: { type: 'text'; text: string }[] });
+        },
+        server: { getClientVersion: (): undefined => undefined },
+      };
+      registerTools(stub as unknown as Parameters<typeof registerTools>[0], s, VERSION);
+      const handler = found.get('recall');
+      if (handler === undefined) { throw new Error('recall was not registered'); }
+
+      const out = text(handler({ session: 'S' }));
+      expect(out).toMatch(/— pending: 1 desk request/);
+      expect(JSON.parse(out.slice(0, out.lastIndexOf('\n\n—')))).toHaveProperty('recent');
+    })));
+
+  test('one carrier speaking silences the others — the fingerprint is shared', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+      expect(text(handleBeginTurn(s, { session: 'S', promptId: 'p-1' }))).toMatch(/pending:/);
+      expect(text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if', session: 'S' })))
+        .not.toContain('pending:');
+    })));
+
+  test('pending.enabled false keeps every carrier quiet', () => withStore(s =>
+    withQueuedIntent(s, new Date('2026-08-30T10:00:00Z'), () => {
+      writeConfig(s, 'pending.enabled', 'false');
+      expect(text(handleExpress(s, VERSION, { channel: 'idea', text: 'what if', session: 'S' })))
+        .not.toContain('pending:');
+    })));
 
 });

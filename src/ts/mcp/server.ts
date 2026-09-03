@@ -35,6 +35,7 @@ import { registerTools } from './tools.js';
 import { registerChartTools } from './chart_tools.js';
 import { registerChecklistTools } from './checklist_tools.js';
 import { registerMessageTools } from './message_tools.js';
+import { registerPendingTools } from './pending_tools.js';
 import { registerNoteTools } from './note_tools.js';
 import { registerDiagramTools } from './diagram_tools.js';
 import { registerShareTools } from './share_tools.js';
@@ -151,6 +152,7 @@ export function buildServer(
   registerChartTools(server, store);
   registerChecklistTools(server, store, version);
   registerMessageTools(server, store, version);
+  registerPendingTools(server, store);
   registerNoteTools(server, store, version);
   registerDiagramTools(server, store);
   registerShareTools(server, store, version);

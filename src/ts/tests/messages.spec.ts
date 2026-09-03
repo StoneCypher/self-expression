@@ -5,8 +5,8 @@ import { join }                from 'node:path';
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
-  postMessage, readMessages, unreadCounts, unreadRows, validateMessage, formatMessages,
-  MESSAGE_TEXT_MAX,
+  postMessage, readMessages, receiptMessages, unreadCounts, unreadRows, validateMessage,
+  formatMessages, MESSAGE_TEXT_MAX,
 } from '../channels/messages.js';
 
 const VERSION = '0.2.1';
@@ -250,6 +250,37 @@ describe('unreadRows — the receipt-free peek issue #98 needs', () => {
   test('an empty session returns nothing rather than a cross-session guess', () => withStore(s => {
     postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
     expect(unreadRows(s, '', NOW)).toEqual([]);
+  }));
+
+});
+
+describe('receiptMessages — the targeted delivery stamp issue #98 needs', () => {
+
+  test('receipts exactly the named rows, leaving the older unread mail alone', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'first', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'second', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'third', session: 's1' }, VERSION, NOW);
+
+    const third = unreadRows(s, 's1', NOW)[2];
+    receiptMessages(s, [Number(third?.['id'])], { reader: 'model', session: 's1' }, NOW);
+
+    // readMessages could not have done this: it consumes the oldest rows first.
+    expect(unreadRows(s, 's1', NOW).map(r => r['text'])).toEqual(['first', 'second']);
+  }));
+
+  test('an empty id list writes nothing at all', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    receiptMessages(s, [], { reader: 'model', session: 's1' }, NOW);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+    expect(unreadRows(s, 's1', NOW)).toHaveLength(1);
+  }));
+
+  test('stamps the reader identity readMessages would have stamped', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    receiptMessages(s, [1], { reader: 'model', session: 's1', agentId: 'ag-3', promptId: 'p-7' }, NOW);
+
+    const row = s.db.prepare('SELECT reader, session, agent_id, prompt_id FROM message_reads').get();
+    expect(row).toMatchObject({ reader: 'model', session: 's1', agent_id: 'ag-3', prompt_id: 'p-7' });
   }));
 
 });

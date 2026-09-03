@@ -431,6 +431,46 @@ export function unreadRows(
                         UNREAD_SELF_SCAN_LIMIT, when.toISOString());
 }
 
+/**
+ * Write delivery receipts for an exact set of message ids (issue #98) — the receipting
+ * half of {@link readMessages}, exposed on its own.
+ *
+ * Exists for `claim_pending`, which must consume a caller-named *subset* of the unread
+ * mail. {@link readMessages} cannot express that: it receipts every row it returns, and
+ * the rows it returns are the oldest unread ones under a `limit`, so claiming the third
+ * unread message through it would silently receipt the first two as well — mail the
+ * caller never asked for and never receives. That is exactly the failure a claim exists
+ * to avoid, so the claim path pairs {@link unreadRows} (peek, no receipts) with this
+ * (receipt, no read) and reports every id it stamps.
+ *
+ * The same single `INSERT` {@link readMessages} uses backs both — there is deliberately
+ * one writer of `message_reads`, so the two paths cannot drift into two shapes.
+ *
+ * Receipts are append-only and never deduplicated, so a caller must pass ids it observed
+ * as *unread* — {@link unreadRows} is how — rather than a set it guessed at.
+ *
+ * @param ids    the message ids to mark delivered to `reader`; an empty list writes nothing
+ * @param reader who collected them; its `session`, `agentId` and `promptId` are stamped
+ *               on each receipt as the provenance of the delivery
+ * @param when   injectable clock for the receipt timestamps; defaults to now
+ *
+ * @example
+ *   const waiting = unreadRows(store, 's1');
+ *   receiptMessages(store, waiting.map(row => Number(row['id'])), { reader: 'model', session: 's1' });
+ *   unreadRows(store, 's1')  // => [] — those are delivered now
+ *
+ * @see readMessages
+ * @see unreadRows
+ */
+export function receiptMessages(
+  store  : Store,
+  ids    : readonly number[],
+  reader : Reader,
+  when   : Date = new Date(),
+): void {
+  receipt(store, ids, reader, when);
+}
+
 /** The unread tallies the per-turn hook reports. */
 export interface UnreadCounts {
   /** Unread `self` notes for the given session; 0 when no session is known. */
