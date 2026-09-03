@@ -79,12 +79,19 @@ describe('withPendingNotice', () => {
 
     })));
 
-  test('leaves a reply with no text block alone', () => withStore(s => withDesk(deskDir => {
-    writeConfig(s, 'desk.path', deskDir);
-    const now = new Date('2026-08-30T10:00:00Z');
-    writeQuestions(deskDir, [queued('q1', 'first ask', now)]);
-    expect(withPendingNotice(s, 'S', { content: [] }, now)).toEqual({ content: [] });
-  })));
+  test('leaves a reply with no text block alone, without swallowing the notice', () =>
+    withStore(s => withDesk(deskDir => {
+
+      writeConfig(s, 'desk.path', deskDir);
+      const now = new Date('2026-08-30T10:00:00Z');
+      writeQuestions(deskDir, [queued('q1', 'first ask', now)]);
+
+      expect(withPendingNotice(s, 'S', { content: [] }, now)).toEqual({ content: [] });
+
+      // The line was never carried, so it must still be waiting to be said.
+      expect(pendingNotice(s, 'S', now)).toMatch(/pending: 1 desk request/);
+
+    })));
 
   test('fails open: a notice that throws leaves the reply exactly as it was', () =>
     withStore(s => withDesk(deskDir => {

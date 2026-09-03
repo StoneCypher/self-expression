@@ -95,13 +95,16 @@ export function withPendingNotice(
 
   try {
 
-    const notice = pendingNotice(store, session, now);
-    if (notice === null) { return out; }
-
     const blocks = out.content,
           last   = blocks.length - 1;
 
+    // Before the notice is computed, not after: `pendingNotice` records that the session
+    // was told the moment it speaks, so asking it a question this reply cannot carry the
+    // answer to would swallow the line for good.
     if (blocks[last] === undefined) { return out; }
+
+    const notice = pendingNotice(store, session, now);
+    if (notice === null) { return out; }
 
     return {
       ...out,
