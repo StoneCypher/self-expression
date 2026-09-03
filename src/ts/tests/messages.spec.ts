@@ -5,7 +5,7 @@ import { join }                from 'node:path';
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
-  postMessage, readMessages, unreadCounts, validateMessage, formatMessages,
+  postMessage, readMessages, unreadCounts, unreadRows, validateMessage, formatMessages,
   MESSAGE_TEXT_MAX,
 } from '../channels/messages.js';
 
@@ -223,6 +223,33 @@ describe('unreadCounts', () => {
   test('no session means no self count, never a cross-session guess', () => withStore(s => {
     postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
     expect(unreadCounts(s, undefined, NOW).forModel).toBe(0);
+  }));
+
+});
+
+describe('unreadRows — the receipt-free peek issue #98 needs', () => {
+
+  test('returns the unread self rows for the session, oldest first, without receipting', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'first', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'second', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'other session', session: 's2' }, VERSION, NOW);
+
+    const rows = unreadRows(s, 's1', NOW);
+    expect(rows.map(r => r['text'])).toEqual(['first', 'second']);
+
+    // Unlike readMessages, a peek never writes a receipt — the same rows come back.
+    expect(unreadRows(s, 's1', NOW).map(r => r['text'])).toEqual(['first', 'second']);
+  }));
+
+  test('a row already receipted through readMessages drops out of the peek too', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    readMessages(s, { reader: 'model', session: 's1' }, {}, NOW);
+    expect(unreadRows(s, 's1', NOW)).toEqual([]);
+  }));
+
+  test('an empty session returns nothing rather than a cross-session guess', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    expect(unreadRows(s, '', NOW)).toEqual([]);
   }));
 
 });

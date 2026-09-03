@@ -244,6 +244,8 @@ The registered keys:
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
 | `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
+| `pending.enabled` | bool | `true` | Append a one-line notice of pending desk requests and unread messages to tool replies and hook context, but only when the pending set changes (#98). |
+| `pending.nag_hours` | int | `4` | Hours an item may wait before its notice repeats even though nothing else changed — a standing backlog nags every few hours rather than staying silent forever. |
 | `mailbox.enabled` | bool | `false` | Held notes (#43): the one switch that stops composition, offering, and surfacing at once. **Off by default**, and only the exact value `true` enables — this is a consent surface, so an ambiguous value means no. |
 | `mailbox.surface_budget` | int | `1` | How many held notes one turn of yours may be offered. `0` holds everything without disabling composition. |
 | `mailbox.daily_cap` | int | `3` | Held notes that may be surfaced in any **rolling** 24 hours — rolling, so midnight is not a free refill. |

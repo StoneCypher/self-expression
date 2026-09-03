@@ -243,7 +243,7 @@ function receipt(store: Store, ids: readonly number[], reader: Reader, when: Dat
 }
 
 /** The unread rows for one audience, for one reader, oldest first. */
-function unreadRows(
+function unreadRowsFor(
   store    : Store,
   audience : Audience,
   reader   : Reader,
@@ -379,7 +379,7 @@ export function readMessages(
 
     const rows = (!ack || audience === 'record')
       ? recentRows(store, audience, reader, query.box, limit)
-      : unreadRows(store, audience, reader, query.box, limit, nowUtc);
+      : unreadRowsFor(store, audience, reader, query.box, limit, nowUtc);
 
     if (ack && mayReceipt(audience, reader)) {
       receipt(store, rows.map(r => Number(r['id'])), reader, when);
@@ -391,6 +391,44 @@ export function readMessages(
 
   return out;
 
+}
+
+/** The most unread `self` rows {@link unreadRows} will ever scan for one session. */
+const UNREAD_SELF_SCAN_LIMIT = 100;
+
+/**
+ * The unread `self` message rows for one session, without writing receipts (issue #98).
+ *
+ * Exists for the pending-notice collector ({@link ../pending.js collectPending}), which
+ * needs to know *whether* mail is waiting without *consuming* it: calling
+ * {@link readMessages} would write a receipt for every row it returned, permanently
+ * removing those messages from the reader's actual unread mail the moment a background
+ * check merely glanced at it. This is the read-only half of what {@link readMessages}
+ * does for `audience: 'self'` with a model reader, exposed on its own so a caller can
+ * peek at true unread state — not the `ack: false` history peek, which would also
+ * surface already-read rows.
+ *
+ * @param when injectable clock for expiry evaluation; defaults to now
+ * @returns the unread `self` rows for `session`, oldest first, capped at
+ *          {@link UNREAD_SELF_SCAN_LIMIT}; `[]` for an empty session
+ *
+ * @example
+ *   postMessage(store, { audience: 'self', text: 'resume at step 3', session: 's1' }, v);
+ *   unreadRows(store, 's1')  // => [{ id: 1, text: 'resume at step 3', ts_utc: '…', … }]
+ *   readMessages(store, { reader: 'model', session: 's1' }, {});
+ *   unreadRows(store, 's1')  // => [] — that receipt is real, this peek respects it
+ *
+ * @see readMessages
+ * @see unreadCounts
+ */
+export function unreadRows(
+  store   : Store,
+  session : string,
+  when    : Date = new Date(),
+): Record<string, unknown>[] {
+  if (session === '') { return []; }
+  return unreadRowsFor(store, 'self', { reader: 'model', session }, undefined,
+                        UNREAD_SELF_SCAN_LIMIT, when.toISOString());
 }
 
 /** The unread tallies the per-turn hook reports. */
