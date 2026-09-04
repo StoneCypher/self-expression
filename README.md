@@ -653,7 +653,7 @@ Three MCP tools, the third shared with the desk's pending notice (#98):
 |---|---|
 | `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
 | `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
-| `claim_pending` | Take what the pending notice named (#98): `kind` (`desk_intent` or `message`, omit for both), `key` (one item, omit for all), `session` (fallback identity, used only when no hook ever observed one — an observed session always wins). Stamps each desk row `claimed` and receipts each message, replying `{ session, claimed, remaining }` with the item's full text, not the notice's truncated label. Not gated on `pending.enabled` — that key governs whether the notice speaks, not whether a session may take what it already knows about. |
+| `claim_pending` | Take what the pending notice named (#98): `kind` (`desk_intent` or `message`, omit for both), `key` (one item, omit for all), `session` (fallback identity, used only when no hook ever observed one — an observed session always wins). Stamps each desk row `claimed` and receipts each message, replying `{ session, claimed, remaining }` with each item's full text — the notice itself carries only counts and kinds. Not gated on `pending.enabled` — that key governs whether the notice speaks, not whether a session may take what it already knows about. |
 
 The user's own door, with no model in the loop:
 
@@ -682,7 +682,7 @@ stays silent, and a standing one repeats after `pending.nag_hours` hours (defaul
 rather than nagging every turn or falling silent forever. An emptied set is announced
 once, as `pending: clear`. `claim_pending` is the counterpart tool — it takes what the
 notice named, stamping a desk row `claimed` or receipting a message, and hands back the
-full text rather than the notice's truncated label.
+full text; the notice itself carries only counts and kinds.
 
 &nbsp;
 

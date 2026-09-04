@@ -22,7 +22,7 @@ import type { ToolReply } from '../mcp/chart_tools.js';
 
 const VERSION = '0.2.1';
 
-/** A body longer than the notice's 60-character label cut, to prove claims carry the whole thing. */
+/** A body well past any plausible summary length, to prove claims carry the whole thing. */
 const LONG_TEXT = 'merge #21 once the flaky windows test settles, then tag the release and tell me';
 
 function withStore<T>(fn: (s: Store) => T): T {
@@ -124,7 +124,7 @@ describe('withPendingNotice', () => {
 
 describe('handleClaimPending — desk intents', () => {
 
-  test('stamps the row and returns its whole text, not the truncated notice label', () =>
+  test('stamps the row and returns its whole text, where the notice gave only a count', () =>
     withStore(s => withDesk(deskDir => {
 
       writeConfig(s, 'desk.path', deskDir);
