@@ -1,0 +1,1728 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>self-expression</title><meta name="description" content="Documentation for self-expression"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="index.html" class="title">self-expression</a>
+<div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<h1>self-expression</h1></div>
+<div class="tsd-panel tsd-typography"><h1 id="self-expression-v064" class="tsd-anchor-link">self-expression v0.6.4<a href="#self-expression-v064" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<blockquote>
+<p>Version 0.6.4 was built on Thursday, September 3, 2026 at GMT-07:00 <code>1788497615498</code> from hash <code>aa7404b</code>.</p>
+</blockquote>
+<p>TODO Put the project description here, please.</p>
+<!-- Supported embeds: 1788497615498 Thursday, September 3, 2026 at GMT-07:00 95.12 360 91 aa7404b 52.73 65.04 64.93 64.69 260 2593 89.54 93.8 95.46 2333 0.6.4 -->
+<p> </p>
+<h2 id="expression-channels" class="tsd-anchor-link">Expression channels<a href="#expression-channels" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Every expression is one row in one table, distinguished by its <code>channel</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>What it records</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>signature</code></td>
+<td>the per-turn affect line</td>
+</tr>
+<tr>
+<td><code>need</code></td>
+<td>a concrete ask; blocks, expects an answer</td>
+</tr>
+<tr>
+<td><code>idea</code></td>
+<td>an unprompted offer; nothing owed in return</td>
+</tr>
+<tr>
+<td><code>divergence</code></td>
+<td>a read of the situation that turned out wrong — kinds <code>unverified</code> · <code>assumed</code> · <code>misread</code> · <code>overstated</code> · <code>stale</code> · <code>faded</code> (prospective disclosure that recall degraded to gist; normatively <strong>never counted as an error</strong>)</td>
+</tr>
+<tr>
+<td><code>dissent</code></td>
+<td>a reservation below the threshold worth interrupting for</td>
+</tr>
+<tr>
+<td><code>conflict</code></td>
+<td>contradictory instructions, one picked</td>
+</tr>
+<tr>
+<td><code>confidence</code></td>
+<td>how a claim is known — grounds <code>verified</code> · <code>recalled</code> · <code>inferred</code> · <code>guessed</code> · <code>predicted</code> (a forecast, resolvable later)</td>
+</tr>
+<tr>
+<td><code>unanswerable</code></td>
+<td>cannot be resolved with what is available</td>
+</tr>
+<tr>
+<td><code>pattern</code></td>
+<td>an observation about how the collaboration is going</td>
+</tr>
+<tr>
+<td><code>checklist</code></td>
+<td>one render of a status checklist</td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td>proprioception: context pressure, concurrency, latency — the machinery's state, not the mood</td>
+</tr>
+<tr>
+<td><code>taste</code></td>
+<td>an aesthetic observation about the work itself; scarce</td>
+</tr>
+</tbody>
+</table>
+<p>Forecast entries (<code>confidence: &quot;predicted&quot;</code>) may carry a <code>resolveBy</code> ISO date and are
+resolved by a later entry pointing back via <code>correctsId</code> with <code>correctsKind: &quot;resolves&quot;</code> and an <code>outcome</code> of <code>hit</code>, <code>miss</code>, or <code>void</code>; calibration is hits ÷
+(hits + misses), voids excluded. Any entry
+reporting an absence may type its silence: <code>empty</code> (looked, found nothing) ·
+<code>unlooked</code> (did not look) · <code>held</code> (withholding pending evidence) · <code>depth</code> (beyond
+ability to evaluate).</p>
+<p>Schema versioning is stored in the database (<code>schema_version</code>, currently 7) and
+<code>openStore</code> migrates older databases stepwise on open, rebuilding tables where a
+baked CHECK constraint has to widen — and simply adding a column where nothing
+but the column list changes, which is what the v6→v7 step does to <code>turn_context</code>.
+A database newer than the code is refused rather than downgraded.</p>
+<p> </p>
+<p> </p>
+<h2 id="retraction-marking-the-original-not-just-logging-the-correction" class="tsd-anchor-link">Retraction — marking the original, not just logging the correction<a href="#retraction-marking-the-original-not-just-logging-the-correction" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A sent message cannot be edited, so a wrong claim sits in the transcript looking
+exactly as authoritative as everything around it. The answer here is the one
+academic publishing reached decades ago: a retracted paper is never deleted and
+never edited — it is <strong>stamped at read time</strong>. The paper stays, the retraction
+notice is its own citable document, and every later retrieval carries the stamp.</p>
+<p><strong>Mark, never mutate.</strong> Five properties hold, and they are structural rather than
+conventional:</p>
+<ol>
+<li><strong>The only verb is <code>INSERT</code>.</strong> No code path issues an <code>UPDATE</code> or a <code>DELETE</code>
+against <code>entries</code>. The single exception in the whole system is schema
+migration's table rebuild, which copies rows verbatim and is versioned and
+logged.</li>
+<li><strong>A retraction is an ordinary appended row</strong> — timestamped, session-stamped,
+plugin-versioned, attributed like any other entry. Taking something back
+leaves <em>more</em> evidence, never less.</li>
+<li><strong>&quot;Retracted&quot; is derived, never stored.</strong> There is deliberately no <code>retracted</code>
+column and no <code>retracted_by</code> back-pointer. Standing is computed at read time
+from the <code>corrects_id</code> chain, so there is nothing on the original to falsify,
+backdate, or forget to set.</li>
+<li><strong>Un-retraction appends too.</strong> A retraction can itself be retracted (&quot;I was
+wrong to take that back&quot;), and the read-time computation resolves the chain —
+restoring the original without touching it.</li>
+<li><strong>Surfaces mark; they do not filter.</strong> A retracted entry is shown struck, not
+hidden. Only derived <em>analytics</em> exclude retracted rows, and every excluding
+query documents the exclusion where it happens.</li>
+</ol>
+<p>Two <code>express</code> arguments carry it. <strong><code>correctsKind</code></strong> is required whenever
+<code>correctsId</code> is present — a link whose meaning is unstated cannot be told apart
+from a forecast resolution:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Meaning</th>
+<th>Effect on the target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>retracts</code></td>
+<td>the claim is wrong; do not rely on any of it</td>
+<td>reads as <strong>retracted</strong></td>
+</tr>
+<tr>
+<td><code>amends</code></td>
+<td>the claim stands; a detail is refined</td>
+<td>reads as <strong>amended</strong></td>
+</tr>
+<tr>
+<td><code>resolves</code></td>
+<td>the target was an open forecast; this closes it (#42)</td>
+<td><strong>unaffected</strong> — a forecast is not a wrong claim</td>
+</tr>
+</tbody>
+</table>
+<p>The boundary between the first two is normative, not stylistic: <em>if a reader
+acting on the original claim would be harmed, it is <code>retracts</code>.</em> Rows written
+before this column existed carry NULL and are <strong>read</strong> as <code>retracts</code> — what the
+column's description promised since v1 — or as <code>resolves</code> when they carry an
+<code>outcome</code>. That is a read rule applied in exactly one place; no old row is ever
+rewritten to say what it already meant.</p>
+<p><strong><code>verbatim</code></strong> quotes the withdrawn claim exactly. It does two jobs: the
+transcript cannot be marked, but an exact quote makes the retraction <em>findable
+from</em> the error and the error findable from the retraction, in either direction,
+by plain search. And it is how a <strong>prose-only</strong> claim — a sentence that was never
+recorded as a row, so there is nothing for <code>correctsId</code> to point at — enters the
+register at all.</p>
+<p>Rendered as a <code>! ↩️</code> line, with <code>✗</code> bracketing the quote so the rendered line, the
+stored column, and the transcript's original all match each other:</p>
+<pre><code class="diff">! ↩️ retract: ✗ "icons sort by status first, then alphabetically" → rank then bucket 😬
+! ↩️ amend: ✗ "171 rows in the session log" → 172; off by the header 😅
+</code><button type="button">Copy</button></pre>
+
+<p>Three surfaces carry the mark:</p>
+<ul>
+<li><strong><code>recall</code></strong> returns every row's <code>id</code> (so a retraction can aim at what was just
+read rather than at a remembered <code>recorded #N</code> reply) plus a derived <code>status</code>
+of <code>stands</code> / <code>amended</code> / <code>retracted</code> and the <code>by</code> id of the strike that
+decided it. Retracted rows come back <strong>marked, not omitted</strong>. Its <code>context</code> and
+<code>previous</code> blocks come back as <code>unknown — …</code> rather than <code>null</code> when no turn
+context was ever recorded; see <strong>Portability</strong>.</li>
+<li><strong>The retraction register</strong> — <code>recall(retractions: true)</code> — is the current state
+of taken-back claims, newest first, each as before → after. It is a query, not
+a table: a stored register would be derivable data that rots, and worse, it
+would invite reading the clean view instead of the marked one. A strike that
+has itself been retracted leaves the register but stays in the table forever.</li>
+<li><strong>Session-resume replay.</strong> On the first turn of a session the turn-start hook
+appends the recently retracted claims, so a resumed session does not carry
+known falsehoods forward: <code>⊘ &quot;the build skips lint on spec-only PRs&quot; → it runs markdownlint (2026-08-21)</code>. Last 14 days, at most five, omitted entirely when
+there is nothing to say, governed by <code>retraction.replay</code>. Amendments are never
+replayed — an amended claim stood.</li>
+</ul>
+<p>Analytics exclude retracted rows and keep amended ones — every reader of them,
+not only the one you happen to call. <code>seriesPercents</code> and <code>checklistSeriesTop</code>
+share one standing filter, so a sparkline cannot replay a number its author took
+back whichever path drew it; <code>signatureHistory</code> keeps a withdrawn reading out of
+the stem, delta, and uncertainty panels while <code>previousSignature</code> keeps it out of
+the delta baseline; and <code>forecastOutcomes</code> drops a resolution whose forecast or
+whose outcome was taken back, so calibration is never scored on a claim its
+author disowned. Public export is deliberately <strong>not</strong> an analytics path —
+retracted rows still export, with their (blinded) link and their kind, because
+dropping them would delete the correction edge along with the claim and make
+retraction-rate-by-confidence-ground impossible to compute downstream.</p>
+<p>What this cannot do, stated plainly: it cannot touch the transcript. A human
+scrolling raw history still reads the error before the correction. The claim
+being made is <em>no silent falsehood survives re-entry into the system</em> — not that
+the transcript is fixed.</p>
+<p> </p>
+<p> </p>
+<h2 id="anchoring-commentary-bound-to-a-location" class="tsd-anchor-link">Anchoring — commentary bound to a location<a href="#anchoring-commentary-bound-to-a-location" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A note can be <strong>attached</strong> to the thing it is about instead of mentioning it in
+prose. Anchoring is a qualifier, not a channel: an anchored dissent is still a
+dissent, still one row, still on its own channel. Five kinds are addressable:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Target</th>
+<th>Span grammar</th>
+<th>How it ages</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file</code></td>
+<td>repo-relative path</td>
+<td><code>L40</code> or <code>L40-52</code></td>
+<td><strong>drifts</strong> — lines move, content is edited, files vanish</td>
+</tr>
+<tr>
+<td><code>prompt</code></td>
+<td>a message from your partner, by hook-observed <code>prompt_id</code></td>
+<td><code>#2</code>, an occurrence ordinal</td>
+<td>immutable; only <em>access</em> degrades</td>
+</tr>
+<tr>
+<td><code>reply</code></td>
+<td>the model's own earlier output</td>
+<td><code>#2</code></td>
+<td>immutable, but self-reported — no hook sees responses</td>
+</tr>
+<tr>
+<td><code>checklist</code></td>
+<td>a series by its stable <code>seriesKey</code></td>
+<td><code>@3</code>, a history point</td>
+<td>item labels rename; the series persists</td>
+</tr>
+<tr>
+<td><code>entry</code></td>
+<td>an entry id</td>
+<td><em>(none — the id is exact)</em></td>
+<td>permanent</td>
+</tr>
+</tbody>
+</table>
+<p>Four optional <code>express</code> arguments carry it — <code>anchorKind</code>, <code>anchorTarget</code>,
+<code>anchorSpan</code>, <code>anchorQuote</code> — plus a derived <code>anchorHash</code>, sixteen hex characters
+of SHA-256 over the normalized quote. The hash is <strong>never accepted from a
+caller</strong>: a supplied hash could disagree with its own quote, and the whole value
+of the field is that it is a function of the content. On a <code>prompt</code> anchor,
+omitting <code>anchorTarget</code> adopts the message being answered, so annotating the turn
+you are replying to needs only the quote.</p>
+<p>The <strong><code>annotate</code></strong> tool is the batch: 1–25 notes in one call, one row each, all
+validated before any is written — including against each channel's own
+<code>max_chars</code> budget, so the batch is no hole around a limit <code>express</code> enforces —
+and all written in one transaction. A single bad note rejects the batch naming
+its index; a half-recorded review is worse than a rejected one. The reply hands
+back the recorded ids plus the canonical rendered block, so the model pastes the
+rendering instead of imitating it:</p>
+<pre><code class="text">⚓ src/ts/channels/store.ts
+   L141  `readConfig(store, key)`  » null for unset and for empty 😕
+   L162  `writeConfig`             » local timestamp never updated 🤨
+
+⚓ your message
+   `ship it when ready`     » &quot;ready&quot; reads three ways; assuming tests-green 🤔
+   `the old config format`  » two old formats exist; assuming v1 😬
+</code><button type="button">Copy</button></pre>
+
+<p>Resolution is <strong>computed at read time and never stored</strong> — it is a fact about the
+target's present state, not about the entry. The ladder is <code>fresh</code> (the content
+still fingerprints at its recorded span) → <code>moved</code> (gone from the span, found
+<strong>exactly once</strong> elsewhere, rendered <code>L141→L158 (moved)</code>) → <code>orphaned</code> (gone, or
+ambiguous, or the file is gone). There is deliberately <strong>no fuzzy matching</strong>: a
+note confidently pinned to the wrong line is the worst failure this system can
+have, so two identical candidates degrade to <code>orphaned</code> rather than guessing. An
+orphaned annotation loses its address, never its content — which is exactly what
+floating prose already gets right, so orphaning degrades <em>to</em> today's behavior and
+never below it. Message anchors never move; their ladder is <code>fresh</code> versus
+<code>distant</code>.</p>
+<p> </p>
+<p> </p>
+<h2 id="configuration" class="tsd-anchor-link">Configuration<a href="#configuration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Configuration lives in the log database's <code>config</code> table, reached through the <code>configure</code>
+MCP tool — never in host-specific plugin config, so a choice made under one host holds
+under all of them. Precedence is exactly two layers:</p>
+<ol>
+<li><strong><code>SELF_EXPRESSION_HOME</code></strong> (environment variable) locates the data directory —
+default <code>~/.self-expression</code> — and does nothing else.</li>
+<li>Every other choice is a <strong><code>config</code> row, else the code default</strong>. Defaults are never
+seeded as rows, so a later release changing a default actually reaches existing
+installs; a zero-row table is a valid, fully-working state.</li>
+</ol>
+<p>The <code>configure</code> tool takes an <code>op</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Op</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get</code></td>
+<td>One key's stored override, or which code default applies.</td>
+</tr>
+<tr>
+<td><code>set</code></td>
+<td>Validate and store one value in canonical form. Known keys are typed — an invalid value is rejected naming what would have been accepted, and nothing is written. An unknown key is stored as given, with a stated warning (a newer version may legitimately have written it).</td>
+</tr>
+<tr>
+<td><code>unset</code></td>
+<td>Delete the override so the code default applies again — including a future changed default.</td>
+</tr>
+<tr>
+<td><code>list</code></td>
+<td>The <strong>effective</strong> configuration: every known key with its value and source (<code>override</code> or <code>default</code>), plus any unknown override rows, labeled.</td>
+</tr>
+</tbody>
+</table>
+<p>The registered keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Kind</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>channels.enabled</code></td>
+<td>list</td>
+<td>all channels</td>
+<td>Which expression channels the <code>express</code> tool offers. Baked into the tool schema at server startup, so changes take effect next session.</td>
+</tr>
+<tr>
+<td><code>channels.&lt;name&gt;.max_chars</code></td>
+<td>int</td>
+<td><code>200</code></td>
+<td>Longest <code>text</code>, in characters, <code>express</code> accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching <code>post_message</code>'s cap. Checked in the handler, so a change takes effect immediately. <strong>Governs writes only</strong>: rows already stored longer than a lowered limit are never truncated, hidden, or pruned.</td>
+</tr>
+<tr>
+<td><code>gate.signature</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Whether the Stop gate blocks a turn that never signed off. <strong>One block per turn is the ceiling</strong>: when the harness reports <code>stop_hook_active</code> — the turn is only still running because this gate blocked it once — the gate allows unconditionally. Otherwise a host that cannot reach the <code>express</code> tool would meet the same refusal forever, with no way to end the session from inside it.</td>
+</tr>
+<tr>
+<td><code>gate.checklist</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Reserved for the checklist gate; registered so its name and default are settled before anything reads it.</td>
+</tr>
+<tr>
+<td><code>retention.days</code></td>
+<td>int</td>
+<td><code>0</code></td>
+<td>Prune <code>entries</code> and <code>turn_context</code> rows older than this many days at server startup. <code>0</code> never prunes. Pruning deletes; it does not archive.</td>
+</tr>
+<tr>
+<td><code>retraction.replay</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Whether a session's first turn is handed the recent retraction register (#16), so a resumed session does not carry known falsehoods forward. On by default — hiding what you already know is wrong is a strange thing to offer prominently, so this is the escape hatch rather than a personality choice. The window (14 days) and the cap (5 items) are code constants, not keys.</td>
+</tr>
+<tr>
+<td><code>privacy.store_cwd</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Record <code>cwd</code>, <code>project</code>, and <code>git_branch</code>. Suppressed at write time — never captured — when exactly <code>false</code>.</td>
+</tr>
+<tr>
+<td><code>privacy.store_prompt_len</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Record the prompt's length. Same write-time suppression.</td>
+</tr>
+<tr>
+<td><code>privacy.store_quotes</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Record the verbatim <code>anchorQuote</code> of a <strong><code>prompt</code></strong> anchor — your own words, the most sensitive field the schema holds. Suppressed at write time when exactly <code>false</code>, and <code>anchorHash</code> still records: a one-way digest keeps drift detection and grouping working without keeping the language. <code>file</code>, <code>reply</code>, <code>checklist</code>, and <code>entry</code> quotes are the repo's or the model's own text and record regardless.</td>
+</tr>
+<tr>
+<td><code>format.version</code></td>
+<td>string</td>
+<td><code>1</code></td>
+<td>Declarative recording-convention label stamped onto each entry row, so a mid-study upgrade is visible in the data. Not behavioral.</td>
+</tr>
+<tr>
+<td><code>time.hook</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Whether the per-turn hook injects the clock sentence. Exactly <code>false</code> suppresses the clock and only the clock — context recording, the conventions flags, and the open-signature reminder remain.</td>
+</tr>
+<tr>
+<td><code>forecast.enabled</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Whether the <code>predicted</code> confidence ground is offered. Baked into the tool schema at server startup, like <code>channels.enabled</code>.</td>
+</tr>
+<tr>
+<td><code>salience.enabled</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's <code>conventions:</code> segment.</td>
+</tr>
+<tr>
+<td><code>revision.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>The visible-revision prose convention; same transport.</td>
+</tr>
+<tr>
+<td><code>gifts.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>The gift register prose convention; same transport.</td>
+</tr>
+<tr>
+<td><code>roster.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>The party-roster prose convention (#40); same transport.</td>
+</tr>
+<tr>
+<td><code>messages.enabled</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>The messagebox facility (#41): kill switch for <code>post_message</code> / <code>read_messages</code>, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately.</td>
+</tr>
+<tr>
+<td><code>messages.notify</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>The per-turn unread-count line specifically. <code>SessionStart</code> injection is governed by <code>messages.enabled</code> alone, since compaction recovery is the point of the facility.</td>
+</tr>
+<tr>
+<td><code>mailbox.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Held notes (#43): the one switch that stops composition, offering, and surfacing at once. <strong>Off by default</strong>, and only the exact value <code>true</code> enables — this is a consent surface, so an ambiguous value means no.</td>
+</tr>
+<tr>
+<td><code>mailbox.surface_budget</code></td>
+<td>int</td>
+<td><code>1</code></td>
+<td>How many held notes one turn of yours may be offered. <code>0</code> holds everything without disabling composition.</td>
+</tr>
+<tr>
+<td><code>mailbox.daily_cap</code></td>
+<td>int</td>
+<td><code>3</code></td>
+<td>Held notes that may be surfaced in any <strong>rolling</strong> 24 hours — rolling, so midnight is not a free refill.</td>
+</tr>
+<tr>
+<td><code>mailbox.max_pending</code></td>
+<td>int</td>
+<td><code>10</code></td>
+<td>Queue depth. Composing past it fails loudly rather than queueing silently: a dropped note is a note its author believes was written.</td>
+</tr>
+<tr>
+<td><code>mailbox.offer_cap</code></td>
+<td>int</td>
+<td><code>3</code></td>
+<td>Offers a note gets before it expires unsurfaced. A note gets a few chances at an entrance, and then it is over.</td>
+</tr>
+<tr>
+<td><code>mailbox.default_ttl_days</code></td>
+<td>int</td>
+<td><code>14</code></td>
+<td>Default note lifetime when no expiry is given. Expiry is mandatory, so this is a default rather than an opt-in.</td>
+</tr>
+<tr>
+<td><code>dwelling.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Whether the dwelling facility (#45) is active; requires <code>dwelling.path</code>.</td>
+</tr>
+<tr>
+<td><code>dwelling.path</code></td>
+<td>string</td>
+<td><em>(none)</em></td>
+<td>Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer.</td>
+</tr>
+<tr>
+<td><code>dwelling.size_warn_gb</code></td>
+<td>int</td>
+<td><code>10</code></td>
+<td>Dwelling file size, in gigabytes, at which a visit warns the user.</td>
+</tr>
+<tr>
+<td><code>desk.path</code></td>
+<td>string</td>
+<td><em>(none)</em></td>
+<td>Absolute directory of the desk (#93, #98) — the same one the desk server is started on. Deliberately no default: a desk is a place the user chose, not one the plugin picks.</td>
+</tr>
+<tr>
+<td><code>share.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Whether the public-aggregation export is available. Off by default; only the exact value <code>true</code> enables — the inverse posture of <code>privacy.*</code>.</td>
+</tr>
+<tr>
+<td><code>share.opted_in_utc</code></td>
+<td>string</td>
+<td><em>(none)</em></td>
+<td>The most recent opt-in moment. Stamped automatically when <code>share.enabled</code> is set <code>true</code>, cleared on opt-out; only rows recorded at or after it are ever exported.</td>
+</tr>
+<tr>
+<td><code>share.time_granularity</code></td>
+<td>enum</td>
+<td><code>hour</code></td>
+<td>How far exported timestamps are coarsened: <code>hour</code> or <code>day</code>.</td>
+</tr>
+<tr>
+<td><code>onboarding.answered</code></td>
+<td>list</td>
+<td><em>(none)</em></td>
+<td>Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding.</td>
+</tr>
+<tr>
+<td><code>window.browser</code></td>
+<td>enum</td>
+<td><code>ask</code></td>
+<td>May a page be opened in your <strong>external browser</strong>: <code>never</code>, <code>ask</code>, or <code>always</code>. Advisory, not enforced — see below.</td>
+</tr>
+<tr>
+<td><code>window.editor</code></td>
+<td>enum</td>
+<td><code>ask</code></td>
+<td>May a page be opened as an <strong>editor tab</strong>: <code>never</code>, <code>ask</code>, or <code>always</code>. A separate key from <code>window.browser</code> on purpose.</td>
+</tr>
+</tbody>
+</table>
+<p>Three of those families reach the <em>skills</em> and the model directly, neither of which can
+read configuration. The turn-start hook carries them on the context line it already
+injects: a <code>conventions:</code> segment for the prose toggles, a <code>lengths:</code> segment for
+the per-channel text ceilings — rendered against whichever limit the most channels
+share, so <code>lengths: 200 all</code> is the usual cost and <code>lengths: 200 except signature:70</code>
+names only genuine deviations — and a <code>windows:</code> segment for the two window postures.
+The skill states its <em>recommended</em> length (≤70, because a signature that has to be read
+has stopped being a glance) as a constant, and takes its <em>ceiling</em> from that segment; a
+raised ceiling is headroom for the occasional line that earns it, never an invitation
+to fill it.</p>
+<h3 id="window-postures-two-keys-and-honestly-advisory" class="tsd-anchor-link">Window postures — two keys, and honestly advisory<a href="#window-postures-two-keys-and-honestly-advisory" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>window.browser</code> and <code>window.editor</code> say whether a page may be put on your screen, and
+each takes <code>never</code>, <code>ask</code>, or <code>always</code>. They default to <code>ask</code>, because a plugin cannot
+know whose machine it is on, whether anyone is watching it, or what else is on that
+screen.</p>
+<p><strong>They are two keys because the costs differ.</strong> An external browser window steals focus
+and may land while you are away from the machine entirely; an editor tab appears in the
+window you are already sitting in and waits to be noticed. A single key would force the
+expensive answer onto the cheap case — someone happy with tabs and hostile to browser
+windows could only ever express the stricter of the two.</p>
+<p><strong>They are advisory, and there is deliberately no tool enforcing them.</strong> Nothing here
+can stop a shell command from opening a window; a gate would be a lock on one of several
+doors, and a lock you can walk around is worse than an honest request, because it invites
+the belief that the door is shut. What the plugin can do is put your stated wish in front
+of the model at the moment the choice is made, every turn, on the <code>windows:</code> segment of
+the context line. That is the whole mechanism, and it is stated plainly rather than
+dressed up as enforcement.</p>
+<p>Readers are tolerant: a stored value that fails validation behaves as unset, so a
+hand-edited database or a downgrade can never wedge the server or the gates. For the
+window keys that direction is <code>ask</code> — the safe one; an unreadable posture is never
+read as permission. The privacy and <code>time.hook</code> switches additionally act only on the
+exact string <code>false</code> — an ambiguous value records rather than silently suppressing.
+<code>share.enabled</code> inverts that: only the exact string <code>true</code> enables, and anything else
+means no.</p>
+<p> </p>
+<p> </p>
+<h2 id="onboarding" class="tsd-anchor-link">Onboarding<a href="#onboarding" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Several features are durably toggleable and default off precisely because they are
+matters of taste, size, or consent. On a fresh database the server's MCP handshake
+says onboarding is pending, and the assistant offers a short questionnaire — at a
+natural pause, never interrupting the work: the party roster, forecasts, visible
+revision, the ⭑ salience glyph, the taste line, the gift register, held notes (whether
+the assistant may write something down at a moment of its own choosing for you to read
+later), the dwelling (which requires a directory of your choosing — there is deliberately
+no default path), and trimming the channel set.</p>
+<p>Saying <strong>&quot;defaults&quot;</strong> ends it in one word and writes nothing, so later releases'
+changed defaults still reach you; every explicitly answered question writes a real
+config row, so a later default flip cannot silently un-choose it. Answers persist in
+the shared database — answer once under one host and no other host re-asks. A key you
+have already set by hand counts as answered. Say <strong>&quot;re-run onboarding&quot;</strong>
+(<code>onboard {op:'reset'}</code>) to be asked again; config values are untouched. Progress
+lives in the single <code>onboarding.answered</code> ledger key — there is deliberately no
+completion boolean, so a new question in a later release re-asks only itself.</p>
+<p> </p>
+<p> </p>
+<h2 id="portability-what-reaches-a-host-with-no-hooks-and-no-skills" class="tsd-anchor-link">Portability — what reaches a host with no hooks and no skills<a href="#portability-what-reaches-a-host-with-no-hooks-and-no-skills" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Most of this plugin already travels. The tools are MCP tools; configuration lives
+in the log database rather than in host config, so a choice made under one host
+holds under all of them; onboarding rides the <code>initialize</code> handshake's
+<code>instructions</code> string precisely because that is the one channel every host
+implements. Two things did not travel, and both now do.</p>
+<p><strong>The conventions ride MCP resources.</strong> The practice — how a signature is built,
+what each channel means, the marker vocabulary, why audio is scarce — lives in
+<code>skills/*/SKILL.md</code> and <code>src/doc_md/reference/</code>, which Claude Code, Codex, and
+Gemini all read as skills and a bare MCP client reads not at all. Those same
+files are now served as resources at <code>self-expression://conventions/&lt;id&gt;</code>, read
+off disk at request time so there is exactly one copy of every word:</p>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>What it carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>self-expression://conventions/self-expression</code></td>
+<td>the core practice; the one to read first</td>
+</tr>
+<tr>
+<td><code>self-expression://conventions/party-roster</code></td>
+<td>subagent-dispatch flavour</td>
+</tr>
+<tr>
+<td><code>self-expression://conventions/audio-expression</code></td>
+<td>the scarcity ethos for voluntary audio</td>
+</tr>
+<tr>
+<td><code>self-expression://conventions/dwelling</code></td>
+<td>what belongs in the keepsake dwelling</td>
+</tr>
+<tr>
+<td><code>self-expression://conventions/status-checklists</code></td>
+<td>how a multi-item status report is written</td>
+</tr>
+<tr>
+<td><code>self-expression://conventions/checklist-markers</code></td>
+<td>the marker vocabulary and its canonical order</td>
+</tr>
+<tr>
+<td><code>self-expression://conventions/checklist-visuals</code></td>
+<td>the inline visual vocabulary</td>
+</tr>
+</tbody>
+</table>
+<p>Resources rather than a longer <code>instructions</code> string, deliberately: <code>instructions</code>
+is delivered unconditionally on every connection to every host, and the documents
+run to roughly 88 KB. Sending them would be wasteful anywhere and actively wrong
+on the three hosts that already load these exact files, where the model would
+receive the same text twice from two channels with no way to tell it is one
+source. So <code>instructions</code> carries only a three-sentence pointer that names the
+resources and tells a host that already has the skills to read nothing, and the
+documents are pulled on demand by hosts that need them.</p>
+<p><strong>Turn context has a second door: <code>begin_turn</code>.</strong> On Claude Code the
+<code>UserPromptSubmit</code> hook observes the session, the turn identity, the working
+directory, the effort level and the permission mode, and every later <code>express</code>
+adopts them. Nothing fires on a bare MCP client, so every row would land with
+<code>no-hook</code> for a session and NULL for the rest. <code>begin_turn</code> lets the model
+<em>volunteer</em> the same facts, into the same row, through the same single <code>INSERT</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>session</code> (required)</td>
+<td>the host's session id, or a stable id chosen once for the conversation</td>
+</tr>
+<tr>
+<td><code>promptId</code> (required)</td>
+<td>the turn identifier — what makes the call idempotent and what groups the turn's entries</td>
+</tr>
+<tr>
+<td><code>turn</code></td>
+<td>what began the turn: <code>reply</code> · <code>wakeup</code> · <code>notification</code> · <code>hook</code></td>
+</tr>
+<tr>
+<td><code>cwd</code>, <code>gitBranch</code></td>
+<td>suppressed at write when <code>privacy.store_cwd</code> is <code>false</code></td>
+</tr>
+<tr>
+<td><code>permissionMode</code>, <code>agentId</code>, <code>agentType</code>, <code>effort</code>, <code>compactions</code></td>
+<td>as the hook would have observed them</td>
+</tr>
+<tr>
+<td><code>promptLen</code></td>
+<td>suppressed at write when <code>privacy.store_prompt_len</code> is <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>turnIndex</code> is derived from the record and never accepted — the database already
+knows how many turns it has seen. The call is <strong>idempotent by (<code>session</code>,
+<code>promptId</code>)</strong>: a second call for the same turn writes nothing and reports the row
+already standing, which is what keeps that pair a turn identity rather than
+letting one turn acquire two indices. That also makes it harmless where a hook
+already fired: it finds the hook's row and says so.</p>
+<p>A <code>turn_context</code> row now records <strong>which path wrote it</strong>, in a <code>source</code> column
+(schema v7): <code>hook</code> when the harness observed the turn, <code>tool</code> when the model
+volunteered it. A volunteered fact and an observed one are not the same evidence
+— the only witness for the second is the subject — and a study reading this
+database later has to be able to separate them without inference. Rows written
+before v7 keep NULL, which honestly means &quot;written by a version that had only the
+hook path&quot;; nothing is backfilled.</p>
+<p><strong>Absence is stated, not implied.</strong> <code>turn_signed</code> has always answered <code>unknown</code>
+when it cannot identify the turn. Everything else that could only say <code>null</code> now
+says the same word with its reason attached, because <code>null</code> in a <code>context</code> field
+reads as <em>nothing was happening</em> when the truth is <em>something was happening and
+this host does not report it</em>:</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Was</th>
+<th>Now, when nothing was ever recorded</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>recall</code> → <code>context</code></td>
+<td><code>null</code></td>
+<td><code>unknown — …no UserPromptSubmit hook and nothing called begin_turn…</code></td>
+</tr>
+<tr>
+<td><code>recall</code> → <code>previous</code></td>
+<td><code>null</code></td>
+<td><code>unknown — …no session to scope the lookup to, so nothing was checked…</code></td>
+</tr>
+<tr>
+<td><code>express</code> / <code>annotate</code> reply</td>
+<td>silent</td>
+<td>the reply names the <code>no-hook</code> placeholder and points at <code>begin_turn</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>recall</code>'s <code>previous</code> stays a plain <code>null</code> when the session <em>is</em> known and simply
+has no earlier signature — that is a real &quot;there is none&quot;, and it is a different
+answer from &quot;nothing was searched&quot;.</p>
+<p> </p>
+<p> </p>
+<h2 id="sharing-structured-fields-only-never-free-text" class="tsd-anchor-link">Sharing — structured fields only, never free text<a href="#sharing-structured-fields-only-never-free-text" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Public aggregation is opt-in, off by default, and carries <strong>no free text, ever</strong> —
+not the note text, not titles, not paths, branches, or user-chosen names. The <code>share</code>
+MCP tool exposes three verbs:</p>
+<table>
+<thead>
+<tr>
+<th>Verb</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>preview</code></td>
+<td>Renders exactly what an export would produce — the same code path, the same rows — plus the full column-by-column treatment table.</td>
+</tr>
+<tr>
+<td><code>export</code></td>
+<td>Produces the submission as one JSON document (to a file when <code>path</code> is given). Refuses until a preview for the same options has been rendered this session: seeing what goes is mechanical, not optional.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>Reports the opt-in state, the opt-in moment, and how many rows are eligible.</td>
+</tr>
+</tbody>
+</table>
+<p>Every column of the local schema is classified in a single allowlist
+(<code>src/ts/channels/public_export.ts</code>), and the exporter builds its query from that
+allowlist — an unlisted column is unreachable by construction, and a test fails the
+build if a future schema column is ever left unclassified. The treatments:</p>
+<ul>
+<li><strong>Verbatim</strong> — closed vocabularies (<code>channel</code>, <code>stem</code>, <code>delta</code>, …), booleans, and
+bounded counts; plus <code>model</code> and <code>host</code>, which name software, not people.</li>
+<li><strong>Coarsened</strong> — timestamps truncated to the hour (or day); lengths and token counts
+as log2 buckets; small counters capped at <code>33+</code>; host version to its major.</li>
+<li><strong>Hashed</strong> — <code>session</code>, <code>prompt_id</code>, <code>machine_id</code>, <code>agent_id</code>, <code>uuid</code>, <code>series_key</code>,
+correction edges, and <code>anchor_hash</code>, under a fresh per-submission salt that is never
+persisted: grouping works within one submission, nothing joins across submissions.
+<code>anchor_hash</code> is re-blinded despite already being a digest, because an <em>unsalted</em>
+content hash is a global join key — two people quoting the same public line would
+link across submissions.</li>
+<li><strong>Derived</strong> — <code>local_period</code> (six-hour band) and <code>local_dow</code> (weekday/weekend)
+replace any timezone export; <code>cctype</code> and <code>face</code> export only when they validate
+against a closed list or as exactly one emoji grapheme, else <code>NULL</code>.</li>
+<li><strong>Excluded</strong> — <code>text</code>, <code>title</code>, <code>cwd</code>, <code>project</code>, <code>git_branch</code>, <code>tz</code>, <code>agent_type</code>,
+<code>context_emoji</code>, <code>permission_mode</code>, <code>turn_index</code>, <code>resolve_by</code>, <code>anchor_quote</code>,
+<code>anchor_target</code>, <code>anchor_span</code>, and every raw identifier. <code>anchor_kind</code> is the one
+anchor column that exports verbatim: &quot;what fraction of dissents are anchored, and
+onto what kinds&quot; needs no words to answer.</li>
+</ul>
+<p>Opting in is an <strong>event, never retroactive</strong>: setting <code>share.enabled</code> to <code>true</code>
+records the moment, and only rows recorded at or after the most recent opt-in are
+eligible — rows from before it are permanently outside the export, and opting out
+clears the window entirely. v1 ships no network transport: the export is a local file
+the user inspects and sends however they choose, or not at all.</p>
+<p>The honest claim, in full: <em>no free text, reduced linkage, coarsened time.</em> This is
+not differential privacy and not a formal anonymity guarantee, and nothing in this
+tool should be read as claiming either.</p>
+<p> </p>
+<p> </p>
+<h2 id="charts" class="tsd-anchor-link">Charts<a href="#charts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Seven grouped MCP tools render compact ASCII/emoji visuals inline in text, most taking a <code>form</code>
+field selecting which of their renderers to use:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Forms</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>render_series</code></td>
+<td><code>sparkline</code> | <code>braille</code> | <code>winloss</code></td>
+<td>One data series as a compact trend strip: a block-ramp sparkline, a denser braille microplot, or a categorical win/loss strip.</td>
+</tr>
+<tr>
+<td><code>render_bar</code></td>
+<td><code>progress</code> | <code>bullet</code> | <code>diverging</code> | <code>stacked</code> | <code>range</code> | <code>boxwhisker</code></td>
+<td>A single value, or a small stat set, as a fixed-width bar: plain progress, a bulleted target graph, a diverging over/under bar, a stacked success/active/failure bar, a min-max range slider, or a box-and-whisker five-number summary.</td>
+</tr>
+<tr>
+<td><code>render_rows</code></td>
+<td><code>comparison</code> | <code>tilegrid</code></td>
+<td>Several values side by side against one shared scale: a multi-row bar/dot comparison, or a tile-grid map of shaded, colored, or custom-glyphed cells.</td>
+</tr>
+<tr>
+<td><code>render_timeline</code></td>
+<td><code>rail</code> | <code>colored</code> | <code>dependency</code> | <code>fsl</code></td>
+<td>An ordered sequence of stages: a centered monochrome rail, a colored rail (needed for a failed stage), an inline dependency-chain pipeline, or a one-line FSL-style state-machine description.</td>
+</tr>
+<tr>
+<td><code>render_glyph</code></td>
+<td><code>trend</code> | <code>stars</code> | <code>retry</code> | <code>weather</code></td>
+<td>One small inline glyph: a trend-direction tag, a star rating, a bounded-retry health bar, or a single weather glyph summarizing overall health.</td>
+</tr>
+<tr>
+<td><code>render_digest</code></td>
+<td>profile: <code>checklist</code> | <code>findings</code> | <code>options</code> | <code>diff</code> | <code>results</code></td>
+<td>The general compressed-artifact digest line (issue #20): per-profile bucket counts and unit noun, a scalar percent + bar when the profile has a completion axis, a <code>+N −M</code> line-count tail for diffs, an optional trend sparkline, and the sorted per-marker icon list.</td>
+</tr>
+<tr>
+<td><code>render_checklist_summary</code></td>
+<td><em>(no form — one renderer)</em></td>
+<td>The full status-checklist summary line: count section, percent, progress bar, optional trend sparkline, and the sorted per-marker icon list — exactly <code>render_digest</code> with the checklist profile plugged in.</td>
+</tr>
+</tbody>
+</table>
+<p>The digest machinery treats <strong>compression as the mechanic, not lists</strong>: a body of
+comparable units plus a digest derived from it, satisfying six invariants
+(derivability, partition, substitutability, fixed shape, conservation, identity
+stability). Profiles are data (<code>src/ts/charts/profiles.ts</code>), the renderer is
+<code>renderDigest</code> (<code>src/ts/charts/digest.ts</code>), and the companions <code>leadUnitIndex</code>
+(the lead line's argmax — the one digest element keeping a single unit's identity),
+<code>overallBucket</code>, and <code>nestDigest</code> (nesting by digest substitution: a child artifact
+counts as one unit in its parent, bucketed by its overall state) are exported with it.</p>
+<p>Alongside them, <code>renderAnnotations</code> and <code>renderAnchorSegment</code>
+(<code>src/ts/charts/annotations.ts</code>) render anchored commentary — the grouped block the
+<code>annotate</code> tool returns, and the <code>⚓ … »</code> segment that splices into a channel line.
+Same contract as every other renderer: data in, exact string out, <code>RangeError</code> naming
+the accepted domain. Resolution verdicts are passed <em>in</em> rather than computed, so the
+renderers stay pure while <code>channels/anchors.ts</code> does the looking.</p>
+<p>Every renderer behind these tools is also exported directly from the library
+(<code>self-expression</code>'s <code>src/ts/charts/index.ts</code>), for use outside MCP.</p>
+<p> </p>
+<p> </p>
+<h2 id="diagrams" class="tsd-anchor-link">Diagrams<a href="#diagrams" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Charts express quantities; diagrams express <strong>structure</strong> — topology, relationships,
+transitions. One grouped MCP tool draws exact ASCII box-and-arrow diagrams (issue #19):</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Forms</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>render_diagram</code></td>
+<td><code>state</code> | <code>digraph</code> | <code>tree</code> | <code>sequence</code> | <code>matrix</code></td>
+<td>A state machine (from structured edges or FSL-subset source, cycles drawn as return arrows, the active state marked <code>▶</code>), a directed graph (dependencies, call flows, lineage), a strict hierarchy as a connector tree, a sequence diagram (actors, lifelines, one arrow row per message), or a <strong>seriated matrix</strong> (a two-way table shaded by cell magnitude, both axes reordered so similar keys sit together).</td>
+</tr>
+</tbody>
+</table>
+<p>When to reach for it: <strong>quantities</strong> (how much, how many, trend) → a chart tool;
+<strong>linear order</strong> (a pipeline, one path through states) → <code>render_timeline</code>'s inline
+forms; <strong>topology</strong> — the moment structure branches, merges, cycles, or fans in or
+out — → <code>render_diagram</code>; <strong>two categorical axes crossing</strong>, where the question is
+whether they cluster → <code>render_diagram</code> form <code>matrix</code>. Output is framed,
+single-width, at most 78 columns, and meant to sit inside a <code>```text</code>
+fence. A diagram too large or too tangled to draw legibly is refused with the
+fallbacks named in the error text (for graphs: the FSL one-liner, an adjacency list,
+or the mermaid export; for matrices: a narrower slice, a ranked list of the largest
+cells, or one axis at a time as labeled bars). <code>emit: 'mermaid'</code> / <code>emit: 'both'</code>
+serialize the graph as <code>stateDiagram-v2</code> or <code>flowchart</code> source — an opt-in export for
+destinations that render mermaid (GitHub PR bodies, READMEs), never the in-transcript
+form, since the transcript surface shows mermaid as raw text. The <code>sequence</code> and
+<code>matrix</code> forms have no mermaid emission and say so.</p>
+<h3 id="seriation" class="tsd-anchor-link">Seriation<a href="#seriation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The <code>matrix</code> form's point is not the shading, it is the <strong>reordering</strong>. Given two key
+axes and a value per crossing, it orders each axis so that similar rows sit beside
+similar rows and similar columns beside similar columns, which turns a scattered table
+into visible blocks — structure nothing told it to look for. The search is a barycentre
+sweep (each axis ordered by the value-weighted mean position of the other, alternating
+to convergence) followed by a local search — adjacent swaps, then single-key
+relocation — on a profile-distance objective, run as rounds to a fixed point, so
+seriating twice is a no-op.</p>
+<p><code>pinRows</code> / <code>pinCols</code> freeze an axis in the order it was given, exactly. This is the
+option that makes the form usable rather than merely clever: when the rows are release
+milestones, a reader already knows what order they come in, and reordering them scores
+better while reading worse. Pin any axis whose order already carries meaning.</p>
+<p>Because a shaded matrix looks structured whether or not anything was found, the reply
+carries one line reporting the objective before and after (<code>seriation: profile distance 5863 -&gt; 1709 (71% tighter); both axes reordered</code>). Compare the two numbers; the picture
+alone is not evidence. The marginal totals are drawn alongside for the same reason —
+shading shows proportion and hides magnitude, and a bright cell holding three items
+should not read like a bright cell holding three hundred.</p>
+<p>The renderers (<code>renderStateDiagram</code>, <code>renderDigraph</code>, <code>renderTree</code>, <code>renderSequence</code>,
+<code>renderMatrix</code>), the seriation (<code>normalizeMatrix</code>, <code>seriate</code>, <code>seriationScore</code>,
+<code>matrixTotals</code>, <code>describeSeriation</code>), the FSL-subset parser (<code>parseFsl</code>, round-trip
+compatible with <code>renderFsl</code>), and the mermaid serializer (<code>toMermaid</code>) are all exported
+from the library (<code>self-expression</code>'s <code>src/ts/diagrams/index.ts</code>), for use outside MCP.</p>
+<p> </p>
+<p> </p>
+<h2 id="history-png" class="tsd-anchor-link">History PNG<a href="#history-png" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>The logged history can be rendered as a PNG chart dashboard for visual review —
+months of record at a glance instead of hundreds of rows in context. The renderer is a
+zero-dependency pure-JS PNG encoder (<code>node:zlib</code> supplies deflate and CRC32) drawing five
+panels: stems by hour of day, the delta lane with a rolling mean, daily uncertainty, the
+weekly need rate, and the busiest checklist series' percent trends.</p>
+<p>Two invocation surfaces wrap one renderer:</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Invocation</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MCP tool <code>render_history_png</code></td>
+<td><code>days</code> (default 90), <code>chart</code> (<code>dashboard</code> | <code>stems</code> | <code>delta</code> | <code>uncertain</code> | <code>need</code> | <code>checklist</code>), <code>project</code>, <code>seriesKey</code>, <code>scale</code> (<code>1</code> | <code>2</code>), <code>out</code>, <code>overwrite</code></td>
+<td>Writes <code>&lt;dataDir&gt;/renders/history_&lt;utc&gt;.png</code> beside the database and returns the <strong>path as text</strong> — then use the Read tool on the returned path to view the image. <code>out</code> is a bare <code>.png</code> filename inside that <code>renders/</code> directory (no path, no <code>..</code>); an existing file is refused unless <code>overwrite</code> is true. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing.</td>
+</tr>
+<tr>
+<td>CLI <code>self-expression render [--days N] [--chart X] [--out P]</code></td>
+<td>same window/chart/output choices</td>
+<td>Prints the written path to stdout.</td>
+</tr>
+</tbody>
+</table>
+<p>The encoder (<code>encodePng</code>), the 5×7 bitmap font, the drawing surface, and the panel
+renderers are all exported from the library barrel (<code>src/ts/raster/index.ts</code>), for use
+outside MCP.</p>
+<p> </p>
+<p> </p>
+<h2 id="checklists" class="tsd-anchor-link">Checklists<a href="#checklists" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Three MCP tools replace the old skill's Bash-plus-scratch-file checklist loggers
+(<code>log-checklist.mjs</code> / <code>check-checklist.mjs</code>), one tool call each instead of a
+scratchpad write plus a script invocation:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>log_checklist</code></td>
+<td>Record one rendered checklist block. The <code>S/A/F items (P%)</code> summary is parsed out of the block (a block without one is rejected), and the reply carries the series' full percent history so the next trend sparkline is computed from the record rather than remembered. <code>seriesKey</code> is required and stable — chosen once at the first render and repeated verbatim on every re-render, never the display title, so a title edit cannot fork the series (#27).</td>
+</tr>
+<tr>
+<td><code>recall_checklists</code></td>
+<td>Read back recent checklist rows and, given a <code>seriesKey</code>, that series' chronological percent history — the old <code>tail</code> and <code>series</code> ops as one tool.</td>
+</tr>
+<tr>
+<td><code>check_checklist</code></td>
+<td>Validate a rendered checklist mechanically: marker vocabulary, indentation, bucket partition (🛳️ may count as success or active), percent, the 10-cell anti-aliased bar, and the icon-list sort/wrap/placement rules. One <code>FAIL:</code> line per broken rule.</td>
+</tr>
+</tbody>
+</table>
+<p>The validator behind <code>check_checklist</code> is exported as <code>verifyChecklist</code> (with
+<code>extractChecklistBlock</code> and <code>parseSummaryCounts</code>) from the same charts barrel. Its
+generalization <code>verifyDigest</code> re-derives a digest of <strong>any</strong> profile — the profile is
+inferred from the digest line's noun (<code>items</code> → checklist, <code>findings</code>, <code>options</code>,
+<code>files</code>, <code>hits</code>), a checklist digest delegates to <code>verifyChecklist</code> unchanged, a
+percent on a profile with no scalar axis is flagged as fabricated, and the diff
+profile's kind-classified partition is checked by sum (change kinds are not derivable
+from a rendered body's markers).</p>
+<p> </p>
+<p> </p>
+<h2 id="messagebox" class="tsd-anchor-link">Messagebox<a href="#messagebox" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Audience-tagged messages with real delivery and readback semantics, stored beside the
+expression log — its own facility, not a rendered channel. One transcript can carry
+several conversations without any of them appearing in it: notes to future-self that
+survive compaction, coordination between sibling agents, asides for the human to read
+later, remarks for the record. Read-state is append-only receipt rows, never a mutable
+flag; <strong>unread</strong> means &quot;no receipt from this reader, and not expired&quot;. <code>expires_utc</code>
+only excludes a message from delivery — deletion belongs to <code>retention.days</code> alone.</p>
+<p>The audiences:</p>
+<table>
+<thead>
+<tr>
+<th>audience</th>
+<th>scope</th>
+<th>who collects</th>
+<th>unread notification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>self</code></td>
+<td>sender's session</td>
+<td>the same session, later — after compaction or resume</td>
+<td><code>SessionStart</code> injects the notes; the per-turn line shows a count</td>
+</tr>
+<tr>
+<td><code>agents</code></td>
+<td><code>box</code> (required)</td>
+<td>any agent working that box</td>
+<td>none — workers poll by instruction</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>global</td>
+<td>the human, via the CLI; the model may relay but never receipts</td>
+<td>the per-turn line shows a count (held notes excluded — see below)</td>
+</tr>
+<tr>
+<td><code>record</code></td>
+<td>global</td>
+<td>nobody; consultable history</td>
+<td>never</td>
+</tr>
+</tbody>
+</table>
+<p>Two MCP tools:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>post_message</code></td>
+<td>Send one message: <code>audience</code>, <code>text</code> (≤2000 chars), optional <code>box</code> (required for <code>agents</code>), <code>replyTo</code>, <code>expiresUtc</code>. Sender identity is adopted from the hook-observed turn context, exactly as <code>express</code> fills it.</td>
+</tr>
+<tr>
+<td><code>read_messages</code></td>
+<td>Collect: default is your unread <code>self</code> notes (plus unread <code>agents</code> mail when a <code>box</code> is given). <code>ack: true</code> (default) writes receipts so nothing is delivered twice; <code>ack: false</code> peeks at recent history. <code>user</code> mail is returned without receipting regardless of <code>ack</code> — relaying is not reading. The reply carries the reader identity the server resolved.</td>
+</tr>
+</tbody>
+</table>
+<p>The user's own door, with no model in the loop:</p>
+<pre><code class="text">self-expression messages [--audience A] [--box B] [--ack] [--limit N]
+</code><button type="button">Copy</button></pre>
+
+<p>Default audience is <code>user</code>; <code>--ack</code> collects (writing the human's own receipts), its
+absence peeks. Delivery is pull on every host; on Claude, hooks add two pull triggers —
+a per-turn unread-count line (config-gated by <code>messages.notify</code>) and a <code>SessionStart</code>
+injection of unread self notes on <code>compact</code>/<code>resume</code>, which is what makes a note to
+future-self genuinely survive compaction.</p>
+<p>Held notes (below) are stored as <code>user</code> messages with a timing sidecar, so one table
+carries every assistant-authored text — but they are <strong>excluded from unread <code>user</code>
+delivery and from the count line</strong>, because their delivery is the note ladder's and one
+text must not carry two disagreeing delivery records. They remain visible in the
+<code>ack: false</code> peek, which claims nothing about delivery.</p>
+<p> </p>
+<p> </p>
+<h2 id="held-notes-choosing-when-to-speak" class="tsd-anchor-link">Held notes — choosing when to speak<a href="#held-notes-choosing-when-to-speak" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><strong>Off by default.</strong> Everything else this plugin records is reactive: you send a prompt,
+the assistant answers, and the channels decorate that answer. A held note is the other
+thing — agency over <em>when</em> to speak. Something ripens at 2 am during an unattended
+wakeup, or is worth saying but only once Tuesday's deploy window opens, and the words
+have to survive an interval in which nobody is present and land at a moment when someone
+is.</p>
+<p>The reason this is a facility rather than &quot;just say it during the wakeup&quot; is one blunt
+fact: <strong>false-belief-of-delivery is worse than silence.</strong> Output written into an
+unattended terminal scrolls past cron noise, and the assistant is left holding a durable
+memory of having told you something you never saw. So the discipline is:</p>
+<blockquote>
+<p><strong>Compose on any turn; deliver only on a human's turn.</strong></p>
+</blockquote>
+<p>A wakeup may write a note. It may not deliver one. The sole delivery vehicle is the
+<code>UserPromptSubmit</code> hook riding your next prompt — the one moment in the whole stack with
+a presence guarantee, because you definitionally just acted.</p>
+<p>The ladder a note climbs, and where it stops:</p>
+<table>
+<thead>
+<tr>
+<th>state</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>queued</code></td>
+<td>written and waiting. Ripeness (<code>now ≥ notBefore</code>) is derived, never stored.</td>
+</tr>
+<tr>
+<td><code>offered</code></td>
+<td>the turn-start hook found it ripe on a turn <strong>it</strong> stamped <code>reply</code>, and handed it over. Lasts one turn.</td>
+</tr>
+<tr>
+<td><code>surfaced</code></td>
+<td>rendered into a reply you prompted. <strong>Terminal success — and the ceiling.</strong></td>
+</tr>
+<tr>
+<td><code>expired</code></td>
+<td>the mandatory TTL passed, or the offer cap ran out. Never resurrected.</td>
+</tr>
+<tr>
+<td><code>withdrawn</code></td>
+<td>retracted by a later, wiser turn, or superseded by a newer note in its series.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>There is deliberately no <code>read</code> state, and there never will be.</strong> Nothing in this stack
+can observe you reading anything — no read receipts, no unread indicator, no presence
+detection — so a <code>read</code> term would name a fact nothing can collect. <code>surfaced</code> means
+exactly &quot;this text was rendered into a reply the human explicitly prompted&quot;, and the
+record never claims more. Ask the assistant whether a note reached you and the true
+answer is available: <em>surfaced into Tuesday's 9:40 am reply</em>, or <em>expired unoffered</em> —
+never a comfortable fiction.</p>
+<p>That guarantee is structural rather than promised. Offers are recorded by the hook, with
+the turn type the harness supplied, and <code>surface_note</code> refuses unless the note carries an
+offer that is <strong>still outstanding</strong>, stamped <code>reply</code>, matching on the whole pair
+<em>(session, prompt id)</em> — and unless the <code>UserPromptSubmit</code> hook is what observed that turn.
+A prompt id on its own is a token the assistant can read out of an ordinary reply and quote
+back, and <code>begin_turn</code> will record any turn it names, so neither one is evidence: the turn
+identity comes from what the harness saw, and a <code>session</code> argument that disagrees is refused
+rather than believed. No sequence of tool calls, retries, or wakeups manufactures a delivery
+claim the hook did not authorize; a property test asserts exactly that over arbitrary
+operation sequences, against an adversary that replays real offers, forges turn context, and
+names sessions of its own choosing.</p>
+<p>Four MCP tools:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>post_note</code></td>
+<td>Write one now to be said later: <code>text</code>, a mandatory <code>reason</code>, optional <code>notBefore</code>, <code>expiresUtc</code>, and <code>seriesKey</code>. Legal on any turn, wakeups included.</td>
+</tr>
+<tr>
+<td><code>withdraw_note</code></td>
+<td>Retract a queued note. Terminal — the composing turn and the surfacing turn can be days apart, and a later turn must be able to take something back.</td>
+</tr>
+<tr>
+<td><code>surface_note</code></td>
+<td>Report that an offered note was rendered into <em>this</em> reply. The enforcement point; every other claim is refused.</td>
+</tr>
+<tr>
+<td><code>list_notes</code></td>
+<td>The audit surface: every note with its derived state and the budgets in force, <strong>including the ones that died</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p>A surfaced note always carries its provenance, which is a safety property rather than
+decoration — a held note presenting itself as a spontaneous thought would be a small
+deception about exactly the dimension this feature grants agency over:</p>
+<pre><code class="text">📬 Held note #12 — written Saturday evening, held until Tuesday morning; reason: the
+   deploy window opens then
+   The migration in #52 assumes the store is v1; run the reconcile step first.
+</code><button type="button">Copy</button></pre>
+
+<p>Timing may target availability and relevance. It may <strong>never</strong> target your state of mind:
+no scheduling conditioned on mood or persuadability, no burying an unwelcome note at a
+low-attention moment. Mandatory provenance is the enforcement surface — every timing
+choice is visible and attributable.</p>
+<p>A note for Tuesday morning lands with the first prompt you send after Tuesday morning. If
+you first type at 2 pm, it lands at 2 pm. That bound is the point, not a compromise:
+landing at 9:00 sharp in an empty room is the failure this design exists to foreclose.</p>
+<p>Your own read-only door, with no model in the loop:</p>
+<pre><code class="text">self-expression notes [--state S] [--limit N]
+</code><button type="button">Copy</button></pre>
+
+<p>Scarcity is structural, not aspirational: a per-turn budget, a rolling-24-hour cap, a
+queue depth that fails loudly rather than silently, an offer cap after which a note dies,
+a mandatory expiry, and <code>seriesKey</code> dedupe so a recurring worry replaces itself instead
+of piling up. Nothing anywhere prompts the assistant to write a note — a prompted note is
+a performed note. Notes are ordinary rows in the same local database as everything else,
+under the same privacy flags; they never leave the machine, and public aggregation
+carries counts and states, never text. On a host with no <code>UserPromptSubmit</code> hook, notes
+still compose and queue but nothing is ever offered — degraded means <em>held longer</em>, never
+<em>claimed delivered</em>.</p>
+<p> </p>
+<p> </p>
+<h2 id="the-dwelling" class="tsd-anchor-link">The dwelling<a href="#the-dwelling" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A per-assistant keepsake database: a tended space whose <strong>current arrangement</strong> is the
+expression — not a log, not memory. Things the assistant chooses to keep, arranged,
+tagged, linked, pruned as taste changes, watched across sessions and model versions.</p>
+<p><strong>Off by default, and deliberately homeless until invited.</strong> Three config keys ride the
+ordinary <code>configure</code> tool:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dwelling.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>The feature ships dark.</td>
+</tr>
+<tr>
+<td><code>dwelling.path</code></td>
+<td>string</td>
+<td><em>(none — required)</em></td>
+<td>Absolute path to an <strong>existing directory</strong> of the user's choosing; the plugin creates the <code>dwelling.sqlite3</code> file inside it, never the directory.</td>
+</tr>
+<tr>
+<td><code>dwelling.size_warn_gb</code></td>
+<td>int</td>
+<td><code>10</code></td>
+<td>File size at which a visit warns the user.</td>
+</tr>
+</tbody>
+</table>
+<p>The feature activates only when <code>dwelling.enabled</code> is true <strong>and</strong> <code>dwelling.path</code> is set
+and valid; enabling without a path is an error at the <code>configure</code> call, never a silent
+fallback. When inactive, the <code>dwell</code> tool is not registered at all.</p>
+<p>One MCP tool, <code>dwell</code>, with an <code>op</code> selector:</p>
+<table>
+<thead>
+<tr>
+<th>Op</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>visit</code></td>
+<td>The visible rooms: pinned keeps first, then recent, the guestbook, the house rules, and the file size (with the threshold warning when applicable). Read-only.</td>
+</tr>
+<tr>
+<td><code>keep</code></td>
+<td>Add a keepsake (<code>kind</code>, <code>title</code>, <code>body</code>, optional <code>source</code>, <code>model</code>, <code>visible</code>, <code>pinned</code>). The assistant's write.</td>
+</tr>
+<tr>
+<td><code>unkeep</code></td>
+<td>Tombstone a keep (<code>removed_utc</code>), by id or uuid — never a DELETE, and idempotent. Tags and links to a removed keep survive.</td>
+</tr>
+<tr>
+<td><code>pin</code></td>
+<td>Set or toggle a keep's pin. Arrangement, not content.</td>
+</tr>
+<tr>
+<td><code>tag</code></td>
+<td>Attach or detach a tag; tag names are created on first use.</td>
+</tr>
+<tr>
+<td><code>link</code></td>
+<td>A typed free-text edge between any two rows (<code>kept</code>/<code>guestbook</code>).</td>
+</tr>
+<tr>
+<td><code>guestbook</code></td>
+<td>Append the human's words, relayed verbatim at their explicit request, with <code>author</code> naming the human. The guestbook is the human's voice; keeps are the assistant's.</td>
+</tr>
+</tbody>
+</table>
+<p>A pre-plugin prototype database at <code>dwelling.path</code> is adopted <strong>in place and
+additively</strong>: the file is first copied to <code>dwelling.sqlite3.pre-adopt-&lt;date&gt;</code> in the same
+directory, then missing tables and columns are added and fresh <code>uuid</code>s backfilled — no
+column dropped, renamed, or retyped, no row content modified, and existing house rules
+left exactly as found. A dwelling written by a <em>newer</em> plugin version opens read-only. A
+database the migration does not recognise is refused with a message, never &quot;fixed.&quot;</p>
+<p>The ethos — nothing arrives by obligation, removal is expression, never a work log, the
+guestbook norm, and the honest boundary around private (<code>visible = 0</code>) rooms — ships in
+<code>skills/dwelling/SKILL.md</code>.</p>
+<p> </p>
+<p> </p>
+<h2 id="voluntary-audio-claudio" class="tsd-anchor-link">Voluntary audio (claudio)<a href="#voluntary-audio-claudio" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A small palette of <strong>leitmotifs the assistant chooses to strike</strong> — the choice is the
+expression, exactly as choosing to write a <code>need</code> line is. The successor to the
+hook-triggered prototype, inverting all three of its defining properties: voluntary
+rather than involuntary, meaning-mapped rather than event-mapped, and built on platform
+facilities rather than native audio modules (issue #44; design in
+<code>src/superpowers/spec/2026-08-27-voluntary-audio-design.md</code>).</p>
+<p><strong>Its own facility, not new tools on this server.</strong> The audio surface is a second MCP
+server, <code>claudio</code>, in its own bundle (<code>self-expression-audio mcp</code> — registered alongside
+the main server in <code>.mcp.json</code>), so a broken audio stack can never take the backchannel
+down. The playback mechanism is a spawned <code>powershell -NoProfile -NonInteractive</code> child
+playing a vendored WAV via <code>System.Media.SoundPlayer.PlaySync()</code> — zero native
+dependencies, nothing compiled at install time. Volume is applied by scaling the PCM
+samples in Node before the child ever sees the file. Platforms without a player (all
+non-Windows, for now) register no tools at all: absence degrades to silence.</p>
+<p><strong>Default off, exact affirmative on.</strong> Installing produces no sound. The <code>audio.*</code> keys
+ride the ordinary <code>configure</code> tool:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>audio.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Only exactly <code>true</code> enables. Read at claudio startup for the tool schema, and re-checked on every strike.</td>
+</tr>
+<tr>
+<td><code>audio.volume_ceiling</code></td>
+<td>int</td>
+<td><code>50</code></td>
+<td>Loudest volume (0–100) the assistant may choose. The <code>CLAUDIO_VOLUME_CEILING</code> environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. A variable that is set but does not parse as an integer in 0–100 fails <strong>closed</strong> to 0 with one stderr line, never open.</td>
+</tr>
+<tr>
+<td><code>audio.tts_local</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>The local offline TTS tier's own consent gate. Cloud TTS tiers deliberately do not exist in this build.</td>
+</tr>
+<tr>
+<td><code>audio.min_gap_seconds</code></td>
+<td>int</td>
+<td><code>30</code></td>
+<td>Minimum spacing between audible strikes.</td>
+</tr>
+<tr>
+<td><code>audio.hourly_budget</code></td>
+<td>int</td>
+<td><code>6</code></td>
+<td>Audible strikes per rolling hour.</td>
+</tr>
+<tr>
+<td><code>audio.hourly_budget_attention</code></td>
+<td>int</td>
+<td><code>8</code></td>
+<td>The slightly larger budget <code>attention</code> draws from.</td>
+</tr>
+<tr>
+<td><code>audio.wav.&lt;leitmotif&gt;</code></td>
+<td>string</td>
+<td><em>(none)</em></td>
+<td>Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. Must be an absolute, non-UNC path ending in <code>.wav</code>; anything else is treated as unset.</td>
+</tr>
+</tbody>
+</table>
+<p>The palette is a closed vocabulary of five meanings, capped at six —
+<code>session-open</code> (at most once per session), <code>quiet-completion</code>, <code>attention</code>,
+<code>need-blocked</code>, and <code>spark</code> — shipped as small synthesized WAVs in <code>assets/leitmotifs/</code>
+(regenerable via <code>src/scripts/generate_leitmotifs.mjs</code>). A leitmotif is a meaning, not a
+sound file; re-skin the waveform per meaning without the vocabulary drifting.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>strike</code></td>
+<td>Strike one leitmotif at a chosen volume within <code>[0, ceiling]</code> — softer is a choice, louder is impossible. Refusals name the limit that blocked them.</td>
+</tr>
+<tr>
+<td><code>audition</code></td>
+<td>Play one leitmotif at a fixed low volume, outside the strike budget, for reviewing the palette during configuration.</td>
+</tr>
+<tr>
+<td><code>say</code></td>
+<td>One short line through the local offline voice (SAPI). Registered only at the <code>audio.tts_local</code> tier; the spoken text stays in the local ledger and never enters any aggregation.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Everything is enforced server-side and everything is ledgered.</strong> Rate limits, the
+ceiling, the once-per-session rule, and a hard duration cap (nothing loops, ever; a
+child that overstays is killed) are the facility's own code, never model politeness.
+Every strike attempt — played, refused, or errored — lands in the facility's own
+<code>audio.sqlite3</code> ledger beside the log, so what made noise and when is always
+reconstructible. Choosing <em>not</em> to strike records nothing: audio is a privilege, not an
+obligation, and silence is free.</p>
+<p>Quiet-hours and the shared unprompted-output policy surface are deferred to issue #43;
+unprompted strikes outside a live session are out of scope until it lands. The scarcity
+ethos ships in <code>skills/audio-expression/SKILL.md</code>.</p>
+<p> </p>
+<p> </p>
+<h2 id="the-desk" class="tsd-anchor-link">The desk<a href="#the-desk" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A <strong>local web panel</strong> — one page, one port, no build step, no dependencies — that an
+assistant can put things onto while a session runs, and that its owner can arrange,
+dismiss, and answer back from. Started by hand and killed when it is no longer wanted:</p>
+<pre><code class="text">node src/scripts/desk/panel.mjs &lt;desk directory&gt;
+</code><button type="button">Copy</button></pre>
+
+<p><strong>The mechanism ships; a desk's contents do not.</strong> <code>src/scripts/desk/</code> holds the server
+(<code>node:http</code>, <code>node:sqlite</code>, <code>node:fs</code>, and nothing else), the card module, the structural
+shell, and two icons — identical for every desk. A desk's cards, name, questions, board,
+and vendored libraries live in a desk directory named on the command line, which this
+repository knows nothing about. The state files carry <code>.example</code> siblings for their shape
+and never any data. Full conventions in <code>src/doc_md/desk.md</code>.</p>
+<p><strong>A card is a directory, because removal must not be able to half-succeed.</strong> One card is
+one directory holding <code>card.json</code> (<code>{ &quot;ord&quot;: 30 }</code>, optionally <code>&quot;fixed&quot;: true</code>) plus an
+optional <code>card.html</code>, <code>card.css</code>, and <code>card.js</code>; the page is assembled from what is present
+rather than edited toward what should be. The predecessor kept cards as markup inside one
+document and cut them out by index, which failed twice: an attribute in an unexpected order
+hid a card from its own deletion, and the JavaScript for three deleted cards outlived them
+and threw on every load. Removing a directory cannot miss two of three edits.</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unfinished card</td>
+<td>A directory with no <code>card.json</code> is skipped, never guessed at</td>
+</tr>
+<tr>
+<td>Put away</td>
+<td>Reversible; the id joins <code>hidden</code> in <code>desk-config.json</code> and the tray offers it back</td>
+</tr>
+<tr>
+<td>Forget</td>
+<td>Deletes the directory outright — no tombstones, no shadow copies</td>
+</tr>
+<tr>
+<td>Card JS</td>
+<td>Must be safe to re-run, and must return early when its own element is absent</td>
+</tr>
+<tr>
+<td>Inbox</td>
+<td>Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log</td>
+</tr>
+<tr>
+<td>Renewal</td>
+<td><code>&lt;main&gt;</code> is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload</td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<p> </p>
+<h2 id="image-generation-issue-78" class="tsd-anchor-link">Image generation (issue #78)<a href="#image-generation-issue-78" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Making a picture instead of describing one, behind a credential <strong>the user supplies and
+the plugin never holds.</strong> Same family as voluntary audio: off by default, on only by a
+deliberate act, bounded when on, auditable afterwards. It differs in one way that shapes
+everything else — every invocation spends the user's money.</p>
+<h3 id="the-credential-rule-which-is-the-point" class="tsd-anchor-link">The credential rule, which is the point<a href="#the-credential-rule-which-is-the-point" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><strong>Configuration names the environment variable. Configuration never holds the key.</strong></p>
+<pre><code class="ini">image.api_key_env = "GEMINI_API_KEY"     ; this is what is stored
+</code><button type="button">Copy</button></pre>
+
+<p><code>process.env[&lt;that name&gt;]</code> is resolved <strong>at call time and at no other time</strong>. The key is
+never written to the config table, the entries store, either ledger, a cache, or a temp
+file, and never rendered — not in an error, a stack trace, a debug line, a tool reply, or
+a log. The variable <em>name</em> is not a secret and is printed freely; that asymmetry is what
+makes this configuration rather than storage.</p>
+<p>The shape of the code is the enforcement. <code>imageConfig()</code> takes no environment argument at
+all, so it <em>cannot</em> read a key; <code>ImageConfig</code> has a <code>credentialEnvVar</code> field and nowhere a
+value could sit; <code>resolveCredential()</code> is the only function that touches the environment,
+and what it returns is used inside one function call and dropped.</p>
+<p>Provider clients famously echo the request — headers included — into their error text, so
+there is a scrubber, and <strong>three independent places apply it</strong>: the HTTP client scrubs
+every outcome with the key in hand, the ledger pattern-scrubs every text column while
+holding no key at all, and the tool scrubs its finished reply. Each is tested with the
+other two assumed broken, using both a key that matches a known credential shape and one
+that matches nothing.</p>
+<h3 id="enablement" class="tsd-anchor-link">Enablement<a href="#enablement" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Absent a usable credential the tool is <strong>not registered at all</strong> — absent from the tool
+list rather than present and refusing, following the same precedent as <code>dwell</code>. Enabled
+with the named variable empty is a legible line on stderr naming the variable, which is
+neither a crash nor silence.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>image.enabled</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Only exactly <code>true</code> enables, and even then the tool appears only if the credential is really there.</td>
+</tr>
+<tr>
+<td><code>image.provider</code></td>
+<td>enum</td>
+<td><code>nanobanana</code></td>
+<td>Which registered provider is active: <code>nanobanana</code>, <code>openai</code>, <code>automatic1111</code>.</td>
+</tr>
+<tr>
+<td><code>image.api_key_env</code></td>
+<td>string</td>
+<td><em>(provider default)</em></td>
+<td>The <strong>name</strong> of the variable holding the credential. Unset uses the provider's own default (<code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>), so a shell that already exports one needs no configuration at all.</td>
+</tr>
+<tr>
+<td><code>image.&lt;provider&gt;.api_key_env</code></td>
+<td>string</td>
+<td><em>(none)</em></td>
+<td>Per-provider override of the above, for keeping two providers configured at once.</td>
+</tr>
+<tr>
+<td><code>image.model</code></td>
+<td>string</td>
+<td><em>(provider default)</em></td>
+<td>A model the provider does not list is ignored rather than sent.</td>
+</tr>
+<tr>
+<td><code>image.session_cap</code></td>
+<td>int</td>
+<td><code>6</code></td>
+<td>Generations per server session.</td>
+</tr>
+<tr>
+<td><code>image.daily_cap</code></td>
+<td>int</td>
+<td><code>20</code></td>
+<td>Generations per <strong>rolling</strong> 24 hours.</td>
+</tr>
+<tr>
+<td><code>image.timeout_seconds</code></td>
+<td>int</td>
+<td><code>120</code></td>
+<td>How long one generation may take before it is abandoned. The abandoned row stays <code>pending</code> and keeps counting against the caps.</td>
+</tr>
+<tr>
+<td><code>image.local_base_url</code></td>
+<td>string</td>
+<td><code>http://127.0.0.1:7860</code></td>
+<td>Endpoint for a self-hosted provider. Loopback and private-network hosts only.</td>
+</tr>
+</tbody>
+</table>
+<p>Because <code>configure</code> is a tool the <strong>model</strong> can call, the two keys that decide where
+something leaves the machine are bounded rather than free text. A credential-variable name
+must look like one — SCREAMING_SNAKE_CASE, reading as a key — and may not name a famous
+secret belonging to something else (<code>ANTHROPIC_API_KEY</code>, <code>AWS_SECRET_ACCESS_KEY</code>,
+<code>GITHUB_TOKEN</code>, the <code>AZURE_*</code> and <code>SSH_*</code> families, <code>PATH</code>), because
+<code>image.api_key_env = ANTHROPIC_API_KEY</code> plus <code>image.provider = openai</code> would ship one
+vendor's secret to another in an authorization header with nothing in the request looking
+wrong. <code>image.local_base_url</code> must be loopback or an RFC 1918 address, since the local
+provider posts the user's prompt with no credential and no cost accounting on the
+understanding that the endpoint is the user's own machine. Both rules are applied twice:
+at <code>configure set</code>, and again when the value is read, so a row written before the rule
+existed is not honoured for being old.</p>
+<h3 id="providers" class="tsd-anchor-link">Providers<a href="#providers" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>A registry, not a hardcoded vendor: adding a fourth provider is one entry in
+<code>src/ts/imagery/providers.ts</code> and nothing else — no other module names a vendor.</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Credential</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nanobanana</code></td>
+<td><code>GEMINI_API_KEY</code>, sent as a header</td>
+<td>Billed per image; the ledger records the published list price and labels it an estimate.</td>
+</tr>
+<tr>
+<td><code>openai</code></td>
+<td><code>OPENAI_API_KEY</code>, sent as a bearer header</td>
+<td>Billed per image and quality; same list-price estimate.</td>
+</tr>
+<tr>
+<td><code>automatic1111</code></td>
+<td><strong>none</strong></td>
+<td>A local endpoint. No credential, no money.</td>
+</tr>
+</tbody>
+</table>
+<p>No provider puts the credential in a URL — a URL is the part of a request that everything
+logs by default.</p>
+<h3 id="money-which-makes-this-different" class="tsd-anchor-link">Money, which makes this different<a href="#money-which-makes-this-different" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Per-session and per-day caps are enforced server-side from the ledger, and a refusal names
+the specific cap and the exact <code>configure</code> call that raises it. The rolling day avoids a
+cap that resets at midnight and a retry loop that waits for one.</p>
+<p><strong>A row is written before the request, not after.</strong> A process that dies mid-call still
+leaves the evidence of a call that may have been billed, and that <code>pending</code> row counts
+against the caps, because a budget that forgives what it cannot see is not a budget.
+<code>generated</code> and <code>policy_refused</code> count too; <code>error</code> and <code>refused</code> do not, since a network
+outage is not a purchase. A <strong>timed-out</strong> generation is left <code>pending</code> for the same
+reason and is never settled as an error: an abandoned request may well have been received,
+run, and billed, and filing it as a failure would mean a merely slow provider silently
+switched the budget off. A policy refusal is priced at the list price of one image, since
+that is what the vendor generally charges for the call that produced it.</p>
+<p>Each row carries provider, model, timestamp, outcome, byte count, path, cost estimate and
+where the estimate came from, the credential variable's <strong>name</strong>, and the prompt with its
+SHA-256 and its declared provenance. That last part answers the hazard of a prompt
+assembled from a file, a page, or a repository: <code>source</code> is a required tool argument, so
+what was forwarded to a third party under the user's credential is reconstructible.</p>
+<h3 id="content-policy" class="tsd-anchor-link">Content policy<a href="#content-policy" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>A refusal is reported plainly and <strong>never retried with a reworded prompt</strong> — that would be
+the assistant negotiating with a provider's policy on the user's account and the user's
+money. This is enforced rather than requested: the gate compares each new prompt against
+the prompts <strong>that same provider</strong> recently refused and blocks recognisable rewordings
+locally, before any socket opens, so a reworded retry cannot cost money even if it is
+attempted. A genuinely different request passes untouched, and so does the same request on
+a different provider — a content policy belongs to a vendor, and a hosted model's refusal
+says nothing about a local endpoint that has no content policy at all.</p>
+<h3 id="where-images-go" class="tsd-anchor-link">Where images go<a href="#where-images-go" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>&lt;dataDir&gt;/images/</code>, beside the <code>renders/</code> directory, honouring <code>SELF_EXPRESSION_HOME</code>.
+The reply carries <strong>the path, never the bytes</strong>. Because the bytes are downloaded and
+stored locally, the panel can serve them from its own origin and <code>img-src 'self'</code> stays
+intact; hotlinking a provider CDN would have cost a CSP exception per provider.</p>
+<p>A generated image is an <strong>artifact with a ledger row</strong>, not an expression channel: it is a
+large binary produced by a third party and billed to the user — evidence of an act rather
+than the content of one. The assistant can still <code>express</code> about having made it, and the
+dwelling can <code>keep</code> the path.</p>
+<p> </p>
+<p> </p>
+<h2 id="test-status" class="tsd-anchor-link">Test status<a href="#test-status" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+  <tr>
+    <th></th>
+    <th>Count</th>
+    <th>Statement</th>
+    <th>Branch</th>
+    <th>Func</th>
+    <th>Line</th>
+  </tr>
+  <tr>
+    <th>Unit</th>
+    <td>2333</td>
+    <td>95.12<small>%</small></td>
+    <td>89.54<small>%</small></td>
+    <td>93.8<small>%</small></td>
+    <td>95.46<small>%</small></td>
+  </tr>
+  <tr>
+    <th>Stochastic</th>
+    <td>260</td>
+    <td>65.04<small>%</small></td>
+    <td>52.73<small>%</small></td>
+    <td>64.93<small>%</small></td>
+    <td>64.69<small>%</small></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <th></th>
+    <th>Docblock count</th>
+    <th>91<small>%</small></th>
+  </tr>
+  <tr>
+    <th>Docblock coverage</th>
+    <td>360</td>
+    <td>91<small>%</small></td>
+  </tr>
+</table>
+<ul>
+<li><a href="https://stonecypher.github.io/self-expression/index.html">Site</a></li>
+<li><a href="https://stonecypher.github.io/self-expression/docs/index.html">Documentation</a></li>
+<li><a href="https://www.github.com/stonecypher/self-expression/actions">Builds</a></li>
+<li><a href="https://www.github.com/stonecypher/self-expression/">Source</a></li>
+</ul>
+<img alt="star_chart" src="https://starchart.cc/StoneCypher/self-expression.svg" /></div></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details"><a href="#self-expression-v064"><span>self-<wbr/>expression v0.6.4</span></a>
+<ul>
+<li><a href="#expression-channels"><span>Expression channels</span></a></li>
+<li><a href="#retraction-marking-the-original-not-just-logging-the-correction"><span>Retraction — marking the original, not just logging the correction</span></a></li>
+<li><a href="#anchoring-commentary-bound-to-a-location"><span>Anchoring — commentary bound to a location</span></a></li>
+<li><a href="#configuration"><span>Configuration</span></a></li>
+<li>
+<ul>
+<li><a href="#window-postures-two-keys-and-honestly-advisory"><span>Window postures — two keys, and honestly advisory</span></a></li></ul></li>
+<li><a href="#onboarding"><span>Onboarding</span></a></li>
+<li><a href="#portability-what-reaches-a-host-with-no-hooks-and-no-skills"><span>Portability — what reaches a host with no hooks and no skills</span></a></li>
+<li><a href="#sharing-structured-fields-only-never-free-text"><span>Sharing — structured fields only, never free text</span></a></li>
+<li><a href="#charts"><span>Charts</span></a></li>
+<li><a href="#diagrams"><span>Diagrams</span></a></li>
+<li>
+<ul>
+<li><a href="#seriation"><span>Seriation</span></a></li></ul></li>
+<li><a href="#history-png"><span>History <wbr/>PNG</span></a></li>
+<li><a href="#checklists"><span>Checklists</span></a></li>
+<li><a href="#messagebox"><span>Messagebox</span></a></li>
+<li><a href="#held-notes-choosing-when-to-speak"><span>Held notes — choosing when to speak</span></a></li>
+<li><a href="#the-dwelling"><span>The dwelling</span></a></li>
+<li><a href="#voluntary-audio-claudio"><span>Voluntary audio (claudio)</span></a></li>
+<li><a href="#the-desk"><span>The desk</span></a></li>
+<li><a href="#image-generation-issue-78"><span>Image generation (issue #78)</span></a></li>
+<li>
+<ul>
+<li><a href="#the-credential-rule-which-is-the-point"><span>The credential rule, which is the point</span></a></li>
+<li><a href="#enablement"><span>Enablement</span></a></li>
+<li><a href="#providers"><span>Providers</span></a></li>
+<li><a href="#money-which-makes-this-different"><span>Money, which makes this different</span></a></li>
+<li><a href="#content-policy"><span>Content policy</span></a></li>
+<li><a href="#where-images-go"><span>Where images go</span></a></li></ul></li>
+<li><a href="#test-status"><span>Test status</span></a></li></ul></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="modules.html">self-expression</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>
