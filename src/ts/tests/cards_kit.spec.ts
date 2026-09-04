@@ -11,7 +11,9 @@
 
 import { describe, test, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { loadKit, describeKit, listCardTypes, defaultKitDir, RENDER_CARD_TRIGGER } from '../cards/kit.js';
+import {
+  loadKit, describeKit, listCardTypes, indexCardTypes, defaultKitDir, RENDER_CARD_TRIGGER,
+} from '../cards/kit.js';
 
 const MINI = resolve(__dirname, 'fixtures', 'cardkit-mini');
 const REAL = defaultKitDir(resolve(__dirname, '..', '..', '..'));
@@ -61,4 +63,27 @@ describe('listCardTypes', () => {
     expect(listCardTypes(kit)).toBe(kit.groups);
     expect(() => listCardTypes(kit, 'charts')).toThrow(/unknown category/);
   });
+});
+
+describe('indexCardTypes', () => {
+  test('keeps the category headings and the type names, and drops everything else', async () => {
+    const kit = await loadKit(MINI);
+    expect(indexCardTypes(kit.groups)).toEqual([
+      { key: 'ranking-and-comparison', label: 'Ranking and comparison',
+        question: 'Which is bigger?', types: ['tally'] },
+      { key: 'text-and-code', label: 'Text and code',
+        question: 'What does it say, exactly as written?', types: ['blurb'] },
+    ]);
+  });
+
+  test('is small enough to be worth the shortcut: the real kit indexes to a fraction of its full form',
+    async () => {
+      const kit     = await loadKit(REAL);
+      const full    = JSON.stringify(kit.groups, null, 2).length;
+      const compact = JSON.stringify(indexCardTypes(kit.groups), null, 2).length;
+      expect(compact * 10).toBeLessThan(full);
+      // Every type still reachable by name — the shortcut hides detail, not types.
+      const named = indexCardTypes(kit.groups).flatMap(g => g.types);
+      expect([...named].sort()).toEqual([...kit.types.keys()].sort());
+    }, 20000);
 });

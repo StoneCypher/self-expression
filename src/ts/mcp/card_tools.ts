@@ -25,8 +25,8 @@ import { z }         from 'zod';
 
 import { effectiveValue }             from '../channels/config.js';
 import type { Store }                 from '../channels/store.js';
-import { describeKit, listCardTypes } from '../cards/kit.js';
-import type { CardKit, CategoryGroup } from '../cards/kit.js';
+import { describeKit, indexCardTypes, listCardTypes } from '../cards/kit.js';
+import type { CardKit, CategoryGroup }                from '../cards/kit.js';
 import { writeAnswerCard }            from '../cards/answer.js';
 import type { RenderRequest }         from '../cards/answer.js';
 import type { ToolReply }             from './chart_tools.js';
@@ -102,7 +102,8 @@ export function deskDeck(store: Store): string | null {
 const RENDER_CARD_SHAPE = {
   type:  z.string().min(1).max(40).describe('a card type name from the catalogue below'),
   title: z.string().min(1).max(120).describe('the card heading'),
-  data:  z.unknown().optional().describe("the type's data shape — list_card_types shows it"),
+  data:  z.unknown().optional().describe(
+    "the type's data shape — list_card_types, named with that type's category, shows it"),
   ord:   z.number().int().optional().describe(
     'placement inside the answer band [1000, 2000); omit to append'),
 };
@@ -126,7 +127,8 @@ expectType<Equal<RenderCardArgs, z.infer<z.ZodObject<typeof RENDER_CARD_SHAPE>>>
 
 /** The raw zod shape backing `list_card_types`'s `inputSchema`. */
 const LIST_CARD_TYPES_SHAPE = {
-  category: z.string().optional().describe('one category key to show; omit for all'),
+  category: z.string().optional().describe(
+    'one category key, shown in full with every data shape; omit for the type names in every category'),
 };
 
 /**
@@ -220,22 +222,30 @@ export function handleRenderCard(
 }
 
 /**
- * Handles `list_card_types`: the catalogue as JSON, whole or narrowed to one category.
+ * Handles `list_card_types`: the catalogue as JSON, at index depth for the whole thing and at
+ * full depth for one named category.
  *
- * The groups are handed back exactly as the kit computed them — this layer serialises, it does
- * not reshape — so what the model reads here is the same structure `render_card`'s description
- * was generated from.
+ * The depth is the point. A named category is handed back exactly as the kit computed it — every
+ * type's `summary`, `shape` and `settings`, which is what a caller about to fill in `data` needs.
+ * The bare call is answered with {@link indexCardTypes} instead: the full catalogue serialises to
+ * roughly 45 KB against the real 88-type kit, some 11k tokens spent to answer "which category?",
+ * and the names alone answer that. Nothing is hidden — the shapes are one more call away, and the
+ * reply names the category that produces them.
  *
  * @param kit  the loaded card kit
  * @param args an optional category key to narrow to
- * @returns tool text: the matching groups as pretty-printed JSON, or a sentence naming the
- *   unknown category alongside the ones that exist
+ * @returns tool text: the named group in full as pretty-printed JSON, the whole catalogue as
+ *   names by category, or a sentence naming the unknown category alongside the ones that exist
  *
  * @example
- * handleListCardTypes(kit, { category: 'text-and-code' });   // one group, as JSON
+ * handleListCardTypes(kit, { category: 'text-and-code' });   // one group in full, as JSON
+ * @example
+ * handleListCardTypes(kit, {});   // every category with its type names, no shapes
  * @example
  * text(handleListCardTypes(kit, { category: 'charts' }));
  * // 'unknown category: charts — one of ranking-and-comparison, text-and-code'
+ *
+ * @see indexCardTypes — the compact rows the bare call replies with
  */
 export function handleListCardTypes(kit: CardKit, args: ListCardTypesArgs): ToolReply {
 
@@ -255,7 +265,8 @@ export function handleListCardTypes(kit: CardKit, args: ListCardTypesArgs): Tool
     throw error;
   }
 
-  return reply(JSON.stringify(groups, null, 2));
+  const shown = args.category === undefined ? indexCardTypes(groups) : groups;
+  return reply(JSON.stringify(shown, null, 2));
 
 }
 
@@ -289,7 +300,9 @@ export function registerCardTools(server: McpServer, store: Store, kit: CardKit)
     title: 'List card types',
     description:
       'The card catalogue grouped by the question each category answers — use it to find a '
-      + 'type when you are holding a question rather than a chart name.',
+      + 'type when you are holding a question rather than a chart name. Called bare it lists '
+      + 'the type names in each category; name a category to see each of its types with its '
+      + 'summary and the data shape render_card wants.',
     inputSchema: LIST_CARD_TYPES_SHAPE,
   }, (args) => handleListCardTypes(kit, args));
 

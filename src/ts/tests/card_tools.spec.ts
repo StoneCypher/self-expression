@@ -199,6 +199,39 @@ describe('list_card_types', () => {
     expect(one[0]?.members.map(m => m.name)).toContain('blurb');
   });
 
+  // The bare call is the one a model makes first, and against the real 88-type kit the full
+  // catalogue serialises to some 45 KB — around 11k tokens to answer "which category?". The
+  // shapes still exist; they are one named-category call away.
+  test('the bare call carries type names by category and no per-type detail at all', async () => {
+    const kit = await loadKit(MINI);
+    const rows = JSON.parse(text(handleListCardTypes(kit, {}))) as Record<string, unknown>[];
+
+    expect(rows.map(r => r['key'])).toEqual(['ranking-and-comparison', 'text-and-code']);
+    for (const row of rows) {
+      expect(Object.keys(row).sort()).toEqual(['key', 'label', 'question', 'types']);
+      expect(row).not.toHaveProperty('members');
+      expect(row).not.toHaveProperty('shape');
+      expect(row).not.toHaveProperty('summary');
+      expect(row).not.toHaveProperty('settings');
+    }
+
+    // The fixture's two types, spelled out rather than read back off the kit.
+    expect(rows.map(r => r['types'])).toEqual([['tally'], ['blurb']]);
+    expect(rows[0]?.['question']).toBe('Which is bigger?');
+  });
+
+  test('a named category still carries every type’s shape, summary and settings', async () => {
+    const kit   = await loadKit(MINI);
+    const one   = JSON.parse(text(handleListCardTypes(kit, { category: 'text-and-code' }))) as
+      { key: string; members: Record<string, unknown>[] }[];
+    const blurb = one[0]?.members.find(m => m['name'] === 'blurb');
+
+    expect(blurb).toBeDefined();
+    expect(blurb?.['shape']).toBe('{ text: string }');
+    expect(blurb?.['summary']).toBe('A short quoted passage.');
+    expect(blurb).toHaveProperty('settings');
+  });
+
   test('refuses an unknown category by name and lists the ones that exist', async () => {
     const kit = await loadKit(MINI);
     const out = text(handleListCardTypes(kit, { category: 'charts' }));

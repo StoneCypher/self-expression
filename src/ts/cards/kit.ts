@@ -84,6 +84,24 @@ export interface CategoryGroup {
 }
 
 /**
+ * One category with only its type *names* — the catalogue at index depth, for a reader who is
+ * choosing a category rather than filling in a data shape.
+ *
+ * @example
+ * const row: CategoryIndex = { key: 'geographic', label: 'Geographic', question: 'Where?',
+ *   types: ['map', 'globe'] };
+ *
+ * @see indexCardTypes
+ * @see CategoryGroup — the same category at full depth, summaries and shapes included
+ */
+export interface CategoryIndex {
+  readonly key: string;
+  readonly label: string;
+  readonly question: string;
+  readonly types: readonly string[];
+}
+
+/**
  * A loaded card kit: every type, grouped by category, plus the two functions that install and
  * check a card — all as they came from the kit itself, so nothing here can drift from it.
  *
@@ -216,4 +234,29 @@ export function listCardTypes(kit: CardKit, category?: string): readonly Categor
   const hit = kit.groups.filter(g => g.key === category);
   if (hit.length === 0) { throw new RangeError(`unknown category: ${category}`); }
   return hit;
+}
+
+/**
+ * Drop every category down to its type names, so the whole catalogue can be offered without
+ * spending a reply on it.
+ *
+ * The full form runs to roughly 45 KB against the real 88-type kit — some 11k tokens for a
+ * question usually answered by "which category?". The names alone are a few hundred bytes and
+ * are enough to pick one; {@link listCardTypes} with that category then hands back the shapes.
+ *
+ * @param groups the groups to reduce, as {@link listCardTypes} yields
+ * @returns one row per group, in the same order, carrying only `key`, `label`, `question` and
+ *   the member names
+ *
+ * @example
+ * indexCardTypes(kit.groups)[0];
+ * // { key: 'ranking-and-comparison', label: 'Ranking and comparison',
+ * //   question: 'Which is bigger?', types: ['tally'] }
+ *
+ * @see CategoryIndex
+ */
+export function indexCardTypes(groups: readonly CategoryGroup[]): readonly CategoryIndex[] {
+  return groups.map(g => ({
+    key: g.key, label: g.label, question: g.question, types: g.members.map(m => m.name),
+  }));
 }
