@@ -283,6 +283,38 @@ describe('receiptMessages — the targeted delivery stamp issue #98 needs', () =
     expect(row).toMatchObject({ reader: 'model', session: 's1', agent_id: 'ag-3', prompt_id: 'p-7' });
   }));
 
+  test('the delivery rules bind here too — a model cannot receipt the human\'s mail', () => withStore(s => {
+    postMessage(s, { audience: 'user', text: 'for the human', session: 's1' }, VERSION, NOW);
+
+    expect(receiptMessages(s, [1], { reader: 'model', session: 's1' }, NOW)).toEqual([]);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+    expect(unreadCounts(s, 's1', NOW).forUser).toBe(1);
+  }));
+
+  test('nor a human the model\'s, nor anyone a record row', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'model mail', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'record', text: 'for posterity', session: 's1' }, VERSION, NOW);
+
+    expect(receiptMessages(s, [1], { reader: 'user' }, NOW)).toEqual([]);
+    expect(receiptMessages(s, [2], { reader: 'model', session: 's1' }, NOW)).toEqual([]);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+  }));
+
+  test('a permitted id rides along beside a refused one rather than being lost with it', () =>
+    withStore(s => {
+      postMessage(s, { audience: 'self', text: 'mine', session: 's1' }, VERSION, NOW);
+      postMessage(s, { audience: 'user', text: 'not mine', session: 's1' }, VERSION, NOW);
+
+      expect(receiptMessages(s, [1, 2], { reader: 'model', session: 's1' }, NOW)).toEqual([1]);
+      expect(unreadRows(s, 's1', NOW)).toEqual([]);
+      expect(unreadCounts(s, 's1', NOW).forUser).toBe(1);
+    }));
+
+  test('an id naming no message is skipped rather than leaving an orphan receipt', () => withStore(s => {
+    expect(receiptMessages(s, [999], { reader: 'model', session: 's1' }, NOW)).toEqual([]);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+  }));
+
 });
 
 describe('formatMessages', () => {

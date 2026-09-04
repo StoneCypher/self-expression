@@ -446,6 +446,15 @@ export function unreadRows(
  * The same single `INSERT` {@link readMessages} uses backs both — there is deliberately
  * one writer of `message_reads`, so the two paths cannot drift into two shapes.
  *
+ * **The delivery rules hold here too.** {@link mayReceipt} gates every id, exactly as it
+ * gates {@link readMessages}: a model never writes a `user` receipt (relaying is not
+ * reading), a human never writes the model's, and `record` never receipts for anyone. The
+ * check is per row rather than per call, because this function — unlike `readMessages`,
+ * which walks one audience at a time — is handed bare ids and cannot be told an audience
+ * it would then have to trust. An id whose pairing is disallowed, and an id naming no
+ * message at all, are both skipped rather than stamped, and the returned list says which
+ * ones actually took, so a caller reporting "claimed" can report only what it really took.
+ *
  * Receipts are append-only and never deduplicated, so a caller must pass ids it observed
  * as *unread* — {@link unreadRows} is how — rather than a set it guessed at.
  *
@@ -453,11 +462,17 @@ export function unreadRows(
  * @param reader who collected them; its `session`, `agentId` and `promptId` are stamped
  *               on each receipt as the provenance of the delivery
  * @param when   injectable clock for the receipt timestamps; defaults to now
+ * @returns the ids actually receipted, in the order given — the input minus whatever the
+ *          delivery rules refused and whatever named no message
  *
  * @example
  *   const waiting = unreadRows(store, 's1');
  *   receiptMessages(store, waiting.map(row => Number(row['id'])), { reader: 'model', session: 's1' });
  *   unreadRows(store, 's1')  // => [] — those are delivered now
+ *
+ * @example
+ *   // a model may not collect the human's mail on their behalf
+ *   receiptMessages(store, [userMailId], { reader: 'model', session: 's1' })  // => []
  *
  * @see readMessages
  * @see unreadRows
@@ -467,8 +482,23 @@ export function receiptMessages(
   ids    : readonly number[],
   reader : Reader,
   when   : Date = new Date(),
-): void {
-  receipt(store, ids, reader, when);
+): number[] {
+
+  if (ids.length === 0) { return []; }
+
+  const rows = store.db.prepare(
+    `SELECT id, audience FROM messages WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+
+  const permitted = new Set(rows
+    .filter(row => isMember(AUDIENCES, row['audience']) && mayReceipt(row['audience'], reader))
+    .map(row => Number(row['id'])));
+
+  const allowed = ids.filter(id => permitted.has(id));
+
+  receipt(store, allowed, reader, when);
+
+  return allowed;
+
 }
 
 /** The unread tallies the per-turn hook reports. */

@@ -14,9 +14,9 @@ import type { Store }                         from '../channels/store.js';
 import { postMessage, unreadRows }            from '../channels/messages.js';
 import { writeQuestions, readQuestions }      from '../channels/desk_questions.js';
 import { pendingNotice }                      from '../channels/pending.js';
-import { NO_HOOK_SESSION }                    from '../channels/context.js';
+import { NO_HOOK_SESSION, recordContext }     from '../channels/context.js';
 import {
-  withPendingNotice, handleClaimPending, registerPendingTools,
+  withPendingNotice, handleClaimPending, registerPendingTools, claimSession,
 } from '../mcp/pending_tools.js';
 import type { ToolReply } from '../mcp/chart_tools.js';
 
@@ -43,9 +43,11 @@ function text(out: ToolReply): string {
 }
 
 /** Parses a `claim_pending` reply. */
-function parsed(out: ToolReply): { claimed: { kind: string; key: string; label: string; since: string }[];
+function parsed(out: ToolReply): { session: string;
+                                   claimed: { kind: string; key: string; label: string; since: string }[];
                                    remaining: number } {
   return JSON.parse(text(out)) as {
+    session: string;
     claimed: { kind: string; key: string; label: string; since: string }[]; remaining: number };
 }
 
@@ -135,6 +137,8 @@ describe('handleClaimPending — desk intents', () => {
         kind: 'desk_intent', key: 'q1', label: LONG_TEXT, since: now.toISOString(),
       }]);
       expect(out.remaining).toBe(0);
+      // An irreversible write names the identity it ran under.
+      expect(out.session).toBe('S');
 
       const row = readQuestions(deskDir)[0];
       expect(row?.claimed).toEqual({ session: 'S', at: now.toISOString() });
@@ -171,6 +175,7 @@ describe('handleClaimPending — messages', () => {
       kind: 'message', key: '1', label: LONG_TEXT, since: now.toISOString(),
     }]);
     expect(out.remaining).toBe(0);
+    expect(out.session).toBe('S');
     expect(unreadRows(s, 'S', now)).toEqual([]);
   }));
 
@@ -285,18 +290,61 @@ describe('registerPendingTools', () => {
     expect(seen.map(entry => entry.name)).toEqual(['claim_pending']);
     expect(seen[0]?.schema['kind']?.isOptional()).toBe(true);
     expect(seen[0]?.schema['key']?.isOptional()).toBe(true);
-    expect(seen[0]?.schema).not.toHaveProperty('session');
+    expect(seen[0]?.schema['session']?.isOptional()).toBe(true);
   }));
 
-  test('the registered handler claims for the hook-observed session', () =>
+  test('a hook-observed session is what the claim runs under, and the reply says so', () =>
     withStore(s => withDesk(deskDir => {
+
+      writeConfig(s, 'desk.path', deskDir);
+      const now = new Date('2026-08-30T10:00:00Z');
+      writeQuestions(deskDir, [queued('q1', 'ask', now)]);
+      recordContext(s, { session: 'observed-A', promptId: 'p-1' });
+
+      expect(parsed(claimHandler(s)({})).session).toBe('observed-A');
+      expect(readQuestions(deskDir)[0]?.claimed).toMatchObject({ session: 'observed-A' });
+    })));
+
+  test('an observed session beats a claimed one — a caller cannot claim in another name', () =>
+    withStore(s => withDesk(deskDir => {
+
+      writeConfig(s, 'desk.path', deskDir);
+      const now = new Date('2026-08-30T10:00:00Z');
+      writeQuestions(deskDir, [queued('q1', 'ask', now)]);
+      recordContext(s, { session: 'observed-A', promptId: 'p-1' });
+
+      expect(parsed(claimHandler(s)({ session: 'B' })).session).toBe('observed-A');
+      expect(readQuestions(deskDir)[0]?.claimed).toMatchObject({ session: 'observed-A' });
+    })));
+
+  test('with nothing observed, the claimed session is the fallback', () =>
+    withStore(s => withDesk(deskDir => {
+
       writeConfig(s, 'desk.path', deskDir);
       const now = new Date('2026-08-30T10:00:00Z');
       writeQuestions(deskDir, [queued('q1', 'ask', now)]);
 
-      claimHandler(s)({});
+      expect(parsed(claimHandler(s)({ session: 'B' })).session).toBe('B');
+      expect(readQuestions(deskDir)[0]?.claimed).toMatchObject({ session: 'B' });
+    })));
 
+  test('with neither observed nor claimed, the visible placeholder — never an invented id', () =>
+    withStore(s => withDesk(deskDir => {
+
+      writeConfig(s, 'desk.path', deskDir);
+      const now = new Date('2026-08-30T10:00:00Z');
+      writeQuestions(deskDir, [queued('q1', 'ask', now)]);
+
+      expect(parsed(claimHandler(s)({})).session).toBe(NO_HOOK_SESSION);
       expect(readQuestions(deskDir)[0]?.claimed).toMatchObject({ session: NO_HOOK_SESSION });
     })));
+
+  test('claimSession applies the same precedence on its own', () => withStore(s => {
+    expect(claimSession(s, {})).toBe(NO_HOOK_SESSION);
+    expect(claimSession(s, { session: 'B' })).toBe('B');
+    recordContext(s, { session: 'observed-A', promptId: 'p-1' });
+    expect(claimSession(s, { session: 'B' })).toBe('observed-A');
+    expect(claimSession(s, {})).toBe('observed-A');
+  }));
 
 });

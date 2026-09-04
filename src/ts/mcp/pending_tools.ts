@@ -122,9 +122,41 @@ export function withPendingNotice(
 /** What a caller supplies to `claim_pending`, after schema validation. */
 export interface ClaimArgs {
   /** Claim only this source's items; omit to claim both. */
-  readonly kind? : PendingItem['kind'] | undefined;
+  readonly kind?    : PendingItem['kind'] | undefined;
   /** Claim only this item — a desk question id, or a message id as a string. */
-  readonly key?  : string | undefined;
+  readonly key?     : string | undefined;
+  /**
+   * Fallback claiming identity, used only when no hook ever observed one. Read by
+   * {@link claimSession}, which the tool registration applies before calling
+   * {@link handleClaimPending}; the handler itself is given the already-resolved session
+   * and does not consult this field.
+   */
+  readonly session? : string | undefined;
+}
+
+/**
+ * The identity a `claim_pending` call runs under: **observed beats claimed**.
+ *
+ * `latestContext(store)` first, `args.session` only as a fallback, the visible `no-hook`
+ * placeholder when neither exists — the same precedence
+ * {@link ./message_tools.js handleReadMessages} uses, and deliberately the opposite of
+ * `post_message`'s caller-wins order. Posting is a caller describing its own message;
+ * claiming is an irreversible write against a session's mail and a desk row that will
+ * carry that name forever, so a claimed identity must never displace an observed one.
+ *
+ * @param args the tool arguments, whose `session` is the lowest-precedence source
+ * @returns the session to stamp desk claims and message receipts with
+ *
+ * @example
+ *   claimSession(store, {})                    // => 'sess-1' when a hook observed it
+ *   claimSession(store, { session: 'mine' })   // => 'sess-1' still — observed wins
+ *   claimSession(store, { session: 'mine' })   // => 'mine' on a host with no hook
+ *   claimSession(store, {})                    // => 'no-hook' when nothing is known
+ *
+ * @see ../channels/context.js NO_HOOK_SESSION
+ */
+export function claimSession(store: Store, args: ClaimArgs): string {
+  return ctxStr(latestContext(store), 'session') ?? args.session ?? NO_HOOK_SESSION;
 }
 
 /**
@@ -195,6 +227,10 @@ function claimDeskIntents(store: Store, session: string, args: ClaimArgs, now: D
  *
  * Gated on `messages.enabled` for the same reason the notice's message source is: a
  * switched-off messagebox must not be quietly drained by a claim.
+ *
+ * Only the ids `receiptMessages` reports as actually stamped are returned, the same way
+ * a desk row `claimIntent` refused is skipped rather than reported: `claimed` names what
+ * this call really took, never what it merely tried to take.
  */
 function claimMessages(store: Store, session: string, args: ClaimArgs, now: Date): ClaimedItem[] {
 
@@ -214,9 +250,10 @@ function claimMessages(store: Store, session: string, args: ClaimArgs, now: Date
           promptId : ctxStr(context, 'prompt_id'),
         };
 
-  receiptMessages(store, wanted.map(row => Number(row['id'])), reader, now);
+  const stamped = new Set(
+    receiptMessages(store, wanted.map(row => Number(row['id'])), reader, now));
 
-  return wanted.map((row): ClaimedItem => {
+  return wanted.filter(row => stamped.has(Number(row['id']))).map((row): ClaimedItem => {
     const body = row['text'];
     return {
       kind  : 'message',
@@ -238,24 +275,36 @@ function claimMessages(store: Store, session: string, args: ClaimArgs, now: Date
  * for the session afterwards, across **both** sources regardless of any narrowing, because
  * it answers the question the caller actually has next: is there more.
  *
+ * The reply **echoes the session it ran under**, the way `read_messages` echoes the
+ * reader identity the server resolved. Claiming is irreversible — a desk row carries the
+ * claiming name forever, and a receipt cannot be un-written — so the one thing a caller
+ * must never have to guess at afterwards is whose name it happened in. A claim that ran
+ * under `no-hook`, or under a session the caller did not expect, is then visible in the
+ * reply instead of only in the desk file.
+ *
  * Claiming is not gated on `pending.enabled`. That key governs whether the notice is
  * *spoken*; a session that knows about an item by any other route — the desk in front of
  * it, a previous reply — must still be able to take it.
  *
- * @param session the claiming identity: stamped into each desk row and each receipt, and
- *                the fence on which messages are even visible
+ * @param session the claiming identity, already resolved by {@link claimSession}: stamped
+ *                into each desk row and each receipt, echoed in the reply, and the fence
+ *                on which messages are even visible. `args.session` is *not* consulted
+ *                here; it is the registration layer's lowest-precedence fallback and is
+ *                folded into this parameter before the call.
  * @param args    `kind` narrows to one source, `key` to one item; both omitted claims
  *                everything waiting
  * @param now     injectable clock for the claim stamps and receipts; defaults to now
  *
  * @example
  *   handleClaimPending(store, 'sess-1', {})
- *   // => {"claimed":[{"kind":"desk_intent","key":"q1","label":"merge #21?","since":"…"}],
+ *   // => {"session":"sess-1",
+ *   //     "claimed":[{"kind":"desk_intent","key":"q1","label":"merge #21?","since":"…"}],
  *   //     "remaining":0}
  *
  * @example
  *   handleClaimPending(store, 'sess-1', { key: 'no-such-thing' })
- *   // => {"claimed":[],"remaining":2}   — nothing taken, and what is still waiting
+ *   // => {"session":"sess-1","claimed":[],"remaining":2}
+ *   //    nothing taken, whose name nothing was taken in, and what is still waiting
  *
  * @throws {SyntaxError} If `desk.path` names a `questions.json` that will not parse and
  *                       the call did not narrow to `kind: 'message'`; nothing is claimed
@@ -277,6 +326,7 @@ export function handleClaimPending(
   ];
 
   return reply(JSON.stringify({
+    session,
     claimed,
     remaining: collectPending(store, session, now).length,
   }, null, 2));
@@ -286,10 +336,11 @@ export function handleClaimPending(
 /**
  * Register `claim_pending` on `server`.
  *
- * No `session` argument, unlike `express` or `read_messages`: claiming stamps a desk row
- * and burns a message receipt in somebody's name, and a claimed identity has no business
- * overriding an observed one for a write nobody can undo. The session comes from the
- * hook-observed turn context, or the visible `no-hook` placeholder when no hook ever ran.
+ * The `session` argument is a *fallback*, not an override: {@link claimSession} takes the
+ * hook-observed session first and reaches for this only on a host where nothing was ever
+ * observed. Claiming stamps a desk row and burns a message receipt in somebody's name, so
+ * a claimed identity must never displace an observed one — the same precedence
+ * `read_messages` keeps, and deliberately not `post_message`'s.
  *
  * Registered unconditionally — `pending.enabled` is a runtime switch over the *notice*,
  * checked per call, not a reason to hide the tool that acts on what the notice named.
@@ -299,6 +350,7 @@ export function handleClaimPending(
  *
  * @see ./server.js buildServer
  * @see handleClaimPending
+ * @see claimSession
  */
 export function registerPendingTools(server: McpServer, store: Store): void {
 
@@ -309,11 +361,12 @@ export function registerPendingTools(server: McpServer, store: Store): void {
       'desk rows as claimed by this session and receipts messages, returning their ' +
       'text. Call it when you are about to act on them, not to make the line go away.',
     inputSchema : {
-      kind : z.enum(['message', 'desk_intent']).optional().describe('claim only this kind'),
-      key  : z.string().optional().describe(
+      kind    : z.enum(['message', 'desk_intent']).optional().describe('claim only this kind'),
+      key     : z.string().optional().describe(
         'claim only this item — a desk question id or a message id'),
+      session : z.string().optional().describe(
+        'fallback identity when no hook context has been observed; an observed session always wins'),
     },
-  }, (args) => handleClaimPending(
-    store, ctxStr(latestContext(store), 'session') ?? NO_HOOK_SESSION, args));
+  }, (args) => handleClaimPending(store, claimSession(store, args), args));
 
 }
