@@ -132,17 +132,18 @@ describe('the freshness ladder — stochastic', () => {
 
 describe('the span grammar — stochastic', () => {
 
-  it('a file span parses exactly when the grammar accepts it', () => {
-    fc.assert(fc.property(
-      fc.oneof(
-        fc.integer({ min: 0, max: 300 }).map(n => `L${String(n)}`),
-        fc.tuple(fc.integer({ min: 0, max: 300 }), fc.integer({ min: 0, max: 300 }))
-          .map(([a, b]) => `L${String(a)}-${String(b)}`),
-        fc.string({ maxLength: 8 }),
-      ),
-      (span) => {
-        expect(parseFileSpan(span) === null).toBe(spanProblem('file', span) !== null);
-      }), { numRuns: 500 });
+  it('parses a bare L<n> exactly when n is 1 or more, into the one-line range {n, n}', () => {
+    fc.assert(fc.property(fc.integer({ min: 0, max: 300 }), (n) => {
+      const parsed = parseFileSpan(`L${String(n)}`);
+      expect(parsed).toEqual(n >= 1 ? { start: n, end: n } : null);
+    }), { numRuns: 300 });
+  });
+
+  it('parses L<a>-<b> exactly when it is forward and non-zero, never reordering a backwards range', () => {
+    fc.assert(fc.property(fc.integer({ min: 0, max: 300 }), fc.integer({ min: 0, max: 300 }), (a, b) => {
+      const parsed = parseFileSpan(`L${String(a)}-${String(b)}`);
+      expect(parsed).toEqual(a >= 1 && b >= a ? { start: a, end: b } : null);
+    }), { numRuns: 500 });
   });
 
   it('no kind ever accepts another kind’s grammar by accident', () => {

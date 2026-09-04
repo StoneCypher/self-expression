@@ -400,12 +400,20 @@ describe('renderMatrix — stochastic invariants', () => {
     );
   });
 
-  it('is deterministic, and indifferent to having been seriated first', () => {
+  it('is deterministic, and still names every original row key once after being seriated', () => {
     fc.assert(
       fc.property(matrixArb, (data) => {
-        expect(renderMatrix(data)).toBe(renderMatrix(data));
-        const found = seriate(data);
-        expect(renderMatrix(found.matrix)).toBe(renderMatrix(found.matrix));
+        const rendered = renderMatrix(data);
+        expect(renderMatrix(data)).toBe(rendered);              // pure: same input twice, same text
+        for (const key of data.rows) { expect(rendered.split(key).length - 1).toBe(1); }
+
+        const found    = seriate(data),
+              seriated  = renderMatrix(found.matrix);
+        expect(renderMatrix(found.matrix)).toBe(seriated);       // determinism survives seriation too
+        // Seriation only reorders rows and columns; it must not lose, duplicate, or
+        // rename one along the way — the render of the reordered table still names every
+        // original row key exactly once, just possibly on a different line than above.
+        for (const key of data.rows) { expect(seriated.split(key).length - 1).toBe(1); }
       }),
       { numRuns: 200 }
     );

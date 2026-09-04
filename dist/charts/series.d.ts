@@ -23,6 +23,16 @@
  */
 export type SeriesScale = 'absolute' | 'relative';
 /**
+ * The glyph a non-finite point (`NaN`, `Infinity`, `-Infinity` — a gap or a bad
+ * upstream computation) renders as, in both {@link renderSparkline} and
+ * {@link renderBraille}: a middle dot, distinct from every ramp glyph in both the
+ * block and braille families so a missing point is never mistaken for a real
+ * (if extreme) value.
+ *
+ * @see renderSeries
+ */
+export declare const MISSING_GLYPH = "\u00B7";
+/**
  * Renders a trend sparkline: one `EIGHTHS` glyph per point in `series`, oldest to
  * newest.
  *

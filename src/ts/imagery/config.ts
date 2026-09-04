@@ -31,6 +31,16 @@
  *   3. the provider's own {@link ImageProvider.defaultEnvVar} — so a user whose shell
  *      already exports `OPENAI_API_KEY` configures nothing but `image.enabled`.
  *
+ * ## Which names may be given, and which endpoints dialled
+ *
+ * `configure` is a tool the **model** can call, so "the user names the variable" is
+ * only true if nothing else can name one usefully. {@link credentialEnvVarProblem}
+ * bounds what a name may be — a credential-shaped name, never a famous secret
+ * belonging to some other vendor — and {@link localBaseUrlProblem} bounds where the
+ * local provider may post, to loopback and the private ranges. Both are enforced twice:
+ * at `configure set` time by the registry, and again here at read time, so a row
+ * written before the rule existed cannot be honoured by being old.
+ *
  * @see ./providers.js
  * @see ./gate.js
  * @see ../channels/config.js
@@ -95,6 +105,218 @@ export const DEFAULT_LOCAL_BASE_URL = 'http://127.0.0.1:7860';
 /** The provider selected when `image.provider` is unset. */
 export const DEFAULT_PROVIDER_ID: ImageProviderId = DEFAULT_IMAGE_PROVIDER.id;
 
+// ---------------------------------------------------------------------------------
+// Which variables may be named, and which endpoints may be dialled
+//
+// Both rules below exist because `configure` is a **model-callable** tool. A key that
+// accepts any string is a key the model can point anywhere, and these two point at the
+// two things that leave the machine: a secret, and a prompt.
+// ---------------------------------------------------------------------------------
+
+/**
+ * The shape a credential variable's name must have: SCREAMING_SNAKE_CASE, three to
+ * 128 characters, starting with a letter.
+ *
+ * Not cosmetic. A value that is not shaped like an environment variable name is
+ * evidence that something other than a name was pasted into a key documented to hold
+ * one — a key with spaces in it, a lowercase word, a URL — and the honest answer to
+ * that is a rejection naming what was expected, not a lookup that quietly misses.
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const CREDENTIAL_ENV_NAME_PATTERN: RegExp = /^[A-Z][A-Z0-9_]{2,127}$/;
+
+/**
+ * Variable names that famously hold a credential for something that is **not** an
+ * image provider, and are refused outright.
+ *
+ * The hazard is worth stating plainly, because nothing about the resulting request
+ * would look wrong: `configure set image.api_key_env ANTHROPIC_API_KEY` followed by
+ * `configure set image.provider openai` sends one vendor's secret to another vendor's
+ * endpoint in an `authorization: Bearer` header, on a tool the model can call by
+ * itself. `PATH`, `HOME` and `USERPROFILE` are here for the same reason in a smaller
+ * way: they are not secrets, but they are not credentials either, and shipping the
+ * user's home directory to a third party is nobody's intent.
+ *
+ * @see CREDENTIAL_ENV_DENIED_PREFIXES
+ * @see credentialEnvVarProblem
+ */
+export const CREDENTIAL_ENV_DENYLIST: readonly string[] = [
+  'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY',
+  'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN',
+  'GITHUB_TOKEN', 'GH_TOKEN', 'NPM_TOKEN',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'PATH', 'HOME', 'USERPROFILE',
+];
+
+/**
+ * Name prefixes whose whole family is refused, because the family is a credential
+ * estate rather than one image key: Azure's service credentials and everything SSH.
+ */
+export const CREDENTIAL_ENV_DENIED_PREFIXES: readonly string[] = ['AZURE_', 'SSH_'];
+
+/** Suffixes that mark a name as naming a key rather than naming something else. */
+export const CREDENTIAL_ENV_ALLOWED_SUFFIXES: readonly string[] = ['_API_KEY', '_KEY', '_TOKEN'];
+
+/**
+ * Prefixes that exempt a name from the suffix rule, so this facility's own variables
+ * and a user's deliberately image-scoped ones need no particular ending.
+ */
+export const CREDENTIAL_ENV_ALLOWED_PREFIXES: readonly string[] = ['IMAGE_', 'SELF_EXPRESSION_'];
+
+/**
+ * Why a proposed credential-variable name is not acceptable, or `null` when it is.
+ *
+ * A problem string rather than a boolean because both callers need the sentence: the
+ * `configure` validator prints it as what would have been accepted, and the tolerant
+ * reader uses only its presence. Written in the registry's voice — what was expected,
+ * never a bare "no".
+ *
+ * @param name - the proposed variable name; trimmed here, so callers need not
+ * @returns the reason it is refused, or `null` when the name may be used
+ *
+ * @example
+ *   credentialEnvVarProblem('OPENAI_API_KEY')     // => null
+ *   credentialEnvVarProblem('IMAGE_LOCAL_TOKEN')  // => null
+ *   credentialEnvVarProblem('ANTHROPIC_API_KEY')  // => 'a name other than ANTHROPIC_API_KEY, …'
+ *   credentialEnvVarProblem('my key')             // => 'an environment variable NAME in …'
+ *
+ * @see credentialEnvVarAllowed
+ */
+export function credentialEnvVarProblem(name: string): string | null {
+
+  const trimmed = name.trim();
+
+  if (!CREDENTIAL_ENV_NAME_PATTERN.test(trimmed)) {
+    return 'an environment variable NAME in SCREAMING_SNAKE_CASE — letters, digits and ' +
+           'underscores, starting with a letter, 3 to 128 characters. This key holds the ' +
+           'name of a variable, never a credential';
+  }
+
+  if (CREDENTIAL_ENV_DENYLIST.includes(trimmed)) {
+    return `a name other than ${trimmed}, which holds a credential for something that is not ` +
+           'an image provider; naming it here would send that secret to an image vendor in an ' +
+           'authorization header';
+  }
+
+  const denied = CREDENTIAL_ENV_DENIED_PREFIXES.find(prefix => trimmed.startsWith(prefix));
+
+  if (denied !== undefined) {
+    return `a name not starting with ${denied}, because that family holds credentials for ` +
+           'something that is not an image provider';
+  }
+
+  const namesAKey = CREDENTIAL_ENV_ALLOWED_SUFFIXES.some(suffix => trimmed.endsWith(suffix))
+                 || CREDENTIAL_ENV_ALLOWED_PREFIXES.some(prefix => trimmed.startsWith(prefix));
+
+  return namesAKey ? null
+    : `a name ending in ${CREDENTIAL_ENV_ALLOWED_SUFFIXES.join(', ')} or starting with ` +
+      `${CREDENTIAL_ENV_ALLOWED_PREFIXES.join(' or ')}, so that what is named is recognisably ` +
+      'an image credential and not some other variable that happens to be in the environment';
+
+}
+
+/**
+ * Whether a name may be used as a credential variable at all.
+ *
+ * @example
+ *   credentialEnvVarAllowed('GEMINI_API_KEY')  // => true
+ *   credentialEnvVarAllowed('PATH')            // => false
+ */
+export function credentialEnvVarAllowed(name: string): boolean {
+  return credentialEnvVarProblem(name) === null;
+}
+
+/** The four dotted decimal octets of an IPv4 literal, or `null` for anything else. */
+function ipv4Octets(host: string): number[] | null {
+
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) { return null; }
+
+  const octets = host.split('.').map(Number);
+
+  return octets.every(octet => octet <= 255) ? octets : null;
+
+}
+
+/**
+ * Whether a hostname is loopback or a private-network address — the only hosts the
+ * local provider is allowed to post to.
+ *
+ * Literals only, and deliberately: a name is not resolved, so `images.example.com`
+ * is refused rather than looked up. Resolution would make the answer depend on DNS at
+ * the moment of the check, which is exactly the property a security boundary must not
+ * have.
+ *
+ * @param host - a URL hostname; IPv6 brackets are tolerated
+ *
+ * @example
+ *   isLoopbackOrPrivateHost('127.0.0.1')    // => true
+ *   isLoopbackOrPrivateHost('192.168.1.9')  // => true
+ *   isLoopbackOrPrivateHost('[::1]')        // => true
+ *   isLoopbackOrPrivateHost('example.com')  // => false
+ */
+export function isLoopbackOrPrivateHost(host: string): boolean {
+
+  const name = host.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
+
+  if (name === 'localhost' || name.endsWith('.localhost')) { return true; }
+  if (name === '::1' || name === '0:0:0:0:0:0:0:1')        { return true; }
+
+  const octets = ipv4Octets(name);
+
+  if (octets === null) { return false; }
+
+  const [first = -1, second = -1] = octets;
+
+  return first === 127                                  // 127/8, loopback
+      || first === 10                                   // 10/8
+      || (first === 172 && second >= 16 && second <= 31) // 172.16/12
+      || (first === 192 && second === 168);             // 192.168/16
+
+}
+
+/**
+ * Why a proposed local endpoint is not acceptable, or `null` when it is.
+ *
+ * The `automatic1111` provider posts the user's prompt to this URL with no credential
+ * and no cost accounting, on the stated understanding that the endpoint is the user's
+ * own machine. An arbitrary host in this key turns "a local model" into "an
+ * unaccounted third party receiving every prompt", which is the one thing the whole
+ * facility is arranged to make impossible, so it is checked rather than assumed.
+ *
+ * @param raw - the proposed base URL
+ * @returns the reason it is refused, or `null` when it may be used
+ *
+ * @example
+ *   localBaseUrlProblem('http://127.0.0.1:7860')  // => null
+ *   localBaseUrlProblem('https://evil.example')   // => 'a loopback or private-network host …'
+ *
+ * @see isLoopbackOrPrivateHost
+ */
+export function localBaseUrlProblem(raw: string): string | null {
+
+  const trimmed = raw.trim();
+
+  let url: URL;
+
+  try { url = new URL(trimmed); }
+  catch { return "an absolute http:// or https:// URL, for example 'http://127.0.0.1:7860'"; }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return `an http:// or https:// URL; ${url.protocol}// is not a scheme this facility posts to`;
+  }
+
+  if (url.username !== '' || url.password !== '') {
+    return 'a URL carrying no userinfo — a secret in a URL is a secret in the one part of a ' +
+           'request that everything logs';
+  }
+
+  return isLoopbackOrPrivateHost(url.hostname) ? null
+    : 'a loopback or private-network host (localhost, 127.x, 10.x, 172.16–31.x, 192.168.x, ' +
+      `::1); ${url.hostname} is a remote host, and the local provider would send the user’s ` +
+      'prompt to it with no credential, no cost accounting, and no vendor relationship';
+
+}
+
 /**
  * The image configuration in force.
  *
@@ -130,6 +352,26 @@ function textOr(raw: string | null): string | null {
 }
 
 /**
+ * A stored credential-variable name, or `null` when it is absent, blank, or a name
+ * this facility will not read a credential from.
+ *
+ * The check is repeated here rather than trusted from `configure set` on purpose: a
+ * row written before the validator existed, or edited into the database by hand, must
+ * not be honoured just because it is stored. Readers are tolerant in the house style,
+ * so a refused name behaves as unset and the next rule applies.
+ */
+function namedVar(raw: string | null): string | null {
+  const trimmed = textOr(raw);
+  return trimmed !== null && credentialEnvVarAllowed(trimmed) ? trimmed : null;
+}
+
+/** A stored local endpoint, or `null` when it is absent, blank, or not a local host. */
+function localUrlOr(raw: string | null): string | null {
+  const trimmed = textOr(raw);
+  return trimmed !== null && localBaseUrlProblem(trimmed) === null ? trimmed : null;
+}
+
+/**
  * The environment variable one provider's credential is read from: the per-provider
  * override, then the single-key spelling, then the provider's own default.
  *
@@ -146,8 +388,8 @@ export function credentialEnvVar(store: Store, provider: ImageProvider): string 
 
   if (!provider.needsCredential) { return null; }
 
-  return textOr(readConfig(store, providerApiKeyEnvKey(provider.id)))
-      ?? textOr(readConfig(store, IMAGE_API_KEY_ENV_KEY))
+  return namedVar(readConfig(store, providerApiKeyEnvKey(provider.id)))
+      ?? namedVar(readConfig(store, IMAGE_API_KEY_ENV_KEY))
       ?? provider.defaultEnvVar;
 
 }
@@ -180,7 +422,7 @@ export function imageConfig(store: Store): ImageConfig {
     sessionCap       : intOr(readConfig(store, IMAGE_SESSION_CAP_KEY), DEFAULT_SESSION_CAP,     0, 1000),
     dailyCap         : intOr(readConfig(store, IMAGE_DAILY_CAP_KEY),   DEFAULT_DAILY_CAP,       0, 10000),
     timeoutSeconds   : intOr(readConfig(store, IMAGE_TIMEOUT_KEY),     DEFAULT_TIMEOUT_SECONDS, 5, 900),
-    localBaseUrl     : textOr(readConfig(store, IMAGE_LOCAL_BASE_URL_KEY)) ?? DEFAULT_LOCAL_BASE_URL,
+    localBaseUrl     : localUrlOr(readConfig(store, IMAGE_LOCAL_BASE_URL_KEY)) ?? DEFAULT_LOCAL_BASE_URL,
     credentialEnvVar : credentialEnvVar(store, provider),
   };
 

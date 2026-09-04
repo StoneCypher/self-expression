@@ -28,8 +28,30 @@ import { isMember, describeVocabulary } from '../channels/vocabulary.js';
 export type SeriesScale = 'absolute' | 'relative';
 
 /**
+ * The glyph a non-finite point (`NaN`, `Infinity`, `-Infinity` — a gap or a bad
+ * upstream computation) renders as, in both {@link renderSparkline} and
+ * {@link renderBraille}: a middle dot, distinct from every ramp glyph in both the
+ * block and braille families so a missing point is never mistaken for a real
+ * (if extreme) value.
+ *
+ * @see renderSeries
+ */
+export const MISSING_GLYPH = '·';
+
+/**
  * Shared arithmetic behind {@link renderSparkline} and {@link renderBraille}: one glyph
  * per point in `series`, drawn from `ramp` and mapped by `scale`.
+ *
+ * A non-finite point renders as {@link MISSING_GLYPH} instead of being run through
+ * `absoluteIndex`/`relativeIndex` — indexing a ramp with the `NaN` those functions
+ * would otherwise produce reads as `undefined`, which `Array.prototype.join` renders
+ * as the empty string, silently shortening the output by one glyph per bad point
+ * (`renderSparkline([1, 2, 3, Infinity], 'relative')` used to return `'▁▁▁'`, three
+ * glyphs for four points). Non-finite points are also excluded when computing
+ * `'relative'`'s min/max, so one bad point cannot collapse the whole series' domain to
+ * `NaN` and blank every glyph (`renderSparkline([-Infinity, 2, 3, 4], 'relative')` used
+ * to return `''`). The result is that the rendered strip always has exactly one glyph
+ * per input point, real or missing.
  *
  * `label` names the caller in the fewer-than-4-points error, so the message a caller
  * sees names the function they actually called rather than a generic internal one.
@@ -53,12 +75,17 @@ function renderSeries(
   const steps = ramp.length;
 
   if (scale === 'absolute') {
-    return series.map(value => ramp[absoluteIndex(value, steps)]).join('');
+    return series.map(value =>
+      Number.isFinite(value) ? ramp[absoluteIndex(value, steps)] : MISSING_GLYPH
+    ).join('');
   }
 
-  const min = Math.min(...series);
-  const max = Math.max(...series);
-  return series.map(value => ramp[relativeIndex(value, min, max, steps)]).join('');
+  const finite = series.filter(Number.isFinite);
+  const min = finite.length > 0 ? Math.min(...finite) : 0;
+  const max = finite.length > 0 ? Math.max(...finite) : 0;
+  return series.map(value =>
+    Number.isFinite(value) ? ramp[relativeIndex(value, min, max, steps)] : MISSING_GLYPH
+  ).join('');
 }
 
 /**

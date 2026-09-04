@@ -125,6 +125,25 @@ export function platformHasPlayer(platform: string): boolean {
 }
 
 /**
+ * The kill deadline `runPlayer` actually uses: `capMs` clamped into
+ * `[1, HARD_CAP_MS]`. Pure, and the sole place that decision is made, so both the
+ * hard cap (spec rule 5 — nothing outlives {@link HARD_CAP_MS}, however large a
+ * `capMs` is requested) and the floor (a non-positive deadline would fire a timer
+ * immediately or, worse, never) are one line of arithmetic instead of two scattered
+ * ones.
+ *
+ * @param capMs - the requested kill deadline in milliseconds; any finite number
+ *
+ * @example
+ *   effectiveCapMs(4000)                 // => 4000
+ *   effectiveCapMs(HARD_CAP_MS + 60_000) // => HARD_CAP_MS — never longer than the hard cap
+ *   effectiveCapMs(-40)                  // => 1 — never zero or negative
+ */
+export function effectiveCapMs(capMs: number): number {
+  return Math.min(Math.max(1, capMs), HARD_CAP_MS);
+}
+
+/**
  * Run one player command under the hard cap, resolving with how it ended.
  *
  * Resolves — never rejects — because every ending must reach the ledger. A nonzero
@@ -134,7 +153,8 @@ export function platformHasPlayer(platform: string): boolean {
  *
  * @param command - what to spawn
  * @param spawnFn - the spawner; inject a fake in tests so no audio ever plays
- * @param capMs   - kill deadline in milliseconds; clamped to {@link HARD_CAP_MS}
+ * @param capMs   - kill deadline in milliseconds; clamped to {@link HARD_CAP_MS} by
+ *                  {@link effectiveCapMs}
  *
  * @example
  *   const outcome = await runPlayer(soundPlayerCommand(path), spawnDetached, 4000);
@@ -148,7 +168,7 @@ export function runPlayer(
 
   return new Promise<PlayOutcome>(resolve => {
 
-    const deadline = Math.min(Math.max(1, capMs), HARD_CAP_MS);
+    const deadline = effectiveCapMs(capMs);
 
     let child: ChildLike;
     try {

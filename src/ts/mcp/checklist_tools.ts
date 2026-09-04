@@ -33,8 +33,11 @@ import { verifyChecklist, parseSummaryCounts } from '../charts/verify.js';
 import { recordEntry, recentChecklists, seriesPercents } from '../channels/entries.js';
 import { latestContext } from '../channels/context.js';
 import { privacyFlags }  from '../channels/privacy.js';
-import { FORMAT_VERSION, effectiveValue } from '../channels/config.js';
-import { stamp }         from '../channels/time.js';
+import {
+  FORMAT_VERSION, effectiveValue, channelMaxChars, channelMaxCharsKey,
+} from '../channels/config.js';
+import { stamp }           from '../channels/time.js';
+import { enabledChannels } from './tools.js';
 import type { Store }     from '../channels/store.js';
 import type { ToolReply } from './chart_tools.js';
 
@@ -117,6 +120,14 @@ expectType<Equal<LogChecklistArgs, z.infer<z.ZodObject<typeof LOG_CHECKLIST_SHAP
  * `S/A/F items (P%)` line is rejected with an `error:` reply (never a protocol fault),
  * because a checklist that was never summarized has no business in the trend series.
  *
+ * Two more gates run before any of that, reusing the exact checks `express` applies to
+ * every other channel (#76, #42): the `checklist` channel must currently be enabled
+ * ({@link ../mcp/tools.js enabledChannels}), and `block` must fit its configured
+ * per-channel limit ({@link ../channels/config.js channelMaxChars}). Neither check can
+ * live in the schema the way it does for `express` and `annotate` — this tool takes no
+ * `channel` argument to narrow, so a disabled or over-budget checklist channel would
+ * otherwise write straight through with no gate at all.
+ *
  * Context the hook observed (session, turn, effort, cwd, and the rest) is adopted for
  * anything the caller did not supply, mirroring the `express` tool — including the
  * second privacy gate on the path-carrying fields, and the declarative
@@ -144,6 +155,25 @@ export function handleLogChecklist(
   args          : LogChecklistArgs,
   client?       : ClientIdentity,
 ): ToolReply {
+
+  // The same disabled-channel and per-channel length gates `express` enforces (#76,
+  // #42) — checked here explicitly because this tool's schema carries no `channel`
+  // argument for the enum-narrowing trick that closes the same hole for express and
+  // annotate. Checked first, before the summary line is even parsed: a disabled or
+  // over-budget channel is refused regardless of what the block contains.
+  if (!enabledChannels(store).includes('checklist')) {
+    return reply(
+      "error: log_checklist cannot record — the 'checklist' channel is currently " +
+      'disabled (configure set channels.enabled to include it); nothing was written');
+  }
+
+  const limit = channelMaxChars(store, 'checklist');
+  if (args.block.length > limit) {
+    return reply(
+      `error: cannot log_checklist:\n  - text is ${String(args.block.length)} characters; ` +
+      `the 'checklist' channel allows at most ${String(limit)} ` +
+      `(configure set ${channelMaxCharsKey('checklist')} <n> to change it); nothing was written`);
+  }
 
   const summary = parseSummaryCounts(args.block);
   if (summary === null) {

@@ -83,6 +83,27 @@ describe('region confinement — stochastic invariants', () => {
     );
   }, 30_000);
 
+  it('polyline always terminates, even with non-finite vertices among arbitrary floats', () => {
+    // The load-bearing regression: a non-finite coordinate used to make the Bresenham
+    // walk's `cx === tx && cy === ty` termination test never true, hanging forever. Every
+    // generated vertex list — NaN, ±Infinity, and huge finite floats all included — must
+    // finish drawing (each segment capped at |dx|+|dy|+1 steps) and stay confined.
+    const floatArb  = fc.double({ noNaN: false, noDefaultInfinity: false, min: -1e6, max: 1e6 });
+    const vertexArb = fc.tuple(floatArb, floatArb);
+    fc.assert(
+      fc.property(
+        regionSetupArb,
+        fc.array(vertexArb, { minLength: 0, maxLength: 8 }),
+        (setup, vertices) => {
+          const region = subRegion(fullRegion(makeSurface(20, 20, WHITE)), setup.x, setup.y, setup.width, setup.height);
+          polyline(region, vertices, INK);
+          assertOutsideUntouched(region);
+        }
+      ),
+      { numRuns: 200 }
+    );
+  }, 30_000);
+
   it('text never writes outside its region, whatever the string and position', () => {
     fc.assert(
       fc.property(

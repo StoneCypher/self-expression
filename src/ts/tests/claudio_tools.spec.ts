@@ -11,7 +11,9 @@ import type { AudioDeps, AudioSession } from '../claudio/tools.js';
 import type { PlayerCommand, PlayOutcome } from '../claudio/player.js';
 import { MAX_SAY_CHARS } from '../claudio/player.js';
 import { encodeWavPcm16 } from '../claudio/synth.js';
-import { AUDIO_ENABLED_KEY, AUDIO_TTS_LOCAL_KEY, AUDIO_MIN_GAP_KEY, motifWavKey } from '../claudio/config.js';
+import {
+  AUDIO_ENABLED_KEY, AUDIO_TTS_LOCAL_KEY, AUDIO_MIN_GAP_KEY, AUDIO_HOURLY_BUDGET_KEY, motifWavKey,
+} from '../claudio/config.js';
 import { LEITMOTIFS } from '../claudio/vocabulary.js';
 
 const VERSION = '0.0.0-test';
@@ -282,6 +284,74 @@ describe('the rate-limit window is one rolling hour', () => {
     const out = await handleStrike(rig.store, rig.ledger, rig.deps, rig.session, VERSION, 'strike',
                                    { leitmotif: 'spark' });
     expect(out.content[0]?.text).toContain('struck');
+  }));
+
+});
+
+describe('the rate-limit slot is reserved before the play — concurrent calls cannot all pass', () => {
+
+  /**
+   * Regression for the bug where the ledger only gained a row once `play()`
+   * resolved: N concurrent calls all read the same empty ledger inside the gate
+   * and all passed. `play` here resolves on a later macrotask (a real
+   * `setTimeout`), so every concurrent call's synchronous "decide" phase runs
+   * before any of them can possibly have recorded an outcome — exactly the window
+   * the reservation in `reserveSlot` exists to close.
+   */
+  test('only the hourly budget worth of N concurrent strikes reach the player', () => withRig(async rig => {
+    writeConfig(rig.store, AUDIO_MIN_GAP_KEY, '0');
+    writeConfig(rig.store, AUDIO_HOURLY_BUDGET_KEY, '3');
+
+    const FIXED = new Date('2026-08-31T12:00:00.000Z');
+    let playCount = 0;
+    const deps: AudioDeps = {
+      assetDir : rig.assetDir,
+      env      : {},
+      now      : () => FIXED,
+      play     : () => {
+        playCount += 1;
+        return new Promise(resolve => {
+          setTimeout(() => resolve({ ok: true, capped: false, detail: null }), 0);
+        });
+      },
+    };
+
+    const attempts = 10,
+          results  = await Promise.all(Array.from({ length: attempts }, () =>
+            handleStrike(rig.store, rig.ledger, deps, rig.session, VERSION, 'strike', { leitmotif: 'spark' })));
+
+    expect(playCount).toBe(3);
+    expect(results.filter(r => r.content[0]?.text.startsWith('struck')).length).toBe(3);
+    expect(results.filter(r => r.content[0]?.text.includes('hourly strike budget')).length).toBe(7);
+
+    // Every reservation is released once its play resolves and the ledger row
+    // takes over — nothing leaks past the burst.
+    expect(rig.session.reservations).toHaveLength(0);
+
+    const followUp = await handleStrike(rig.store, rig.ledger, deps, rig.session, VERSION, 'strike',
+                                        { leitmotif: 'spark' });
+    expect(followUp.content[0]?.text).toContain('hourly strike budget');
+  }));
+
+  test('an in-flight reservation counts against the minimum gap too', () => withRig(async rig => {
+    writeConfig(rig.store, AUDIO_HOURLY_BUDGET_KEY, '10');   // budget is not the limiter here
+    const FIXED = new Date('2026-08-31T12:00:00.000Z');
+    const deps: AudioDeps = {
+      assetDir : rig.assetDir,
+      env      : {},
+      now      : () => FIXED,
+      play     : () => new Promise(resolve => {
+        setTimeout(() => resolve({ ok: true, capped: false, detail: null }), 0);
+      }),
+    };
+
+    const [first, second] = await Promise.all([
+      handleStrike(rig.store, rig.ledger, deps, rig.session, VERSION, 'strike', { leitmotif: 'spark' }),
+      handleStrike(rig.store, rig.ledger, deps, rig.session, VERSION, 'strike', { leitmotif: 'quiet-completion' }),
+    ]);
+
+    expect(first?.content[0]?.text).toContain('struck');
+    expect(second?.content[0]?.text).toContain('minimum gap');
   }));
 
 });

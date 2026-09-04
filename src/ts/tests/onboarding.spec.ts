@@ -235,6 +235,17 @@ describe('onboard answer — one question per call, explicit answers always writ
     expect(readConfig(s, 'forecast.enabled')).toBe('true');
   }));
 
+  test('a startup-baked answer (forecast) carries the next-start caveat; a runtime one (roster) does not', () => withStore(s => {
+    const forecastOut = text(handleOnboard(s, { op: 'answer', id: 'forecast', value: 'false' }));
+    expect(forecastOut).toContain('forecast.enabled = false');
+    expect(forecastOut).toContain('next server start');
+    expect(forecastOut).toContain('baked into the tool schema');
+
+    const rosterOut = text(handleOnboard(s, { op: 'answer', id: 'roster', value: 'true' }));
+    expect(rosterOut).toContain('roster.enabled = true');
+    expect(rosterOut).not.toContain('next server start');
+  }));
+
   test('an invalid value is refused, nothing written, and the question stays pending', () => withStore(s => {
     const out = text(handleOnboard(s, { op: 'answer', id: 'roster', value: 'yes' }));
     expect(out).toMatch(/^error: /);

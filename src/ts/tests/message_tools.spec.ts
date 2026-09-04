@@ -79,14 +79,40 @@ describe('handleReadMessages', () => {
     expect(parsed.messages[0]?.['text']).toBe('note');
   }));
 
-  test('the hook-observed session beats a claimed one for collection', () => withStore(s => {
+  test('a claimed session with no hook context of its own is trusted — nothing else is known', () => withStore(s => {
     recordContext(s, { session: 'sess-1' });
     handlePostMessage(s, VERSION, { audience: 'self', text: 'mine', session: 'sess-2' });
-    // The claimed sess-2 must not let this reader collect sess-2's notes.
+    // sess-2 never had a hook fire for it; the claim is all there is, so it is honoured.
     const parsed = JSON.parse(text(handleReadMessages(s, { audience: 'self', session: 'sess-2' }))) as
+      { reader: Record<string, unknown>; messages: { text: string }[] };
+    expect(parsed.reader['session']).toBe('sess-2');
+    expect(parsed.messages).toHaveLength(1);
+    expect(parsed.messages[0]?.text).toBe('mine');
+  }));
+
+  test('a concurrent session sharing the store never resolves as a different session\'s reader ' +
+       '(regression, issue: unscoped latestContext)', () => withStore(s => {
+    // Two sessions share one log.sqlite3, exactly as every real install does. B's hook
+    // fires first, then A's — so the *globally* latest context row belongs to A, not B.
+    recordContext(s, { session: 'sess-B', promptId: 'pB1' });
+    recordContext(s, { session: 'sess-A', promptId: 'pA1' });
+    handlePostMessage(s, VERSION, { audience: 'self', text: 'for A only' });   // adopts sess-A, the latest
+
+    // B reads first, explicitly as itself. An unscoped lookup would resolve B's reader
+    // as sess-A (the globally latest context) and both hand B A's mail and receipt it
+    // under A's identity, so A would never see it.
+    const bRead = JSON.parse(text(handleReadMessages(s, { session: 'sess-B' }))) as
       { reader: Record<string, unknown>; messages: unknown[] };
-    expect(parsed.reader['session']).toBe('sess-1');
-    expect(parsed.messages).toHaveLength(0);
+    expect(bRead.reader['session']).toBe('sess-B');
+    expect(bRead.messages).toHaveLength(0);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+
+    // A reads next and gets its own mail, undisturbed by B's read.
+    const aRead = JSON.parse(text(handleReadMessages(s, { session: 'sess-A' }))) as
+      { reader: Record<string, unknown>; messages: { text: string }[] };
+    expect(aRead.reader['session']).toBe('sess-A');
+    expect(aRead.messages).toHaveLength(1);
+    expect(aRead.messages[0]?.text).toBe('for A only');
   }));
 
   test('the session argument fills in only when no hook has run', () => withStore(s => {

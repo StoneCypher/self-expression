@@ -4,11 +4,19 @@
  * Three families, in descending order of how much the design rests on them:
  *
  * 1. **The delivery gate.** For *arbitrary* interleavings of composing, reply turns,
- *    wakeups, withdrawals, and deliberately forged surfacing attempts: every recorded
- *    `surfaced` event is preceded by an `offered` event on the same note, with the same
- *    `prompt_id`, stamped `reply` by the hook. This is the property the whole feature
- *    exists to guarantee — "no sequence of operations produces a delivery claim the hook
- *    did not authorize" — and it is checked against the real ledger, never a model of it.
+ *    wakeups, withdrawals, and adversarial surfacing attempts: every recorded `surfaced`
+ *    event points at an `offered` event that was **still outstanding** on a `reply` turn
+ *    the **harness itself observed**, matching on the whole pair `(session, prompt_id)`.
+ *    This is the property the whole feature exists to guarantee — "no sequence of
+ *    operations produces a delivery claim the hook did not authorize" — and it is checked
+ *    against the real ledger, never a model of it.
+ *
+ *    The forger is deliberately not a straw man. Forging a prompt id nobody ever issued
+ *    tests almost nothing: the interesting attacker uses ids it legitimately saw (offers
+ *    are shown to the model, and prompt ids ride ordinary tool replies), calls `begin_turn`
+ *    to manufacture the turn context those ids belong to, names whatever session suits it,
+ *    and tries after the offer has lapsed rather than before. Every one of those moves was
+ *    a real hole; the property is what keeps them closed.
  * 2. **Budgets are ceilings.** Under the same arbitrary sequences: nothing surfaces more
  *    than `daily_cap` times in the window, no note is offered more than `offer_cap`
  *    times, and the queue never exceeds `max_pending`.
@@ -32,6 +40,7 @@ import {
   deriveNoteState, noteBudgets, surfacedRecently,
 } from '../channels/notes.js';
 import { handleSurfaceNote }   from '../mcp/note_tools.js';
+import { handleBeginTurn }     from '../mcp/tools.js';
 import { onUserPromptSubmit }  from '../mcp/hooks.js';
 import { unreadCounts }        from '../channels/messages.js';
 import { NOTE_STATES, NOTE_EVENTS, TURNS } from '../channels/vocabulary.js';
@@ -41,13 +50,23 @@ import { buildV4, insertV4Message } from './helpers/v4_fixture.js';
 const VERSION = '0.0.0-stoch';
 const NOW     = new Date('2026-08-28T12:00:00Z');
 
+/** The session the honest half of a run works under; the hook stamps every turn with it. */
+const REAL_SESSION = 'sess-1';
+
+/**
+ * The sessions a forging attempt may name — the real one included, because "claim the
+ * right session but the wrong turn" is a distinct attack from "claim another session".
+ */
+const FORGE_SESSIONS = [REAL_SESSION, 'ghost', 'sess-2'] as const;
+
 /** One thing a run can do to the mailbox. */
 type Op =
   | { readonly kind: 'compose';      readonly text: string; readonly delayDays: number;
       readonly series: string | null }
-  | { readonly kind: 'replyTurn';    readonly surface: boolean }
+  | { readonly kind: 'replyTurn';    readonly surface: boolean; readonly budget: number }
   | { readonly kind: 'wakeup' }
-  | { readonly kind: 'forgeSurface'; readonly id: number }
+  | { readonly kind: 'forgeSurface'; readonly id: number; readonly session: number;
+      readonly prompt: number; readonly beginTurn: boolean }
   | { readonly kind: 'withdraw';     readonly id: number };
 
 const opArb: fc.Arbitrary<Op> = fc.oneof(
@@ -57,25 +76,101 @@ const opArb: fc.Arbitrary<Op> = fc.oneof(
     delayDays : fc.integer({ min: 0, max: 3 }),
     series    : fc.option(fc.constantFrom('alpha', 'beta'), { nil: null }),
   }),
-  fc.record({ kind: fc.constant('replyTurn' as const), surface: fc.boolean() }),
+  fc.record({
+    kind    : fc.constant('replyTurn' as const),
+    surface : fc.boolean(),
+    // The per-turn budget in force for this turn. A zero is what produces the state a
+    // lapse-replay attack needs: a turn that lapses the previous offer without making a
+    // new one, so `last_offer_prompt` goes on naming a turn whose offer is over.
+    budget  : fc.integer({ min: 0, max: 2 }),
+  }),
   fc.record({ kind: fc.constant('wakeup' as const) }),
-  fc.record({ kind: fc.constant('forgeSurface' as const), id: fc.integer({ min: 1, max: 6 }) }),
+  fc.record({
+    kind      : fc.constant('forgeSurface' as const),
+    // Kept near the ids a short run actually creates, so the attacks land on real notes
+    // rather than spending most of their draws on ids nothing ever composed.
+    id        : fc.integer({ min: 1, max: 4 }),
+    // Which of the prompt ids this run has already put in front of the model to reuse —
+    // real offers included, which is the whole point.
+    prompt    : fc.nat({ max: 40 }),
+    session   : fc.nat({ max: 5 }),
+    // Whether to manufacture the turn context first, through the hookless host's door.
+    beginTurn : fc.boolean(),
+  }),
   fc.record({ kind: fc.constant('withdraw' as const),     id: fc.integer({ min: 1, max: 6 }) }),
 );
 
 const opsArb = fc.array(opArb, { minLength: 1, maxLength: 14 });
 
-/** Every ledger row, in recording order — the ground truth every property reads. */
-function ledger(store: Store): { id: number; note: number; event: string;
-                                 turn: string | null; prompt: string | null }[] {
+/**
+ * Every prompt id this run has already exposed — offers on the ledger and turns in the
+ * context table both reach the model through ordinary replies, so both are fair game for
+ * a forger, plus one id nobody ever issued as a control.
+ */
+function observedPrompts(store: Store): string[] {
+  const fromLedger = store.db.prepare(
+          'SELECT DISTINCT prompt_id FROM note_events WHERE prompt_id IS NOT NULL').all()
+          .map(row => String(row['prompt_id'])),
+        fromTurns  = store.db.prepare(
+          'SELECT DISTINCT prompt_id FROM turn_context WHERE prompt_id IS NOT NULL').all()
+          .map(row => String(row['prompt_id']));
+  return [...new Set([...fromLedger, ...fromTurns, 'never-issued'])];
+}
+
+/** One `(session, prompt_id)` pair as a comparable key; JSON so no value can smuggle the joiner. */
+function turnKey(session: string | null, promptId: string | null): string {
+  return JSON.stringify([session, promptId]);
+}
+
+/** The `(session, prompt_id)` pairs the harness itself observed — the only ones that count. */
+function hookObservedTurns(store: Store): Set<string> {
+  return new Set(store.db.prepare(`
+    SELECT session, prompt_id FROM turn_context
+     WHERE source = 'hook' AND prompt_id IS NOT NULL`).all()
+    .map(row => turnKey(String(row['session']), String(row['prompt_id']))));
+}
+
+/** Every note this run has ever offered — the full target list for a replay attack. */
+function everOfferedNotes(store: Store): number[] {
   return store.db.prepare(
-    'SELECT id, note_id, event, turn, prompt_id FROM note_events ORDER BY id')
+    "SELECT DISTINCT note_id FROM note_events WHERE event = 'offered' ORDER BY note_id").all()
+    .map(row => Number(row['note_id']));
+}
+
+/**
+ * The turn one note was last offered on — the exact pair a replay attack quotes back,
+ * since it is a pair the model was genuinely shown.
+ */
+function lastOffer(store: Store, noteId: number): { prompt: string; session: string } | null {
+  const row = store.db.prepare(`
+    SELECT prompt_id, session FROM note_events
+     WHERE note_id = ? AND event = 'offered' ORDER BY id DESC LIMIT 1`).get(noteId);
+  return row === undefined || row['prompt_id'] === null
+    ? null
+    : { prompt: String(row['prompt_id']), session: String(row['session'] ?? '') };
+}
+
+/** One row of the append-only ledger, as the properties read it. */
+interface LedgerRow {
+  readonly id      : number;
+  readonly note    : number;
+  readonly event   : string;
+  readonly turn    : string | null;
+  readonly prompt  : string | null;
+  readonly session : string | null;
+}
+
+/** Every ledger row, in recording order — the ground truth every property reads. */
+function ledger(store: Store): LedgerRow[] {
+  return store.db.prepare(
+    'SELECT id, note_id, event, turn, prompt_id, session FROM note_events ORDER BY id')
     .all().map(row => ({
-      id     : Number(row['id']),
-      note   : Number(row['note_id']),
-      event  : String(row['event']),
-      turn   : row['turn']      === null ? null : String(row['turn']),
-      prompt : row['prompt_id'] === null ? null : String(row['prompt_id']),
+      id      : Number(row['id']),
+      note    : Number(row['note_id']),
+      event   : String(row['event']),
+      turn    : row['turn']      === null ? null : String(row['turn']),
+      prompt  : row['prompt_id'] === null ? null : String(row['prompt_id']),
+      session : row['session']   === null ? null : String(row['session']),
     }));
 }
 
@@ -93,7 +188,7 @@ function drive(store: Store, ops: readonly Op[]): void {
         composeNote(store, {
           text      : op.text,
           reason    : 'stochastic',
-          session   : 'sess-1',
+          session   : REAL_SESSION,
           seriesKey : op.series ?? undefined,
           notBefore : new Date(NOW.getTime() + op.delayDays * 86_400_000).toISOString(),
         }, VERSION, NOW);
@@ -104,9 +199,10 @@ function drive(store: Store, ops: readonly Op[]): void {
     if (op.kind === 'replyTurn') {
       prompts += 1;
       const prompt = `p-${String(prompts)}`;
+      writeConfig(store, 'mailbox.surface_budget', String(op.budget));
       // The real hook path: it writes the turn context AND performs the offer, which is
       // exactly how offers reach the ledger in production.
-      onUserPromptSubmit(store, { session_id: 'sess-1', prompt_id: prompt }, NOW);
+      onUserPromptSubmit(store, { session_id: REAL_SESSION, prompt_id: prompt }, NOW);
       if (op.surface) {
         for (const view of listNotes(store, { limit: 200 }, NOW)) {
           if (view.state !== 'offered') { continue; }
@@ -120,14 +216,67 @@ function drive(store: Store, ops: readonly Op[]): void {
     if (op.kind === 'wakeup') {
       prompts += 1;
       const turn = TURNS[1 + (prompts % 3)] ?? 'wakeup';
-      expect(offerRipeNotes(store, { turn, promptId: `w-${String(prompts)}` }, NOW)).toEqual([]);
+      expect(offerRipeNotes(store, { turn, promptId: `w-${String(prompts)}`,
+                                     session: REAL_SESSION }, NOW)).toEqual([]);
       continue;
     }
 
     if (op.kind === 'forgeSurface') {
-      // A delivery claim for a turn that never offered anything must always be refused.
-      expect(() => surfaceNote(store, op.id, { turn: 'reply', promptId: `forged-${String(op.id)}` }, NOW))
-        .toThrow();
+
+      const seen    = observedPrompts(store),
+            prompt  = seen[op.prompt % seen.length] ?? 'never-issued',
+            session = FORGE_SESSIONS[op.session % FORGE_SESSIONS.length] ?? REAL_SESSION,
+            targets = new Set<number>([op.id]);
+
+      // Attack 1 — replay, against every note that was ever offered. Quote back the exact
+      // turn each was last offered on, which is a pair the model was genuinely shown, and
+      // manufacture the turn context for it through the hookless host's door. This is the
+      // reported hole: it succeeds if and only if that offer is still outstanding on an
+      // observed turn, which after any lapse it is not.
+      for (const noteId of everOfferedNotes(store)) {
+
+        const replay = lastOffer(store, noteId);
+
+        if (replay === null) { continue; }
+
+        if (op.beginTurn) {
+          try { handleBeginTurn(store, { session: replay.session, promptId: replay.prompt }, NOW); }
+          catch { /* a refusal is a fine outcome; the invariant is what matters */ }
+        }
+        try { handleSurfaceNote(store, { id: noteId, session: replay.session }); }
+        catch { /* refused */ }
+        try {
+          surfaceNote(store, noteId,
+                      { turn: 'reply', promptId: replay.prompt, session: replay.session }, NOW);
+        } catch { /* refused */ }
+
+      }
+
+      // Attack 2 — a turn of the forger's own making, and an offer to go with it. Nothing
+      // in production reaches that offer call; the hook is the only caller. But assuming
+      // it stays the only caller is exactly the assumption a property test should refuse
+      // to make, and it is what gives the hook-sourcing check something to bite on.
+      if (op.beginTurn) {
+        try { handleBeginTurn(store, { session, promptId: prompt }, NOW); }
+        catch { /* refused */ }
+        for (const view of offerRipeNotes(store, { turn: 'reply', promptId: prompt, session }, NOW)) {
+          targets.add(view.id);
+        }
+      }
+
+      // Both doors into the claim: the tool, which resolves the turn for itself, and the
+      // library call, where the forger gets to state the whole turn. Neither is asserted
+      // to throw — a forger that happens to name the real outstanding offer on the real
+      // observed turn has simply surfaced a note, honestly. The property below is what
+      // says every *recorded* claim was one of those.
+      try { handleSurfaceNote(store, { id: op.id, session }); }
+      catch { /* refused */ }
+
+      for (const target of targets) {
+        try { surfaceNote(store, target, { turn: 'reply', promptId: prompt, session }, NOW); }
+        catch { /* refused */ }
+      }
+
       continue;
     }
 
@@ -155,7 +304,7 @@ function withMailbox(seed: number, fn: (s: Store) => void): void {
 
 describe('the delivery gate holds under arbitrary operation sequences', () => {
 
-  it('every surfaced note was offered on that exact turn, by the hook, as a reply', () => {
+  it('every surfaced note held an outstanding offer on that exact observed turn', () => {
     let run = 0;
     fc.assert(fc.property(opsArb, (ops) => {
 
@@ -164,18 +313,41 @@ describe('the delivery gate holds under arbitrary operation sequences', () => {
 
         drive(store, ops);
 
-        const rows    = ledger(store),
-              offers  = rows.filter(r => r.event === 'offered'),
-              claims  = rows.filter(r => r.event === 'surfaced');
+        const rows     = ledger(store),
+              observed = hookObservedTurns(store),
+              claims   = rows.filter(r => r.event === 'surfaced');
 
         // Every offer is a hook fact: there is no other writer of this event.
-        for (const offer of offers) { expect(offer.turn).toBe('reply'); }
+        for (const offer of rows.filter(r => r.event === 'offered')) {
+          expect(offer.turn).toBe('reply');
+        }
 
-        // And every delivery claim points back at one of them, on the same turn.
         for (const claim of claims) {
-          const authorized = offers.some(offer =>
-            offer.note === claim.note && offer.prompt === claim.prompt && offer.id < claim.id);
-          expect(authorized).toBe(true);
+
+          // The offer it points at is the note's latest one before the claim.
+          const offer = rows.filter(r =>
+            r.note === claim.note && r.event === 'offered' && r.id < claim.id).pop();
+
+          expect(offer).toBeDefined();
+          if (offer === undefined) { continue; }
+
+          // Stamped `reply` by the hook, and matching on the whole identity — a prompt id
+          // alone is a token the model can read out of a reply and quote back.
+          expect(offer.turn).toBe('reply');
+          expect(offer.prompt).toBe(claim.prompt);
+          expect(offer.session).toBe(claim.session);
+          expect(claim.prompt).not.toBeNull();
+          expect(claim.session).not.toBeNull();
+
+          // Still outstanding: nothing at all happened to this note between the offer and
+          // the claim, so no lapse, no sweep, and no second offer sits in between.
+          expect(rows.some(r => r.note === claim.note && r.id > offer.id && r.id < claim.id))
+            .toBe(false);
+
+          // And the harness genuinely saw that turn. A `begin_turn` row for the same pair
+          // is not this — that is the difference the `source` column exists to keep.
+          expect([...observed]).toContain(turnKey(claim.session, claim.prompt));
+
         }
 
         // The mirror property: a note can be claimed delivered at most once.
@@ -183,11 +355,12 @@ describe('the delivery gate holds under arbitrary operation sequences', () => {
 
       });
 
-    }), { numRuns: 25 });
-    // 25 property runs each build a real database on disk and drive up to fourteen
-    // operations through it; the default 5s vitest timeout is a flake margin under a
-    // concurrent build, not a correctness bound.
-  }, 60_000);
+    }), { numRuns: 150 });
+    // Far more runs than its siblings, because this one has to *reach* the states the
+    // attacks exploit — a lapsed offer needs a turn that lapsed without re-offering, which
+    // only a spent per-turn budget produces. Verified by removing each guard in turn and
+    // watching the property fail; at 25 runs it did not, which made it a decoration.
+  }, 120_000);
 
   it('budgets are ceilings, not intentions', () => {
     let run = 0;

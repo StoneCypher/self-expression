@@ -32,6 +32,12 @@
  * `pending` row behind — which is the one outcome an after-the-fact ledger could never
  * record and is also the one that may still have been billed.
  *
+ * A **timed-out** generation is the same shape and gets the same answer: the row is
+ * left `pending` rather than settled, because a request abandoned mid-flight is exactly
+ * as unknown as one whose process died, and `pending` is the outcome that counts
+ * against the caps. Filing a timeout as an `error` — which does not count — would mean
+ * a provider that merely runs slow silently turns every budget off.
+ *
  * @see ../imagery/gate.js
  * @see ../imagery/client.js
  * @see ../imagery/ledger.js
@@ -54,7 +60,7 @@ import type { HttpSend }           from '../imagery/client.js';
 import { estimateCost, IMAGE_SIZES, IMAGE_PROVIDER_IDS } from '../imagery/providers.js';
 import type { ImageSize }          from '../imagery/providers.js';
 import {
-  billableInSession, billableSince, closeImageLedger, openImageLedger,
+  billableInSession, billableSince, closeImageLedger, markAbandoned, openImageLedger,
   policyRefusalsSince, recordAttempt, recordRefusal, settleAttempt,
 } from '../imagery/ledger.js';
 import type { AttemptRecord, ImageLedger } from '../imagery/ledger.js';
@@ -244,7 +250,7 @@ export async function handleGenerateImage(
     ask, config, credential,
     { session : billableInSession(ledger, deps.sessionId),
       day     : billableSince(ledger, windowStart(now)) },
-    policyRefusalsSince(ledger, windowStart(now)),
+    policyRefusalsSince(ledger, windowStart(now), config.provider.id),
   );
 
   if (!decision.allowed) {
@@ -274,10 +280,26 @@ export async function handleGenerateImage(
     secrets,
   );
 
+  if (outcome.kind === 'timeout') {
+    // Deliberately not settled. The row stays `pending`, which is the ledger's word for
+    // "we asked and do not know", and `pending` is billable — so an abandoned call keeps
+    // counting against the caps. Settling it as an error would make a provider that is
+    // merely slow into a facility with no budget at all.
+    markAbandoned(ledger, written.id, outcome.detail);
+    return reply(scrub(
+      `error: ${outcome.detail} — ledger #${String(written.id)} is left pending on purpose: ` +
+      'the call may already have been billed, so it keeps counting against the session and ' +
+      'daily caps. Tell the user the generation was abandoned and is being counted; do not ' +
+      'retry it automatically.',
+      secrets));
+  }
+
   if (outcome.kind === 'policy') {
+    const refused = estimateCost(config.provider, outcome);
     settleAttempt(ledger, written.id, {
       outcome: 'policy_refused', detail: outcome.detail, imageCount: 0, bytes: null,
-      path: null, costEstimateUsd: null, costSource: 'none', providerRequestId: null,
+      path: null, costEstimateUsd: refused.usd, costSource: refused.source,
+      providerRequestId: null,
     }, now);
     return reply(scrub(
       `refused by provider policy: ${outcome.detail} — ledger #${String(written.id)}. ` +

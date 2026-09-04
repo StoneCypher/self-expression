@@ -462,6 +462,14 @@ export function imageProvider(id: string): ImageProvider | undefined {
  * Kept separate from the providers themselves so the "which of the two did we use"
  * answer is computed in exactly one place and can be asserted on directly.
  *
+ * **A content-policy refusal is priced, not zeroed.** The refusal reached the provider,
+ * and the major vendors bill for the call that produced it — which is also why
+ * `policy_refused` counts against the caps. A refusal returns no images, so the count
+ * cannot be the multiplier; the base per-image price is, which is the smallest honest
+ * figure rather than a `null` that would silently under-report every spend total. An
+ * `error` and a `timeout` are priced at nothing here, an error because it bought
+ * nothing and a timeout because the caller never settles that row at all.
+ *
  * @param provider - the provider that ran the attempt
  * @param outcome  - what its reply came to
  * @returns the amount in USD and where the amount came from; `none` when nothing is known
@@ -469,20 +477,29 @@ export function imageProvider(id: string): ImageProvider | undefined {
  * @example
  *   estimateCost(openai, { kind: 'image', images: [img], costEstimateUsd: null, … })
  *   // => { usd: 0.04, source: 'list-price' }
+ *   estimateCost(openai, { kind: 'policy', detail: 'refused' })
+ *   // => { usd: 0.04, source: 'list-price' }
+ *   estimateCost(openai, { kind: 'error', detail: 'socket hang up' })
+ *   // => { usd: null, source: 'none' }
  */
 export function estimateCost(
   provider : ImageProvider,
   outcome  : ProviderOutcome,
 ): { usd: number | null; source: CostSource } {
 
-  if (outcome.kind !== 'image') { return { usd: null, source: 'none' }; }
+  if (outcome.kind === 'error') { return { usd: null, source: 'none' }; }
 
-  if (outcome.costEstimateUsd !== null && outcome.costSource === 'provider') {
+  if (outcome.kind === 'image'
+      && outcome.costEstimateUsd !== null && outcome.costSource === 'provider') {
     return { usd: outcome.costEstimateUsd, source: 'provider' };
   }
 
-  return provider.listPriceUsd === null
-    ? { usd: null, source: 'none' }
-    : { usd: provider.listPriceUsd * outcome.images.length, source: 'list-price' };
+  if (provider.listPriceUsd === null) { return { usd: null, source: 'none' }; }
+
+  // A refusal returns no images, so the count cannot be the multiplier; one call was
+  // still made, and one image's price is what it would have been billed at.
+  const billed = outcome.kind === 'policy' ? 1 : outcome.images.length;
+
+  return { usd: provider.listPriceUsd * billed, source: 'list-price' };
 
 }

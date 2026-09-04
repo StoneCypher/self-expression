@@ -59,6 +59,66 @@ export const ENABLED_KEY = 'channels.enabled';
 export const FORECAST_KEY = 'forecast.enabled';
 
 /**
+ * Config keys baked into a tool schema at server registration, rather than read live
+ * on every call — so writing one through `configure` or `onboard` changes nothing
+ * about what the model can currently call; only the *next* start reflects it.
+ *
+ * `channels.enabled` narrows the `channel` enum on `express`/`annotate`;
+ * `forecast.enabled` narrows the `confidence` enum the same way (both at this file's
+ * `registerTools`, from `channels` and `grounds` computed once at the top of that
+ * function). `image.enabled` decides whether `generate_image` and its siblings are
+ * registered at all ({@link ../mcp/server.js buildServer}'s `resolveImageFacility`
+ * call). `audio.enabled` and `audio.tts_local` decide the same for the entirely
+ * separate `claudio` process ({@link ../claudio/server.js buildAudioServer}) — a
+ * different server, baked at its own startup, not this one's.
+ *
+ * Deliberately excludes keys that are re-checked per call instead — `messages.enabled`,
+ * `mailbox.enabled`, and the hook-time toggles (`salience.enabled`, `revision.enabled`,
+ * `gifts.enabled`, `roster.enabled`): those are live immediately, and a restart notice
+ * on them would be a lie in the other direction. Also excludes `dwelling.enabled` /
+ * `dwelling.path`, which carry their own startup-notice mechanism
+ * ({@link ../dwelling/config.js dwellingChangeNotice}) predating this one.
+ *
+ * @see startupBakedNotice
+ */
+export const STARTUP_BAKED_KEYS: ReadonlySet<string> = new Set([
+  ENABLED_KEY, FORECAST_KEY, 'image.enabled', 'audio.enabled', 'audio.tts_local',
+]);
+
+/**
+ * The "next start" caveat for a `configure`/`onboard` reply that just wrote a
+ * {@link STARTUP_BAKED_KEYS} member — the empty string for every other key.
+ *
+ * One helper rather than a `? :` at each call site, so a future startup-baked key
+ * reaches every writer — `handleConfigure` and `handleOnboard`'s generic-boolean
+ * branch today — by adding one case here, not one per writer.
+ *
+ * @returns the caveat, beginning with ' — ', or '' when `key` is not startup-baked
+ *
+ * @example
+ *   startupBakedNotice(ENABLED_KEY)      // => ' — takes effect at the next server start; …'
+ *   startupBakedNotice('retention.days') // => ''
+ */
+export function startupBakedNotice(key: string): string {
+
+  switch (key) {
+    case ENABLED_KEY:
+      return ' — takes effect at the next server start; the channel enum is baked into the tool schema at startup';
+    case FORECAST_KEY:
+      return ' — takes effect at the next server start; the confidence enum is baked into the tool schema at startup';
+    case 'image.enabled':
+      return ' — takes effect at the next server start; the image tools are registered only when this reads true at startup';
+    case 'audio.enabled':
+    case 'audio.tts_local':
+      return ' — takes effect the next time the separate claudio audio server starts; it bakes this at its own registration, ' +
+             'not at this server\'s';
+    default:
+      return '';
+  }
+
+}
+
+/**
  * Which channels are currently active.
  *
  * Defaults to all of them, because the default in code — not a seeded row — is what
@@ -774,6 +834,42 @@ export function handleBeginTurn(store: Store, args: BeginTurnArgs, when: Date = 
 }
 
 /**
+ * Config keys written only by an event, never directly by `configure set` or
+ * `configure unset` — a home for `share.opted_in_utc` and any future key like it.
+ *
+ * @see rejectEventOnlyWrite
+ */
+export const EVENT_ONLY_KEYS: ReadonlySet<string> = new Set(['share.opted_in_utc']);
+
+/**
+ * Refuse a direct `configure set`/`unset` of an {@link EVENT_ONLY_KEYS} member, naming
+ * the event that writes and clears it instead.
+ *
+ * `share.opted_in_utc` exists to answer one question honestly: which rows were
+ * recorded after the user actually opted in to public aggregation (issue #31). A
+ * direct write could defeat that — `configure set share.opted_in_utc 1970-01-01T…Z`
+ * followed by `configure set share.enabled true` (which only stamps the moment when
+ * none is already on record) would make every row ever recorded eligible, and a future
+ * date would silently export nothing. It is written only by the `share.enabled true`
+ * transition and cleared only by `share.enabled false` (see {@link handleConfigure}),
+ * so any direct write — set or unset, even a value that would otherwise validate — is
+ * refused before the registered validator ever runs.
+ *
+ * @returns the refusal text, or `null` when `key` is not event-only
+ *
+ * @example
+ *   rejectEventOnlyWrite('share.opted_in_utc')
+ *   // => "error: share.opted_in_utc is written only by the share.enabled opt-in event …"
+ *   rejectEventOnlyWrite('retention.days')  // => null
+ */
+export function rejectEventOnlyWrite(key: string): string | null {
+  if (!EVENT_ONLY_KEYS.has(key)) { return null; }
+  return `error: ${key} is written only by the share.enabled opt-in event ` +
+    "(configure set share.enabled true) and cleared only by opting out " +
+    "(configure set share.enabled false); it cannot be set or unset directly";
+}
+
+/**
  * What a caller supplies to `configure`, after schema validation.
  *
  * Hand-written for the same `isolatedDeclarations` reason as the checklist tools'
@@ -808,7 +904,14 @@ export interface ConfigureArgs {
  * not a flag. Setting `share.enabled` to `true` stamps `share.opted_in_utc` when no
  * moment is on record; setting it `false` — or unsetting it — clears the moment, so a
  * later re-opt-in starts a fresh window and deliberately forfeits everything earlier.
- * Rows recorded before the most recent opt-in are permanently outside the export.
+ * Rows recorded before the most recent opt-in are permanently outside the export. That
+ * moment is itself off-limits to a direct `set`/`unset` — see {@link rejectEventOnlyWrite}
+ * — because a backdated or future-dated stamp would make the export eligibility window a
+ * lie the model could tell.
+ *
+ * A `set` that lands on a key in {@link STARTUP_BAKED_KEYS} carries a "next start"
+ * caveat: the tool schema that key shapes was built once, at registration, and does
+ * not re-read config — see {@link startupBakedNotice}.
  *
  * @example
  *   handleConfigure(store, { op: 'set', key: 'retention.days', value: '90' })
@@ -836,18 +939,25 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
   }
 
   if (args.op === 'unset') {
+    const blockedEvent = rejectEventOnlyWrite(args.key);
+    if (blockedEvent !== null) { return reply(`${blockedEvent}; nothing was removed`); }
+
     const removed = deleteConfig(store, args.key),
           shared  = args.key === 'share.enabled' && deleteConfig(store, 'share.opted_in_utc'),
           tail    = (def === undefined ? ''
                   : def.fallback === null ? '; the key is simply absent now'
                   : `; code default '${def.fallback}' applies`)
-                  + (shared ? '; share.opted_in_utc cleared — a later opt-in starts a fresh window' : '');
+                  + (shared ? '; share.opted_in_utc cleared — a later opt-in starts a fresh window' : '')
+                  + startupBakedNotice(args.key);
     return reply(removed
       ? `${args.key} unset${tail}`
       : `${args.key} had no override; nothing to unset${tail}`);
   }
 
   if (args.value === undefined) { return reply("error: 'value' is required for set"); }
+
+  const blockedEvent = rejectEventOnlyWrite(args.key);
+  if (blockedEvent !== null) { return reply(`${blockedEvent}. nothing was written`); }
 
   if (def === undefined) {
     writeConfig(store, args.key, args.value);
@@ -890,9 +1000,7 @@ export function handleConfigure(store: Store, args: ConfigureArgs): ToolReply {
     }
   }
 
-  const restart = args.key === ENABLED_KEY
-    ? ' — takes effect at the next server start; the channel enum is baked into the tool schema at startup'
-    : '';
+  const restart = startupBakedNotice(args.key);
 
   const dwelling = dwellingChangeNotice(args.key);
 
@@ -1130,7 +1238,12 @@ export function handleOnboard(store: Store, args: OnboardArgs): ToolReply {
     ? ' — matches the current default, and written anyway: an explicit choice holds even if a later release flips the default'
     : '';
 
-  return reply(`${key} = ${bool.canonical}${pinned}.${pendingTail(store)}`);
+  // Startup-baked keys (forecast.enabled today; a future question wired to
+  // image.enabled or an audio.* key would hit this too) need the same "next start"
+  // caveat here as configure gives — this is the other writer of the same rows.
+  const baked = startupBakedNotice(key);
+
+  return reply(`${key} = ${bool.canonical}${pinned}${baked}.${pendingTail(store)}`);
 
 }
 
@@ -1388,10 +1501,17 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
     description : 'Whether this turn already carries a closing signature. Exact, by turn identity.',
     inputSchema : { promptId: z.string().optional() },
   }, (args) => {
+    // Turn identity is the pair (session, prompt_id), so the observed session rides along
+    // with the prompt id — but only when the context row is about the turn being asked
+    // about. A caller-named promptId may belong to a session other than the newest
+    // context row's, and pairing the two would ask about a turn nobody mentioned; there
+    // the session stays undefined and narrows nothing, which is the fail-open reading.
     const context  = latestContext(store),
-          promptId = args.promptId
-            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : '');
-    return reply(promptId === '' ? 'unknown' : String(hasClosingSignature(store, promptId)));
+          observed = typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : '',
+          promptId = args.promptId ?? observed,
+          session  = promptId === observed && typeof context?.['session'] === 'string'
+            ? context['session'] : undefined;
+    return reply(promptId === '' ? 'unknown' : String(hasClosingSignature(store, session, promptId)));
   });
 
   server.registerTool('configure', {

@@ -1,6 +1,6 @@
 import {
   escapePwshSingleQuoted, soundPlayerCommand, sapiSpeakCommand, platformHasPlayer,
-  runPlayer, HARD_CAP_MS,
+  runPlayer, effectiveCapMs, HARD_CAP_MS,
 } from '../claudio/player.js';
 import type { ChildLike, SpawnLike } from '../claudio/player.js';
 
@@ -77,6 +77,23 @@ describe('platformHasPlayer', () => {
 
 });
 
+describe('effectiveCapMs', () => {
+
+  test('passes an in-range request through unchanged', () => {
+    expect(effectiveCapMs(4000)).toBe(4000);
+  });
+
+  test('clamps a request above HARD_CAP_MS down to it', () => {
+    expect(effectiveCapMs(HARD_CAP_MS + 60_000)).toBe(HARD_CAP_MS);
+  });
+
+  test('floors a non-positive request to 1, never zero or negative', () => {
+    expect(effectiveCapMs(0)).toBe(1);
+    expect(effectiveCapMs(-500)).toBe(1);
+  });
+
+});
+
 describe('runPlayer', () => {
 
   test('a clean exit resolves ok without killing', async () => {
@@ -124,15 +141,28 @@ describe('runPlayer', () => {
     expect(fake.kills()).toBe(1);
   });
 
-  test('the cap deadline itself is clamped to HARD_CAP_MS', async () => {
-    // A cap request beyond the absolute limit must not extend the child's life;
-    // asserted through the reported deadline on a cap kill with a tiny fake clock
-    // is not possible without waiting, so assert the clamp arithmetic indirectly:
-    // a deadline of 1 fires immediately even when a huge capMs is clamped down.
-    const fake = fakeChild(),
-          outcome = await runPlayer(soundPlayerCommand('x.wav'), () => fake.child, 1);
-    expect(outcome.capped).toBe(true);
-    expect(HARD_CAP_MS).toBeLessThanOrEqual(12000);
+  test('a capMs above HARD_CAP_MS is clamped down: the kill timer fires at the cap, not the request', async () => {
+    // Runs the real clamp (effectiveCapMs) end to end with a capMs far beyond the
+    // limit, under fake timers, so the *actual* deadline used can be observed
+    // instead of merely comparing HARD_CAP_MS to itself (the old, fake version of
+    // this test).
+    vi.useFakeTimers();
+    try {
+      const fake = fakeChild(),
+            pending = runPlayer(soundPlayerCommand('x.wav'), () => fake.child, HARD_CAP_MS + 60_000);
+
+      await vi.advanceTimersByTimeAsync(HARD_CAP_MS - 1);
+      expect(fake.kills()).toBe(0);   // the oversized request has not been honoured
+
+      await vi.advanceTimersByTimeAsync(1);
+      const outcome = await pending;
+      expect(outcome.ok).toBe(false);
+      expect(outcome.capped).toBe(true);
+      expect(outcome.detail).toContain(`${String(HARD_CAP_MS)} ms hard cap`);
+      expect(fake.kills()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('a first outcome wins: an exit after the cap kill changes nothing', async () => {

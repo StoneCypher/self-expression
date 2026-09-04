@@ -1,10 +1,10 @@
-# self-expression v0.6.2
+# self-expression v0.6.3
 
-> Version 0.6.2 was built on Sunday, August 30, 2026 at GMT-07:00 `1788123805240` from hash `9dc6f0b`.
+> Version 0.6.3 was built on Thursday, September 3, 2026 at GMT-07:00 `1788496057841` from hash `0d5fd2a`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788123805240 Sunday, August 30, 2026 at GMT-07:00 95.04 358 91 9dc6f0b 52.69 65.11 64.27 64.7 234 2369 89.31 93.54 95.4 2135 0.6.2 -->
+<!-- Supported embeds: 1788496057841 Thursday, September 3, 2026 at GMT-07:00 95.11 360 91 0d5fd2a 52.86 65.06 65.03 64.71 260 2592 89.52 93.8 95.46 2332 0.6.3 -->
 
 
 
@@ -128,10 +128,14 @@ Three surfaces carry the mark:
   there is nothing to say, governed by `retraction.replay`. Amendments are never
   replayed — an amended claim stood.
 
-Analytics exclude retracted rows and keep amended ones: `seriesPercents` drops a
-withdrawn checklist snapshot so a sparkline cannot replay a number its author
-took back, and `previousSignature` skips a retracted signature rather than making
-it the delta baseline. Public export is deliberately **not** an analytics path —
+Analytics exclude retracted rows and keep amended ones — every reader of them,
+not only the one you happen to call. `seriesPercents` and `checklistSeriesTop`
+share one standing filter, so a sparkline cannot replay a number its author took
+back whichever path drew it; `signatureHistory` keeps a withdrawn reading out of
+the stem, delta, and uncertainty panels while `previousSignature` keeps it out of
+the delta baseline; and `forecastOutcomes` drops a resolution whose forecast or
+whose outcome was taken back, so calibration is never scored on a claim its
+author disowned. Public export is deliberately **not** an analytics path —
 retracted rows still export, with their (blinded) link and their kind, because
 dropping them would delete the correction edge along with the claim and make
 retraction-rate-by-confidence-ground impossible to compute downstream.
@@ -228,7 +232,7 @@ The registered keys:
 |---|---|---|---|
 | `channels.enabled` | list | all channels | Which expression channels the `express` tool offers. Baked into the tool schema at server startup, so changes take effect next session. |
 | `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
-| `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
+| `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. **One block per turn is the ceiling**: when the harness reports `stop_hook_active` — the turn is only still running because this gate blocked it once — the gate allows unconditionally. Otherwise a host that cannot reach the `express` tool would meet the same refusal forever, with no way to end the session from inside it. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
 | `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
 | `retraction.replay` | bool | `true` | Whether a session's first turn is handed the recent retraction register (#16), so a resumed session does not carry known falsehoods forward. On by default — hiding what you already know is wrong is a strange thing to offer prominently, so this is the escape hatch rather than a personality choice. The window (14 days) and the cap (5 items) are code constants, not keys. |
@@ -570,7 +574,7 @@ Two invocation surfaces wrap one renderer:
 
 | Surface | Invocation | Result |
 |---|---|---|
-| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. `out` is a bare `.png` filename inside that `renders/` directory (no path, no `..`); an existing file is refused unless `overwrite` is true. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
 | CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
 
 The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
@@ -694,9 +698,15 @@ never a comfortable fiction.
 
 That guarantee is structural rather than promised. Offers are recorded by the hook, with
 the turn type the harness supplied, and `surface_note` refuses unless the note carries an
-offer stamped `reply` on that same turn. No sequence of tool calls, retries, or wakeups
-manufactures a delivery claim the hook did not authorize; a property test asserts exactly
-that over arbitrary operation sequences.
+offer that is **still outstanding**, stamped `reply`, matching on the whole pair
+*(session, prompt id)* — and unless the `UserPromptSubmit` hook is what observed that turn.
+A prompt id on its own is a token the assistant can read out of an ordinary reply and quote
+back, and `begin_turn` will record any turn it names, so neither one is evidence: the turn
+identity comes from what the harness saw, and a `session` argument that disagrees is refused
+rather than believed. No sequence of tool calls, retries, or wakeups manufactures a delivery
+claim the hook did not authorize; a property test asserts exactly that over arbitrary
+operation sequences, against an adversary that replays real offers, forges turn context, and
+names sessions of its own choosing.
 
 Four MCP tools:
 
@@ -816,12 +826,12 @@ ride the ordinary `configure` tool:
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `audio.enabled` | bool | `false` | Only exactly `true` enables. Read at claudio startup for the tool schema, and re-checked on every strike. |
-| `audio.volume_ceiling` | int | `50` | Loudest volume (0–100) the assistant may choose. The `CLAUDIO_VOLUME_CEILING` environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. |
+| `audio.volume_ceiling` | int | `50` | Loudest volume (0–100) the assistant may choose. The `CLAUDIO_VOLUME_CEILING` environment variable, set in the host's MCP registration where no tool call can reach, clamps it further — the effective ceiling is always the minimum of the two. A variable that is set but does not parse as an integer in 0–100 fails **closed** to 0 with one stderr line, never open. |
 | `audio.tts_local` | bool | `false` | The local offline TTS tier's own consent gate. Cloud TTS tiers deliberately do not exist in this build. |
 | `audio.min_gap_seconds` | int | `30` | Minimum spacing between audible strikes. |
 | `audio.hourly_budget` | int | `6` | Audible strikes per rolling hour. |
 | `audio.hourly_budget_attention` | int | `8` | The slightly larger budget `attention` draws from. |
-| `audio.wav.<leitmotif>` | string | *(none)* | Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. |
+| `audio.wav.<leitmotif>` | string | *(none)* | Replacement 16-bit PCM WAV for one meaning; unset plays the vendored asset. Must be an absolute, non-UNC path ending in `.wav`; anything else is treated as unset. |
 
 The palette is a closed vocabulary of five meanings, capped at six —
 `session-open` (at most once per session), `quiet-completion`, `attention`,
@@ -932,14 +942,27 @@ neither a crash nor silence.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `image.enabled` | bool | `false` | Only exactly `true` enables, and even then the tool appears only if the credential is really there. |
-| `image.provider` | string | `nanobanana` | Which registered provider is active. |
+| `image.provider` | enum | `nanobanana` | Which registered provider is active: `nanobanana`, `openai`, `automatic1111`. |
 | `image.api_key_env` | string | *(provider default)* | The **name** of the variable holding the credential. Unset uses the provider's own default (`GEMINI_API_KEY`, `OPENAI_API_KEY`), so a shell that already exports one needs no configuration at all. |
 | `image.<provider>.api_key_env` | string | *(none)* | Per-provider override of the above, for keeping two providers configured at once. |
 | `image.model` | string | *(provider default)* | A model the provider does not list is ignored rather than sent. |
 | `image.session_cap` | int | `6` | Generations per server session. |
 | `image.daily_cap` | int | `20` | Generations per **rolling** 24 hours. |
-| `image.timeout_seconds` | int | `120` | How long one generation may take before it is abandoned. |
-| `image.local_base_url` | string | `http://127.0.0.1:7860` | Endpoint for a self-hosted provider. |
+| `image.timeout_seconds` | int | `120` | How long one generation may take before it is abandoned. The abandoned row stays `pending` and keeps counting against the caps. |
+| `image.local_base_url` | string | `http://127.0.0.1:7860` | Endpoint for a self-hosted provider. Loopback and private-network hosts only. |
+
+Because `configure` is a tool the **model** can call, the two keys that decide where
+something leaves the machine are bounded rather than free text. A credential-variable name
+must look like one — SCREAMING_SNAKE_CASE, reading as a key — and may not name a famous
+secret belonging to something else (`ANTHROPIC_API_KEY`, `AWS_SECRET_ACCESS_KEY`,
+`GITHUB_TOKEN`, the `AZURE_*` and `SSH_*` families, `PATH`), because
+`image.api_key_env = ANTHROPIC_API_KEY` plus `image.provider = openai` would ship one
+vendor's secret to another in an authorization header with nothing in the request looking
+wrong. `image.local_base_url` must be loopback or an RFC 1918 address, since the local
+provider posts the user's prompt with no credential and no cost accounting on the
+understanding that the endpoint is the user's own machine. Both rules are applied twice:
+at `configure set`, and again when the value is read, so a row written before the rule
+existed is not honoured for being old.
 
 ### Providers
 
@@ -965,7 +988,11 @@ cap that resets at midnight and a retry loop that waits for one.
 leaves the evidence of a call that may have been billed, and that `pending` row counts
 against the caps, because a budget that forgives what it cannot see is not a budget.
 `generated` and `policy_refused` count too; `error` and `refused` do not, since a network
-outage is not a purchase.
+outage is not a purchase. A **timed-out** generation is left `pending` for the same
+reason and is never settled as an error: an abandoned request may well have been received,
+run, and billed, and filing it as a failure would mean a merely slow provider silently
+switched the budget off. A policy refusal is priced at the list price of one image, since
+that is what the vendor generally charges for the call that produced it.
 
 Each row carries provider, model, timestamp, outcome, byte count, path, cost estimate and
 where the estimate came from, the credential variable's **name**, and the prompt with its
@@ -978,9 +1005,11 @@ what was forwarded to a third party under the user's credential is reconstructib
 A refusal is reported plainly and **never retried with a reworded prompt** — that would be
 the assistant negotiating with a provider's policy on the user's account and the user's
 money. This is enforced rather than requested: the gate compares each new prompt against
-prompts the provider recently refused and blocks recognisable rewordings locally, before
-any socket opens, so a reworded retry cannot cost money even if it is attempted. A
-genuinely different request passes untouched.
+the prompts **that same provider** recently refused and blocks recognisable rewordings
+locally, before any socket opens, so a reworded retry cannot cost money even if it is
+attempted. A genuinely different request passes untouched, and so does the same request on
+a different provider — a content policy belongs to a vendor, and a hosted model's refusal
+says nothing about a local endpoint that has no content policy at all.
 
 ### Where images go
 
@@ -1011,19 +1040,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2135</td>
-    <td>95.04<small>%</small></td>
-    <td>89.31<small>%</small></td>
-    <td>93.54<small>%</small></td>
-    <td>95.4<small>%</small></td>
+    <td>2332</td>
+    <td>95.11<small>%</small></td>
+    <td>89.52<small>%</small></td>
+    <td>93.8<small>%</small></td>
+    <td>95.46<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>234</td>
-    <td>65.11<small>%</small></td>
-    <td>52.69<small>%</small></td>
-    <td>64.27<small>%</small></td>
-    <td>64.7<small>%</small></td>
+    <td>260</td>
+    <td>65.06<small>%</small></td>
+    <td>52.86<small>%</small></td>
+    <td>65.03<small>%</small></td>
+    <td>64.71<small>%</small></td>
   </tr>
 </table>
 
@@ -1035,7 +1064,7 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>358</td>
+    <td>360</td>
     <td>91<small>%</small></td>
   </tr>
 </table>
