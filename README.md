@@ -898,7 +898,7 @@ the same posture `generate_image` takes toward a missing credential.
 | Tool | What it does |
 |---|---|
 | `render_card` | Draw one card onto the desk: `type`, `title`, the type's own `data`, and an optional `ord`. The id and the placement are derived; the reply names the card, its ord, its directory, and anything the write aged out. Its **description is generated from the catalogue at registration time**, so the types offered to the model and the types that exist cannot drift apart. |
-| `list_card_types` | The catalogue grouped by the question each category answers — for when you are holding a question rather than a chart name. Omit `category` for all of them; name one to see only that group. |
+| `list_card_types` | The catalogue grouped by the question each category answers — for when you are holding a question rather than a chart name. Omit `category` for type names alone; name one to see the data `shape`s and settings in that group. |
 
 Answer cards live in their own **band**, ords `[1000, 2000)`, so they always read below
 every hand-placed card and never renumber one. The newest `desk.answer_cards` survive and
