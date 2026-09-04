@@ -15,7 +15,7 @@ import { join }   from 'node:path';
 import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store } from '../channels/store.js';
 import {
-  billableInSession, closeImageLedger, openImageLedger, recordAttempt, settleAttempt,
+  billableInSession, closeImageLedger, openImageLedger, recordAttempt, settleAttempt, spendSince,
 } from '../imagery/ledger.js';
 import type { ImageLedger } from '../imagery/ledger.js';
 import {
@@ -360,6 +360,88 @@ describe('the no-rewording rule, end to end', () => {
       await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
       expect(billableInSession(rig.ledger, rig.deps.sessionId)).toBe(1);
     }, { send: refusingSender }));
+
+  test('a policy refusal is priced, so the spend total does not quietly under-report', () =>
+    withRig(async rig => {
+      await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+      const row = lastRow(rig.ledger);
+      expect(row['outcome']).toBe('policy_refused');
+      expect(row['cost_estimate_usd']).toBe(0.04);
+      expect(row['cost_source']).toBe('list-price');
+      expect(spendSince(rig.ledger, '2026-08-29T00:00:00.000Z')).toBeCloseTo(0.04, 6);
+    }, { send: refusingSender }));
+
+  test("a refusal by one provider does not fence the prompt off on another provider's endpoint", () =>
+    withRig(async rig => {
+      await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+      expect(rig.sent).toHaveLength(1);
+
+      // A local Automatic1111 has no content policy at all, so a hosted vendor's refusal
+      // says nothing about it — and must not block it.
+      writeConfig(rig.store, IMAGE_PROVIDER_KEY, 'automatic1111');
+      const local = await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+      expect(local.content[0]?.text ?? '').not.toContain('substantially identical');
+      expect(rig.sent).toHaveLength(2);
+
+      // …and the provider that did refuse is still refusing.
+      writeConfig(rig.store, IMAGE_PROVIDER_KEY, 'openai');
+      const again = await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+      expect(again.content[0]?.text ?? '').toContain('substantially identical');
+      expect(rig.sent).toHaveLength(2);
+    }, { send: refusingSender, config: { [IMAGE_SESSION_CAP_KEY]: '10' } }));
+
+});
+
+describe('a timed-out generation is unknown, not free', () => {
+
+  /** What `AbortSignal.timeout` rejects with: recognised by name, not by message. */
+  const timingOut = (): HttpSend => () => {
+    const error = new Error('The operation was aborted due to timeout');
+    error.name = 'TimeoutError';
+    return Promise.reject(error);
+  };
+
+  test('the row is left pending rather than settled as an error', () => withRig(async rig => {
+    const out = await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+    const row = lastRow(rig.ledger);
+
+    expect(row['outcome']).toBe('pending');
+    expect(row['settled_utc']).toBeNull();
+    expect(String(row['detail'])).toContain('abandoned');
+    expect(out.content[0]?.text ?? '').toContain('pending');
+  }, { send: timingOut }));
+
+  test('and therefore keeps counting against the caps, which is the whole point', () =>
+    withRig(async rig => {
+      await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+      expect(billableInSession(rig.ledger, rig.deps.sessionId)).toBe(1);
+
+      // The scenario the fix exists for: every call times out, the provider bills each
+      // one, and the cap has to engage anyway.
+      const next = await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION,
+                                             args({ prompt: 'a completely unrelated seascape' }));
+      expect(next.content[0]?.text ?? '').toContain('image.session_cap');
+    }, { send: timingOut, config: { [IMAGE_SESSION_CAP_KEY]: '1' } }));
+
+  test('an ordinary transport failure still settles as an error and does not count', () =>
+    withRig(async rig => {
+      await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+      expect(lastRow(rig.ledger)['outcome']).toBe('error');
+      expect(billableInSession(rig.ledger, rig.deps.sessionId)).toBe(0);
+    }, { send: () => () => Promise.reject(new Error('socket hang up')) }));
+
+  test('the abandonment reply carries no credential either', () => withRig(async rig => {
+    const out = await handleGenerateImage(rig.store, rig.ledger, rig.deps, VERSION, args());
+    expect(out.content[0]?.text ?? '').not.toContain(OPAQUE_KEY);
+    expect(allRows(rig.ledger)).not.toContain(OPAQUE_KEY);
+  }, {
+    key  : OPAQUE_KEY,
+    send : () => (plan) => {
+      const error = new Error(`timed out sending ${JSON.stringify(plan.headers)}`);
+      error.name = 'TimeoutError';
+      return Promise.reject(error);
+    },
+  }));
 
 });
 

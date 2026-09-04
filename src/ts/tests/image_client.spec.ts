@@ -10,7 +10,9 @@
 
 import { describe, test, expect } from 'vitest';
 
-import { MAX_TOTAL_IMAGE_BYTES, callProvider, scrubOutcome } from '../imagery/client.js';
+import {
+  MAX_TOTAL_IMAGE_BYTES, callProvider, isAbandonment, scrubOutcome,
+} from '../imagery/client.js';
 import type { HttpSend } from '../imagery/client.js';
 import { imageProvider } from '../imagery/providers.js';
 import type { ImageProvider, ImageRequestPlan } from '../imagery/providers.js';
@@ -130,6 +132,76 @@ describe('a provider that echoes the request in its error body', () => {
     const out = await callProvider(provider, planFor(provider, OPAQUE_KEY), send, 1000, [OPAQUE_KEY]);
     expect(out.kind).toBe('policy');
     if (out.kind === 'policy') { expect(out.detail).not.toContain(OPAQUE_KEY); }
+  });
+
+});
+
+describe('an abandoned request is not the same as a failed one', () => {
+
+  /**
+   * What `AbortSignal.timeout` actually produces: the rejection is recognised by its
+   * `name`, not by its message, so the fakes here carry the real names rather than
+   * plausible-looking text.
+   */
+  function named(name: string, message = 'aborted'): Error {
+    const error = new Error(message);
+    error.name = name;
+    return error;
+  }
+
+  test('a TimeoutError rejection is a timeout, not an error', async () => {
+    const provider = must('openai');
+    const out = await callProvider(provider, planFor(provider, OPAQUE_KEY),
+                                   () => Promise.reject(named('TimeoutError')), 5000, [OPAQUE_KEY]);
+    expect(out.kind).toBe('timeout');
+    if (out.kind === 'timeout') {
+      expect(out.detail).toContain('abandoned');
+      expect(out.detail).toContain('5000');
+    }
+  });
+
+  test('an AbortError rejection is a timeout too — older runtimes spell it that way', async () => {
+    const provider = must('openai');
+    const out = await callProvider(provider, planFor(provider, ''),
+                                   () => Promise.reject(named('AbortError')), 1000, []);
+    expect(out.kind).toBe('timeout');
+  });
+
+  test('a wrapped rejection is found through its cause, which is how fetch reports it', async () => {
+    const provider = must('openai');
+    const wrapped  = new TypeError('fetch failed', { cause: named('TimeoutError') });
+    const out = await callProvider(provider, planFor(provider, ''),
+                                   () => Promise.reject(wrapped), 1000, []);
+    expect(out.kind).toBe('timeout');
+  });
+
+  test('an ordinary transport failure is still an error — the distinction has to cut both ways', async () => {
+    const provider = must('openai');
+    const out = await callProvider(provider, planFor(provider, ''),
+                                   () => Promise.reject(new Error('socket hang up')), 1000, []);
+    expect(out.kind).toBe('error');
+  });
+
+  test('an abandoned request loses the credential like every other path', async () => {
+    const provider = must('openai');
+    const send: HttpSend = (plan) => Promise.reject(
+      named('TimeoutError', `timed out posting headers=${JSON.stringify(plan.headers)}`));
+    const out = await callProvider(provider, planFor(provider, OPAQUE_KEY), send, 1000, [OPAQUE_KEY]);
+    if (out.kind === 'timeout') { expect(out.detail).not.toContain(OPAQUE_KEY); }
+  });
+
+  test('isAbandonment answers on shapes that are not errors at all', () => {
+    expect(isAbandonment(undefined)).toBe(false);
+    expect(isAbandonment(null)).toBe(false);
+    expect(isAbandonment('TimeoutError')).toBe(false);
+    expect(isAbandonment({ name: 'TimeoutError' })).toBe(true);
+    expect(isAbandonment({ name: 42 })).toBe(false);
+  });
+
+  test('isAbandonment stops walking a cause chain rather than looping forever', () => {
+    const looped: { name: string; cause?: unknown } = { name: 'TypeError' };
+    looped.cause = looped;
+    expect(isAbandonment(looped)).toBe(false);
   });
 
 });

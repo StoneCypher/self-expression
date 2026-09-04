@@ -86,6 +86,51 @@ function excerpt(text: string, secrets: readonly string[]): string {
 }
 
 /**
+ * The `name` values Node puts on a rejection when a request was **abandoned** rather
+ * than answered.
+ *
+ * Both spellings are here because both occur: `AbortSignal.timeout` rejects with a
+ * `TimeoutError`, while an abort from any other source — and older runtimes' timeouts —
+ * rejects with an `AbortError`. Either way nobody knows what the provider did with the
+ * request, which is the distinction the ledger cares about.
+ */
+export const ABANDONMENT_ERROR_NAMES: readonly string[] = ['TimeoutError', 'AbortError'];
+
+/** How far down a `cause` chain to look before giving up. */
+const MAX_CAUSE_DEPTH = 4;
+
+/**
+ * Whether a rejection means the request was abandoned rather than definitely failed.
+ *
+ * Follows `cause`, because `fetch` wraps: a timed-out request surfaces as a bare
+ * `TypeError: fetch failed` in some runtimes with the `TimeoutError` one level down,
+ * and a check that only read the top-level `name` would silently mis-file every
+ * timeout as an ordinary error — the exact bug this function exists to prevent.
+ *
+ * @param error - the thrown value, of entirely unknown shape
+ * @param depth - how many `cause` hops have already been taken; callers pass nothing
+ *
+ * @example
+ *   isAbandonment(Object.assign(new Error('x'), { name: 'TimeoutError' }))  // => true
+ *   isAbandonment(new Error('socket hang up'))                              // => false
+ *   isAbandonment(new TypeError('fetch failed',
+ *                 { cause: Object.assign(new Error('t'), { name: 'TimeoutError' }) }))  // => true
+ */
+export function isAbandonment(error: unknown, depth = 0): boolean {
+
+  if (depth > MAX_CAUSE_DEPTH || typeof error !== 'object' || error === null) { return false; }
+
+  const thrown = error as { name?: unknown; cause?: unknown };
+
+  if (typeof thrown.name === 'string' && ABANDONMENT_ERROR_NAMES.includes(thrown.name)) {
+    return true;
+  }
+
+  return thrown.cause === undefined ? false : isAbandonment(thrown.cause, depth + 1);
+
+}
+
+/**
  * Scrub every `detail` an outcome carries, whichever arm it is.
  *
  * Applied to provider output unconditionally. A provider reader has no access to a
@@ -106,18 +151,37 @@ export function scrubOutcome(outcome: ProviderOutcome, secrets: readonly string[
 }
 
 /**
+ * What one call came to.
+ *
+ * Everything a provider's reader can say, plus the one thing only the caller can: that
+ * the request was **abandoned** before any answer arrived. That arm is not a
+ * {@link ProviderOutcome} because no reader could ever produce it — there was no reply
+ * to read — and it is not folded into `error` because the two mean opposite things to
+ * the budget. An `error` is a definite failure and costs nothing; an abandonment is a
+ * request the provider may well have received, run, and billed, and a ledger that
+ * settled it as a failure would let a facility whose every call times out spend
+ * without limit.
+ *
+ * @see ../mcp/image_tools.js
+ */
+export type CallOutcome =
+  | ProviderOutcome
+  | { readonly kind : 'timeout'; readonly detail : string };
+
+/**
  * Send one planned request and interpret the reply, scrubbing everything on the way out.
  *
- * Failure modes are kept distinct because the caller treats them differently: a
- * `policy` outcome is reported to the user and never reworded, while an `error` is an
- * ordinary failure the caller may describe and the user may retry.
+ * Failure modes are kept distinct because the caller treats each differently: a
+ * `policy` outcome is reported to the user and never reworded, an `error` is an
+ * ordinary failure the caller may describe and the user may retry, and a `timeout` is
+ * an unknown that stays unknown — see {@link CallOutcome}.
  *
  * @param provider  - the provider whose reader interprets the reply
  * @param plan      - the fully-formed request; consumed here and never returned
  * @param send      - how to perform the request
  * @param timeoutMs - how long to wait before abandoning it
  * @param secrets   - credential values held right now, for the scrubber
- * @returns the provider's outcome, with every text field scrubbed
+ * @returns the call's outcome, with every text field scrubbed
  *
  * @example
  *   await callProvider(openai, plan, nodeSend, 120_000, [key])
@@ -129,14 +193,19 @@ export async function callProvider(
   send      : HttpSend,
   timeoutMs : number,
   secrets   : readonly string[],
-): Promise<ProviderOutcome> {
+): Promise<CallOutcome> {
 
   let reply: HttpReply;
 
   try {
     reply = await send(plan, timeoutMs);
   } catch (error) {
-    return { kind: 'error', detail: `the request to ${provider.label} failed: ${scrubError(error, secrets)}` };
+    const detail = scrubError(error, secrets);
+    return isAbandonment(error)
+      ? { kind: 'timeout', detail:
+          `the request to ${provider.label} was abandoned after ${String(timeoutMs)}ms without ` +
+          `an answer, so whether it was run and billed is unknown: ${detail}` }
+      : { kind: 'error', detail: `the request to ${provider.label} failed: ${detail}` };
   }
 
   const payload = parseJson(reply.text);

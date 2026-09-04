@@ -180,6 +180,29 @@ function expectedBar(percent: number): string {
   return percent > 100 ? '█'.repeat(10) : barCells(percent);
 }
 
+/**
+ * The expected completion percent for a checklist's `(P%)` head: success over total on
+ * the normal path. A checklist block with zero **parsed** items (a block whose header
+ * states a nonzero triple but whose body has no `- <marker>` lines at all — a common
+ * "summary line pasted without its items" mistake, or a genuinely item-less block)
+ * divides by zero on that formula; `renderChecklistSummary` itself never emits a
+ * zero-item block (it throws), so there is no rendered convention to match, but the
+ * validator still owes a defined answer instead of `NaN`. It takes the header's own
+ * stated `pending` (active) count as the tie-breaker: nothing pending reads as
+ * vacuously complete (100%), anything stated pending reads as incomplete (0%) — either
+ * way a real number the `P === expP` check can compare against, so a genuine mismatch
+ * still fails loudly instead of being masked behind `NaN% computed`.
+ *
+ * @example
+ *   expectedCompletionPercent(3, 4, 1)  // => 75 — the normal division
+ *   expectedCompletionPercent(0, 0, 0)  // => 100 — no items parsed, header claims none pending
+ *   expectedCompletionPercent(1, 0, 0)  // => 100 — same tie-break; the header's own 1/0/0
+ *                                       //    sum mismatch is caught by a separate check
+ */
+function expectedCompletionPercent(success: number, totalParsed: number, pending: number): number {
+  return totalParsed !== 0 ? Math.round((100 * success) / totalParsed) : (pending === 0 ? 100 : 0);
+}
+
 /** The `check(cond, okMsg, failMsg)` accumulator both validators thread through their checks. */
 type CheckFn = (cond: boolean, okMsg: string, failMsg: string) => void;
 
@@ -414,7 +437,7 @@ export function verifyChecklist(text: string): ChecklistVerification {
       `bucket partition consistent (computed ${String(nSucc)}+${String(nShip)}🛳️ / ${String(nFail)} fail)`,
       `bucket mismatch: items imply success ${String(nSucc)}–${String(nSucc + nShip)}, failure ${String(nFail)}; stated ${String(S)}/${String(A)}/${String(F)}`);
 
-    const expP = nItems === 0 ? Number.NaN : Math.round((100 * S) / nItems);
+    const expP = expectedCompletionPercent(S, nItems, A);
     check(P === expP, `percent ${String(P)}% matches`, `percent ${String(P)}% stated, ${String(expP)}% computed`);
     check(bar === expectedBar(P),
       `bar matches ${String(P)}%`,

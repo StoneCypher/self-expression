@@ -390,9 +390,15 @@ export function drawChecklistSeries(region: Region, series: readonly ChecklistSe
 
     const color = SERIES_COLORS[index % SERIES_COLORS.length] ?? GREY;
 
+    // A non-finite percent (NaN, ±Infinity — bad upstream data) maps to a non-finite y
+    // rather than a clamped one: `Math.min`/`Math.max` propagate NaN through unchanged,
+    // so clamping alone cannot make a non-finite percent plottable. Producing a
+    // non-finite point instead lets `polyline` drop it (and the segments touching it)
+    // as a gap, per its own non-finite handling, rather than drawing a wrong point at
+    // the 0% or 100% edge.
     const points = oneSeries.percents.map((percent, i): readonly [number, number] => [
       oneSeries.percents.length === 1 ? 0 : Math.floor(i * (lines.width - 1) / (oneSeries.percents.length - 1)),
-      2 + Math.round((100 - Math.min(100, Math.max(0, percent))) / 100 * chartH),
+      Number.isFinite(percent) ? 2 + Math.round((100 - Math.min(100, Math.max(0, percent))) / 100 * chartH) : NaN,
     ]);
 
     polyline(lines, points, color);

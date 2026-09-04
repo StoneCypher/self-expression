@@ -107,6 +107,39 @@ export interface FslTransition {
     action?: string;
 }
 /**
+ * Escapes a state name for safe embedding in the FSL text `renderFsl` builds by string
+ * concatenation, so a name containing an arrow, whitespace, a quote, `;`, `*`, or a
+ * newline cannot be mistaken for grammar rather than content.
+ *
+ * A name that needs no protection is returned unchanged, so the common case (plain
+ * identifiers) produces exactly the compact output `renderFsl`'s examples show. A name
+ * that does is wrapped in double quotes with any backslash or double quote inside it
+ * backslash-escaped — the convention this codebase already uses for quoted actions
+ * (`'action'` in `diagrams/fsl.ts`), lifted to double quotes since a state name may
+ * itself legitimately contain a single quote.
+ *
+ * This repo's own FSL subset parser (`diagrams/fsl.ts`) does not currently accept a
+ * quoted *state* name — only quoted actions — so a quoted name here is not guaranteed
+ * to round-trip through `parseFsl`; neither this repo's parser nor its design notes
+ * state a quoting rule for state names, so this escaping is a conservative, documented
+ * assumption rather than a rule read out of a spec. What it does guarantee: the name's
+ * exact text is recoverable from the quoted form, and none of the characters that give
+ * the grammar its structure ever appear unquoted in the output.
+ *
+ * @param name the raw state name, as supplied by a caller
+ * @returns `name` unchanged when it is already safe to embed bare; otherwise a
+ *          double-quoted, backslash-escaped form
+ *
+ * @example
+ *   fslName('locked')    // => 'locked'
+ *   fslName('a -> b')    // => '"a -> b"'
+ *   fslName('say "hi"')  // => '"say \\"hi\\""'
+ *
+ * @see renderFsl
+ * @see ../diagrams/fsl.js parseFsl
+ */
+export declare function fslName(name: string): string;
+/**
  * Renders a one-line FSL-style state-machine description: `from 'action' -> to;`,
  * consecutive transitions merged into a single chained statement wherever one's `to`
  * matches the next's `from`, `;`-terminated statements where they do not connect.

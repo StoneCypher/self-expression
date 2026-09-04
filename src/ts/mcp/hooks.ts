@@ -28,19 +28,45 @@ import type { Store }                              from '../channels/store.js';
 import { clockTime, zoneAbbreviation, partOfDay }  from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
 
-/** The subset of a hook payload these handlers read. */
+/**
+ * The subset of a hook payload these handlers read, named for what the harness actually
+ * sends rather than for what a field's job would suggest it is called.
+ *
+ * That distinction has already cost this file one silent bug: the prompt text arrives as
+ * `prompt`, and a handler reading `user_input` recorded `undefined` on every turn while
+ * looking entirely correct. Two fields the harness sends and no handler wants —
+ * `last_assistant_message` and `session_title` — are declared anyway, marked as never
+ * stored, so the payload's real shape is legible here instead of only in a transcript.
+ *
+ * Claude Code is the only host that sends hook payloads today; `hooks.claude.json` is the
+ * only wiring that exists, and the Codex and Gemini manifests list hooks as pending. So
+ * these names track one harness on purpose. A second host gets its own fields when it
+ * arrives, rather than speculative aliases nothing has ever populated.
+ *
+ * @see ../../doc_md/plugin-layout.md the per-host manifest table
+ */
 export interface HookPayload {
-  readonly session_id?      : string;
-  readonly prompt_id?       : string;
-  readonly cwd?             : string;
-  readonly permission_mode? : string;
-  readonly agent_id?        : string;
-  readonly agent_type?      : string;
-  readonly user_input?      : string;
-  readonly effort?          : { readonly level?: string };
-  readonly hook_event_name? : string;
+  readonly session_id?             : string;
+  readonly prompt_id?              : string;
+  readonly cwd?                    : string;
+  readonly permission_mode?        : string;
+  readonly agent_id?               : string;
+  readonly agent_type?             : string;
+  /** `UserPromptSubmit`: the text the user typed. Only its **length** is ever read. */
+  readonly prompt?                 : string;
+  readonly effort?                 : { readonly level?: string };
+  readonly hook_event_name?        : string;
   /** `SessionStart` only: what began the session — `startup`, `resume`, `clear`, or `compact`. */
-  readonly source?          : string;
+  readonly source?                 : string;
+  /**
+   * `Stop` only: the turn is already continuing because a Stop hook blocked it once.
+   * {@link onStop} allows unconditionally when this is `true` — see there for why.
+   */
+  readonly stop_hook_active?       : boolean;
+  /** `Stop`: the turn's final assistant text. Documented for shape; never read, never stored. */
+  readonly last_assistant_message? : string;
+  /** `UserPromptSubmit`: the host's session title. Documented for shape; never read, never stored. */
+  readonly session_title?          : string;
 }
 
 /** What a handler wants written to stdout, and nothing else. */
@@ -493,7 +519,9 @@ export const OPEN_REMINDER_CLOCKLESS =
  * The path-carrying fields — `cwd` and the prompt length — are gated here on the privacy
  * config, at the point of capture, so a suppressed field is never written to the database
  * rather than being hidden after the fact. The config read is inside the fail-open `try`,
- * so a config error skips the context write entirely and still delivers the clock.
+ * so a config error skips the context write entirely and still delivers the clock. The
+ * length is measured on `payload.prompt`, which is the field the harness actually sends;
+ * only the count is kept, never the words.
  *
  * The context line also carries the conventions-flags segment ({@link conventionFlags})
  * between the clock and the open reminder — the transport by which config keys reach
@@ -558,7 +586,10 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
         agentId        : payload.agent_id,
         agentType      : payload.agent_type,
         effort         : payload.effort?.level,
-        promptLen      : privacy.storePromptLen ? payload.user_input?.length : undefined,
+        // `prompt`, not `user_input`: the latter is a field Claude Code has never sent, so
+        // the length silently recorded NULL on every turn and `privacy.store_prompt_len`
+        // governed nothing at all.
+        promptLen      : privacy.storePromptLen ? payload.prompt?.length : undefined,
         // The harness observed this turn; nothing here is the model's word for itself.
         // `begin_turn` writes the same shape with 'tool', and the column is what keeps
         // the two distinguishable to anyone reading the database later.
@@ -648,32 +679,51 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
 /**
  * `Stop`: refuse to end a turn that never signed off.
  *
- * The question is answered exactly, by turn identity, replacing a three-minute
- * freshness window that passed a slow turn on the *previous* turn's signature and
- * blocked a long turn that had done the right thing.
+ * The question is answered exactly, by turn identity — the pair (`session`,
+ * `prompt_id`) — replacing a three-minute freshness window that passed a slow turn on
+ * the *previous* turn's signature and blocked a long turn that had done the right thing.
+ * Only a `close` satisfies it: a `mid` signature marks a mid-turn lurch and does not end
+ * the turn. See {@link ../channels/entries.js hasClosingSignature}.
  *
  * Returns `null` — meaning allow — whenever the answer is not confidently no: gate
  * disabled, no store, no turn context, no known turn. Enforcing on a guess is worse
  * than not enforcing.
  *
+ * **One block per turn is the ceiling, and `stop_hook_active` is how that ceiling is
+ * enforced.** Claude Code sets the flag on a `Stop` event when the assistant is only
+ * still running because a Stop hook blocked it a moment ago. Blocking again at that
+ * point asks for a signature the last block already asked for, and if the `express` tool
+ * cannot answer — MCP server down, version skew, a host that never loaded it — the same
+ * refusal repeats forever and the session cannot be ended from inside. So a second block
+ * is never issued: the gate has had its one say, and a gate that can wedge a session is
+ * worse than a signature that goes unwritten. This is the fail-open principle in the file
+ * header applied to the one failure the handler can see coming.
+ *
  * @example
- *   onStop(store, {})   // => null when the turn already signed off
- *   onStop(store, {})   // => { decision: 'block', reason: '…' } when it did not
+ *   onStop(store, {})                            // => null when the turn already signed off
+ *   onStop(store, {})                            // => { decision: 'block', reason: '…' } when it did not
+ *   onStop(store, { stop_hook_active: true })    // => null; the gate already spoke this turn
  */
 export function onStop(store: Store | null, payload: HookPayload): HookOutput {
 
-  if (store === null) { return null; }
+  if (store === null)           { return null; }
+  if (payload.stop_hook_active) { return null; }   // already blocked once; never twice
 
   try {
 
     if (readConfig(store, 'gate.signature') === 'false') { return null; }
 
+    // The turn's identity is the pair (session, prompt_id), so both halves are recovered:
+    // the payload's when the host supplies them, else the observed turn-context row's.
+    // A `p1` invented by a hookless host in one session must not close a `p1` in another.
     const context  = latestContext(store, payload.session_id),
           promptId = payload.prompt_id
-            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined);
+            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined),
+          session  = payload.session_id
+            ?? (typeof context?.['session']   === 'string' ? context['session']   : undefined);
 
-    if (promptId === undefined || promptId === '') { return null; }
-    if (hasClosingSignature(store, promptId))      { return null; }
+    if (promptId === undefined || promptId === '')     { return null; }
+    if (hasClosingSignature(store, session, promptId)) { return null; }
 
     return {
       decision: 'block',

@@ -322,6 +322,16 @@ declare function canonicalRank(marker: string): number;
  */
 type SeriesScale = 'absolute' | 'relative';
 /**
+ * The glyph a non-finite point (`NaN`, `Infinity`, `-Infinity` — a gap or a bad
+ * upstream computation) renders as, in both {@link renderSparkline} and
+ * {@link renderBraille}: a middle dot, distinct from every ramp glyph in both the
+ * block and braille families so a missing point is never mistaken for a real
+ * (if extreme) value.
+ *
+ * @see renderSeries
+ */
+declare const MISSING_GLYPH = "\u00B7";
+/**
  * Renders a trend sparkline: one `EIGHTHS` glyph per point in `series`, oldest to
  * newest.
  *
@@ -796,6 +806,39 @@ interface FslTransition {
     /** The action or event driving the transition, if the diagram names one. */
     action?: string;
 }
+/**
+ * Escapes a state name for safe embedding in the FSL text `renderFsl` builds by string
+ * concatenation, so a name containing an arrow, whitespace, a quote, `;`, `*`, or a
+ * newline cannot be mistaken for grammar rather than content.
+ *
+ * A name that needs no protection is returned unchanged, so the common case (plain
+ * identifiers) produces exactly the compact output `renderFsl`'s examples show. A name
+ * that does is wrapped in double quotes with any backslash or double quote inside it
+ * backslash-escaped — the convention this codebase already uses for quoted actions
+ * (`'action'` in `diagrams/fsl.ts`), lifted to double quotes since a state name may
+ * itself legitimately contain a single quote.
+ *
+ * This repo's own FSL subset parser (`diagrams/fsl.ts`) does not currently accept a
+ * quoted *state* name — only quoted actions — so a quoted name here is not guaranteed
+ * to round-trip through `parseFsl`; neither this repo's parser nor its design notes
+ * state a quoting rule for state names, so this escaping is a conservative, documented
+ * assumption rather than a rule read out of a spec. What it does guarantee: the name's
+ * exact text is recoverable from the quoted form, and none of the characters that give
+ * the grammar its structure ever appear unquoted in the output.
+ *
+ * @param name the raw state name, as supplied by a caller
+ * @returns `name` unchanged when it is already safe to embed bare; otherwise a
+ *          double-quoted, backslash-escaped form
+ *
+ * @example
+ *   fslName('locked')    // => 'locked'
+ *   fslName('a -> b')    // => '"a -> b"'
+ *   fslName('say "hi"')  // => '"say \\"hi\\""'
+ *
+ * @see renderFsl
+ * @see ../diagrams/fsl.js parseFsl
+ */
+declare function fslName(name: string): string;
 /**
  * Renders a one-line FSL-style state-machine description: `from 'action' -> to;`,
  * consecutive transitions merged into a single chained statement wherever one's `to`
@@ -2988,8 +3031,16 @@ declare function subRegion(region: Region, x: number, y: number, width: number, 
  * Set one pixel, region-relative. Coordinates outside the region are silently
  * skipped — clipping, not clamping, so a stray coordinate never smears the edge.
  *
+ * The in-bounds test is written to fail closed: every comparison with `NaN` is
+ * `false`, so a positive `x < region.width`-style test would let a non-finite
+ * coordinate slip through and corrupt the index arithmetic below. Negating a
+ * conjunction of the in-bounds comparisons instead means any `NaN` component
+ * makes the conjunction `false`, so the negation is `true` and the pixel is
+ * skipped, exactly like a coordinate that is simply out of range.
+ *
  * @example
  *   pixel(fullRegion(s), 0, 0, INK);
+ *   pixel(fullRegion(s), NaN, 0, INK);   // silently skipped, not written as index 0
  */
 declare function pixel(region: Region, x: number, y: number, color: Rgba): void;
 /**
@@ -3024,10 +3075,18 @@ declare function rect(region: Region, x: number, y: number, width: number, heigh
  * Connected line segments through `points`, drawn with Bresenham's algorithm.
  * A single point draws one pixel; an empty list draws nothing.
  *
+ * A point with a non-finite coordinate (`NaN`, `Infinity`, `-Infinity` — upstream data
+ * gaps or a bad computation) is dropped rather than drawn: neither the segment leading
+ * into it nor the segment leading out of it is drawn, so the line shows a gap instead
+ * of hanging. Without this, a Bresenham walk toward a non-finite target never satisfies
+ * its `cx === tx && cy === ty` termination test and loops forever — synchronous code
+ * that blocks the whole (single-threaded) MCP server, not just the one render.
+ *
  * @param points region-relative `[x, y]` vertices, in drawing order
  *
  * @example
  *   polyline(region, [[0, 10], [5, 2], [10, 8]], BLUE);
+ *   polyline(region, [[0, 0], [NaN, 5], [10, 10]], BLUE);  // draws nothing near the NaN point
  */
 declare function polyline(region: Region, points: readonly (readonly [number, number])[], color: Rgba): void;
 /**
@@ -3285,5 +3344,5 @@ declare const LOGICAL_HEIGHT = 720;
  */
 declare function renderHistoryPng(data: HistoryData, options?: RenderOptions): Buffer;
 
-export { BLUE, BRAILLE, CANONICAL_ORDER, CHECKLIST_PROFILE, DEFAULT_COL_LABEL_HEIGHT, DEFAULT_DIAGRAM_WIDTH, DEFAULT_SERIATION_PASSES, DEFAULT_SERIATION_ROUNDS, DELTA_WINDOW, DIAGRAM_FALLBACKS, DIFF_PROFILE, EIGHTHS, FAILURE_MARKERS, FINDINGS_PROFILE, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, INLINE_ENTRY_LIMIT, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MATRIX_FALLBACKS, MATRIX_RAMP, MAX_DIAGRAM_NODES, MAX_ENTRIES_PER_LINE, MAX_MATRIX_ROWS, MAX_SERIATION_KEYS, MIN_MATRIX_LABEL, OPTIONS_PROFILE, ORANGE, OUTCOMES, PNG_SIGNATURE, PROFILES, PROFILE_NAMES, PURPLE, QUOTE_DISPLAY_CAP, RESULTS_PROFILE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, describeSeriation, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fullRegion, glyphColumns, hline, layoutDigraph, leadUnitIndex, makeGrid, makeSurface, matrixTotals, measureText, mergeLine, nestDigest, normalizeGraph, normalizeMatrix, overallBucket, parseFsl, parseSummaryCounts, pixel, polyline, profileForNoun, readPixel, rect, relativeIndex, renderAnchorSegment, renderAnchorTarget, renderAnnotations, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigest, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderMatrix, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, seriate, seriationScore, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, verifyDigest, vline };
+export { BLUE, BRAILLE, CANONICAL_ORDER, CHECKLIST_PROFILE, DEFAULT_COL_LABEL_HEIGHT, DEFAULT_DIAGRAM_WIDTH, DEFAULT_SERIATION_PASSES, DEFAULT_SERIATION_ROUNDS, DELTA_WINDOW, DIAGRAM_FALLBACKS, DIFF_PROFILE, EIGHTHS, FAILURE_MARKERS, FINDINGS_PROFILE, FIRST_CODE, GLYPHS, GLYPH_HEIGHT, GLYPH_SPACING, GLYPH_WIDTH, GREEN, GREY, HISTORY_CHARTS, INK, INLINE_ENTRY_LIMIT, LAST_CODE, LIGHT_GREY, LOGICAL_HEIGHT, LOGICAL_WIDTH, MATRIX_FALLBACKS, MATRIX_RAMP, MAX_DIAGRAM_NODES, MAX_ENTRIES_PER_LINE, MAX_MATRIX_ROWS, MAX_SERIATION_KEYS, MIN_MATRIX_LABEL, MISSING_GLYPH, OPTIONS_PROFILE, ORANGE, OUTCOMES, PNG_SIGNATURE, PROFILES, PROFILE_NAMES, PURPLE, QUOTE_DISPLAY_CAP, RESULTS_PROFILE, SERIES_COLORS, SHADES, SKY, STEM_COLORS, SUCCESS_MARKERS, TREND_DIRECTIONS, VERMILLION, WEATHER_STATES, WHITE, YELLOW, absoluteIndex, attach, barCells, boundaryGlyph, canonicalRank, classifyMarker, dayColumn, deltaColor, describeSeriation, displayLabel, double, drawBox, drawChecklistSeries, drawDeltaLane, drawHline, drawNeedRate, drawPath, drawStemPunch, drawText, drawUncertainStrip, drawVline, encodePng, expandWaypoints, extractChecklistBlock, fillRect, fslName, fullRegion, glyphColumns, hline, layoutDigraph, leadUnitIndex, makeGrid, makeSurface, matrixTotals, measureText, mergeLine, nestDigest, normalizeGraph, normalizeMatrix, overallBucket, parseFsl, parseSummaryCounts, pixel, polyline, profileForNoun, readPixel, rect, relativeIndex, renderAnchorSegment, renderAnchorTarget, renderAnnotations, renderBoxWhisker, renderBraille, renderBullet, renderChecklistSummary, renderComparison, renderDependencyChain, renderDigest, renderDigraph, renderDiverging, renderFsl, renderGrid, renderHistoryPng, renderLines, renderMatrix, renderProgressBar, renderRange, renderRetryHealth, renderSequence, renderSparkline, renderStacked, renderStars, renderStateDiagram, renderTileGrid, renderTimelineColored, renderTimelineRail, renderTree, renderTrendTag, renderWeather, renderWinLoss, requireGridSafe, rollingMean, seriate, seriationScore, setCell, stemColor, subRegion, text, toMermaid, unhandled_external, upscale, usedExtent, verifyChecklist, verifyDigest, vline };
 export type { AnnotationKind, AnnotationNote, AnnotationOptions, AnnotationResolution, AnnotationStatus, BoxWhiskerStats, Bucket, CharGrid, ChecklistItem, ChecklistSeriesRow, ChecklistVerification, ComparisonRow, DiagramEdge, DiagramNode, DiagramRenderOptions, DigestBucketSpec, DigestOptions, DigestProfile, DigestUnit, Digraph, DigraphLayout, DigraphLayoutOptions, FslTransition, GridPoint, HistoryChart, HistoryData, MatrixData, MatrixRenderOptions, MatrixTotals, MermaidDialect, Milestone, MilestoneState, NeedWeekRow, NestedDigest, NodeBox, Outcome, ProfileName, RangeStyle, Region, RenderGridOptions, RenderOptions, Rgba, RoutedEdge, SequenceMessage, SeriationOptions, SeriationResult, SeriesScale, SignatureRow, StateDiagramOptions, SummaryCounts, SummaryOptions, Surface, TileCell, TileFill, TreeRenderOptions, TrendDirection, WeatherState };

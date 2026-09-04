@@ -53,6 +53,78 @@ function columnNames(db: DatabaseSync, table: string): Set<string> {
 }
 
 /**
+ * Base columns each dwelling table must already carry before its file may be
+ * adopted — every column in that table's `./schema.js` DDL, *minus* whatever
+ * {@link migrateAdditively} is documented to add for it (mirroring
+ * `KEPT_ADDABLE_COLUMNS` for `kept`: `uuid` for `guestbook` and `link`,
+ * `updated_utc` for `meta`). `tag` and `kept_tag` have no addable columns, since
+ * `migrateAdditively` only ever `CREATE TABLE IF NOT EXISTS`s them — a no-op against
+ * a same-named table of the wrong shape, so their full DDL shape is required.
+ *
+ * Hand-maintained rather than parsed from the DDL strings, the same tradeoff
+ * `KEPT_ADDABLE_COLUMNS` already makes: a table gaining a genuinely new required
+ * column here needs a matching update, or adoption under-validates rather than
+ * over-validates.
+ */
+const REQUIRED_TABLE_COLUMNS: Readonly<Record<string, readonly string[]>> = {
+  kept      : ['id', 'added_utc', 'kind', 'title', 'body'],
+  guestbook : ['id', 'ts_utc', 'author', 'text'],
+  tag       : ['id', 'name'],
+  kept_tag  : ['kept_id', 'tag_id'],
+  link      : ['id', 'from_kind', 'from_id', 'to_kind', 'to_id', 'edge', 'added_utc'],
+  meta      : ['key', 'value'],
+};
+
+/** One schema-owned table present in the file but missing required columns. */
+interface ShapeMismatch {
+  readonly table   : string;
+  readonly missing : readonly string[];
+}
+
+/**
+ * Every schema-owned table that exists in `db` but is missing one or more of its
+ * required base columns — the check deciding whether a pre-existing file may be
+ * adopted at all.
+ *
+ * A table absent entirely is not a mismatch: `migrateAdditively` creates it fresh,
+ * with the correct shape, so there is nothing to refuse. A table *present* under the
+ * right name but the wrong shape (a prototype's `guestbook` carrying `id, ts, who,
+ * note` instead of `id, ts_utc, author, text`, say) is refused before anything is
+ * written — the additive migration would otherwise leave it exactly as wrong as it
+ * found it, since `ALTER TABLE ADD COLUMN` only adds what is missing and `CREATE
+ * TABLE IF NOT EXISTS` is a no-op against an existing table.
+ *
+ * @param tables the table names present in `db`, from {@link tableNames}
+ *
+ * @example
+ *   shapeMismatches(db, tables)  // => [] on a clean prototype
+ *   shapeMismatches(db, tables)
+ *   // => [{ table: 'guestbook', missing: ['ts_utc', 'author', 'text'] }]
+ */
+function shapeMismatches(db: DatabaseSync, tables: ReadonlySet<string>): ShapeMismatch[] {
+
+  const problems: ShapeMismatch[] = [];
+
+  for (const [table, required] of Object.entries(REQUIRED_TABLE_COLUMNS)) {
+    if (!tables.has(table)) { continue; }
+    const present = columnNames(db, table),
+          missing = required.filter(name => !present.has(name));
+    if (missing.length > 0) { problems.push({ table, missing }); }
+  }
+
+  return problems;
+
+}
+
+/** One clause per mismatched table, for the refusal message. */
+function describeMismatches(problems: readonly ShapeMismatch[]): string {
+  return problems
+    .map(p => `'${p.table}' lacks required column${p.missing.length === 1 ? '' : 's'} ` +
+      p.missing.map(c => `'${c}'`).join(', '))
+    .join('; ');
+}
+
+/**
  * Read one dwelling `meta` value, or `null` when absent (including when the `meta`
  * table itself is absent, which is how a young prototype presents).
  *
@@ -224,12 +296,15 @@ export function openDwelling(path: string): DwellingStore {
       throw new Error(refusal(path, "no 'kept' table and no schema_version"));
     }
 
-    const kept = columnNames(db, 'kept');
-    for (const required of ['id', 'added_utc', 'kind', 'title', 'body']) {
-      if (!kept.has(required)) {
-        db.close();
-        throw new Error(refusal(path, `the 'kept' table lacks required column '${required}'`));
-      }
+    // Every schema-owned table present in the file must already have the right
+    // shape — not only 'kept' — because the migration below is additive: it fixes a
+    // table that is *missing* something, never one that is present but different
+    // (README, "A database the migration does not recognise is refused with a
+    // message, never 'fixed'.").
+    const mismatches = shapeMismatches(db, tables);
+    if (mismatches.length > 0) {
+      db.close();
+      throw new Error(refusal(path, describeMismatches(mismatches)));
     }
 
     db.close();
@@ -265,8 +340,17 @@ export function openDwelling(path: string): DwellingStore {
     return { db, path, readOnly: true, adoptedBackup: null };
   }
 
-  // Older plugin schema: the same backup-then-additive machinery as adoption.
+  // Older plugin schema: the same backup-then-additive machinery as adoption,
+  // including the same pre-write shape check — a table already present but
+  // reshaped by hand is refused rather than migrated over.
   if (version < DWELLING_SCHEMA_VERSION) {
+
+    const mismatches = shapeMismatches(db, tables);
+    if (mismatches.length > 0) {
+      db.close();
+      throw new Error(refusal(path, describeMismatches(mismatches)));
+    }
+
     db.close();
     const backup = freshBackupPath(path);
     copyFileSync(path, backup);

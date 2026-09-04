@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir }       from 'node:os';
 import { join }         from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -189,6 +189,67 @@ describe('openDwelling — refusal and read-only', () => {
     db.close();
     expect(() => openDwelling(path)).toThrow(/kind|added_utc|title|body/);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('refuses a prototype whose guestbook has a different shape, touching nothing and backing up nothing', () => {
+    const dir = tmp(), path = join(dir, 'dwelling.sqlite3'),
+          db  = new DatabaseSync(path);
+    db.exec(`CREATE TABLE kept (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      added_utc TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL)`);
+    // A prototype whose guestbook was never ours: id, ts, who, note instead of
+    // id, uuid, ts_utc, author, text — the shape addGuestbook and visit both assume.
+    db.exec('CREATE TABLE guestbook (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, who TEXT, note TEXT)');
+    db.prepare('INSERT INTO kept (added_utc, kind, title, body) VALUES (?,?,?,?)')
+      .run('2026-08-27T01:00:00.000Z', 'quote', 'a keep', 'body text');
+    db.prepare('INSERT INTO guestbook (ts, who, note) VALUES (?,?,?)')
+      .run('2026-08-27T02:00:00.000Z', 'John', 'graffiti');
+    db.close();
+
+    const before = readFileSync(path);
+
+    expect(() => openDwelling(path)).toThrow(/refusing/);
+    expect(() => openDwelling(path)).toThrow(/guestbook/);
+
+    expect(readFileSync(path).equals(before)).toBe(true);   // never touched, not even to migrate
+    expect(readdirSync(dir)).toHaveLength(1);                // no pre-adopt-* backup was written
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('refuses a prototype whose tag table has a different shape, even though kept and guestbook are fine', () => {
+    const dir = tmp(), path = join(dir, 'dwelling.sqlite3'),
+          db  = new DatabaseSync(path);
+    db.exec(`CREATE TABLE kept (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      added_utc TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL)`);
+    db.exec('CREATE TABLE guestbook (id INTEGER PRIMARY KEY AUTOINCREMENT, ts_utc TEXT NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL)');
+    // A pre-existing 'tag' table this plugin did not create, shaped differently —
+    // 'CREATE TABLE IF NOT EXISTS tag' in the migration would be a silent no-op here.
+    db.exec('CREATE TABLE tag (label TEXT PRIMARY KEY)');
+    db.prepare('INSERT INTO kept (added_utc, kind, title, body) VALUES (?,?,?,?)')
+      .run('2026-08-27T01:00:00.000Z', 'quote', 'a keep', 'body text');
+    db.close();
+
+    expect(() => openDwelling(path)).toThrow(/'tag'/);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('adopts and migrates a prototype missing tag, kept_tag, and link entirely', () => {
+    const dir = tmp(), path = join(dir, 'dwelling.sqlite3'),
+          db  = new DatabaseSync(path);
+    db.exec(`CREATE TABLE kept (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      added_utc TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL)`);
+    db.prepare('INSERT INTO kept (added_utc, kind, title, body) VALUES (?,?,?,?)')
+      .run('2026-08-27T01:00:00.000Z', 'quote', 'a keep', 'body text');
+    db.close();
+
+    const s = openDwelling(path);
+    expect(s.adoptedBackup).not.toBeNull();
+    expect(s.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('tag','kept_tag','link')"
+    ).all()).toHaveLength(3);
+    closeDwelling(s); rmSync(dir, { recursive: true, force: true });
   });
 
   test('refuses a file that is not SQLite at all', () => {

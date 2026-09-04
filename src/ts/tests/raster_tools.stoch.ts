@@ -13,9 +13,11 @@ import { tmpdir }              from 'node:os';
 import { join }                from 'node:path';
 import { crc32 }               from 'node:zlib';
 
+import { dirname }               from 'node:path';
+
 import { openStore, closeStore } from '../channels/store.js';
 import { recordEntry, localHour, isoWeekKey } from '../channels/entries.js';
-import { renderHistoryToFile }   from '../mcp/chart_tools.js';
+import { renderHistoryToFile, resolveRenderPath } from '../mcp/chart_tools.js';
 import { HISTORY_CHARTS }        from '../raster/compose.js';
 
 const VERSION = '0.2.0';
@@ -92,7 +94,7 @@ describe('renderHistoryToFile — stochastic end-to-end', () => {
 
           const result = renderHistoryToFile(store, {
             days: options.days, chart: options.chart, scale: options.scale,
-            out: join(dir, 'render.png'),
+            out: 'render.png',
           }, WHEN);
 
           const png = readFileSync(result.path);
@@ -150,6 +152,25 @@ describe('isoWeekKey — stochastic invariants', () => {
         }
       ),
       { numRuns: 200 }
+    );
+  });
+
+});
+
+describe('resolveRenderPath — stochastic invariants', () => {
+
+  it('for any string, out either throws or resolves inside <dataDir>/renders/', () => {
+    fc.assert(
+      fc.property(fc.string({ maxLength: 40 }), (out) => {
+        const dataDir = 'C:/data', rendersDir = join(dataDir, 'renders');
+        try {
+          const path = resolveRenderPath(dataDir, out);
+          expect(dirname(path)).toBe(rendersDir);
+        } catch (err) {
+          expect(err).toBeInstanceOf(RangeError);
+        }
+      }),
+      { numRuns: 300 }
     );
   });
 

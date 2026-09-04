@@ -70,10 +70,11 @@ export interface GuestbookEntry {
 /** Everything a visit returns: the visible rooms, the rules, and the file's health. */
 export interface Visit {
   readonly houseRules    : string | null;
-  /** Pinned visible keeps, newest first. */
+  /** Pinned visible keeps, newest first, capped at {@link VISIT_SECTION_LIMIT}. */
   readonly pinned        : readonly VisitKeep[];
-  /** Unpinned visible keeps, newest first. */
+  /** Unpinned visible keeps, newest first, capped at {@link VISIT_SECTION_LIMIT}. */
   readonly recent        : readonly VisitKeep[];
+  /** Guestbook entries, newest first, capped at {@link VISIT_SECTION_LIMIT}. */
   readonly guestbook     : readonly GuestbookEntry[];
   readonly fileSizeBytes : number;
   /** Present when the file exceeds the configured threshold. */
@@ -347,29 +348,46 @@ function toVisitKeep(store: DwellingStore, row: Record<string, unknown>): VisitK
 }
 
 /**
+ * Rows returned per section of a `visit` — pinned keeps, recent keeps, and the
+ * guestbook are each capped at this many, newest first. `visit` answers "what's on
+ * your desk lately," not "show me everything ever kept" — a house that has
+ * accumulated hundreds of keeps or guestbook entries must not hand all of them back
+ * on every glance. Older material stays in the database, reachable by other ops; it
+ * is only absent from this one summary.
+ */
+export const VISIT_SECTION_LIMIT = 20;
+
+/**
  * The visible rooms: pinned things first, then recent keeps, the guestbook, the house
  * rules, and the file size with its threshold warning when applicable. Read-only —
  * this is the answer to "what's on your desk lately."
  *
  * Never returns a private room (`visible = 0`) or a removed keep; both exclusions are
- * the designed surface, not an option.
+ * the designed surface, not an option. Each section is capped at
+ * {@link VISIT_SECTION_LIMIT}, newest first.
  *
  * @param sizeWarnGb - warning threshold in whole gigabytes (`dwelling.size_warn_gb`)
  *
  * @example
  *   const seen = visit(house, 10);
- *   seen.pinned.length + seen.recent.length   // every visible, unremoved keep
+ *   seen.pinned.length + seen.recent.length   // up to 2 * VISIT_SECTION_LIMIT
  *   seen.sizeWarning                          // => null, below the threshold
  */
 export function visit(store: DwellingStore, sizeWarnGb: number): Visit {
 
-  const keeps = store.db.prepare(
-    'SELECT * FROM kept WHERE visible = 1 AND removed_utc IS NULL ORDER BY pinned DESC, id DESC'
-  ).all().map(row => toVisitKeep(store, row));
+  const pinned = store.db.prepare(
+    'SELECT * FROM kept WHERE visible = 1 AND removed_utc IS NULL AND pinned = 1 ' +
+    'ORDER BY id DESC LIMIT ?'
+  ).all(VISIT_SECTION_LIMIT).map(row => toVisitKeep(store, row));
+
+  const recent = store.db.prepare(
+    'SELECT * FROM kept WHERE visible = 1 AND removed_utc IS NULL AND pinned = 0 ' +
+    'ORDER BY id DESC LIMIT ?'
+  ).all(VISIT_SECTION_LIMIT).map(row => toVisitKeep(store, row));
 
   const guestbook: GuestbookEntry[] = store.db.prepare(
-    'SELECT * FROM guestbook ORDER BY id ASC'
-  ).all().map(row => ({
+    'SELECT * FROM guestbook ORDER BY id DESC LIMIT ?'
+  ).all(VISIT_SECTION_LIMIT).map(row => ({
     id     : Number(row['id']),
     uuid   : String(row['uuid']),
     ts_utc : String(row['ts_utc']),
@@ -382,8 +400,8 @@ export function visit(store: DwellingStore, sizeWarnGb: number): Visit {
 
   return {
     houseRules    : readDwellingMeta(store.db, 'house_rules'),
-    pinned        : keeps.filter(k => k.pinned),
-    recent        : keeps.filter(k => !k.pinned),
+    pinned,
+    recent,
     guestbook,
     fileSizeBytes : bytes,
     sizeWarning   : bytes > threshold

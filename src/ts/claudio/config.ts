@@ -17,6 +17,9 @@
  *   the `configure` tool the assistant operates; the environment block of the host's
  *   MCP registration is not. A user who sets the variable therefore holds a clamp no
  *   tool call can loosen, while the config row stays available for day-to-day taste.
+ *   Because that clamp is the one thing the assistant can never talk its way past, a
+ *   variable that is *set but unparseable* fails CLOSED to the most restrictive
+ *   ceiling rather than falling open — see {@link parseCeilingEnv}.
  *
  * @see ../channels/config.js
  * @see ./gate.js
@@ -97,13 +100,58 @@ function intOr(raw: string | null, fallback: number, min: number, max: number): 
 }
 
 /**
+ * The ceiling {@link parseCeilingEnv} answers for a `CLAUDIO_VOLUME_CEILING` that is
+ * set but fails to parse: the most restrictive value there is, so a broken clamp
+ * silences rather than un-clamps.
+ */
+export const CEILING_ENV_PARSE_FAILURE = 0;
+
+/**
+ * Parse the `CLAUDIO_VOLUME_CEILING` environment override strictly: a finite integer
+ * in [0, 100], or nothing.
+ *
+ * Unset means "no clamp offered" and answers 100 silently — the config row alone
+ * governs, the ordinary case for most installs. Anything else that fails to parse
+ * (blank, `'abc'`, `'NaN'`, `'1e999'`, a non-integer like `'1.5'`, an out-of-range
+ * integer) is a misconfiguration, not an absence — and because this variable exists
+ * specifically as the one clamp no tool call can loosen, a typo in it must never
+ * quietly remove that clamp. It therefore fails CLOSED to
+ * {@link CEILING_ENV_PARSE_FAILURE} and writes one line to stderr naming the
+ * offending value, rather than falling through to 100 and leaving the assistant
+ * unclamped (the previous, mistaken behavior).
+ *
+ * @param raw - `env[CEILING_ENV_VAR]`; `undefined` when the key is absent entirely
+ *
+ * @example
+ *   parseCeilingEnv(undefined)   // => 100 — no variable set, no restriction offered
+ *   parseCeilingEnv('30')        // => 30
+ *   parseCeilingEnv('nonsense')  // => 0, plus one stderr line naming 'nonsense'
+ */
+export function parseCeilingEnv(raw: string | undefined): number {
+
+  if (raw === undefined) { return 100; }
+
+  const trimmed = raw.trim(),
+        parsed  = Number(trimmed);
+
+  if (trimmed !== '' && Number.isInteger(parsed) && parsed >= 0 && parsed <= 100) {
+    return parsed;
+  }
+
+  process.stderr.write(
+    `claudio: ${CEILING_ENV_VAR}=${JSON.stringify(raw)} is not an integer in [0, 100]; ` +
+    `failing closed to ${String(CEILING_ENV_PARSE_FAILURE)} rather than leaving the volume clamp open\n`);
+  return CEILING_ENV_PARSE_FAILURE;
+
+}
+
+/**
  * Read the audio configuration, applying code defaults and the environment clamp.
  *
  * Readers are tolerant in the house pattern: a malformed row behaves as unset. The
- * one deliberate asymmetry is the ceiling, where the environment variable can only
- * ever *lower* the result — a malformed variable is ignored rather than treated as 0,
- * because "typo silences everything" would be a confusing off-switch when
- * `audio.enabled` already is one.
+ * ceiling is the one deliberate asymmetry, and only in one direction: the
+ * environment variable can only ever *lower* the result when it parses, and fails
+ * CLOSED (never open) when it does not — see {@link parseCeilingEnv}.
  *
  * @param store - the shared log store the `config` table lives in
  * @param env   - injectable environment, for tests; defaults to the process's
@@ -116,11 +164,8 @@ export function audioConfig(
   env   : Record<string, string | undefined> = process.env,
 ): AudioConfig {
 
-  const configured = intOr(readConfig(store, AUDIO_CEILING_KEY), DEFAULT_CEILING, 0, 100);
-
-  const envRaw     = env[CEILING_ENV_VAR]?.trim(),
-        envParsed  = envRaw === undefined || envRaw === '' ? NaN : Number(envRaw),
-        envCeiling = Number.isInteger(envParsed) && envParsed >= 0 && envParsed <= 100 ? envParsed : 100;
+  const configured = intOr(readConfig(store, AUDIO_CEILING_KEY), DEFAULT_CEILING, 0, 100),
+        envCeiling = parseCeilingEnv(env[CEILING_ENV_VAR]);
 
   return {
     enabled               : readConfig(store, AUDIO_ENABLED_KEY)   === 'true',
@@ -134,11 +179,55 @@ export function audioConfig(
 }
 
 /**
- * The WAV file to play for one leitmotif: the user's configured replacement when one
- * is set, else the vendored asset `<assetDir>/<leitmotif>.wav`.
+ * Whether `path` is safe to use as a `strike`/`audition` waveform file: an absolute
+ * path — never relative, never a UNC share — ending `.wav` (case-insensitive), and
+ * free of embedded NULs or other control characters.
  *
- * Whether the file exists and is playable is decided at strike time by the parser,
- * which refuses loudly — this resolver only chooses which path to try.
+ * Pure and total; never throws. The refusals exist for distinct reasons: a UNC path
+ * (`\\server\share\...`, or its `//server/share/...` POSIX-notation twin) would send
+ * the player reaching across the network on every strike; a relative path resolves
+ * against whatever directory the server process happens to be started from, which
+ * the user does not control; a non-`.wav` extension would hand
+ * `System.Media.SoundPlayer` a format it cannot play, or a file that is not audio at
+ * all; control characters (the same range {@link escapePwshSingleQuoted} flattens)
+ * could otherwise smuggle something past the PowerShell command line the path is
+ * interpolated into.
+ *
+ * @example
+ *   isValidWavPath('C:\\sounds\\spark.wav')     // => true
+ *   isValidWavPath('/sounds/spark.wav')         // => true
+ *   isValidWavPath('sounds/spark.wav')          // => false — relative
+ *   isValidWavPath('\\\\server\\share\\x.wav')  // => false — UNC
+ *   isValidWavPath('C:\\sounds\\spark.mp3')     // => false — wrong extension
+ *
+ * @see ./player.js
+ */
+export function isValidWavPath(path: string): boolean {
+
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(path)) { return false; }
+
+  if (!/\.wav$/i.test(path)) { return false; }
+
+  if (path.startsWith('\\\\') || path.startsWith('//')) { return false; }   // UNC, either slash convention
+
+  const windowsAbsolute = /^[A-Za-z]:[\\/]/.test(path),
+        posixAbsolute   = path.startsWith('/');   // the '//' UNC form was already refused above
+
+  return windowsAbsolute || posixAbsolute;
+
+}
+
+/**
+ * The WAV file to play for one leitmotif: the user's configured replacement when one
+ * is set and valid, else the vendored asset `<assetDir>/<leitmotif>.wav`.
+ *
+ * An override that fails {@link isValidWavPath} — relative, UNC, wrong extension, or
+ * carrying control characters — behaves as unset, in the same tolerant-reader house
+ * pattern as a malformed integer row: the config value is untrusted input, and a bad
+ * path here is not a reason to hand the player something dangerous or unplayable.
+ * Whether the resolved file exists and decodes is still decided at strike time by
+ * the parser, which refuses loudly — this resolver only chooses which path to try.
  *
  * @param store     - the shared log store the `config` table lives in
  * @param leitmotif - the meaning being struck
@@ -149,6 +238,8 @@ export function audioConfig(
  *   // => '/x/assets/leitmotifs/spark.wav', when no override is set
  */
 export function motifWavPath(store: Store, leitmotif: Leitmotif, assetDir: string): string {
-  const override = readConfig(store, motifWavKey(leitmotif));
-  return override !== null && override.trim() !== '' ? override : join(assetDir, `${leitmotif}.wav`);
+  const override = readConfig(store, motifWavKey(leitmotif))?.trim();
+  return override !== undefined && override !== '' && isValidWavPath(override)
+    ? override
+    : join(assetDir, `${leitmotif}.wav`);
 }

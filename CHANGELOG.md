@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-82 merges; 7 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+85 merges; 8 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__6__1">0.6.1</a>, <a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__6__2">0.6.2</a>, <a href="#0__6__1">0.6.1</a>, <a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
 
 
@@ -22,75 +22,31 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 1:55:45 PM
+## [Untagged] - Sep 3, 2026 9:36:51 PM
 
-Commit [a04d0eaab046d7e0584455f12229aaa5e1bf7b39](https://github.com/StoneCypher/self-expression/commit/a04d0eaab046d7e0584455f12229aaa5e1bf7b39)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 9dc6f0b4821016d7886dc86294cd3fb71c5857d6
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-<a name="0__6__1" />
-
-## [0.6.1] - Aug 30, 2026 1:54:07 PM
-
-Commit [9dc6f0b4821016d7886dc86294cd3fb71c5857d6](https://github.com/StoneCypher/self-expression/commit/9dc6f0b4821016d7886dc86294cd3fb71c5857d6)
+Commit [b493094f88e15bf7737cc8451c8ac38cf355c4ce](https://github.com/StoneCypher/self-expression/commit/b493094f88e15bf7737cc8451c8ac38cf355c4ce)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [ed16981, 5a4d554]
+Merges [b2c8489, 06750d3]
 
-  * Merge pull request #103 from StoneCypher/chore_26-08-30_untrack-coverage-stoch_90
-  * chore: untrack coverage-stoch and add it to .gitignore
-
-
+  * Merge pull request #110 from StoneCypher/fix_26-09-01_review-findings
+  * fix: pre-publish hardening from the 2026-08-31 review (tiers A–E)
 
 
-&nbsp;
+
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 1:50:52 PM
+&nbsp;
 
-Commit [5a4d55453a2f01c3521ee282536b56230a0992c3](https://github.com/StoneCypher/self-expression/commit/5a4d55453a2f01c3521ee282536b56230a0992c3)
+## [Untagged] - Sep 3, 2026 9:33:18 PM
+
+Commit [655ab80f0c7913a3269f824328ba478d8af7dc13](https://github.com/StoneCypher/self-expression/commit/655ab80f0c7913a3269f824328ba478d8af7dc13)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * chore: untrack coverage-stoch and add it to .gitignore
-  * The stochastic-test coverage report was tracked in git: 110 files and
-about 93,700 lines, rewritten wholesale by every build. Because it is a
-generated HTML report over the whole source tree, essentially every
-branch touched every file in it, so it manufactured merge conflicts on
-work that had nothing to do with coverage.
-  * Nothing consumes it. The only references outside the directory itself
-are prose in CONTRIBUTING.md and a spec doc, an ignores entry in
-eslint.config.js, and reportsDirectory: './coverage-stoch' in
-vitest-stoch.config.ts, which is what writes it.
-  * git rm -r --cached leaves the report on disk, so the build keeps
-regenerating it and developers keep their local copy. The pre-existing
-`coverage` ignore rule did not cover this path: it matches an entry
-named exactly `coverage`.
-  * The README badges are unaffected. update_madlibs.js parses the unit and
-stochastic coverage numbers out of build/test_output.txt, the captured
-console output, and never reads coverage-stoch/. Verified end to end
-with a full build: stochcoverage 65.31, stochbranch 52.77, stochfunc
-64.58, stochline 64.9, stochtestcount 234 - all real values, no N/A.
-  * Deliberately left tracked:
-  *   * coverage-typedoc/ - one file, and update_madlibs.js genuinely reads
-    coverage-typedoc/coverage-typedoc.json for the {{doccoverage}}
-    badge. Untracking it would change fresh-clone behaviour to save a
-    single file of conflict surface.
-  * dist/ - installing from a git URL with no build step depends on it.
-    That is a separate decision.
-  * Refs #90
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * docs(readme): regenerate build stamps and test counts for the pending-notice branch (#98)
 
 
 
@@ -99,33 +55,31 @@ with a full build: stochcoverage 65.31, stochbranch 52.77, stochfunc
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:47:31 AM
+## [Untagged] - Sep 3, 2026 9:29:56 PM
 
-Commit [e6a6a3819ca6caf3da29318d12720c9613e0dde2](https://github.com/StoneCypher/self-expression/commit/e6a6a3819ca6caf3da29318d12720c9613e0dde2)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: ed16981de20124be481c047daa4279345fb9b9d4
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-<a name="0__6__0" />
-
-## [0.6.0] - Aug 30, 2026 11:45:44 AM
-
-Commit [ed16981de20124be481c047daa4279345fb9b9d4](https://github.com/StoneCypher/self-expression/commit/ed16981de20124be481c047daa4279345fb9b9d4)
+Commit [06750d3535173d92a4b3dfe611be240149352575](https://github.com/StoneCypher/self-expression/commit/06750d3535173d92a4b3dfe611be240149352575)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [f2b034a, 88090b0]
+Merges [0d5fd2a, b2c8489]
 
-  * Merge pull request #85 from StoneCypher/feat_26-08-28_desk-mechanism
-  * feat: move the desk mechanism into the repo, cards as directories
+  * fix: merge origin/main and repair the render_history_png table row
+  * Merges origin/main (0.6.2) into fix_26-09-01_review-findings and bumps to
+0.6.3, the first version with no existing tag. The branch sat at 0.6.1,
+whose tag already exists, so the release job's `gh release create "$TAG"`
+would have failed with `422 tag_name already exists` once merged to main.
+  * Repairs a malformed row in the `render_history_png` table in
+base_README.md. An earlier edit spliced two versions of that row together
+and left the pipes in `scale` (`1` | `2`) unescaped, so the markdown linter
+counted five columns where the table declares three. The full build's
+eslint stage failed on it. The PR check never caught this because pull
+requests run the ci-lite profile, which disables eslint, docs, cloc,
+changelog and site; the eslint stage only runs on push to main.
+  * The repaired row preserves both intents: main's Read-tool guidance and the
+never-inline-base64 note, plus this branch's `overwrite` parameter and the
+`out` naming constraints.
+  * Generated artifacts (dist, coverage-typedoc, CHANGELOG*, README) were taken
+from main and regenerated by the full build.
 
 
 
@@ -134,33 +88,13 @@ Merges [f2b034a, 88090b0]
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:42:36 AM
+## [Untagged] - Sep 3, 2026 9:27:40 PM
 
-Commit [88090b0739c33030e2ccb4282e6f42f33a4ae97f](https://github.com/StoneCypher/self-expression/commit/88090b0739c33030e2ccb4282e6f42f33a4ae97f)
+Commit [2d632edfc55f82342aec503618f9929685b2ce15](https://github.com/StoneCypher/self-expression/commit/2d632edfc55f82342aec503618f9929685b2ce15)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: bump to 0.6.0 and regenerate artifacts after merging main
-  * The second merge left this branch carrying main's 0.5.0, which main's own
-release job will tag on its next push, so shipping it here would fail with
-"422 tag_name already exists". git ls-remote --tags is the authority and
-shows 0.2.0, 0.2.1, 0.3.0, 0.4.0 tagged; 0.6.0 is unused. Feature branch,
-so MINOR with PATCH reset.
-  * Regenerates every tracked build output against the merged tree: dist/,
-coverage-stoch/, coverage-typedoc/, README.md, CHANGELOG.md,
-CHANGELOG.long.md and their src/doc_md/ copies. The merge commit had reset
-all of these to main wholesale, so this is a clean rebuild rather than a
-patch over a textual hybrid of two branches' outputs.
-  * The full canonical build passes — not the ci profile: 2135 unit tests
-across 78 files, 234 stochastic tests across 37 files, and all four attw
-resolution modes green.
-  * One note for whoever hits it next: deskcards.stoch.ts "carries card source
-through verbatim" timed out at 5000ms on the first attempt and passed on
-re-run, taking 2.67s of test time in isolation. It does a mkdir plus four
-file writes per property run across 24 runs, so it is I/O-bound and
-sensitive to machine load rather than flaky in its logic. Worth a longer
-timeout if it recurs.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * docs: claim_pending prose stops naming the deleted truncated label (#98)
 
 
 
@@ -169,32 +103,24 @@ timeout if it recurs.
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:36:32 AM
+## [Untagged] - Sep 3, 2026 9:09:56 PM
 
-Commit [5b15973dcea1095d20772a49ad2536553a007b74](https://github.com/StoneCypher/self-expression/commit/5b15973dcea1095d20772a49ad2536553a007b74)
+Commit [bd7a266c36ed5dcc9842b0a8a3a4aca177fc08ba](https://github.com/StoneCypher/self-expression/commit/bd7a266c36ed5dcc9842b0a8a3a4aca177fc08ba)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [9e15f20, f2b034a]
-
-  * merge: origin/main into desk-mechanism (second pass, after #86 and #84)
-  * Every tracked generated artifact is reset to main's side wholesale rather
-than textually merged — dist/, coverage-stoch/, coverage-typedoc/,
-CHANGELOG.md, CHANGELOG.long.md, src/doc_md/CHANGELOG*.md and README.md —
-including the ones that did not conflict. A line-by-line merge of two
-branches' build output is a hybrid of neither build; the following build
-regenerates all of it from the merged sources anyway. (docs/ and coverage/
-are untracked and need no handling.)
-  * The only non-generated conflict was package.json's version line, resolved
-to main's 0.5.0; the version bump follows in the next commit.
-  * base_README.md and src/doc_md/plugin-layout.md, hand-integrated in the
-previous pass, auto-merged cleanly this time — "The desk" and "Image
-generation" both survive alongside main's newer sections.
-  * src/scripts/desk/ is untouched: verified empty diff against the branch's
-own HEAD. Landing this branch's desk copy as it stands is deliberate, so
-that feat_26-08-29_cardkit's newer copy later arrives as the incoming side
-of a merge in the normal direction of history.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * refactor: drop the unread PendingItem.label, truncateLabel and LABEL_MAX (#98)
+  * Both sources computed a 60-character label and nothing in production ever read it: the
+notice counts by kind through describePending, and ClaimedItem.label is built straight
+from the desk row or message row in pending_tools.ts. A summary carried on PendingItem was
+a second copy of text that goes stale the moment the row changes, read by nobody.
+  * PendingItem is now identity and timing only. The message source loses the row['text']
+dance with it. No test existed solely to exercise the truncation helper, so none was
+deleted; the fixtures that carried a label field lost it, and the message-source case now
+asserts on `since` rather than the field that went away. pending.stoch.ts's arbitrary
+drops label with no change to any property.
+  * ClaimedItem's DocBlock described itself as PendingItem's four fields with a longer label;
+it now says three plus label, and why the text is read at claim time rather than carried.
 
 
 
@@ -203,18 +129,29 @@ of a merge in the normal direction of history.
 
 &nbsp;
 
-<a name="0__5__0" />
+## [Untagged] - Sep 3, 2026 9:06:58 PM
 
-## [0.5.0] - Aug 30, 2026 11:33:12 AM
-
-Commit [f2b034aa991ea344296e1b4f38289a584fa45d77](https://github.com/StoneCypher/self-expression/commit/f2b034aa991ea344296e1b4f38289a584fa45d77)
+Commit [e0063c7a1c46bc092c7e4d0a3cfe9e225de1ce42](https://github.com/StoneCypher/self-expression/commit/e0063c7a1c46bc092c7e4d0a3cfe9e225de1ce42)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [69c3830, 00334f8]
-
-  * Merge pull request #84 from StoneCypher/feat_26-08-28_window-posture-keys
-  * feat(config): window.browser and window.editor postures, and an enum kind
+  * fix: eight small corrections across the pending notice and its docs (#98)
+  * - nagEpoch guards Date.parse with Number.isFinite. An unparseable `since` produced NaN in
+  the fingerprint, and NaN compares unequal to itself, so one hand-edited timestamp would
+  have re-announced its item every turn forever. Covered in the existing nagEpoch case.
+- desk_questions.writeQuestions no longer claims its tmp+rename matches panel.mjs's own
+  handlers. panel.mjs writes questions.json in place with a bare writeFileSync at every
+  site; this writer is the atomic one, and the DocBlock now says so.
+- desk-shell.html: a queue button disabled by a claim kept the title "do this next", which
+  described an action it would not perform. It now names the claiming session.
+- claim_pending's `key` describe says ids are not unique across the two namespaces and
+  that `kind` narrows the claim.
+- selfNotesSegment's DocBlock gains its missing `store` param line.
+- PENDING_SOURCES gains an @example.
+- plugin-layout.md said "All five carriers" for six; now "every carrier".
+- README/base_README Portability: recall's reply is no longer bare JSON once a notice is
+  appended, so a machine consumer splits on the final "\n\n— ". Verified the separator
+  against withPendingNotice and confirmed recall is the only JSON-returning carrier.
 
 
 
@@ -223,35 +160,19 @@ Merges [69c3830, 00334f8]
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:29:51 AM
+## [Untagged] - Sep 3, 2026 9:02:37 PM
 
-Commit [00334f89cbbb61d9672906e56f6d1aa3292b9fae](https://github.com/StoneCypher/self-expression/commit/00334f89cbbb61d9672906e56f6d1aa3292b9fae)
+Commit [d43193c2f73eaf632bf236ed31d9ce1108282ec1](https://github.com/StoneCypher/self-expression/commit/d43193c2f73eaf632bf236ed31d9ce1108282ec1)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(config): window.browser and window.editor postures, and an enum kind
-  * Adds two configuration keys, `window.browser` and `window.editor`, each taking
-`never`, `ask`, or `always`, and the `enum` config kind they are the first users
-of. `share.time_granularity` moves onto that kind as well, so a closed two-word
-domain reports itself as a choice set instead of as the word "string".
-  * The keys are two rather than one because the costs differ: an external browser
-window steals focus and can land while nobody is at the machine, while an editor
-tab appears in the window the user is already sitting in. A single key would
-force the expensive answer onto the cheap case.
-  * They are advisory by construction, and say so. Nothing in this plugin gates
-window opening — a shell command can open a browser with no MCP call at all, so
-a gate would be a lock on one of several doors. What the plugin can do is put
-the user's stated wish in front of the model at the moment the choice is made,
-which is the new `windows:` segment on the turn-start context line. It fails
-open on its own terms like every other segment.
-  * Version bumped 0.4.0 -> 0.5.0. Main reached 0.4.0 while this branch was open, so
-that number is spoken for; `git ls-remote --tags` is the authority on what has
-shipped, since the Verify version bump job compares against the npm registry and
-this package is unpublished, so it passes for any version at all (issue #99).
-  * Rebuilt against main twice today, once for #97 and once for #86, both times
-because tracked build output re-conflicts every open PR on files nobody edited
-(issue #90).
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * test: cover messages.enabled=false on the pending-notice path (#98)
+  * The messagebox kill switch was covered on the claim path but not on the notice path, so
+nothing held the notice to it. The new case proves both halves: mail alone with the switch
+off is silent and stores no fingerprint, and a desk request alongside it still speaks
+without ever mentioning the muted mail.
+  * Verified non-vacuous by mutation — removing the gate in the message source makes the case
+fail with "pending: 1 unread message".
 
 
 
@@ -260,25 +181,65 @@ because tracked build output re-conflicts every open PR on files nobody edited
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:23:28 AM
+## [Untagged] - Sep 3, 2026 9:00:37 PM
 
-Commit [c919413546db8922464fd8898a0c1aaae999648b](https://github.com/StoneCypher/self-expression/commit/c919413546db8922464fd8898a0c1aaae999648b)
+Commit [820d420eb0cf7303686e501ec0eb4513939734c3](https://github.com/StoneCypher/self-expression/commit/820d420eb0cf7303686e501ec0eb4513939734c3)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [6f2fc80, 69c3830]
+  * docs: SKILL.md names the pending: segment and claim_pending (#98)
+  * The model-facing skill described the Mailbox: segment but never the pending: one beside
+it, leaving the line to be read cold. The new paragraph sits with the count-line etiquette
+it belongs to: what the segment names, that it is a change signal rather than a status bar
+and re-speaks only after pending.nag_hours, that claim_pending takes an item and returns
+the whole text, and that claiming is the point rather than outlasting the line.
+  * It also states that an unread self note is counted in both the Mailbox: and pending:
+segments on purpose — #98 asked to keep both, and without saying so the overlap reads as a
+double-report worth suppressing.
 
-  * Merge origin/main into feat_26-08-28_window-posture-keys
-  * Second pass. Brings in #86 (the seriated matrix), which knocked this branch back
-to CONFLICTING without anyone touching it.
-  * 105 paths conflicted and every one of them was tracked build output: README.md,
-which is generated from base_README.md, and 104 files under coverage-stoch/.
-All took main's side and are regenerated by the build that follows, along with
-dist/, coverage-typedoc/ and the changelogs, which merged without conflict but
-are outputs either way and should not be hybrids of two branches.
-  * Zero source conflicts this time. #86's work lives in src/ts/diagrams/matrix.ts
-and src/ts/tests/diagram_matrix.stoch.ts; this branch touches channels/config.ts,
-mcp/hooks.ts and their tests, so the two never met. base_README.md and
-src/doc_md/plugin-layout.md auto-merged and were checked by hand afterwards.
-  * This is issue #90 for the second time in one afternoon on one PR.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Sep 3, 2026 8:59:36 PM
+
+Commit [7c957df38fb56c104b8fcc68ad959763e2e99b5a](https://github.com/StoneCypher/self-expression/commit/7c957df38fb56c104b8fcc68ad959763e2e99b5a)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * fix: pending_notice obeys retention.days like every other timestamped table (#98)
+  * pruneExpired deleted from every timestamped table except pending_notice, so a fingerprint
+row outlived the horizon the user configured — session-shaped residue of exactly the kind
+retention exists to clear.
+  * The new Pruned.pendingNotice field counts what went. Losing a row costs one
+re-announcement of a backlog the session already knew about, which is much the cheaper
+side of the trade. The README retention row listed only entries and turn_context and was
+already behind the code; it now names the by-age tables and the by-orphanhood ones
+separately.
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Sep 3, 2026 8:56:00 PM
+
+Commit [8b6ef346a49a3db692eed39eaf3415c1b2b24af0](https://github.com/StoneCypher/self-expression/commit/8b6ef346a49a3db692eed39eaf3415c1b2b24af0)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * fix: a swallowed source failure never reports "pending: clear" (#98)
+  * collectPending swallowed a source throw whole, so a corrupt questions.json read as an
+empty queue: the notice announced the backlog was clear and stored the empty fingerprint,
+making the lie stick until the set changed again. That is the exact "the request goes
+quiet" failure #98 exists to end.
+  * collectPendingWithFailures now returns { items, failed }, naming the sources whose read
+threw; collectPending is a thin wrapper over its items, so existing callers are untouched.
+pendingNotice stays silent and stores nothing when the set is empty only because a source
+failed, leaving the remembered fingerprint for the next healthy read to decide. A
+non-empty set with a failed source still speaks, under-counting as before.

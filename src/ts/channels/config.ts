@@ -28,7 +28,7 @@ import { LEITMOTIFS }                   from '../claudio/vocabulary.js';
 import { IMAGE_PROVIDERS }              from '../imagery/providers.js';
 import {
   DEFAULT_DAILY_CAP, DEFAULT_LOCAL_BASE_URL, DEFAULT_PROVIDER_ID, DEFAULT_SESSION_CAP,
-  DEFAULT_TIMEOUT_SECONDS, providerApiKeyEnvKey,
+  DEFAULT_TIMEOUT_SECONDS, credentialEnvVarProblem, localBaseUrlProblem, providerApiKeyEnvKey,
 } from '../imagery/config.js';
 import { readConfig, allConfig }        from './store.js';
 import type { Store }                   from './store.js';
@@ -297,6 +297,49 @@ export function choiceValidator(choices: readonly string[]): (raw: string) => Va
 }
 
 /**
+ * Validate the **name** of an environment variable a credential is read from.
+ *
+ * The one validator in this registry written against a hostile caller rather than a
+ * mistaken one. `configure` is a tool the model can call, and `image.api_key_env` is
+ * read at call time and sent to a third party in an authorization header — so a key
+ * that accepted any string would let `image.api_key_env = ANTHROPIC_API_KEY` plus
+ * `image.provider = openai` ship one vendor's secret to another, with nothing in the
+ * request looking wrong. The rule itself lives beside the facility that enforces it at
+ * read time, so the two cannot drift.
+ *
+ * @example
+ *   validateCredentialEnvVar('OPENAI_API_KEY')     // => { ok: true, canonical: 'OPENAI_API_KEY' }
+ *   validateCredentialEnvVar('ANTHROPIC_API_KEY')  // => { ok: false, expected: 'a name other than …' }
+ *
+ * @see credentialEnvVarProblem
+ */
+export function validateCredentialEnvVar(raw: string): Validation {
+  const trimmed = raw.trim(),
+        problem = credentialEnvVarProblem(trimmed);
+  return problem === null ? { ok: true, canonical: trimmed } : { ok: false, expected: problem };
+}
+
+/**
+ * Validate a self-hosted image endpoint: an `http`/`https` URL on loopback or a
+ * private network, and nowhere else.
+ *
+ * The local provider posts the user's prompt with no credential and no cost
+ * accounting, on the understanding that the endpoint is the user's own machine. A free
+ * string here would quietly turn that into a remote party receiving every prompt.
+ *
+ * @example
+ *   validateLocalBaseUrl('http://127.0.0.1:7860')  // => { ok: true, canonical: 'http://127.0.0.1:7860' }
+ *   validateLocalBaseUrl('https://images.example') // => { ok: false, expected: 'a loopback or …' }
+ *
+ * @see localBaseUrlProblem
+ */
+export function validateLocalBaseUrl(raw: string): Validation {
+  const trimmed = raw.trim(),
+        problem = localBaseUrlProblem(trimmed);
+  return problem === null ? { ok: true, canonical: trimmed } : { ok: false, expected: problem };
+}
+
+/**
  * Validate an ISO 8601 UTC timestamp (a trailing `Z`), canonicalized through
  * `toISOString` so stored values compare lexicographically with entry `ts_utc` values.
  *
@@ -383,6 +426,14 @@ export function windowPostureKey(surface: string): string {
 }
 
 /**
+ * The registered provider ids, as the closed choice set `image.provider` offers.
+ *
+ * Derived from the registry rather than written out, so a provider added in
+ * `imagery/providers.ts` arrives in `configure list` already spelled correctly.
+ */
+const IMAGE_PROVIDER_CHOICES: readonly string[] = IMAGE_PROVIDERS.map(provider => provider.id);
+
+/**
  * Every key this version of the plugin knows about.
  *
  * A key a newer version writes is still stored and preserved (D3) — this registry is
@@ -405,7 +456,10 @@ export function windowPostureKey(surface: string): string {
  * credential. A name is not a secret and is printed freely; the value is read from the
  * environment at call time by `imagery/config.ts` and written nowhere at all. Any future
  * key that would hold a credential rather than name one does not belong in this registry,
- * or in this database. The `window.*` pair is the `enum` kind's first home: two keys, one
+ * or in this database. Because `configure` is model-callable, those name keys and
+ * `image.local_base_url` carry validators written against a hostile value rather than a
+ * mistyped one — what may be named, and where a prompt may be posted, are bounded here and
+ * again at read time. The `window.*` pair is the `enum` kind's first home: two keys, one
  * per window surface, because the cost of an external browser window and the cost of an
  * editor tab are not the same cost.
  */
@@ -545,18 +599,21 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
       'enables, and even then the tool appears only when the named credential variable is ' +
       'actually holding something — off by default because every call spends the user’s money',
     validate: validateBool },
-  { key: 'image.provider', kind: 'string', fallback: DEFAULT_PROVIDER_ID,
+  { key: 'image.provider', kind: 'enum', choices: IMAGE_PROVIDER_CHOICES,
+    fallback: DEFAULT_PROVIDER_ID,
     description:
       'which registered image provider is active; adding a provider is one registry entry ' +
       'in imagery/providers.ts, and this key learns its name automatically',
-    validate: choiceValidator(IMAGE_PROVIDERS.map(provider => provider.id)) },
+    validate: choiceValidator(IMAGE_PROVIDER_CHOICES) },
   { key: 'image.api_key_env', kind: 'string', fallback: null,
     description:
       'the NAME of the environment variable holding the image credential — never the key ' +
       'itself, which is read from the environment at call time and never written to this ' +
-      'table, the ledger, a cache, or a log. Unset falls back to the active provider’s own ' +
-      'default variable name, so a shell that already exports one needs no configuration',
-    validate: stringValidator(128) },
+      'table, the ledger, a cache, or a log. Must look like an image credential’s name and ' +
+      'may not name a well-known secret belonging to something else, because this value ' +
+      'decides what gets sent to an image vendor. Unset falls back to the active provider’s ' +
+      'own default variable name, so a shell that already exports one needs no configuration',
+    validate: validateCredentialEnvVar },
   ...IMAGE_PROVIDERS.map((provider): ConfigKeyDef => ({
     key: providerApiKeyEnvKey(provider.id), kind: 'string', fallback: null,
     description:
@@ -566,7 +623,7 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
       (provider.defaultEnvVar === null
         ? ' — this provider needs no credential, so the key is inert'
         : `. Unset uses ${provider.defaultEnvVar}`),
-    validate: stringValidator(128) })),
+    validate: validateCredentialEnvVar })),
   { key: 'image.model', kind: 'string', fallback: null,
     description: 'which of the active provider’s models to ask for; unset takes the provider’s default, and a model the provider does not list is ignored rather than sent',
     validate: stringValidator(128) },
@@ -582,8 +639,8 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
     description: 'how long one generation may take before it is abandoned; the ledger keeps the abandoned row as pending, which counts against the caps because an unknown call may still have been billed',
     validate: intValidator(5, 900) },
   { key: 'image.local_base_url', kind: 'string', fallback: DEFAULT_LOCAL_BASE_URL,
-    description: 'base URL for a self-hosted image endpoint (the automatic1111 provider); a local provider needs no credential and costs no money, which is why the registry makes needsCredential a per-provider fact rather than an assumption',
-    validate: stringValidator(512) },
+    description: 'base URL for a self-hosted image endpoint (the automatic1111 provider); a local provider needs no credential and costs no money, which is why the registry makes needsCredential a per-provider fact rather than an assumption. Only loopback and private-network hosts are accepted — a remote host here would be an unaccounted third party receiving every prompt',
+    validate: validateLocalBaseUrl },
   { key: 'share.enabled', kind: 'bool', fallback: 'false',
     description: 'whether public-aggregation export (#31) is available; off by default, and only the exact value true enables — the inverse posture of privacy.*',
     validate: validateBool },
