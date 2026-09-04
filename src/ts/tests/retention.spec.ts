@@ -9,6 +9,7 @@ import { recordContext } from '../channels/context.js';
 import { pruneExpired }  from '../channels/retention.js';
 import { postMessage, readMessages, unreadCounts } from '../channels/messages.js';
 import { composeNote, listNotes } from '../channels/notes.js';
+import { rememberFingerprint, lastFingerprint } from '../channels/pending.js';
 
 const VERSION = '0.2.1';
 
@@ -48,7 +49,7 @@ describe('pruneExpired', () => {
 
   test('the default — 0 — disables pruning entirely', () => withStore(s => {
     seed(s);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, pendingNotice: 0 });
     expect(counts(s)).toEqual({ entries: 4, context: 4 });
   }));
 
@@ -56,7 +57,7 @@ describe('pruneExpired', () => {
     seed(s);
     writeConfig(s, 'retention.days', 30);
     expect(pruneExpired(s, NOW))
-      .toEqual({ entries: 2, turnContext: 2, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+      .toEqual({ entries: 2, turnContext: 2, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, pendingNotice: 0 });
     expect(counts(s)).toEqual({ entries: 2, context: 2 });
     const texts = s.db.prepare('SELECT text FROM entries ORDER BY id').all().map(r => r['text']);
     expect(texts).toEqual(['recent', 'today']);
@@ -83,7 +84,7 @@ describe('pruneExpired', () => {
   test('an invalid stored horizon behaves as unset — nothing is pruned (D5)', () => withStore(s => {
     seed(s);
     writeConfig(s, 'retention.days', 'sometimes');
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, pendingNotice: 0 });
     expect(counts(s)).toEqual({ entries: 4, context: 4 });
   }));
 
@@ -91,7 +92,7 @@ describe('pruneExpired', () => {
     seed(s);
     writeConfig(s, 'retention.days', 30);
     pruneExpired(s, NOW);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, pendingNotice: 0 });
   }));
 
   test('messages ride the same horizon (#41): old rows pruned, fresh rows kept', () => withStore(s => {
@@ -142,6 +143,17 @@ describe('pruneExpired', () => {
       'SELECT COUNT(*) AS n FROM note_events WHERE note_id NOT IN (SELECT id FROM notes)').get();
     expect(Number(dangling?.['n'])).toBe(0);
   }));
+
+  test('pending_notice rides the same horizon (#98): the stale row goes, the fresh one stays', () =>
+    withStore(s => {
+      rememberFingerprint(s, 'ancient', 'desk_intent:q1@0', daysAgo(90));
+      rememberFingerprint(s, 'today',   'desk_intent:q2@0', NOW);
+      writeConfig(s, 'retention.days', 30);
+
+      expect(pruneExpired(s, NOW).pendingNotice).toBe(1);
+      expect(lastFingerprint(s, 'ancient')).toBeNull();
+      expect(lastFingerprint(s, 'today')).toBe('desk_intent:q2@0');
+    }));
 
   test('expiry is not retention: an expired message survives pruning inside the horizon', () => withStore(s => {
     postMessage(s, { audience: 'user', text: 'expired but recent', session: 's1',
