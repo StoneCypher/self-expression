@@ -102,11 +102,11 @@ answers and removes the rest, oldest first, the moment another one is written. P
 card (`"fixed": true` in its `card.json`, the same field a hand-placed card can carry) takes
 it out of the count entirely — it stops being an answer and becomes something the desk's
 owner decided to keep, and that decision is the owner's, never the model's. `render_card`
-and `list_card_types` exist only when `desk.path` is configured and a card kit loaded
-beside the running server; until then `render_card` answers by naming the key that turns
-them on rather than guessing at a directory. This is the mechanism; the taste — when a card
-is the honest answer and when three numbers are a sentence — lives apart, in
-`src/doc_md/reference/answer-cards.md`.
+and `list_card_types` are registered whenever a card kit loaded beside the running server,
+independent of `desk.path`; until `desk.path` is set, `render_card` refuses to write and
+answers by naming the key that turns it on rather than guessing at a directory. This is the
+mechanism; the taste — when a card is the honest answer and when three numbers are a
+sentence — lives apart, in `src/doc_md/reference/answer-cards.md`.
 
 The desk this writes onto is the one this file describes, started the same way:
 `self-expression-desk <desk directory>` once installed, or `node
