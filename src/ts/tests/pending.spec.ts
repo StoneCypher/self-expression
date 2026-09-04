@@ -15,7 +15,7 @@ import { postMessage }                        from '../channels/messages.js';
 import { writeQuestions, questionsPath }      from '../channels/desk_questions.js';
 import type { DeskQuestion }                  from '../channels/desk_questions.js';
 import {
-  nagEpoch, fingerprint, describePending, collectPending,
+  nagEpoch, fingerprint, describePending, collectPending, collectPendingWithFailures,
   lastFingerprint, rememberFingerprint, pendingNotice,
 } from '../channels/pending.js';
 import type { PendingItem } from '../channels/pending.js';
@@ -194,6 +194,65 @@ describe('pendingNotice', () => {
       const notice = pendingNotice(s, 'S', now);
       expect(notice).toMatch(/1 unread message/);
       expect(notice).not.toMatch(/desk request/);
+
+    })));
+
+  test('never says "clear" when the only reason the set looks empty is a failed source', () =>
+    withStore(s => withDesk(deskDir => {
+
+      writeConfig(s, 'desk.path', deskDir);
+
+      const t0 = new Date('2026-08-30T10:00:00Z'),
+            t1 = new Date('2026-08-30T10:05:00Z'),
+            t2 = new Date('2026-08-30T10:10:00Z');
+
+      // A real backlog, spoken and remembered.
+      writeQuestions(deskDir, [
+        { id: 'q1', text: 'first ask', asked: t0.toISOString(), queued: 'next', queuedAt: t0.toISOString() },
+      ]);
+      expect(pendingNotice(s, 'S', t0)).toMatch(/1 desk request/);
+      const remembered = lastFingerprint(s, 'S');
+      expect(remembered).not.toBe('');
+
+      // Now the desk file is unreadable and there is no mail, so the collector sees
+      // nothing at all. "Nothing" here is ignorance, not an empty queue: q1 is still
+      // sitting there unclaimed. Announcing 'pending: clear' — and storing '' — would be
+      // the exact "the request goes quiet" failure this facility exists to end.
+      writeFileSync(questionsPath(deskDir), '{ not valid json');
+
+      expect(pendingNotice(s, 'S', t1)).toBeNull();
+      expect(lastFingerprint(s, 'S')).toBe(remembered);
+
+      // Repaired: the real set is readable again and speaks for itself.
+      writeQuestions(deskDir, [
+        { id: 'q1', text: 'first ask', asked: t0.toISOString(), queued: 'next', queuedAt: t0.toISOString() },
+        { id: 'q2', text: 'second ask', asked: t0.toISOString(), queued: 'next', queuedAt: t0.toISOString() },
+      ]);
+      expect(pendingNotice(s, 'S', t2)).toMatch(/2 desk requests/);
+
+    })));
+
+});
+
+describe('collectPendingWithFailures', () => {
+
+  test('names the sources that threw and still returns what the others found', () =>
+    withStore(s => withDesk(deskDir => {
+
+      const now = new Date('2026-08-30T10:00:00Z');
+
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [
+        { id: 'q1', text: 'ask', asked: now.toISOString(), queued: 'next', queuedAt: now.toISOString() },
+      ]);
+      expect(collectPendingWithFailures(s, 'S', now).failed).toEqual([]);
+
+      writeFileSync(questionsPath(deskDir), '{ not valid json');
+      postMessage(s, { audience: 'self', text: 'still here', session: 'S' }, VERSION, now);
+
+      const collected = collectPendingWithFailures(s, 'S', now);
+      expect(collected.failed).toEqual(['desk_intent']);
+      expect(collected.items).toEqual([expect.objectContaining({ kind: 'message' })]);
 
     })));
 

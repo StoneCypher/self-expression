@@ -19,7 +19,10 @@
  * Both are registered in {@link PENDING_SOURCES}, and {@link collectPending} runs each
  * one *fail-open*: a source that throws (a corrupt `questions.json`, say) contributes
  * nothing and never breaks the others, because "the notice broke" is a strictly worse
- * outcome than "the notice under-counted for one turn."
+ * outcome than "the notice under-counted for one turn." Fail-open stops short of lying,
+ * though: {@link collectPendingWithFailures} names the sources that threw, and
+ * {@link pendingNotice} stays silent rather than reporting `'pending: clear'` when the
+ * only reason the set looks empty is that nothing could be read.
  *
  * `pending.enabled=false` turns the whole facility off: {@link pendingNotice} returns
  * `null` and stores nothing, leaving no trace that it ever ran. When the pending set
@@ -146,20 +149,87 @@ const messageSource: PendingSource = {
 export const PENDING_SOURCES: readonly PendingSource[] = [deskSource, messageSource];
 
 /**
- * Every pending item across every source, for one session at one instant.
+ * The result of one collection pass: what was found, and which sources could not be read.
+ *
+ * `failed` is what separates "the queue is empty" from "I could not see the queue" — an
+ * empty `items` with a non-empty `failed` means ignorance, not an empty queue, and a
+ * caller that treats the two alike will eventually tell a session its backlog is clear
+ * while the backlog sits there unclaimed.
+ */
+export interface PendingCollection {
+  /** Every item every readable source returned, in {@link PENDING_SOURCES} order. */
+  readonly items  : PendingItem[];
+  /** The `kind` of each source whose read threw, in the same order; `[]` when all read cleanly. */
+  readonly failed : PendingItem['kind'][];
+}
+
+/**
+ * Every pending item across every source, plus the sources that could not be read at all.
  *
  * Each source runs independently and **fails open**: a source that throws (a corrupt
  * `questions.json`, an unreadable store row) contributes nothing and never stops the
- * remaining sources from running — a notice that under-counts by one source for a turn
- * is a far smaller cost than a notice that breaks outright.
+ * remaining sources from running — a notice that under-counts by one source for a turn is
+ * a far smaller cost than a notice that breaks outright. What it must never do is let the
+ * under-count *pass for a fact*, so the throw is recorded in `failed` rather than
+ * swallowed whole: {@link pendingNotice} reads it to decide whether an empty set is
+ * genuinely empty or merely unreadable.
+ *
+ * @param now the instant to evaluate every source against
+ * @param env the process environment, threaded to sources that read it
+ * @returns the items found, and the kinds of the sources that threw
+ *
+ * @example
+ *   collectPendingWithFailures(store, 'sess-1', new Date())
+ *   // => { items: [{ kind: 'desk_intent', key: 'q1', since: '…' }], failed: [] }
+ *
+ * @example
+ *   // desk.path points at a truncated questions.json, one message unread
+ *   collectPendingWithFailures(store, 'sess-1', new Date())
+ *   // => { items: [{ kind: 'message', key: '5', since: '…' }], failed: ['desk_intent'] }
+ *
+ * @see collectPending
+ * @see PENDING_SOURCES
+ */
+export function collectPendingWithFailures(
+  store   : Store,
+  session : string,
+  now     : Date,
+  env     : Env = process.env,
+): PendingCollection {
+
+  const items  : PendingItem[]          = [],
+        failed : PendingItem['kind'][]  = [];
+
+  for (const source of PENDING_SOURCES) {
+    try {
+      items.push(...source.collect(store, session, now, env));
+    } catch {
+      // Fail-open per source (module docblock): this source contributes nothing, and the
+      // loop continues to the next one rather than aborting the whole collection — but
+      // the failure is named, so an empty result is never mistaken for an empty queue.
+      failed.push(source.kind);
+    }
+  }
+
+  return { items, failed };
+
+}
+
+/**
+ * Every pending item across every source, for one session at one instant.
+ *
+ * The plain view of {@link collectPendingWithFailures}, for the callers that only need a
+ * count and are content to under-count when a source is unreadable — a source that throws
+ * contributes nothing and never stops the others from running.
  *
  * @param now the instant to evaluate every source against
  * @param env the process environment, threaded to sources that read it
  *
  * @example
  *   collectPending(store, 'sess-1', new Date())
- *   // => [{ kind: 'desk_intent', key: 'q1', label: 'merge #21?', since: '…' }]
+ *   // => [{ kind: 'desk_intent', key: 'q1', since: '2026-08-30T08:05:00.000Z' }]
  *
+ * @see collectPendingWithFailures
  * @see PENDING_SOURCES
  */
 export function collectPending(
@@ -168,20 +238,7 @@ export function collectPending(
   now     : Date,
   env     : Env = process.env,
 ): PendingItem[] {
-
-  const out: PendingItem[] = [];
-
-  for (const source of PENDING_SOURCES) {
-    try {
-      out.push(...source.collect(store, session, now, env));
-    } catch {
-      // Fail-open per source (module docblock): this source contributes nothing, and
-      // the loop continues to the next one rather than aborting the whole collection.
-    }
-  }
-
-  return out;
-
+  return collectPendingWithFailures(store, session, now, env).items;
 }
 
 /**
@@ -306,11 +363,15 @@ export function rememberFingerprint(store: Store, session: string, fp: string, n
  * so a session that had a backlog learns it emptied, once — and stays silent thereafter,
  * because `''` then equals `''` on every later call until something pends again.
  *
+ * An empty set reached only because every source that could have spoken *threw* is not
+ * an empty queue, and is never reported as one: nothing is said and nothing is stored,
+ * so the remembered fingerprint survives untouched and the next readable pass decides.
+ *
  * `pending.enabled=false` short-circuits before any of that: `null` is returned and
  * nothing is written, so disabling the facility leaves no residue in `pending_notice`.
  *
  * @param now injectable clock; defaults to now
- * @param env the process environment, threaded to {@link collectPending}'s sources
+ * @param env the process environment, threaded to {@link collectPendingWithFailures}'s sources
  *
  * @example
  *   pendingNotice(store, 'sess-1', new Date())
@@ -318,7 +379,7 @@ export function rememberFingerprint(store: Store, session: string, fp: string, n
  *   pendingNotice(store, 'sess-1', new Date())
  *   // => null  — unchanged since the last call
  *
- * @see collectPending
+ * @see collectPendingWithFailures
  * @see fingerprint
  */
 export function pendingNotice(
@@ -330,10 +391,17 @@ export function pendingNotice(
 
   if (effectiveValue(store, 'pending.enabled') !== 'true') { return null; }
 
-  const nag   = Number(effectiveValue(store, 'pending.nag_hours')),
-        items = collectPending(store, session, now, env),
-        fp    = fingerprint(items, now, nag),
-        last  = lastFingerprint(store, session);
+  const nag       = Number(effectiveValue(store, 'pending.nag_hours')),
+        collected = collectPendingWithFailures(store, session, now, env),
+        items     = collected.items,
+        fp        = fingerprint(items, now, nag),
+        last      = lastFingerprint(store, session);
+
+  // Nothing found, but a source could not be read: that is ignorance, not an empty queue.
+  // Speaking here would claim `pending: clear` over a backlog that is still sitting
+  // there, and storing `''` would make the lie stick until the set changed again. Say
+  // nothing, store nothing, and let the next healthy read be the one that decides.
+  if (items.length === 0 && collected.failed.length > 0) { return null; }
 
   if (fp === (last ?? '')) { return null; }
 
