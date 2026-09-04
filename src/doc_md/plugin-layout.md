@@ -342,12 +342,15 @@ offer-not-gate: one offer at a natural pause, never blocking work, an ignored of
 recurring next session.
 
 **The desk ships its mechanism and none of its contents.** The desk is a local web panel
-run by hand (`node src/scripts/desk/panel.mjs <desk directory>`), so it lands in
-`src/scripts/` — the repository's home for permanent development scripts — rather than in a
-new top-level directory or in `src/ts/`. It is deliberately unbuilt plain ESM: `panel.mjs`
-imports only from `node:` and from `deskcards.mjs`, which is the property that lets it be
-started, used, killed and forgotten without installing anything, and it is not part of any
-bundle, any MCP surface, or the published `files` list.
+run by hand — `self-expression-desk <desk directory>` once installed, or `node
+src/scripts/desk/panel.mjs <desk directory>` from a checkout, both the same script — so it
+lands in `src/scripts/` — the repository's home for permanent development scripts — rather
+than in a new top-level directory or in `src/ts/`. It is deliberately unbuilt plain ESM:
+`panel.mjs` imports only from `node:` and from `deskcards.mjs`, which is the property that
+lets it be started, used, killed and forgotten without installing anything. `src/scripts/desk`
+is in the published `files` list and `panel.mjs` carries its own `bin` entry (issue #93) — the
+mechanism genuinely ships now — but it is still no part of any bundle or the MCP tool surface:
+the desk is a second process, started separately, never a tool a model calls.
 
 What is checked in is the *mechanism* — the server, the card module and its hand-written
 `.d.mts`, the structural shell with its three card placeholders, the second (still
@@ -381,7 +384,7 @@ looks like. So the same files are also served as **MCP resources** at
 `src/ts/mcp/resources.ts` the wiring), read off disk at request time — one copy of every word, no
 build step, no generated duplicate to rot. Resources rather than a longer `instructions` string,
 because `instructions` is delivered unconditionally on every connection and the documents run to
-roughly 88 KB: spending that on the three hosts that already loaded the files would hand the model
+roughly 90 KB: spending that on the three hosts that already loaded the files would hand the model
 the same text twice from two channels. `instructions` therefore carries only a three-sentence
 pointer, which explicitly tells a skill-having host to read nothing. `src/doc_md/reference/` joins
 `skills/` in `package.json`'s `files` list so the checklist references ship too.

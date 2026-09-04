@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * The desk server: a local panel that shows a standing surface and takes input back.
  *

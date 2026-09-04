@@ -24,7 +24,8 @@
   "main": "dist/index.cjs",
   "bin": {
     "self-expression": "dist/cli.cjs",
-    "self-expression-audio": "dist/claudio.cjs"
+    "self-expression-audio": "dist/claudio.cjs",
+    "self-expression-desk": "src/scripts/desk/panel.mjs"
   },
   "exports": {
     ".": {

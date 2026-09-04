@@ -47,7 +47,7 @@ export const ANSWER_CARDS_KEY = 'desk.answer_cards';
 export const NO_DESK_REPLY: string =
   "no desk: set desk.path first — configure({ op: 'set', key: 'desk.path', " +
   "value: '<the desk directory>' }). The desk server reads the same directory " +
-  '(node src/scripts/desk/panel.mjs <the desk directory>).';
+  '(self-expression-desk <dir>).';
 
 /** Wraps a value as the text content an MCP tool result carries. Copied from `chart_tools.ts`. */
 function reply(text: string): ToolReply {

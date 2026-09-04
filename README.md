@@ -354,10 +354,11 @@ off disk at request time so there is exactly one copy of every word:
 | `self-expression://conventions/status-checklists` | how a multi-item status report is written |
 | `self-expression://conventions/checklist-markers` | the marker vocabulary and its canonical order |
 | `self-expression://conventions/checklist-visuals` | the inline visual vocabulary |
+| `self-expression://conventions/answer-cards` | when a card is the honest answer, and when three numbers are a sentence |
 
 Resources rather than a longer `instructions` string, deliberately: `instructions`
 is delivered unconditionally on every connection to every host, and the documents
-run to roughly 88 KB. Sending them would be wasteful anywhere and actively wrong
+run to roughly 90 KB. Sending them would be wasteful anywhere and actively wrong
 on the three hosts that already load these exact files, where the model would
 receive the same text twice from two channels with no way to tell it is one
 source. So `instructions` carries only a three-sentence pointer that names the
@@ -904,7 +905,10 @@ every hand-placed card and never renumber one. The newest `desk.answer_cards` su
 the rest are removed outright, oldest first. Pinning a card (`"fixed": true`) takes it out
 of the count entirely — it stops being an answer and becomes something the desk's owner
 keeps. `desk.path` is what turns the tools on; until it is set, `render_card` answers by
-naming the key and the call that sets it rather than guessing at a directory.
+naming the key and the call that sets it rather than guessing at a directory, and it names
+the same desk server: `self-expression-desk <dir>`. The desk now ships — `src/scripts/desk`
+is in the package's `files` list and `panel.mjs` carries its own `bin` entry — so the
+directory `render_card` writes into is one an installed copy of this plugin can also show.
 
 &nbsp;
 
