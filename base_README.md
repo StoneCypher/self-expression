@@ -412,6 +412,17 @@ this host does not report it*:
 has no earlier signature — that is a real "there is none", and it is a different
 answer from "nothing was searched".
 
+**The pending notice rides tool replies as well as the hook.** `UserPromptSubmit`
+only fires on Claude Code, so a notice that lived there alone would reach one
+host. The same notice — desk requests nobody has claimed, unread `self` mail —
+also rides the last text block of four tool replies: `express`, `annotate`,
+`begin_turn`, and `recall`. Every carrier, hook and tool alike, reads and writes
+one fingerprint row per session, so whichever speaks first about a change in the
+pending set leaves the rest silent until the set changes again, and an unchanged
+set repeats after `pending.nag_hours` hours regardless of which carrier last
+spoke. See **Messagebox** for `claim_pending`, the tool that acts on what the
+notice named.
+
 &nbsp;
 
 &nbsp;
@@ -628,12 +639,13 @@ The audiences:
 | `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count (held notes excluded — see below) |
 | `record` | global | nobody; consultable history | never |
 
-Two MCP tools:
+Three MCP tools, the third shared with the desk's pending notice (#98):
 
 | Tool | Purpose |
 |---|---|
 | `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
 | `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
+| `claim_pending` | Take what the pending notice named (#98): `kind` (`desk_intent` or `message`, omit for both), `key` (one item, omit for all), `session` (fallback identity, used only when no hook ever observed one — an observed session always wins). Stamps each desk row `claimed` and receipts each message, replying `{ session, claimed, remaining }` with the item's full text, not the notice's truncated label. Not gated on `pending.enabled` — that key governs whether the notice speaks, not whether a session may take what it already knows about. |
 
 The user's own door, with no model in the loop:
 
@@ -652,6 +664,17 @@ carries every assistant-authored text — but they are **excluded from unread `u
 delivery and from the count line**, because their delivery is the note ladder's and one
 text must not carry two disagreeing delivery records. They remain visible in the
 `ack: false` peek, which claims nothing about delivery.
+
+A related but distinct signal is the **pending notice** (#98): a one-line summary of desk
+requests nobody has claimed and unread `self` messages together — `pending: 2 desk
+requests, 1 unread message (self-expression claim_pending)` — appended after the reply of
+`express`, `annotate`, `begin_turn`, and `recall`, and after the per-turn hook context on
+Claude Code, whichever speaks first. It says only what changed: an unchanged pending set
+stays silent, and a standing one repeats after `pending.nag_hours` hours (default 4)
+rather than nagging every turn or falling silent forever. An emptied set is announced
+once, as `pending: clear`. `claim_pending` is the counterpart tool — it takes what the
+notice named, stamping a desk row `claimed` or receipting a message, and hands back the
+full text rather than the notice's truncated label.
 
 &nbsp;
 
@@ -885,7 +908,7 @@ and threw on every load. Removing a directory cannot miss two of three edits.
 | Put away | Reversible; the id joins `hidden` in `desk-config.json` and the tray offers it back |
 | Forget | Deletes the directory outright — no tombstones, no shadow copies |
 | Card JS | Must be safe to re-run, and must return early when its own element is absent |
-| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log |
+| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log. The pending notice and `claim_pending` (#98) are the inbox's other reader: a claimed task carries a `claimed · session · time` badge, its two routing buttons go dead, and its 🗑️ stays live — nothing clears `claimed` today, a known limitation |
 | Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
 
 &nbsp;

@@ -181,6 +181,16 @@ stop being a glance, and a question with that many answers belongs in conversati
 instructions the assistant must still act on. The third deletes the row from the file: a
 deletion is a deletion, and a dropped task does not acquire a tombstone field.
 
+**Claiming** is the inbox's other reader (issue #98): `claim_pending` lets a session take
+an open task itself, the way a click on *do this next* or *dispatch to agents* would,
+without a human at the desk. It stamps the row `claimed: { session, at }` — an id and a
+timestamp, nothing else — and the row grows a `claimed · session · time` badge. The two
+routing buttons go dead on a claimed row, since re-routing it out from under the session
+already holding it would silently undo work under way; the 🗑️ stays live, because dropping
+is a delete the desk's owner can still make, not a re-route the claim should block.
+Nothing in the plugin ever clears `claimed` once set — a known limitation, and today the
+only way off a stuck claim is dropping the row or hand-editing `questions.json`.
+
 **Stuck rows** are for something already decided that then quietly did not happen. They sort
 first and take a full red row, because that is precisely the item an inline bullet is good at
 hiding.
@@ -233,7 +243,7 @@ carrying its shape and nothing else.
   either one posting alone must not erase the other.
 - **`questions.json`** — `{ "questions": [ … ] }`; each row has `id`, `text`, `asked`, and
   optionally `options`, `kind`, `stuck`, `answer`, `answeredAt`, `dismissed`, `queued`,
-  `queuedAt`.
+  `queuedAt`, `claimed` (`{ session, at }`, set once by `claim_pending`, issue #98).
 - **`inbox.jsonl`** — append-only, one JSON object per line: `n`, `at`, and whatever the page
   sent, which is usually `kind`, `surface` and `value`.
 - **`geometry.json`** — overwritten, never appended: only the current frame is interesting.
