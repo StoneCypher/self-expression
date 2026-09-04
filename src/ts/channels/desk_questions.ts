@@ -104,8 +104,11 @@ export function readQuestions(deskDir: string): DeskQuestion[] {
  * Replace one desk's whole question queue, atomically.
  *
  * Written to a sibling temp file and renamed into place — never written in place — so a
- * reader (this module or `panel.mjs` itself) can never observe a partial write, matching
- * the pattern `panel.mjs`'s own handlers already use for every other file it owns.
+ * reader (this module or `panel.mjs` itself) can never observe a partial write. This
+ * writer is the atomic one, and deliberately not a copy of the desk's own habit:
+ * `panel.mjs` rewrites `questions.json` with a bare `writeFileSync`, so a reader that
+ * catches one of its writes mid-flight sees truncated JSON. Matching that here would
+ * widen the window rather than narrow it.
  *
  * @param deskDir the desk directory
  * @param rows    the complete replacement row set — not a delta; every row not passed

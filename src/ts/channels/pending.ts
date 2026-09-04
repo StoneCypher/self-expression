@@ -145,7 +145,12 @@ const messageSource: PendingSource = {
   },
 };
 
-/** Every registered pending source, in the order their items appear when tied. */
+/**
+ * Every registered pending source, in the order their items appear when tied.
+ *
+ * @example
+ *   PENDING_SOURCES.map(source => source.kind)  // => ['desk_intent', 'message']
+ */
 export const PENDING_SOURCES: readonly PendingSource[] = [deskSource, messageSource];
 
 /**
@@ -246,18 +251,24 @@ export function collectPending(
  *
  * Never negative: a `since` that is in the future — clock skew, or a bad row — reads as
  * "just started waiting" rather than propagating a negative count into the fingerprint.
+ * An unparseable `since` reads the same way, for a sharper reason: `NaN` compares unequal
+ * to itself, so a single hand-edited timestamp would make the fingerprint differ from
+ * itself on every call and re-announce that item every turn forever.
  *
  * @param since   ISO instant the item started waiting
  * @param now     the instant to measure against
  * @param nagHours hours per interval; the effective `pending.nag_hours`
- * @returns the whole number of intervals elapsed, `0` at minimum
+ * @returns the whole number of intervals elapsed, `0` at minimum and never `NaN`
  *
  * @example
  *   nagEpoch('2026-08-30T00:00:00Z', new Date('2026-08-30T04:00:00Z'), 4)  // => 1
  *   nagEpoch('2026-08-30T00:00:00Z', new Date('2026-08-30T03:59:00Z'), 4)  // => 0
+ *   nagEpoch('whenever', new Date('2026-08-30T04:00:00Z'), 4)              // => 0
  */
 export function nagEpoch(since: string, now: Date, nagHours: number): number {
-  const elapsedHours = (now.getTime() - Date.parse(since)) / 3_600_000;
+  const startedAt = Date.parse(since);
+  if (!Number.isFinite(startedAt)) { return 0; }
+  const elapsedHours = (now.getTime() - startedAt) / 3_600_000;
   return elapsedHours <= 0 ? 0 : Math.floor(elapsedHours / nagHours);
 }
 

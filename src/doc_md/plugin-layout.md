@@ -405,7 +405,7 @@ exactly the failure the `begin_turn` paragraph above exists to avoid. So the not
 (`src/ts/channels/pending.ts`) also rides the last text block of four tool replies —
 `express`, `annotate`, `begin_turn`, `recall` — via `withPendingNotice`
 (`src/ts/mcp/pending_tools.ts`), which fails open and appends nothing when a reply carries
-no text block to append to. All five carriers, hook and tool alike, share one fingerprint
+no text block to append to. Every carrier, hook and tool alike, shares one fingerprint
 row per session (`pending_notice`, schema v8): a **fingerprint** over every open item's
 key plus how many whole `pending.nag_hours` intervals it has waited, so the notice speaks
 only when that fingerprint moves — an item appearing, being claimed away, or crossing a

@@ -768,6 +768,7 @@ export function onStop(store: Store | null, payload: HookPayload): HookOutput {
  * {@link onSessionStart}: a read or receipt error costs the notes and leaves the pending
  * notice free to go out on its own.
  *
+ * @param store   the open store the mail is read from and the receipts are written to
  * @param session the resumed session whose `self` mail is being delivered
  * @param turnId  the hook's `prompt_id`, stamped into the delivery receipts
  * @param now     the instant the read and its receipts are dated

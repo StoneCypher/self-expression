@@ -423,6 +423,14 @@ set repeats after `pending.nag_hours` hours regardless of which carrier last
 spoke. See **Messagebox** for `claim_pending`, the tool that acts on what the
 notice named.
 
+One consequence is worth naming for anyone parsing these replies: `recall`'s
+reply is no longer bare JSON once a notice is appended to it. The notice is added
+to the end of the reply's last text block, separated from it by a blank line and
+an em dash — the exact separator is `\n\n— ` — so a machine consumer should split
+on the **final** occurrence of `\n\n— ` and parse what precedes it. A reply with
+no notice is unchanged, and `express`, `annotate`, and `begin_turn` return prose
+rather than JSON, so only `recall` is affected.
+
 &nbsp;
 
 &nbsp;

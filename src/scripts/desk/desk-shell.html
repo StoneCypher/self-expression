@@ -437,7 +437,7 @@ DESK.inits.push(function () {
          ['🗑️', 'remove from the inbox', 'drop']
         ].forEach(function (spec) {
           var b = document.createElement('button');
-          b.className = 'act'; b.textContent = spec[0]; b.title = spec[1];
+          b.className = 'act'; b.textContent = spec[0];
           /* The two queue buttons go dead while claimed: re-routing a row out from under
              the session holding it would silently undo work already under way. The bin
              does not, and must not — nothing in the plugin ever clears `claimed`, task
@@ -446,6 +446,11 @@ DESK.inits.push(function () {
              forever with no way to retire it but hand-editing questions.json. Dropping is
              a delete, not a re-route, and it stays the desk owner's to make. */
           b.disabled = !!claim && spec[2] !== 'drop';
+          /* A dead button still promising "do this next" describes an action it will not
+             perform; the tooltip is the only place the row can say why it went dead. */
+          b.title = b.disabled
+            ? 'claimed by ' + String(claim.session || '?').slice(0, 8) + ' — cannot re-route'
+            : spec[1];
           b.onclick = function () { act(q.id, spec[2]); };
           li.appendChild(b);
         });

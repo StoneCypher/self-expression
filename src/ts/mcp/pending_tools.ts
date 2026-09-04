@@ -363,7 +363,9 @@ export function registerPendingTools(server: McpServer, store: Store): void {
     inputSchema : {
       kind    : z.enum(['message', 'desk_intent']).optional().describe('claim only this kind'),
       key     : z.string().optional().describe(
-        'claim only this item — a desk question id or a message id'),
+        'claim only this item — a desk question id or a message id. Ids are not unique ' +
+        'across the two: a key on its own matches in both namespaces, so pass kind ' +
+        'alongside it to narrow the claim to one'),
       session : z.string().optional().describe(
         'fallback identity when no hook context has been observed; an observed session always wins'),
     },

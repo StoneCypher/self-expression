@@ -42,6 +42,10 @@ describe('nagEpoch', () => {
     expect(nagEpoch(since, new Date('2026-08-30T08:00:00Z'), 4)).toBe(2);
     // A "since" in the future — a clock skew or a bad row — never yields a negative epoch.
     expect(nagEpoch('2026-08-30T05:00:00Z', new Date('2026-08-30T00:00:00Z'), 4)).toBe(0);
+    // An unparseable "since" — a hand-edited questions.json — reads as "just started
+    // waiting" rather than putting NaN into the fingerprint, where it would compare
+    // unequal to itself and re-announce the same item on every single turn.
+    expect(nagEpoch('whenever', new Date('2026-08-30T00:00:00Z'), 4)).toBe(0);
   });
 
 });
