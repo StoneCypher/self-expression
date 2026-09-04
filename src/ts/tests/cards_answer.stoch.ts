@@ -3,8 +3,9 @@
  *
  * The unit tests pin named cases; these pin the invariants the mechanism exists for: a derived
  * id is always well-formed and length-bounded regardless of what title it comes from, a sequence
- * of renders always converges on exactly the newest `keep` of them, and age-out never touches a
- * card that was never an answer in the first place, whatever `keep` is asked for.
+ * of renders always converges on exactly the newest `keep` of them *and leaves their ords rising
+ * with their `answer.at` stamps*, and age-out never touches a card that was never an answer in
+ * the first place, whatever `keep` is asked for.
  *
  * The kit is loaded once in `beforeAll` (dynamic imports are the same fixture every run, so
  * nothing is gained by reloading it per property run) and every filesystem-touching run gets its
@@ -24,7 +25,7 @@ import { join, resolve } from 'node:path';
 import { loadKit } from '../cards/kit.js';
 import type { CardKit } from '../cards/kit.js';
 import {
-  ANSWER_ORD_BASE, CARD_ID_PATTERN, deriveCardId,
+  ANSWER_ORD_BASE, ANSWER_ORD_SPAN, CARD_ID_PATTERN, deriveCardId,
   listAnswerCards, writeAnswerCard, ageOutAnswers,
 } from '../cards/answer.js';
 
@@ -78,7 +79,8 @@ describe('deriveCardId — stochastic invariants', () => {
 
 describe('writeAnswerCard — stochastic invariants', () => {
 
-  it('after any sequence of renders, exactly the newest `keep` survive', { timeout: DISK_TIMEOUT }, () => {
+  it('after any sequence of renders, exactly the newest `keep` survive, ords rising with `at`',
+     { timeout: DISK_TIMEOUT }, () => {
     fc.assert(
       fc.property(
         fc.uniqueArray(
@@ -105,6 +107,17 @@ describe('writeAnswerCard — stochastic invariants', () => {
             const survivingAt = rows.map(r => r.at).sort();
             const expectedAt  = dates.slice(dates.length - expectedCount).map(d => d.toISOString()).sort();
             expect(survivingAt).toEqual(expectedAt);
+
+            /* `listAnswerCards` returns rows sorted by `answer.at`, so this reads the survivors
+               oldest-first and demands their ords rise with them. That is the whole point of the
+               band: the desk sorts by `ord` and falls back to `id.localeCompare` on a tie, so
+               equal ords silently hand the reading order to the ids. Every ord must also still
+               be inside the band it was allocated from. */
+            for (const [i, row] of rows.entries()) {
+              expect(row.ord).toBeGreaterThanOrEqual(ANSWER_ORD_BASE);
+              expect(row.ord).toBeLessThan(ANSWER_ORD_BASE + ANSWER_ORD_SPAN);
+              if (i > 0) { expect(row.ord).toBeGreaterThan(rows[i - 1]!.ord); }
+            }
           } finally {
             rmSync(deck, { recursive: true, force: true });
           }

@@ -2,9 +2,12 @@
  * Answer cards: what `render_card` puts on the desk, as opposed to what a person places by hand.
  *
  * An answer card is any card whose `card.json` has an `answer: { at: ISO }` field — written by
- * {@link writeAnswerCard}, never by hand. Its `ord` is `ANSWER_ORD_BASE + (count of existing
- * answer cards)`, so answers read newest-last below every hand-placed card; an explicit
- * `req.ord` is honoured only if it is inside `[ANSWER_ORD_BASE, ANSWER_ORD_BASE +
+ * {@link writeAnswerCard}, never by hand. Its `ord` is one past the highest ord already sitting
+ * in the answer band, or `ANSWER_ORD_BASE` when the band is empty — derived from the *maximum*
+ * rather than the count, so answers still read newest-last after age-out has thinned the deck
+ * and the count has stopped growing. When the band runs out, {@link renumberAnswerCards} packs
+ * the survivors back down to `ANSWER_ORD_BASE` in `answer.at` order and the ord is recomputed;
+ * an explicit `req.ord` is honoured only if it is inside `[ANSWER_ORD_BASE, ANSWER_ORD_BASE +
  * ANSWER_ORD_SPAN)`, otherwise `RangeError`. Age-out keeps the `keep` newest by `answer.at` and
  * removes the rest, skipping `fixed` (a card the owner has pinned is not an answer any more).
  * Removal is `rmSync(dir, { recursive: true, force: true })` on a dir whose name matched
@@ -190,20 +193,106 @@ export function listAnswerCards(deck: string): AnswerCard[] {
   return rows.sort((a, b) => a.at.localeCompare(b.at));
 }
 
+/** True for an ord inside `[ANSWER_ORD_BASE, ANSWER_ORD_BASE + ANSWER_ORD_SPAN)`. */
+function inBand(ord: number): boolean {
+  return ord >= ANSWER_ORD_BASE && ord < ANSWER_ORD_BASE + ANSWER_ORD_SPAN;
+}
+
 /**
- * The ord the next answer card should take: the base of the band plus how many answer cards
- * already sit in the deck, so answers read newest-last within their band.
+ * The ord the next answer card should take: one past the highest ord already in the band, so
+ * answers read newest-last within their band however many of them have since aged out.
+ *
+ * Derived from the maximum rather than the count on purpose. Age-out caps the count at `keep`,
+ * so a count-derived ord stops moving on the `keep`-th render and every answer after it lands
+ * on the same number — at which point the desk's `id.localeCompare` tiebreak decides the order
+ * and the newest card can read anywhere in the band. Ords outside the band are ignored rather
+ * than counted: only the answer band is this function's to allocate from.
  *
  * @param deck the deck directory to read
- * @returns an ord — normally inside the answer band, but not clamped to it; a deck already
- *   holding `ANSWER_ORD_SPAN` or more answers yields a value past the band, which
- *   {@link writeAnswerCard} then refuses rather than silently spilling into hand-placed territory
+ * @returns an ord — `ANSWER_ORD_BASE` for a deck with nothing in the band, otherwise one past
+ *   the highest ord in it. That is exactly `ANSWER_ORD_BASE + ANSWER_ORD_SPAN` once the band is
+ *   exhausted (a card already sits on its last ord), which {@link writeAnswerCard} answers by
+ *   renumbering rather than by spilling into hand-placed territory
  *
  * @example
  * nextAnswerOrd('/desk/cards');   // 1000, for an empty or answer-free deck
+ * @example
+ * // a deck whose only surviving answer sits at 1004, its older siblings aged out
+ * nextAnswerOrd('/desk/cards');   // 1005, not 1001
+ *
+ * @see renumberAnswerCards — what reclaims the band when this reaches its end
  */
 export function nextAnswerOrd(deck: string): number {
-  return ANSWER_ORD_BASE + listAnswerCards(deck).length;
+  const ords = listAnswerCards(deck).map(c => c.ord).filter(inBand);
+  if (ords.length === 0) { return ANSWER_ORD_BASE; }
+  return ords.reduce((hi, ord) => (ord > hi ? ord : hi), ANSWER_ORD_BASE) + 1;
+}
+
+/**
+ * Pack every answer card back down to the bottom of the band, in `answer.at` order, so a desk
+ * that has exhausted the band can keep rendering without the ords losing their meaning.
+ *
+ * Reachable only after `ANSWER_ORD_SPAN` renders on one desk, since {@link nextAnswerOrd} hands
+ * out one ord per render and never reuses one. Fixed cards are renumbered too: pinning takes a
+ * card out of age-out's accounting, but it still occupies an ord in the band, so leaving it
+ * behind would strand exactly the cards the owner cared about above the repacked ones. Relative
+ * order is preserved — the survivors keep reading oldest-first — and only `ord` is touched, so
+ * `answer`, `fixed`, `spec` and everything else in a `card.json` travel through unchanged.
+ *
+ * A card whose `card.json` has become unreadable between the listing and the rewrite is skipped
+ * rather than guessed at, the same discipline {@link listAnswerCards} uses.
+ *
+ * @param deck the deck directory to renumber
+ * @returns how many `card.json` files were actually rewritten; a card already sitting on its new
+ *   ord is left alone, so a deck that needs nothing returns 0
+ *
+ * @example
+ * // a deck whose three answers sit at 1997, 1998 and 1999
+ * renumberAnswerCards('/desk/cards');   // 3, and they now sit at 1000, 1001 and 1002
+ *
+ * @see nextAnswerOrd — what goes back to handing out ords once this has run
+ */
+export function renumberAnswerCards(deck: string): number {
+  let rewritten = 0;
+
+  for (const [index, card] of listAnswerCards(deck).entries()) {
+    const ord = ANSWER_ORD_BASE + index;
+    if (card.ord === ord) { continue; }
+
+    const path = join(card.dir, 'card.json');
+    let meta: unknown;
+    try { meta = JSON.parse(readFileSync(path, 'utf8')); }
+    catch { continue; }
+    if (typeof meta !== 'object' || meta === null) { continue; }
+
+    writeFileSync(path, JSON.stringify({ ...(meta as Record<string, unknown>), ord }, null, 2) + '\n');
+    rewritten += 1;
+  }
+
+  return rewritten;
+}
+
+/**
+ * The ord one render should land on: the caller's own when it gave one, otherwise the next free
+ * ord in the band — reclaiming the band first when it has run out.
+ *
+ * An explicit `req.ord` is passed straight through, out of range or not, so {@link writeAnswerCard}
+ * still refuses it by name: a caller that named a number wants that number or an error, not a
+ * silent substitution. Only the derived path renumbers, and only when it has to, so the rewrite
+ * costs at most `keep` plus the pinned cards once per `ANSWER_ORD_SPAN` renders.
+ *
+ * @param deck the deck directory the render is landing in
+ * @param req  the render request, read only for its optional explicit `ord`
+ * @returns the ord to write, not yet checked against the band
+ */
+function ordForRender(deck: string, req: RenderRequest): number {
+  if (req.ord !== undefined) { return req.ord; }
+
+  const next = nextAnswerOrd(deck);
+  if (inBand(next)) { return next; }
+
+  renumberAnswerCards(deck);
+  return nextAnswerOrd(deck);
 }
 
 /**
@@ -220,6 +309,11 @@ export function nextAnswerOrd(deck: string): number {
  * `kit.writeCard`'s own file-writing here to fold the stamp into its single write, which would
  * make this module responsible for the deck's on-disk format instead of the kit.
  *
+ * When `req.ord` is omitted and the band has been used up — the 1000th render on one desk —
+ * {@link renumberAnswerCards} packs the surviving answers back down to `ANSWER_ORD_BASE` and the
+ * ord is recomputed, so the band is a ring rather than a quota. An explicit `req.ord` never
+ * triggers that and is still refused by name when it is outside the band.
+ *
  * @param kit a loaded card kit, as {@link loadKit} yields
  * @param deck the deck directory to write into
  * @param req the type, title, data and optional explicit ord to render
@@ -227,12 +321,15 @@ export function nextAnswerOrd(deck: string): number {
  * @param now the moment of the render; defaults to the current time
  * @returns the id, directory and ord written, plus the ids of any answers this write aged out
  *
- * @throws {RangeError} when `req.type` names no type in `kit`, or `req.ord` (or the computed
- *   next ord) falls outside `[ANSWER_ORD_BASE, ANSWER_ORD_BASE + ANSWER_ORD_SPAN)`
+ * @throws {RangeError} when `req.type` names no type in `kit`, or `req.ord` falls outside
+ *   `[ANSWER_ORD_BASE, ANSWER_ORD_BASE + ANSWER_ORD_SPAN)` — or, for a derived ord, when even a
+ *   renumbering left no room, which takes more than `ANSWER_ORD_SPAN` pinned cards on one desk
  * @throws {Error} when the type's own output fails `kit.audit`, naming the complaints
  *
  * @example
  * writeAnswerCard(kit, '/desk/cards', { type: 'tally', title: 'Done', data: { value: 3, target: 5 } }, 8);
+ *
+ * @see renumberAnswerCards — the band reclamation this triggers when the band runs out
  */
 export function writeAnswerCard(
   kit: CardKit, deck: string, req: RenderRequest, keep: number, now: Date = new Date(),
@@ -240,8 +337,8 @@ export function writeAnswerCard(
   const mod: CardTypeModule | undefined = kit.types.get(req.type);
   if (mod === undefined) { throw new RangeError(`unknown card type: ${req.type}`); }
 
-  const ord = req.ord ?? nextAnswerOrd(deck);
-  if (ord < ANSWER_ORD_BASE || ord >= ANSWER_ORD_BASE + ANSWER_ORD_SPAN) {
+  const ord = ordForRender(deck, req);
+  if (!inBand(ord)) {
     throw new RangeError(
       `ord ${String(ord)} is outside the answer band [${String(ANSWER_ORD_BASE)}, ` +
       `${String(ANSWER_ORD_BASE + ANSWER_ORD_SPAN)})`);
