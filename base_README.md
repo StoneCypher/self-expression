@@ -254,6 +254,7 @@ The registered keys:
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
 | `desk.path` | string | *(none)* | Absolute directory of the desk (#93, #98) — the same one the desk server is started on. Deliberately no default: a desk is a place the user chose, not one the plugin picks. |
+| `desk.answer_cards` | int | `8` | How many `render_card` answer cards the desk keeps before the oldest ages out (#93). A card worth keeping gets pinned (`"fixed": true`) and is never counted. |
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | enum | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
@@ -885,6 +886,25 @@ and threw on every load. Removing a directory cannot miss two of three edits.
 | Card JS | Must be safe to re-run, and must return early when its own element is absent |
 | Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log |
 | Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
+
+### Drawing an answer onto it (issue #93)
+
+Two tools reach the desk from a session — and they exist only when the card kit shipped
+beside the bundle actually loaded. A catalogue that could not be read has no honest
+description to advertise, so the tools are **absent** rather than present-and-refusing,
+the same posture `generate_image` takes toward a missing credential.
+
+| Tool | What it does |
+|---|---|
+| `render_card` | Draw one card onto the desk: `type`, `title`, the type's own `data`, and an optional `ord`. The id and the placement are derived; the reply names the card, its ord, its directory, and anything the write aged out. Its **description is generated from the catalogue at registration time**, so the types offered to the model and the types that exist cannot drift apart. |
+| `list_card_types` | The catalogue grouped by the question each category answers — for when you are holding a question rather than a chart name. Omit `category` for all of them; name one to see only that group. |
+
+Answer cards live in their own **band**, ords `[1000, 2000)`, so they always read below
+every hand-placed card and never renumber one. The newest `desk.answer_cards` survive and
+the rest are removed outright, oldest first. Pinning a card (`"fixed": true`) takes it out
+of the count entirely — it stops being an answer and becomes something the desk's owner
+keeps. `desk.path` is what turns the tools on; until it is set, `render_card` answers by
+naming the key and the call that sets it rather than guessing at a directory.
 
 &nbsp;
 

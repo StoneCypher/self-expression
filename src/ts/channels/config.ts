@@ -514,6 +514,11 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
       'absolute directory of the desk (#93, #98) — the same one the desk server is started on; ' +
       'deliberately no default, since a desk is a place the user chose, not one the plugin picks',
     validate: stringValidator(1024) },
+  { key: 'desk.answer_cards', kind: 'int', fallback: '8',
+    description:
+      'how many render_card answer cards the desk keeps before the oldest ages out (#93); ' +
+      'a card worth keeping gets pinned (fixed: true) and is never counted',
+    validate: intValidator(1, 100) },
   { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
     description: 'dwelling file size, in gigabytes, at which a visit warns the user',
     validate: intValidator(0, 1048576) },
