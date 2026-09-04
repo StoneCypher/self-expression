@@ -574,7 +574,7 @@ Two invocation surfaces wrap one renderer:
 
 | Surface | Invocation | Result |
 |---|---|---|
-| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` | `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text**. `out` is a bare `.png` filename inside that `renders/` directory (no path, no `..`); an existing file is refused unless `overwrite` is true\| `2`), `out` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. `out` is a bare `.png` filename inside that `renders/` directory (no path, no `..`); an existing file is refused unless `overwrite` is true. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
 | CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
 
 The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
@@ -1049,7 +1049,7 @@ dwelling can `keep` the path.
   <tr>
     <th>Stochastic</th>
     <td>{{stochtestcount}}</td>
-    <td>{{coverage}}<small>%</small></td>
+    <td>{{stochcoverage}}<small>%</small></td>
     <td>{{stochbranch}}<small>%</small></td>
     <td>{{stochfunc}}<small>%</small></td>
     <td>{{stochline}}<small>%</small></td>

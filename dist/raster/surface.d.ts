@@ -97,8 +97,16 @@ export declare function subRegion(region: Region, x: number, y: number, width: n
  * Set one pixel, region-relative. Coordinates outside the region are silently
  * skipped — clipping, not clamping, so a stray coordinate never smears the edge.
  *
+ * The in-bounds test is written to fail closed: every comparison with `NaN` is
+ * `false`, so a positive `x < region.width`-style test would let a non-finite
+ * coordinate slip through and corrupt the index arithmetic below. Negating a
+ * conjunction of the in-bounds comparisons instead means any `NaN` component
+ * makes the conjunction `false`, so the negation is `true` and the pixel is
+ * skipped, exactly like a coordinate that is simply out of range.
+ *
  * @example
  *   pixel(fullRegion(s), 0, 0, INK);
+ *   pixel(fullRegion(s), NaN, 0, INK);   // silently skipped, not written as index 0
  */
 export declare function pixel(region: Region, x: number, y: number, color: Rgba): void;
 /**
@@ -133,10 +141,18 @@ export declare function rect(region: Region, x: number, y: number, width: number
  * Connected line segments through `points`, drawn with Bresenham's algorithm.
  * A single point draws one pixel; an empty list draws nothing.
  *
+ * A point with a non-finite coordinate (`NaN`, `Infinity`, `-Infinity` — upstream data
+ * gaps or a bad computation) is dropped rather than drawn: neither the segment leading
+ * into it nor the segment leading out of it is drawn, so the line shows a gap instead
+ * of hanging. Without this, a Bresenham walk toward a non-finite target never satisfies
+ * its `cx === tx && cy === ty` termination test and loops forever — synchronous code
+ * that blocks the whole (single-threaded) MCP server, not just the one render.
+ *
  * @param points region-relative `[x, y]` vertices, in drawing order
  *
  * @example
  *   polyline(region, [[0, 10], [5, 2], [10, 8]], BLUE);
+ *   polyline(region, [[0, 0], [NaN, 5], [10, 10]], BLUE);  // draws nothing near the NaN point
  */
 export declare function polyline(region: Region, points: readonly (readonly [number, number])[], color: Rgba): void;
 /**

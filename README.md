@@ -1,10 +1,10 @@
-# self-expression v0.6.1
+# self-expression v0.6.3
 
-> Version 0.6.1 was built on Sunday, August 30, 2026 at GMT-07:00 `1788122911045` from hash `ed16981`.
+> Version 0.6.3 was built on Thursday, September 3, 2026 at GMT-07:00 `1788496057841` from hash `0d5fd2a`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788122911045 Sunday, August 30, 2026 at GMT-07:00 95.04 358 91 ed16981 52.77 65.31 64.58 64.9 234 2369 89.31 93.54 95.4 2135 0.6.1 -->
+<!-- Supported embeds: 1788496057841 Thursday, September 3, 2026 at GMT-07:00 95.11 360 91 0d5fd2a 52.86 65.06 65.03 64.71 260 2592 89.52 93.8 95.46 2332 0.6.3 -->
 
 
 
@@ -574,7 +574,7 @@ Two invocation surfaces wrap one renderer:
 
 | Surface | Invocation | Result |
 |---|---|---|
-| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` | `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text**. `out` is a bare `.png` filename inside that `renders/` directory (no path, no `..`); an existing file is refused unless `overwrite` is true\| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. `out`, if given, must be a bare filename (no path separators, no `..`, must end in `.png`) naming the render inside that same `renders/` directory — anything else is refused with a clear message, and an existing file is refused unless `overwrite: true`. |
+| MCP tool `render_history_png` | `days` (default 90), `chart` (`dashboard` \| `stems` \| `delta` \| `uncertain` \| `need` \| `checklist`), `project`, `seriesKey`, `scale` (`1` \| `2`), `out`, `overwrite` | Writes `<dataDir>/renders/history_<utc>.png` beside the database and returns the **path as text** — then use the Read tool on the returned path to view the image. `out` is a bare `.png` filename inside that `renders/` directory (no path, no `..`); an existing file is refused unless `overwrite` is true. Never image content over MCP: the file-then-read pattern costs ~1,600 tokens where inline base64 costs ~20,000 and displays nothing. |
 | CLI `self-expression render [--days N] [--chart X] [--out P]` | same window/chart/output choices | Prints the written path to stdout. |
 
 The encoder (`encodePng`), the 5×7 bitmap font, the drawing surface, and the panel
@@ -1040,19 +1040,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2135</td>
-    <td>95.04<small>%</small></td>
-    <td>89.31<small>%</small></td>
-    <td>93.54<small>%</small></td>
-    <td>95.4<small>%</small></td>
+    <td>2332</td>
+    <td>95.11<small>%</small></td>
+    <td>89.52<small>%</small></td>
+    <td>93.8<small>%</small></td>
+    <td>95.46<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>234</td>
-    <td>95.04<small>%</small></td>
-    <td>52.77<small>%</small></td>
-    <td>64.58<small>%</small></td>
-    <td>64.9<small>%</small></td>
+    <td>260</td>
+    <td>65.06<small>%</small></td>
+    <td>52.86<small>%</small></td>
+    <td>65.03<small>%</small></td>
+    <td>64.71<small>%</small></td>
   </tr>
 </table>
 
@@ -1064,7 +1064,7 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>358</td>
+    <td>360</td>
     <td>91<small>%</small></td>
   </tr>
 </table>

@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-81 merges; 6 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
+83 merges; 8 releases; Changelogging the last 10 commits; Full changelog at [CHANGELOG.long.md](CHANGELOG.long.md)
 
 
 
@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 Published tags:
 
-<a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
+<a href="#0__6__2">0.6.2</a>, <a href="#0__6__1">0.6.1</a>, <a href="#0__6__0">0.6.0</a>, <a href="#0__5__0">0.5.0</a>, <a href="#0__4__0">0.4.0</a>, <a href="#0__3__0">0.3.0</a>, <a href="#0__2__1">0.2.1</a>, <a href="#0__2__0">0.2.0</a>
 
 
 
@@ -22,33 +22,24 @@ Published tags:
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:47:31 AM
+## [Untagged] - Sep 3, 2026 9:09:56 PM
 
-Commit [e6a6a3819ca6caf3da29318d12720c9613e0dde2](https://github.com/StoneCypher/self-expression/commit/e6a6a3819ca6caf3da29318d12720c9613e0dde2)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: ed16981de20124be481c047daa4279345fb9b9d4
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-<a name="0__6__0" />
-
-## [0.6.0] - Aug 30, 2026 11:45:44 AM
-
-Commit [ed16981de20124be481c047daa4279345fb9b9d4](https://github.com/StoneCypher/self-expression/commit/ed16981de20124be481c047daa4279345fb9b9d4)
+Commit [bd7a266c36ed5dcc9842b0a8a3a4aca177fc08ba](https://github.com/StoneCypher/self-expression/commit/bd7a266c36ed5dcc9842b0a8a3a4aca177fc08ba)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [f2b034a, 88090b0]
-
-  * Merge pull request #85 from StoneCypher/feat_26-08-28_desk-mechanism
-  * feat: move the desk mechanism into the repo, cards as directories
+  * refactor: drop the unread PendingItem.label, truncateLabel and LABEL_MAX (#98)
+  * Both sources computed a 60-character label and nothing in production ever read it: the
+notice counts by kind through describePending, and ClaimedItem.label is built straight
+from the desk row or message row in pending_tools.ts. A summary carried on PendingItem was
+a second copy of text that goes stale the moment the row changes, read by nobody.
+  * PendingItem is now identity and timing only. The message source loses the row['text']
+dance with it. No test existed solely to exercise the truncation helper, so none was
+deleted; the fixtures that carried a label field lost it, and the message-source case now
+asserts on `since` rather than the field that went away. pending.stoch.ts's arbitrary
+drops label with no change to any property.
+  * ClaimedItem's DocBlock described itself as PendingItem's four fields with a longer label;
+it now says three plus label, and why the text is read at claim time rather than carried.
 
 
 
@@ -57,33 +48,29 @@ Merges [f2b034a, 88090b0]
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:42:36 AM
+## [Untagged] - Sep 3, 2026 9:06:58 PM
 
-Commit [88090b0739c33030e2ccb4282e6f42f33a4ae97f](https://github.com/StoneCypher/self-expression/commit/88090b0739c33030e2ccb4282e6f42f33a4ae97f)
+Commit [e0063c7a1c46bc092c7e4d0a3cfe9e225de1ce42](https://github.com/StoneCypher/self-expression/commit/e0063c7a1c46bc092c7e4d0a3cfe9e225de1ce42)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: bump to 0.6.0 and regenerate artifacts after merging main
-  * The second merge left this branch carrying main's 0.5.0, which main's own
-release job will tag on its next push, so shipping it here would fail with
-"422 tag_name already exists". git ls-remote --tags is the authority and
-shows 0.2.0, 0.2.1, 0.3.0, 0.4.0 tagged; 0.6.0 is unused. Feature branch,
-so MINOR with PATCH reset.
-  * Regenerates every tracked build output against the merged tree: dist/,
-coverage-stoch/, coverage-typedoc/, README.md, CHANGELOG.md,
-CHANGELOG.long.md and their src/doc_md/ copies. The merge commit had reset
-all of these to main wholesale, so this is a clean rebuild rather than a
-patch over a textual hybrid of two branches' outputs.
-  * The full canonical build passes — not the ci profile: 2135 unit tests
-across 78 files, 234 stochastic tests across 37 files, and all four attw
-resolution modes green.
-  * One note for whoever hits it next: deskcards.stoch.ts "carries card source
-through verbatim" timed out at 5000ms on the first attempt and passed on
-re-run, taking 2.67s of test time in isolation. It does a mkdir plus four
-file writes per property run across 24 runs, so it is I/O-bound and
-sensitive to machine load rather than flaky in its logic. Worth a longer
-timeout if it recurs.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * fix: eight small corrections across the pending notice and its docs (#98)
+  * - nagEpoch guards Date.parse with Number.isFinite. An unparseable `since` produced NaN in
+  the fingerprint, and NaN compares unequal to itself, so one hand-edited timestamp would
+  have re-announced its item every turn forever. Covered in the existing nagEpoch case.
+- desk_questions.writeQuestions no longer claims its tmp+rename matches panel.mjs's own
+  handlers. panel.mjs writes questions.json in place with a bare writeFileSync at every
+  site; this writer is the atomic one, and the DocBlock now says so.
+- desk-shell.html: a queue button disabled by a claim kept the title "do this next", which
+  described an action it would not perform. It now names the claiming session.
+- claim_pending's `key` describe says ids are not unique across the two namespaces and
+  that `kind` narrows the claim.
+- selfNotesSegment's DocBlock gains its missing `store` param line.
+- PENDING_SOURCES gains an @example.
+- plugin-layout.md said "All five carriers" for six; now "every carrier".
+- README/base_README Portability: recall's reply is no longer bare JSON once a notice is
+  appended, so a machine consumer splits on the final "\n\n— ". Verified the separator
+  against withPendingNotice and confirmed recall is the only JSON-returning carrier.
 
 
 
@@ -92,32 +79,19 @@ timeout if it recurs.
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:36:32 AM
+## [Untagged] - Sep 3, 2026 9:02:37 PM
 
-Commit [5b15973dcea1095d20772a49ad2536553a007b74](https://github.com/StoneCypher/self-expression/commit/5b15973dcea1095d20772a49ad2536553a007b74)
+Commit [d43193c2f73eaf632bf236ed31d9ce1108282ec1](https://github.com/StoneCypher/self-expression/commit/d43193c2f73eaf632bf236ed31d9ce1108282ec1)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [9e15f20, f2b034a]
-
-  * merge: origin/main into desk-mechanism (second pass, after #86 and #84)
-  * Every tracked generated artifact is reset to main's side wholesale rather
-than textually merged — dist/, coverage-stoch/, coverage-typedoc/,
-CHANGELOG.md, CHANGELOG.long.md, src/doc_md/CHANGELOG*.md and README.md —
-including the ones that did not conflict. A line-by-line merge of two
-branches' build output is a hybrid of neither build; the following build
-regenerates all of it from the merged sources anyway. (docs/ and coverage/
-are untracked and need no handling.)
-  * The only non-generated conflict was package.json's version line, resolved
-to main's 0.5.0; the version bump follows in the next commit.
-  * base_README.md and src/doc_md/plugin-layout.md, hand-integrated in the
-previous pass, auto-merged cleanly this time — "The desk" and "Image
-generation" both survive alongside main's newer sections.
-  * src/scripts/desk/ is untouched: verified empty diff against the branch's
-own HEAD. Landing this branch's desk copy as it stands is deliberate, so
-that feat_26-08-29_cardkit's newer copy later arrives as the incoming side
-of a merge in the normal direction of history.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * test: cover messages.enabled=false on the pending-notice path (#98)
+  * The messagebox kill switch was covered on the claim path but not on the notice path, so
+nothing held the notice to it. The new case proves both halves: mail alone with the switch
+off is silent and stores no fingerprint, and a desk request alongside it still speaks
+without ever mentioning the muted mail.
+  * Verified non-vacuous by mutation — removing the gate in the message source makes the case
+fail with "pending: 1 unread message".
 
 
 
@@ -126,18 +100,21 @@ of a merge in the normal direction of history.
 
 &nbsp;
 
-<a name="0__5__0" />
+## [Untagged] - Sep 3, 2026 9:00:37 PM
 
-## [0.5.0] - Aug 30, 2026 11:33:12 AM
-
-Commit [f2b034aa991ea344296e1b4f38289a584fa45d77](https://github.com/StoneCypher/self-expression/commit/f2b034aa991ea344296e1b4f38289a584fa45d77)
+Commit [820d420eb0cf7303686e501ec0eb4513939734c3](https://github.com/StoneCypher/self-expression/commit/820d420eb0cf7303686e501ec0eb4513939734c3)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [69c3830, 00334f8]
-
-  * Merge pull request #84 from StoneCypher/feat_26-08-28_window-posture-keys
-  * feat(config): window.browser and window.editor postures, and an enum kind
+  * docs: SKILL.md names the pending: segment and claim_pending (#98)
+  * The model-facing skill described the Mailbox: segment but never the pending: one beside
+it, leaving the line to be read cold. The new paragraph sits with the count-line etiquette
+it belongs to: what the segment names, that it is a change signal rather than a status bar
+and re-speaks only after pending.nag_hours, that claim_pending takes an item and returns
+the whole text, and that claiming is the point rather than outlasting the line.
+  * It also states that an unread self note is counted in both the Mailbox: and pending:
+segments on purpose — #98 asked to keep both, and without saying so the overlap reads as a
+double-report worth suppressing.
 
 
 
@@ -146,35 +123,21 @@ Merges [69c3830, 00334f8]
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:29:51 AM
+## [Untagged] - Sep 3, 2026 8:59:36 PM
 
-Commit [00334f89cbbb61d9672906e56f6d1aa3292b9fae](https://github.com/StoneCypher/self-expression/commit/00334f89cbbb61d9672906e56f6d1aa3292b9fae)
+Commit [7c957df38fb56c104b8fcc68ad959763e2e99b5a](https://github.com/StoneCypher/self-expression/commit/7c957df38fb56c104b8fcc68ad959763e2e99b5a)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * feat(config): window.browser and window.editor postures, and an enum kind
-  * Adds two configuration keys, `window.browser` and `window.editor`, each taking
-`never`, `ask`, or `always`, and the `enum` config kind they are the first users
-of. `share.time_granularity` moves onto that kind as well, so a closed two-word
-domain reports itself as a choice set instead of as the word "string".
-  * The keys are two rather than one because the costs differ: an external browser
-window steals focus and can land while nobody is at the machine, while an editor
-tab appears in the window the user is already sitting in. A single key would
-force the expensive answer onto the cheap case.
-  * They are advisory by construction, and say so. Nothing in this plugin gates
-window opening — a shell command can open a browser with no MCP call at all, so
-a gate would be a lock on one of several doors. What the plugin can do is put
-the user's stated wish in front of the model at the moment the choice is made,
-which is the new `windows:` segment on the turn-start context line. It fails
-open on its own terms like every other segment.
-  * Version bumped 0.4.0 -> 0.5.0. Main reached 0.4.0 while this branch was open, so
-that number is spoken for; `git ls-remote --tags` is the authority on what has
-shipped, since the Verify version bump job compares against the npm registry and
-this package is unpublished, so it passes for any version at all (issue #99).
-  * Rebuilt against main twice today, once for #97 and once for #86, both times
-because tracked build output re-conflicts every open PR on files nobody edited
-(issue #90).
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * fix: pending_notice obeys retention.days like every other timestamped table (#98)
+  * pruneExpired deleted from every timestamped table except pending_notice, so a fingerprint
+row outlived the horizon the user configured — session-shaped residue of exactly the kind
+retention exists to clear.
+  * The new Pruned.pendingNotice field counts what went. Losing a row costs one
+re-announcement of a backlog the session already knew about, which is much the cheaper
+side of the trade. The README retention row listed only entries and turn_context and was
+already behind the code; it now names the by-age tables and the by-orphanhood ones
+separately.
 
 
 
@@ -183,28 +146,22 @@ because tracked build output re-conflicts every open PR on files nobody edited
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:23:28 AM
+## [Untagged] - Sep 3, 2026 8:56:00 PM
 
-Commit [c919413546db8922464fd8898a0c1aaae999648b](https://github.com/StoneCypher/self-expression/commit/c919413546db8922464fd8898a0c1aaae999648b)
+Commit [8b6ef346a49a3db692eed39eaf3415c1b2b24af0](https://github.com/StoneCypher/self-expression/commit/8b6ef346a49a3db692eed39eaf3415c1b2b24af0)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [6f2fc80, 69c3830]
-
-  * Merge origin/main into feat_26-08-28_window-posture-keys
-  * Second pass. Brings in #86 (the seriated matrix), which knocked this branch back
-to CONFLICTING without anyone touching it.
-  * 105 paths conflicted and every one of them was tracked build output: README.md,
-which is generated from base_README.md, and 104 files under coverage-stoch/.
-All took main's side and are regenerated by the build that follows, along with
-dist/, coverage-typedoc/ and the changelogs, which merged without conflict but
-are outputs either way and should not be hybrids of two branches.
-  * Zero source conflicts this time. #86's work lives in src/ts/diagrams/matrix.ts
-and src/ts/tests/diagram_matrix.stoch.ts; this branch touches channels/config.ts,
-mcp/hooks.ts and their tests, so the two never met. base_README.md and
-src/doc_md/plugin-layout.md auto-merged and were checked by hand afterwards.
-  * This is issue #90 for the second time in one afternoon on one PR.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * fix: a swallowed source failure never reports "pending: clear" (#98)
+  * collectPending swallowed a source throw whole, so a corrupt questions.json read as an
+empty queue: the notice announced the backlog was clear and stored the empty fingerprint,
+making the lie stick until the set changed again. That is the exact "the request goes
+quiet" failure #98 exists to end.
+  * collectPendingWithFailures now returns { items, failed }, naming the sources whose read
+threw; collectPending is a thin wrapper over its items, so existing callers are untouched.
+pendingNotice stays silent and stores nothing when the set is empty only because a source
+failed, leaving the remembered fingerprint for the next healthy read to decide. A
+non-empty set with a failed source still speaks, under-counting as before.
 
 
 
@@ -213,33 +170,24 @@ src/doc_md/plugin-layout.md auto-merged and were checked by hand afterwards.
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 11:22:22 AM
+## [Untagged] - Sep 3, 2026 8:56:00 PM
 
-Commit [612ba8977dbd0adaec7dd6402cf543790a43e9d6](https://github.com/StoneCypher/self-expression/commit/612ba8977dbd0adaec7dd6402cf543790a43e9d6)
-
-Author: `StoneCypher <StoneCypher@users.noreply.github.com>`
-
-  * deploy: 69c3830a384ee4dca8562826968ae30dbef636a7
-
-
-
-
-&nbsp;
-
-&nbsp;
-
-<a name="0__4__0" />
-
-## [0.4.0] - Aug 30, 2026 11:20:54 AM
-
-Commit [69c3830a384ee4dca8562826968ae30dbef636a7](https://github.com/StoneCypher/self-expression/commit/69c3830a384ee4dca8562826968ae30dbef636a7)
+Commit [52d1396055dad10c038c005503de6e65c9570dad](https://github.com/StoneCypher/self-expression/commit/52d1396055dad10c038c005503de6e65c9570dad)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-Merges [ea0edaf, aa0beac]
-
-  * Merge pull request #86 from StoneCypher/feat_26-08-29_seriated-matrix
-  * feat(diagrams): seriated matrix — reorder a two-way table until its blocks show
+  * @
+fix: a swallowed source failure never reports "pending: clear" (#98)
+  * collectPending swallowed a source throw whole, so a corrupt questions.json read as an
+empty queue: the notice announced the backlog was clear and stored the empty fingerprint,
+making the lie stick until the set changed again. That is the exact "the request goes
+quiet" failure #98 exists to end.
+  * collectPendingWithFailures now returns { items, failed }, naming the sources whose read
+threw; collectPending is a thin wrapper over its items, so existing callers are untouched.
+pendingNotice stays silent and stores nothing when the set is empty only because a source
+failed, leaving the remembered fingerprint for the next healthy read to decide. A
+non-empty set with a failed source still speaks, under-counting as before.
+@
 
 
 
@@ -248,26 +196,63 @@ Merges [ea0edaf, aa0beac]
 
 &nbsp;
 
-## [Untagged] - Aug 30, 2026 10:39:33 AM
+## [Untagged] - Sep 3, 2026 7:59:15 PM
 
-Commit [9e15f20c7c2cbd1d3ee4c2e974c177daf2d17063](https://github.com/StoneCypher/self-expression/commit/9e15f20c7c2cbd1d3ee4c2e974c177daf2d17063)
+Commit [0fb69697cf37395e86d49d6e1de2d5ba824061ab](https://github.com/StoneCypher/self-expression/commit/0fb69697cf37395e86d49d6e1de2d5ba824061ab)
 
 Author: `John Haugeland <stonecypher@gmail.com>`
 
-  * build: bump to 0.4.0 and regenerate artifacts after merging main
-  * The merge left this branch carrying main's 0.3.0, and tag 0.3.0 already
-exists on the remote (confirmed via git ls-remote --tags), so the release
-job would have failed with "422 tag_name already exists" once merged.
-0.4.0 is unused. This is a feature branch, so MINOR with PATCH reset.
-  * Regenerates every tracked build output against the merged tree: dist/,
-coverage-stoch/, README.md, CHANGELOG.md, CHANGELOG.long.md and their
-src/doc_md/ copies.
-  * The full canonical build passes — not the ci profile: 2025 unit tests
-across 77 files, 213 stochastic tests across 36 files, and all four attw
-resolution modes green.
-  * Note for future work in this worktree: node_modules was empty here, and
-because the worktree is nested inside the main checkout, Node resolution
-climbed to the outer repo and ran its vitest. That made process.argv[1]
-point at the main checkout and failed the conventions.spec.ts package-root
-assertion. npm ci in the worktree fixed it; no source change was needed.
-  * Claude-Session: https://claude.ai/code/session_017b21rgf2bm9pMJuVgRik5L
+  * docs(desk): reflow a wrapped issue reference that markdown lint read as a heading (#93)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Sep 3, 2026 7:27:41 PM
+
+Commit [3fc3fb20a713a40e6cfd0e37a4066c1d0465ec31](https://github.com/StoneCypher/self-expression/commit/3fc3fb20a713a40e6cfd0e37a4066c1d0465ec31)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * docs: list_card_types bare call lists names by category (#93)
+
+
+
+
+&nbsp;
+
+&nbsp;
+
+## [Untagged] - Sep 3, 2026 7:19:55 PM
+
+Commit [78539d25d21b42c95d1fc55997e4adfe3b4e2d79](https://github.com/StoneCypher/self-expression/commit/78539d25d21b42c95d1fc55997e4adfe3b4e2d79)
+
+Author: `John Haugeland <stonecypher@gmail.com>`
+
+  * fix(cards): close the answer-stamp window, and the review's remaining small findings (#93)
+  * `writeAnswerCard`'s read-parse-stamp-write now runs inside a `try`, removing the card directory
+before rethrowing: an unstamped card is not an answer, so `listAnswerCards` skips it and
+`ageOutAnswers` could never remove it — it would squat on a band ord forever. Process death
+inside the window still leaves one, and the DocBlock now says exactly that much and no more.
+Two tests cover it: a `card.json` the stamp cannot parse, and one that parses to a non-object.
+  * Also:
+- `conventions.ts`: the pointer's reasoning said "all seven" against a registry of eight; its
+  `@example` said "(7 documents)" for the same reason. Both now say eight.
+- `kit.ts`: `CardMeta.contains` and `CategoryGroup`'s `settings` each get the clause they were
+  missing — `contains` marks a type that legitimately emits several `<section>`s and is what
+  `kit.audit`'s section-count rule keys on; `settings` is `Object.keys(meta.defaults)`.
+- `kit.ts`: `describeKit`'s preamble now names the taste document, the
+  `self-expression://conventions/answer-cards` resource, at the point of decision. The trigger
+  sentence still leads.
+- `answer.ts`: `ANSWER_ORD_BASE` and `ANSWER_ORD_SPAN` carry the `: number` annotations the plan
+  specified, so the exported type is `number` rather than the literal.
+- `config.ts`: `dwelling.size_warn_gb` moves back beside its family, leaving the two `desk.*`
+  keys together at the end — the order the README table already documents.
+- `desk_panel.spec.ts`: `afterEach` awaits the child's `exit` before removing the desk directory,
+  which the panel holds recursive `watch` handles on; `startPanel` clears its 8 s failure timer
+  once the port is reported.
+- `desk.md`: a warning that the kit's own `newcard.mjs rebuild --deck` regenerates every
+  `card.json` from its recorded spec and so strips `answer` and `fixed` from every card.
