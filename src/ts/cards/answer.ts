@@ -10,7 +10,7 @@
  * Removal is `rmSync(dir, { recursive: true, force: true })` on a dir whose name matched
  * `CARD_ID_PATTERN` — the same guard `deskcards.mjs` `removeCard` uses.
  *
- * @see ./kit.js for the loaded catalogue this module writes through
+ * @see ./kit.js — the loaded catalogue this module writes through
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
