@@ -3,20 +3,43 @@
  *
  * Two kits are exercised: a two-type fixture kit under `fixtures/cardkit-mini/` whose contents
  * the test fully knows (it copies the real `newcard.mjs`/`categories.mjs` loader so the contract
- * under test is the real one), and the real vendored kit at `src/scripts/desk/cardkit/`, whose
+ * under test is the real one — asserted here, byte for byte, rather than left to discipline),
+ * and the real vendored kit at `src/scripts/desk/cardkit/`, whose
  * exact type count is a vendoring detail this test does not pin — it asserts a floor and spot-checks
  * a known type instead. As of this writing the real kit carries 88 types, not the 61 once assumed;
  * do not hard-code that number back in.
  */
 
 import { describe, test, expect } from 'vitest';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import {
   loadKit, describeKit, listCardTypes, indexCardTypes, defaultKitDir, RENDER_CARD_TRIGGER,
 } from '../cards/kit.js';
 
 const MINI = resolve(__dirname, 'fixtures', 'cardkit-mini');
 const REAL = defaultKitDir(resolve(__dirname, '..', '..', '..'));
+
+describe('the fixture kit', () => {
+
+  /* Most of this branch's new tests run against `fixtures/cardkit-mini/` rather than the real
+     88-type kit, and they are only worth anything because the fixture's *loader* is the vendored
+     loader — the two types beside it are stand-ins, but `newcard.mjs` and `categories.mjs` are
+     copies. A drift in either would leave a green suite testing a loader nobody ships. These two
+     tests are what make the copy a copy rather than a hope; if one fails, re-copy the vendored
+     file over the fixture rather than editing the assertion. */
+
+  test('fixture newcard.mjs is the vendored newcard.mjs, byte for byte', () => {
+    expect(readFileSync(join(MINI, 'newcard.mjs'), 'utf8'))
+      .toBe(readFileSync(join(REAL, 'newcard.mjs'), 'utf8'));
+  });
+
+  test('fixture categories.mjs is the vendored categories.mjs, byte for byte', () => {
+    expect(readFileSync(join(MINI, 'categories.mjs'), 'utf8'))
+      .toBe(readFileSync(join(REAL, 'categories.mjs'), 'utf8'));
+  });
+
+});
 
 describe('loadKit', () => {
   test('loads every type module and groups them by category', async () => {
