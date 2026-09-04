@@ -76,9 +76,15 @@ import {
  * `ALTER TABLE … ADD COLUMN`. Pre-existing rows keep NULL, which honestly reads as
  * "written by a version that had only the hook path"; nothing is backfilled.
  *
+ * v8 (issue #98): the `pending_notice` table — one row per session holding the
+ * fingerprint of the last pending-state the session was told about. A notice is repeated
+ * only when this changes, so a standing backlog costs one line per change, not one per
+ * turn. Purely additive, like v2→v3 and v4→v5: no existing table changes shape and no
+ * data moves, so the v7→v8 step only creates what is missing.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -406,6 +412,30 @@ CREATE TABLE IF NOT EXISTS note_events (
   session    TEXT
 )`;
 
+/**
+ * One session's last-told pending-state notice (issue #98): the fingerprint of what it
+ * was last shown, so a host-neutral notice can be repeated only when that changes.
+ *
+ * A recorded intent — a held note, an unread message — has no way to reach a session on
+ * a hookless host: there is no channel back except what the model itself surfaces on its
+ * next turn. This table is that channel's memory. `session` is the primary key rather
+ * than an `id` column with a `session` index: **one row per session**, holding only the
+ * most recent fingerprint, is the entire shape this feature needs — there is no history
+ * to keep, because a superseded fingerprint is simply overwritten. `fingerprint` is
+ * opaque to the schema (a hash or a serialized summary of "what was pending"); the write
+ * side decides what goes into it. `ts_utc` is when that fingerprint was last recorded,
+ * kept for the same audit reason every other table in this schema timestamps its rows.
+ *
+ * @see ./migrate.js migrateV7toV8
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const PENDING_NOTICE_DDL: string = `
+CREATE TABLE IF NOT EXISTS pending_notice (
+  session     TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  ts_utc      TEXT NOT NULL
+)`;
+
 /** Indices covering the queries the gates and the analyses actually run. */
 export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_prompt  ON entries(prompt_id)',
@@ -478,6 +508,7 @@ export const TABLE_DDL: readonly string[] = [
   MESSAGE_READS_DDL,
   NOTES_DDL,
   NOTE_EVENTS_DDL,
+  PENDING_NOTICE_DDL,
 ];
 
 /** Every index the current schema declares — entries, messagebox, and held notes. */

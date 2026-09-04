@@ -49,6 +49,7 @@ import { privacyFlags }                                                      fro
 import { stamp }                                                             from '../channels/time.js';
 import { renderAnnotations }                                                 from '../charts/annotations.js';
 import type { AnnotationNote } from '../charts/annotations.js';
+import { withPendingNotice }                                                 from './pending_tools.js';
 import type { Store }     from '../channels/store.js';
 import type { ToolReply } from './chart_tools.js';
 
@@ -492,10 +493,13 @@ export function handleExpress(
     formatVersion  : effectiveValue(store, 'format.version') ?? FORMAT_VERSION,
   }, pluginVersion);
 
-  return reply(
+  // The pending notice (#98) rides out on the confirmation, after the no-context notice
+  // and after anything else this reply says. It is usually nothing: the notice speaks
+  // only when the pending set changed, and every carrier shares one fingerprint row.
+  return withPendingNotice(store, session, reply(
     `recorded #${String(written.id)} ${written.uuid}` +
     correctionEcho(args.correctsKind, args.correctsId, link.channel) +
-    noContextNotice(session));
+    noContextNotice(session)));
 
 }
 
@@ -662,9 +666,9 @@ export function handleAnnotate(
     anchorQuote  : note.anchorQuote,
   })));
 
-  return reply(
+  return withPendingNotice(store, session, reply(
     `recorded ${ids.map(id => `#${String(id)}`).join(', ')}` +
-    noContextNotice(session) + `\n\n${block}`);
+    noContextNotice(session) + `\n\n${block}`));
 
 }
 
@@ -760,7 +764,7 @@ export function handleBeginTurn(store: Store, args: BeginTurnArgs, when: Date = 
         index  = typeof row?.['turn_index'] === 'number' ? String(row['turn_index']) : '?',
         source = typeof row?.['source'] === 'string' ? row['source'] : 'unrecorded';
 
-  return reply(result.recorded
+  return withPendingNotice(store, args.session, reply(result.recorded
     ? `turn ${index} recorded for session ${args.session} (source: ${source}). ` +
       'express, recall, and the signature gate will adopt it for this turn; no need to ' +
       'pass session or promptId to them.'
@@ -769,7 +773,7 @@ export function handleBeginTurn(store: Store, args: BeginTurnArgs, when: Date = 
       (source === 'hook'
         ? 'This host fires the turn-start hook, which already observed the turn — calling ' +
           'begin_turn here is harmless and unnecessary.'
-        : 'Turn identity is one row; a second call cannot fork it.'));
+        : 'Turn identity is one row; a second call cannot fork it.')), when);
 
 }
 
@@ -1379,7 +1383,12 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       ? register(store, { limit: REGISTER_DEFAULT_LIMIT })
       : undefined;
 
-    return reply(JSON.stringify({ context, previous, recent, retractions }, null, 2));
+    // The notice rides recall too, and under the same session identity the write
+    // surfaces use: `session` is '' here when nothing was ever observed, and letting
+    // that become a second fingerprint row would make one host hear the same line
+    // twice — once from a read, once from a write.
+    return withPendingNotice(store, session === '' ? NO_HOOK_SESSION : session,
+      reply(JSON.stringify({ context, previous, recent, retractions }, null, 2)));
 
   });
 

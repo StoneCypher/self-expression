@@ -230,7 +230,7 @@ The registered keys:
 | `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
-| `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
+| `retention.days` | int | `0` | Prune rows older than this many days at server startup. `entries`, `turn_context`, `messages`, and `pending_notice` go by their own age; `message_reads`, `notes`, and `note_events` go with the message they hang off, never by their own age. `0` never prunes. Pruning deletes; it does not archive. |
 | `retraction.replay` | bool | `true` | Whether a session's first turn is handed the recent retraction register (#16), so a resumed session does not carry known falsehoods forward. On by default — hiding what you already know is wrong is a strange thing to offer prominently, so this is the escape hatch rather than a personality choice. The window (14 days) and the cap (5 items) are code constants, not keys. |
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
@@ -244,6 +244,8 @@ The registered keys:
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
 | `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
+| `pending.enabled` | bool | `true` | Append a one-line notice of pending desk requests and unread messages to tool replies and hook context, but only when the pending set changes (#98). |
+| `pending.nag_hours` | int | `4` | Hours an item may wait before its notice repeats even though nothing else changed — a standing backlog nags every few hours rather than staying silent forever. |
 | `mailbox.enabled` | bool | `false` | Held notes (#43): the one switch that stops composition, offering, and surfacing at once. **Off by default**, and only the exact value `true` enables — this is a consent surface, so an ambiguous value means no. |
 | `mailbox.surface_budget` | int | `1` | How many held notes one turn of yours may be offered. `0` holds everything without disabling composition. |
 | `mailbox.daily_cap` | int | `3` | Held notes that may be surfaced in any **rolling** 24 hours — rolling, so midnight is not a free refill. |
@@ -253,6 +255,7 @@ The registered keys:
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+| `desk.path` | string | *(none)* | Absolute directory of the desk (#93, #98) — the same one the desk server is started on. Deliberately no default: a desk is a place the user chose, not one the plugin picks. |
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | enum | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
@@ -408,6 +411,25 @@ this host does not report it*:
 `recall`'s `previous` stays a plain `null` when the session *is* known and simply
 has no earlier signature — that is a real "there is none", and it is a different
 answer from "nothing was searched".
+
+**The pending notice rides tool replies as well as the hook.** `UserPromptSubmit`
+only fires on Claude Code, so a notice that lived there alone would reach one
+host. The same notice — desk requests nobody has claimed, unread `self` mail —
+also rides the last text block of four tool replies: `express`, `annotate`,
+`begin_turn`, and `recall`. Every carrier, hook and tool alike, reads and writes
+one fingerprint row per session, so whichever speaks first about a change in the
+pending set leaves the rest silent until the set changes again, and an unchanged
+set repeats after `pending.nag_hours` hours regardless of which carrier last
+spoke. See **Messagebox** for `claim_pending`, the tool that acts on what the
+notice named.
+
+One consequence is worth naming for anyone parsing these replies: `recall`'s
+reply is no longer bare JSON once a notice is appended to it. The notice is added
+to the end of the reply's last text block, separated from it by a blank line and
+an em dash — the exact separator is `\n\n— ` — so a machine consumer should split
+on the **final** occurrence of `\n\n— ` and parse what precedes it. A reply with
+no notice is unchanged, and `express`, `annotate`, and `begin_turn` return prose
+rather than JSON, so only `recall` is affected.
 
 &nbsp;
 
@@ -625,12 +647,13 @@ The audiences:
 | `user` | global | the human, via the CLI; the model may relay but never receipts | the per-turn line shows a count (held notes excluded — see below) |
 | `record` | global | nobody; consultable history | never |
 
-Two MCP tools:
+Three MCP tools, the third shared with the desk's pending notice (#98):
 
 | Tool | Purpose |
 |---|---|
 | `post_message` | Send one message: `audience`, `text` (≤2000 chars), optional `box` (required for `agents`), `replyTo`, `expiresUtc`. Sender identity is adopted from the hook-observed turn context, exactly as `express` fills it. |
 | `read_messages` | Collect: default is your unread `self` notes (plus unread `agents` mail when a `box` is given). `ack: true` (default) writes receipts so nothing is delivered twice; `ack: false` peeks at recent history. `user` mail is returned without receipting regardless of `ack` — relaying is not reading. The reply carries the reader identity the server resolved. |
+| `claim_pending` | Take what the pending notice named (#98): `kind` (`desk_intent` or `message`, omit for both), `key` (one item, omit for all), `session` (fallback identity, used only when no hook ever observed one — an observed session always wins). Stamps each desk row `claimed` and receipts each message, replying `{ session, claimed, remaining }` with each item's full text — the notice itself carries only counts and kinds. Not gated on `pending.enabled` — that key governs whether the notice speaks, not whether a session may take what it already knows about. |
 
 The user's own door, with no model in the loop:
 
@@ -649,6 +672,17 @@ carries every assistant-authored text — but they are **excluded from unread `u
 delivery and from the count line**, because their delivery is the note ladder's and one
 text must not carry two disagreeing delivery records. They remain visible in the
 `ack: false` peek, which claims nothing about delivery.
+
+A related but distinct signal is the **pending notice** (#98): a one-line summary of desk
+requests nobody has claimed and unread `self` messages together — `pending: 2 desk
+requests, 1 unread message (self-expression claim_pending)` — appended after the reply of
+`express`, `annotate`, `begin_turn`, and `recall`, and after the per-turn hook context on
+Claude Code, whichever speaks first. It says only what changed: an unchanged pending set
+stays silent, and a standing one repeats after `pending.nag_hours` hours (default 4)
+rather than nagging every turn or falling silent forever. An emptied set is announced
+once, as `pending: clear`. `claim_pending` is the counterpart tool — it takes what the
+notice named, stamping a desk row `claimed` or receipting a message, and hands back the
+full text; the notice itself carries only counts and kinds.
 
 &nbsp;
 
@@ -882,7 +916,7 @@ and threw on every load. Removing a directory cannot miss two of three edits.
 | Put away | Reversible; the id joins `hidden` in `desk-config.json` and the tray offers it back |
 | Forget | Deletes the directory outright — no tombstones, no shadow copies |
 | Card JS | Must be safe to re-run, and must return early when its own element is absent |
-| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log |
+| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log. The pending notice and `claim_pending` (#98) are the inbox's other reader: a claimed task carries a `claimed · session · time` badge, its two routing buttons go dead, and its 🗑️ stays live — nothing clears `claimed` today, a known limitation |
 | Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
 
 &nbsp;

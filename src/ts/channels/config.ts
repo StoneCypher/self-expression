@@ -472,6 +472,12 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'messages.notify', kind: 'bool', fallback: 'true',
     description: 'the per-turn unread-count line specifically; SessionStart injection is governed by messages.enabled alone',
     validate: validateBool },
+  { key: 'pending.enabled', kind: 'bool', fallback: 'true',
+    description: 'append a one-line notice of pending desk requests and unread messages to tool replies and hook context when the set changes (#98)',
+    validate: validateBool },
+  { key: 'pending.nag_hours', kind: 'int', fallback: '4',
+    description: 'hours an item may wait before the notice repeats for it even though nothing else changed',
+    validate: intValidator(1, 168) },
   { key: 'mailbox.enabled', kind: 'bool', fallback: 'false',
     description:
       'self-initiated held notes (#43): the one switch that stops composition, offering, ' +
@@ -508,6 +514,11 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
     validate: validateBool },
   { key: 'dwelling.path', kind: 'string', fallback: null,
     description: 'absolute directory the dwelling database lives in; deliberately no default — required when dwelling.enabled is true',
+    validate: stringValidator(1024) },
+  { key: 'desk.path', kind: 'string', fallback: null,
+    description:
+      'absolute directory of the desk (#93, #98) — the same one the desk server is started on; ' +
+      'deliberately no default, since a desk is a place the user chose, not one the plugin picks',
     validate: stringValidator(1024) },
   { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
     description: 'dwelling file size, in gigabytes, at which a visit warns the user',

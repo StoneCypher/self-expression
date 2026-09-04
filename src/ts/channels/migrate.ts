@@ -30,6 +30,7 @@ import {
   MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
   NOTES_DDL, NOTE_EVENTS_DDL, NOTE_INDEX_DDL,
   TURN_CONTEXT_SOURCE_COLUMN,
+  PENDING_NOTICE_DDL,
 } from './schema.js';
 
 /**
@@ -323,6 +324,41 @@ function migrateV6toV7(db: DatabaseSync): void {
 }
 
 /**
+ * The v7→v8 step: create the `pending_notice` table and its `session` primary key
+ * (issue #98).
+ *
+ * Purely additive, exactly like v2→v3 and v4→v5: nothing about `entries`,
+ * `turn_context`, the messagebox, or the held-note tables changes shape, and no row
+ * moves. `pending_notice` holds one row per session — the fingerprint of the last
+ * pending-state notice that session was told about — so a v7 database that never uses
+ * the feature is byte-identical afterward apart from one empty table.
+ *
+ * `CREATE TABLE IF NOT EXISTS` makes the statement idempotent, which also makes this
+ * safe when `openStore` has already applied `TABLE_DDL` before walking the chain — its
+ * normal order of operations.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v7 database exactly as it was.
+ *
+ * @example
+ *   migrateV7toV8(db);   // db is now a v8 database; call site still stamps the version
+ *
+ * @see ./schema.js PENDING_NOTICE_DDL
+ */
+export function migrateV7toV8(db: DatabaseSync): void {
+
+  db.exec('BEGIN');
+  try {
+    db.exec(PENDING_NOTICE_DDL);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
@@ -333,6 +369,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 4, to: 5, apply: migrateV4toV5 },
   { from: 5, to: 6, apply: migrateV5toV6 },
   { from: 6, to: 7, apply: migrateV6toV7 },
+  { from: 7, to: 8, apply: migrateV7toV8 },
 ];
 
 /**

@@ -6,6 +6,7 @@ import { openStore, closeStore, readMeta, writeMeta } from '../channels/store.js
 import { recordEntry, seriesPercents }                from '../channels/entries.js';
 import {
   migrate, MIGRATIONS, hasColumn, V1_ENTRY_COLUMNS, V3_ENTRY_COLUMNS, V5_ENTRY_COLUMNS,
+  migrateV7toV8,
 } from '../channels/migrate.js';
 import { latestContext, recordContext, recordContextOnce } from '../channels/context.js';
 import { standingOf, register, recentEntries } from '../channels/entries.js';
@@ -20,6 +21,7 @@ import { buildV2, insertV2 }                          from './helpers/v2_fixture
 import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
 import { buildV4, insertV4, insertV4Message, V4_ENTRIES_DDL } from './helpers/v4_fixture.js';
 import { buildV6, insertV6Context }                          from './helpers/v6_fixture.js';
+import { buildV7 }                                            from './helpers/v7_fixture.js';
 
 const VERSION = '0.2.0';
 
@@ -629,6 +631,67 @@ describe('openStore on a v6 database (MCP portability: turn_context.source)', ()
 
 });
 
+describe('openStore on a v7 database (issue #98: pending_notice)', () => {
+
+  test('the fixture really is v7: no pending_notice table at all', () => {
+    const dir = tmp(), db = buildV7(join(dir, 'log.sqlite3'));
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'")
+                     .all().map(r => String(r.name));
+    expect(tables).not.toContain('pending_notice');
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('migrateV7toV8 adds pending_notice keyed by session', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v7  = buildV7(path);
+    migrateV7toV8(v7);
+    const cols = v7.prepare("PRAGMA table_info('pending_notice')").all().map(r => r.name);
+    expect(cols).toEqual(['session', 'fingerprint', 'ts_utc']);
+    v7.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('opening it migrates to the current version and the table exists, keyed by session', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV7(path).close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    const cols = s.db.prepare("SELECT name FROM pragma_table_info('pending_notice')")
+                     .all().map(r => String(r['name']));
+    expect(cols).toEqual(['session', 'fingerprint', 'ts_utc']);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('session is the primary key: a second row for the same session is rejected, not silently duplicated', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV7(path).close();
+    const s = openStore(path);
+    s.db.prepare("INSERT INTO pending_notice (session, fingerprint, ts_utc) VALUES ('s1','f1','2026-09-03T00:00:00Z')").run();
+    expect(() => {
+      s.db.prepare("INSERT INTO pending_notice (session, fingerprint, ts_utc) VALUES ('s1','f2','2026-09-03T00:01:00Z')").run();
+    }).toThrow();
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('re-running the step is a no-op, not a duplicate-table error', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV7(path).close();
+    const s = openStore(path);
+    expect(() => { migrate(s.db, 7, 8); }).not.toThrow();
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('meta identity survives migration: created_utc and machine_id are untouched', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV7(path).close();
+    const s = openStore(path);
+    expect(readMeta(s, 'created_utc')).toBe('2026-09-03T00:00:00Z');
+    expect(s.machineId).toBe('77777777-8888-9999-aaaa-bbbbbbbbbbbb');
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
 describe('a v1 database walks the whole chain', () => {
 
   test('1 → current in one open: old rows intact, anchors, messagebox, and notes all usable', () => {
@@ -652,9 +715,12 @@ describe('a v1 database walks the whole chain', () => {
     expect(anchoredEntries(s, 'entry', String(written.id))).toHaveLength(1);
     expect(listNotes(s)).toHaveLength(1);
 
-    // …and the newest step's column arrived with the rest of the chain, usable at once
+    // …and the newest step's table arrived with the rest of the chain, usable at once
     recordContextOnce(s, { session: 's1', promptId: 'p-1', source: 'tool' });
     expect(latestContext(s, 's1')?.['source']).toBe('tool');
+    s.db.prepare("INSERT INTO pending_notice (session, fingerprint, ts_utc) VALUES ('s1','f1','2026-09-03T00:00:00Z')").run();
+    expect(s.db.prepare('SELECT fingerprint FROM pending_notice WHERE session = ?').get('s1')?.fingerprint)
+      .toBe('f1');
 
     closeStore(s); rmSync(dir, { recursive: true, force: true });
   });

@@ -15,7 +15,10 @@
  * receipt whose message survived must survive too, because deleting it would
  * resurrect the message as unread. Message expiry (`expires_utc`) is not retention:
  * it only stops delivery, and only this horizon ever deletes. The held-note tables
- * (#43) hang off `messages` and prune by orphanhood on the same terms. `meta` and
+ * (#43) hang off `messages` and prune by orphanhood on the same terms. The pending-notice
+ * fingerprints (#98) prune by their own age: a stale row is exactly the kind of
+ * session-shaped residue the horizon exists to clear, and the whole cost of losing one is
+ * that a backlog the session already knew about is announced to it once more. `meta` and
  * `config` are never touched.
  *
  * @see ./config.js
@@ -36,6 +39,8 @@ export interface Pruned {
   readonly notes        : number;
   /** Note ledger rows removed because their note was pruned — never by their own age. */
   readonly noteEvents   : number;
+  /** Pending-notice fingerprints removed by their own age (#98). */
+  readonly pendingNotice : number;
 }
 
 /** Milliseconds in one day, for the horizon arithmetic. */
@@ -65,7 +70,8 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
   const days = Number(effectiveValue(store, 'retention.days') ?? '0');
 
   if (days === 0) {
-    return { entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 };
+    return { entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0,
+             pendingNotice: 0 };
   }
 
   const horizon = new Date(now.getTime() - days * DAY_MS).toISOString();
@@ -91,15 +97,21 @@ export function pruneExpired(store: Store, now: Date = new Date()): Pruned {
         notes       = store.db.prepare(
           'DELETE FROM notes WHERE message_id IN (SELECT id FROM messages WHERE ts_utc < ?)')
           .run(horizon),
-        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon);
+        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon),
+        // The pending-notice fingerprints (#98) prune by their own age like any other
+        // timestamped table. Losing one costs a single re-announcement of a backlog the
+        // session had already been told about — a stale row is a horizon violation, and
+        // the re-announcement is the cheaper of the two.
+        pending     = store.db.prepare('DELETE FROM pending_notice WHERE ts_utc < ?').run(horizon);
 
   return {
-    entries      : Number(entries.changes),
-    turnContext  : Number(turnContext.changes),
-    messages     : Number(messages.changes),
-    messageReads : Number(reads.changes),
-    notes        : Number(notes.changes),
-    noteEvents   : Number(noteEvents.changes),
+    entries       : Number(entries.changes),
+    turnContext   : Number(turnContext.changes),
+    messages      : Number(messages.changes),
+    messageReads  : Number(reads.changes),
+    notes         : Number(notes.changes),
+    noteEvents    : Number(noteEvents.changes),
+    pendingNotice : Number(pending.changes),
   };
 
 }

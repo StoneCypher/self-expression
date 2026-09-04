@@ -5,8 +5,8 @@ import { join }                from 'node:path';
 import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
-  postMessage, readMessages, unreadCounts, validateMessage, formatMessages,
-  MESSAGE_TEXT_MAX,
+  postMessage, readMessages, receiptMessages, unreadCounts, unreadRows, validateMessage,
+  formatMessages, MESSAGE_TEXT_MAX,
 } from '../channels/messages.js';
 
 const VERSION = '0.2.1';
@@ -223,6 +223,96 @@ describe('unreadCounts', () => {
   test('no session means no self count, never a cross-session guess', () => withStore(s => {
     postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
     expect(unreadCounts(s, undefined, NOW).forModel).toBe(0);
+  }));
+
+});
+
+describe('unreadRows — the receipt-free peek issue #98 needs', () => {
+
+  test('returns the unread self rows for the session, oldest first, without receipting', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'first', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'second', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'other session', session: 's2' }, VERSION, NOW);
+
+    const rows = unreadRows(s, 's1', NOW);
+    expect(rows.map(r => r['text'])).toEqual(['first', 'second']);
+
+    // Unlike readMessages, a peek never writes a receipt — the same rows come back.
+    expect(unreadRows(s, 's1', NOW).map(r => r['text'])).toEqual(['first', 'second']);
+  }));
+
+  test('a row already receipted through readMessages drops out of the peek too', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    readMessages(s, { reader: 'model', session: 's1' }, {}, NOW);
+    expect(unreadRows(s, 's1', NOW)).toEqual([]);
+  }));
+
+  test('an empty session returns nothing rather than a cross-session guess', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    expect(unreadRows(s, '', NOW)).toEqual([]);
+  }));
+
+});
+
+describe('receiptMessages — the targeted delivery stamp issue #98 needs', () => {
+
+  test('receipts exactly the named rows, leaving the older unread mail alone', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'first', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'second', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'self', text: 'third', session: 's1' }, VERSION, NOW);
+
+    const third = unreadRows(s, 's1', NOW)[2];
+    receiptMessages(s, [Number(third?.['id'])], { reader: 'model', session: 's1' }, NOW);
+
+    // readMessages could not have done this: it consumes the oldest rows first.
+    expect(unreadRows(s, 's1', NOW).map(r => r['text'])).toEqual(['first', 'second']);
+  }));
+
+  test('an empty id list writes nothing at all', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    receiptMessages(s, [], { reader: 'model', session: 's1' }, NOW);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+    expect(unreadRows(s, 's1', NOW)).toHaveLength(1);
+  }));
+
+  test('stamps the reader identity readMessages would have stamped', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'a', session: 's1' }, VERSION, NOW);
+    receiptMessages(s, [1], { reader: 'model', session: 's1', agentId: 'ag-3', promptId: 'p-7' }, NOW);
+
+    const row = s.db.prepare('SELECT reader, session, agent_id, prompt_id FROM message_reads').get();
+    expect(row).toMatchObject({ reader: 'model', session: 's1', agent_id: 'ag-3', prompt_id: 'p-7' });
+  }));
+
+  test('the delivery rules bind here too — a model cannot receipt the human\'s mail', () => withStore(s => {
+    postMessage(s, { audience: 'user', text: 'for the human', session: 's1' }, VERSION, NOW);
+
+    expect(receiptMessages(s, [1], { reader: 'model', session: 's1' }, NOW)).toEqual([]);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+    expect(unreadCounts(s, 's1', NOW).forUser).toBe(1);
+  }));
+
+  test('nor a human the model\'s, nor anyone a record row', () => withStore(s => {
+    postMessage(s, { audience: 'self', text: 'model mail', session: 's1' }, VERSION, NOW);
+    postMessage(s, { audience: 'record', text: 'for posterity', session: 's1' }, VERSION, NOW);
+
+    expect(receiptMessages(s, [1], { reader: 'user' }, NOW)).toEqual([]);
+    expect(receiptMessages(s, [2], { reader: 'model', session: 's1' }, NOW)).toEqual([]);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
+  }));
+
+  test('a permitted id rides along beside a refused one rather than being lost with it', () =>
+    withStore(s => {
+      postMessage(s, { audience: 'self', text: 'mine', session: 's1' }, VERSION, NOW);
+      postMessage(s, { audience: 'user', text: 'not mine', session: 's1' }, VERSION, NOW);
+
+      expect(receiptMessages(s, [1, 2], { reader: 'model', session: 's1' }, NOW)).toEqual([1]);
+      expect(unreadRows(s, 's1', NOW)).toEqual([]);
+      expect(unreadCounts(s, 's1', NOW).forUser).toBe(1);
+    }));
+
+  test('an id naming no message is skipped rather than leaving an orphan receipt', () => withStore(s => {
+    expect(receiptMessages(s, [999], { reader: 'model', session: 's1' }, NOW)).toEqual([]);
+    expect(s.db.prepare('SELECT COUNT(*) n FROM message_reads').get()?.['n']).toBe(0);
   }));
 
 });

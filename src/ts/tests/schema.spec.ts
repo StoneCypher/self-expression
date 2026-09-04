@@ -306,8 +306,8 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 7 — the turn_context.source shape', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+  test('is 8 — the pending_notice shape', () => {
+    expect(SCHEMA_VERSION).toBe(8);
   });
 
   test('turn_context declares source, and still bakes no CHECK into that table', () => {

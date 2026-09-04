@@ -331,6 +331,18 @@ them sealed. Mention the human's waiting mail **once** — `self-expression mess
 collects it — and then stop; a nag every turn is noise. The tool schema is the source
 of truth for what the tools accept.
 
+The same context line may carry a `pending:` segment. It names what is waiting on you and
+has not been taken — unclaimed desk requests, unread `self` mail — and it is a change
+signal, not a status bar: it speaks when the set changes, then goes quiet, and says itself
+again only once an item has waited another `pending.nag_hours`. `pending: clear` appears
+once, when a backlog you were told about has gone. `claim_pending` is what takes an item,
+and it hands back the whole text rather than the summary; taking the work is the point,
+and a line that goes quiet because you claimed the thing is the mechanism working, while
+one you outlast until it re-nags is not. An unread `self` note is counted in **both** the
+`Mailbox:` and `pending:` segments where a host carries both. That is deliberate rather
+than double-reporting: the two answer different questions — what is in your mailbox, and
+what is still unfinished.
+
 &nbsp;
 
 ## Held notes: 📬

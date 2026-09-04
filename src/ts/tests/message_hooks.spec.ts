@@ -5,9 +5,13 @@ import { join }                from 'node:path';
 import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store }                         from '../channels/store.js';
 import { postMessage, unreadCounts } from '../channels/messages.js';
+import { writeQuestions }        from '../channels/desk_questions.js';
+import { pendingNotice }         from '../channels/pending.js';
 import {
   mailboxLine, onSessionStart, onUserPromptSubmit, handleHook,
 } from '../mcp/hooks.js';
+import { claimSession, withPendingNotice } from '../mcp/pending_tools.js';
+import type { ToolReply }                 from '../mcp/chart_tools.js';
 
 const VERSION = '0.2.1';
 
@@ -156,5 +160,196 @@ describe('onSessionStart', () => {
     const out = handleHook('session-start', s, { session_id: 'sess-1', source: 'compact' }, NOW);
     expect(JSON.stringify(out)).toContain('SessionStart');
   }));
+
+});
+
+/** A scratch desk directory, for the `desk.path` the pending notice's desk source reads. */
+function withDesk<T>(fn: (deskDir: string) => T): T {
+  const dir = mkdtempSync(join(tmpdir(), 'se-msghooks-desk-'));
+  try { return fn(dir); } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+/** One queued, unclaimed desk row — the shape `openIntents` counts as pending. */
+function queued(id: string, body: string, at: Date): Parameters<typeof writeQuestions>[1][number] {
+  return { id, text: body, asked: at.toISOString(), queued: 'next', queuedAt: at.toISOString() };
+}
+
+describe('onUserPromptSubmit — pending segment (#98)', () => {
+
+  test('carries the notice when the pending set changes, then falls silent', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+
+      const first = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
+      expect(first).toContain('pending: 1 desk request (self-expression claim_pending)');
+
+      // The fingerprint has not moved, so the very next turn says nothing about it.
+      const second = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
+      expect(second).not.toContain('pending:');
+    })));
+
+  test('rides after the mailbox segment and before the open reminder', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+      postMessage(s, { audience: 'user', text: 'c', session: 'sess-1' }, VERSION, NOW);
+
+      const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
+      expect(context.indexOf('Mailbox:')).toBeLessThan(context.indexOf('pending:'));
+      expect(context.indexOf('pending:')).toBeLessThan(context.indexOf('Open this turn'));
+    })));
+
+  test('a turn with nothing pending carries no segment at all', () => withStore(s => {
+    expect(additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW)))
+      .not.toContain('pending:');
+  }));
+
+  test('pending.enabled false silences the carrier', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeConfig(s, 'pending.enabled', false);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+
+      expect(additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW)))
+        .not.toContain('pending:');
+    })));
+
+  test('a hook that spoke leaves the tool carrier quiet, under the identity the hook recorded', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+
+      expect(additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW)))
+        .toContain('pending: 1 desk request');
+
+      // The hook payload's session and the tool layer's *observed* session are one value,
+      // because this hook is what wrote the context row `claimSession` reads back. Asserted
+      // rather than assumed: if the hook ever normalises or renames what it records, the
+      // two carriers would quietly start fingerprinting under different keys and each
+      // would speak the same notice once — which is exactly the fatigue #98 exists to
+      // prevent, and exactly the failure a hardcoded session on both sides would hide.
+      expect(claimSession(s, {})).toBe('sess-1');
+
+      // So the very next tool reply, resolving its session the way the real tool layer
+      // does, finds the fingerprint already moved and appends nothing.
+      const out: ToolReply = { content: [{ type: 'text', text: 'recorded #1' }] };
+      expect(withPendingNotice(s, claimSession(s, {}), out, NOW).content[0]?.text)
+        .toBe('recorded #1');
+
+      // The control, so "unchanged" is a fact about identity and not about the carrier
+      // being inert here: a *different* session has been told nothing, and is told now.
+      expect(withPendingNotice(s, 'sess-2', out, NOW).content[0]?.text)
+        .toContain('pending: 1 desk request');
+    })));
+
+  test('a broken pending table costs the segment and nothing else', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+      // Not a source failure — `collectPending` already fails open per source. This one
+      // throws inside `pendingNotice` itself, so only the carrier's own catch saves the turn.
+      s.db.exec('DROP TABLE pending_notice');
+
+      const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
+      expect(context).not.toContain('pending:');
+      expect(context).toContain('Open this turn');
+    })));
+
+  test('a payload with no session carries no segment — the fingerprint row is per session', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+
+      expect(additionalContext(onUserPromptSubmit(s, {}, NOW))).not.toContain('pending:');
+    })));
+
+});
+
+describe('onSessionStart — pending segment (#98)', () => {
+
+  test('a resume with a new intent waiting carries the notice', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+
+      const context = additionalContext(
+        onSessionStart(s, { session_id: 'sess-1', source: 'resume' }, NOW));
+      expect(context).toContain('pending: 1 desk request (self-expression claim_pending)');
+
+      // Spoken once: the resumed session already knows.
+      expect(onSessionStart(s, { session_id: 'sess-1', source: 'resume' }, NOW)).toBeNull();
+    })));
+
+  test('a compact start carries the notice alongside the unread notes', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+      postMessage(s, { audience: 'self', text: 'resume at step 3', session: 'sess-1' }, VERSION, NOW);
+
+      const context = additionalContext(
+        onSessionStart(s, { session_id: 'sess-1', source: 'compact' }, NOW));
+      expect(context).toContain('resume at step 3');
+      // The notes were just delivered by this same call, so they are not also pending:
+      // only the desk request is named.
+      expect(context).toContain('pending: 1 desk request (self-expression claim_pending)');
+    })));
+
+  test('startup stays silent, and takes nothing — a fresh session has no past self', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+
+      expect(onSessionStart(s, { session_id: 'sess-1', source: 'startup' }, NOW)).toBeNull();
+      // Nothing was recorded either, so the first prompt-submit still gets to say it.
+      expect(pendingNotice(s, 'sess-1', NOW)).toBe(
+        'pending: 1 desk request (self-expression claim_pending)');
+    })));
+
+  test('a resume with nothing waiting and nothing unread stays null', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, []);
+      expect(onSessionStart(s, { session_id: 'sess-1', source: 'resume' }, NOW)).toBeNull();
+    })));
+
+  test('pending.enabled false leaves the notes injection alone', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeConfig(s, 'pending.enabled', false);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+      postMessage(s, { audience: 'self', text: 'note', session: 'sess-1' }, VERSION, NOW);
+
+      const context = additionalContext(
+        onSessionStart(s, { session_id: 'sess-1', source: 'compact' }, NOW));
+      expect(context).toContain('note');
+      expect(context).not.toContain('pending:');
+    })));
+
+  test('a broken pending table costs the notice, not the notes', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+      postMessage(s, { audience: 'self', text: 'note', session: 'sess-1' }, VERSION, NOW);
+      s.db.exec('DROP TABLE pending_notice');
+
+      const context = additionalContext(
+        onSessionStart(s, { session_id: 'sess-1', source: 'compact' }, NOW));
+      expect(context).toContain('note');
+      expect(context).not.toContain('pending:');
+    })));
+
+  test('a note read that throws still delivers the pending notice', () =>
+    withStore(s => withDesk(deskDir => {
+      writeConfig(s, 'desk.path', deskDir);
+      writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
+      postMessage(s, { audience: 'self', text: 'note', session: 'sess-1' }, VERSION, NOW);
+      s.db.exec('DROP TABLE message_reads');
+
+      const context = additionalContext(
+        onSessionStart(s, { session_id: 'sess-1', source: 'compact' }, NOW));
+      expect(context).not.toContain('note');
+      expect(context).toContain('pending: 1 desk request (self-expression claim_pending)');
+    })));
 
 });

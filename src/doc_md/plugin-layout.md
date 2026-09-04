@@ -398,6 +398,33 @@ without inference. Rows predating v7 keep NULL and are never backfilled. The rea
 loudly to match: `recall` answers `unknown — …` where it used to answer `null`, following
 `turn_signed`'s existing convention rather than inventing a second one.
 
+**The pending notice rides tool replies for the same reason (issue #98).** A one-line
+summary of desk requests nobody has claimed and unread `self` mail could have lived on
+`UserPromptSubmit`/`SessionStart` alone, and then said nothing on a host with no hooks —
+exactly the failure the `begin_turn` paragraph above exists to avoid. So the notice
+(`src/ts/channels/pending.ts`) also rides the last text block of four tool replies —
+`express`, `annotate`, `begin_turn`, `recall` — via `withPendingNotice`
+(`src/ts/mcp/pending_tools.ts`), which fails open and appends nothing when a reply carries
+no text block to append to. Every carrier, hook and tool alike, shares one fingerprint
+row per session (`pending_notice`, schema v8): a **fingerprint** over every open item's
+key plus how many whole `pending.nag_hours` intervals it has waited, so the notice speaks
+only when that fingerprint moves — an item appearing, being claimed away, or crossing a
+nag boundary — and whichever carrier speaks first leaves the rest silent until it moves
+again. On `SessionStart`, unread `self` notes are delivered *before* the pending notice is
+computed, deliberately: that read receipts the notes, so the notice never re-announces
+mail the same call just handed over. The collector's message source reads through
+`unreadRows`, a peek that never writes a receipt — a background glance must not be the
+thing that consumes mail a session has not actually read.
+
+`claim_pending` is the counterpart tool: it takes what the notice named, stamping a desk
+row `claimed: { session, at }` or receipting a message, and is registered
+unconditionally — `pending.enabled` gates whether the notice *speaks*, not whether a
+session may take what it already knows about. It runs under `claimSession`'s identity —
+observed session first, `args.session` only as a fallback for a host with no hook, the
+opposite precedence from `post_message` — and consumes mail through `receiptMessages`,
+which stamps and returns only the ids it actually receipted, so a row skipped by another
+session's race is never reported as claimed.
+
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
 there is no sharing to be had, so Claude is pointed at `claude-commands/` and Gemini keeps
