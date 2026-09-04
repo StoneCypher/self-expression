@@ -94,8 +94,8 @@ markup, and it arrives when its manifest does.
 Cards above are hand-placed. An answer card is written by the MCP server's `render_card`
 tool instead — a session draws an answer onto the desk rather than describing it, and the
 id and the ord are derived, not chosen. Answers live in their own band, ords `[1000,
-2000)`, so they always read below every hand-placed card and never renumber one (issue
-#93).
+2000)`, so they always read below every hand-placed card and never renumber one
+(issue #93).
 
 Answers age out. The desk keeps the newest `desk.answer_cards` (default 8) non-pinned
 answers and removes the rest, oldest first, the moment another one is written. Pinning a
