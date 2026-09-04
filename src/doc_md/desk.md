@@ -181,9 +181,9 @@ stop being a glance, and a question with that many answers belongs in conversati
 instructions the assistant must still act on. The third deletes the row from the file: a
 deletion is a deletion, and a dropped task does not acquire a tombstone field.
 
-**Claiming** is the inbox's other reader (issue #98): `claim_pending` lets a session take
-an open task itself, the way a click on *do this next* or *dispatch to agents* would,
-without a human at the desk. It stamps the row `claimed: { session, at }` — an id and a
+**Claiming** is the inbox's other reader (issue #98). Once a human has routed a task to
+*next* or *agents*, `claim_pending` lets a session pick it up itself, without a human at
+the desk to notice. It stamps the row `claimed: { session, at }` — an id and a
 timestamp, nothing else — and the row grows a `claimed · session · time` badge. The two
 routing buttons go dead on a claimed row, since re-routing it out from under the session
 already holding it would silently undo work under way; the 🗑️ stays live, because dropping
