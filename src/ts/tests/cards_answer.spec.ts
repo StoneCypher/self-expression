@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 
 import { loadKit } from '../cards/kit.js';
 import {
-  ANSWER_ORD_BASE, CARD_ID_PATTERN, slugTitle, deriveCardId,
+  ANSWER_ORD_BASE, ANSWER_ORD_SPAN, CARD_ID_PATTERN, slugTitle, deriveCardId,
   listAnswerCards, nextAnswerOrd, writeAnswerCard, ageOutAnswers,
 } from '../cards/answer.js';
 
@@ -79,6 +79,8 @@ describe('writeAnswerCard', () => {
       expect(meta.ord).toBe(ANSWER_ORD_BASE);
       expect(meta.answer.at).toBe(NOW.toISOString());
       expect(meta.spec).toEqual({ title: 'Done', data: { value: 3, target: 5 } });
+      expect(meta.type).toBe('tally');
+      expect(meta.category).toBe('ranking-and-comparison');
       expect(readFileSync(join(r.dir, 'card.html'), 'utf8')).toContain('3 / 5');
       expect(existsSync(join(r.dir, 'card.css'))).toBe(true);
       expect(existsSync(join(r.dir, 'card.js'))).toBe(true);
@@ -95,6 +97,33 @@ describe('writeAnswerCard', () => {
       writeAnswerCard(kit, deck, { type: 'tally', title: 'First', data: { value: 1, target: 2 } }, 8, NOW);
       const r = writeAnswerCard(kit, deck, { type: 'tally', title: 'Second', data: { value: 2, target: 2 } }, 8, NOW);
       expect(r.ord).toBe(ANSWER_ORD_BASE + 1);
+    } finally {
+      rmSync(deck, { recursive: true, force: true });
+    }
+  });
+
+  test('an explicit ord is honoured at both edges of the band and refused just outside either edge', async () => {
+    const deck = tempDeck();
+    try {
+      const kit = await loadKit(MINI);
+
+      const low = writeAnswerCard(kit, deck, { type: 'tally', title: 'Low', data: {}, ord: ANSWER_ORD_BASE }, 8, NOW);
+      expect(low.ord).toBe(ANSWER_ORD_BASE);
+      const lowMeta = JSON.parse(readFileSync(join(low.dir, 'card.json'), 'utf8'));
+      expect(lowMeta.ord).toBe(ANSWER_ORD_BASE);
+
+      const highOrd = ANSWER_ORD_BASE + ANSWER_ORD_SPAN - 1;
+      const high = writeAnswerCard(kit, deck, { type: 'tally', title: 'High', data: {}, ord: highOrd }, 8, NOW);
+      expect(high.ord).toBe(highOrd);
+      const highMeta = JSON.parse(readFileSync(join(high.dir, 'card.json'), 'utf8'));
+      expect(highMeta.ord).toBe(highOrd);
+
+      expect(() => writeAnswerCard(
+        kit, deck, { type: 'tally', title: 'TooHigh', data: {}, ord: ANSWER_ORD_BASE + ANSWER_ORD_SPAN }, 8, NOW,
+      )).toThrow(RangeError);
+      expect(() => writeAnswerCard(
+        kit, deck, { type: 'tally', title: 'TooLow', data: {}, ord: ANSWER_ORD_BASE - 1 }, 8, NOW,
+      )).toThrow(RangeError);
     } finally {
       rmSync(deck, { recursive: true, force: true });
     }

@@ -30,8 +30,19 @@ import {
 
 const MINI = resolve(__dirname, 'fixtures', 'cardkit-mini');
 
-/** Runs per property. Properties B and C each write a deck per run, so the cost is disk. */
+/** Runs for property A (`deriveCardId`), which touches no filesystem. */
 const RUNS = 60;
+
+/**
+ * Runs for properties B and C, which each write a real deck (up to ~720 card writes across a
+ * run of B at RUNS=60) — `deskcards.stoch.ts` hit the same disk-cost ceiling and settled on 12
+ * for its disk-heavy property; this file uses a slightly wider 16 to keep a bit more of the
+ * `keep`/sequence-length space covered while staying well inside a real per-test timeout.
+ */
+const DISK_RUNS = 16;
+
+/** Per-test timeout for the disk-heavy properties (B and C), in milliseconds. */
+const DISK_TIMEOUT = 20_000;
 
 let kit: CardKit;
 beforeAll(async () => { kit = await loadKit(MINI); });
@@ -51,6 +62,7 @@ describe('deriveCardId — stochastic invariants', () => {
         fc.date({
           min: new Date(Date.now() - 50 * 365 * 24 * 60 * 60 * 1000),
           max: new Date(Date.now() + 50 * 365 * 24 * 60 * 60 * 1000),
+          noInvalidDate: true,
         }),
         (type, title, now) => {
           const id = deriveCardId(type, title, now);
@@ -66,11 +78,11 @@ describe('deriveCardId — stochastic invariants', () => {
 
 describe('writeAnswerCard — stochastic invariants', () => {
 
-  it('after any sequence of renders, exactly the newest `keep` survive', () => {
+  it('after any sequence of renders, exactly the newest `keep` survive', { timeout: DISK_TIMEOUT }, () => {
     fc.assert(
       fc.property(
         fc.uniqueArray(
-          fc.date({ min: new Date(2015, 0, 1), max: new Date(2035, 0, 1) }),
+          fc.date({ min: new Date(2015, 0, 1), max: new Date(2035, 0, 1), noInvalidDate: true }),
           { selector: d => d.getTime(), minLength: 1, maxLength: 12 },
         ),
         fc.integer({ min: 1, max: 12 }),
@@ -98,7 +110,7 @@ describe('writeAnswerCard — stochastic invariants', () => {
           }
         },
       ),
-      { numRuns: RUNS },
+      { numRuns: DISK_RUNS },
     );
   });
 
@@ -106,7 +118,7 @@ describe('writeAnswerCard — stochastic invariants', () => {
 
 describe('ageOutAnswers — stochastic invariants', () => {
 
-  it('never removes a hand-placed card (no `answer` field), whatever `keep` is', () => {
+  it('never removes a hand-placed card (no `answer` field), whatever `keep` is', { timeout: DISK_TIMEOUT }, () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 6 }),
@@ -139,7 +151,7 @@ describe('ageOutAnswers — stochastic invariants', () => {
           }
         },
       ),
-      { numRuns: RUNS },
+      { numRuns: DISK_RUNS },
     );
   });
 
