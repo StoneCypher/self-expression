@@ -14,7 +14,7 @@
 import { describe, test, expect } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir }                from 'node:os';
-import { join, resolve }         from 'node:path';
+import { join, resolve, isAbsolute, basename } from 'node:path';
 
 import { openStore, closeStore, writeConfig } from '../channels/store.js';
 import type { Store }                         from '../channels/store.js';
@@ -60,10 +60,28 @@ describe('deskDeck', () => {
     expect(deskDeck(store)).toBe(join(tmpdir(), 'some-desk', 'cards'));
   }));
 
-  test('an empty desk.path reads as no desk rather than as the working directory', () => withStore(store => {
-    writeConfig(store, 'desk.path', '');
-    expect(deskDeck(store)).toBeNull();
-  }));
+  // Named for what it actually exercises. `desk.path` has a null fallback and a
+  // `stringValidator` that rejects blank input, so an empty or whitespace-only override never
+  // reaches deskDeck as a string at all — it comes back through `effectiveValue` as the
+  // fallback. The `path === ''` guard inside deskDeck is a second line no registered key can
+  // currently cross, which is why this test asserts the fallback rather than claiming to cover it.
+  test('a desk.path that fails validation falls back to unset, not to the working directory', () =>
+    withStore(store => {
+      for (const blank of ['', '   ']) {
+        writeConfig(store, 'desk.path', blank);
+        expect(deskDeck(store)).toBeNull();
+      }
+    }));
+
+  test('a relative desk.path is resolved, so a card never lands under the server’s own cwd', () =>
+    withStore(store => {
+      writeConfig(store, 'desk.path', 'mydesk');
+      const deck = deskDeck(store);
+      expect(deck).not.toBeNull();
+      expect(isAbsolute(deck ?? '')).toBe(true);
+      expect(basename(deck ?? '')).toBe('cards');
+      expect(deck).toBe(resolve('mydesk', 'cards'));
+    }));
 
 });
 

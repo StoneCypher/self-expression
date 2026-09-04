@@ -18,7 +18,7 @@
  * @see ./chart_tools.js ToolReply
  */
 
-import { join } from 'node:path';
+import { resolve } from 'node:path';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z }         from 'zod';
@@ -26,7 +26,7 @@ import { z }         from 'zod';
 import { effectiveValue }             from '../channels/config.js';
 import type { Store }                 from '../channels/store.js';
 import { describeKit, listCardTypes } from '../cards/kit.js';
-import type { CardKit }               from '../cards/kit.js';
+import type { CardKit, CategoryGroup } from '../cards/kit.js';
 import { writeAnswerCard }            from '../cards/answer.js';
 import type { RenderRequest }         from '../cards/answer.js';
 import type { ToolReply }             from './chart_tools.js';
@@ -71,21 +71,31 @@ function expectType<T extends true>(value: T): T { return value; }
  * Where answer cards are written: the `cards` directory inside the configured desk, or `null`
  * when no desk has been named.
  *
- * An empty `desk.path` reads as "no desk" rather than as the process's working directory —
- * a blank setting must never resolve to somewhere cards would actually land.
+ * The result is **resolved against the process's working directory**, because
+ * `stringValidator` accepts a relative `desk.path` (`mydesk`, `../desk`) and `panel.mjs`
+ * resolves its own directory argument the same way. Left relative, a card would land under
+ * whichever directory the MCP server happened to start in, the reply would report success, and
+ * the desk would never show it. `resolve` is a no-op for the absolute path this key normally
+ * holds.
+ *
+ * The `path === ''` clause cannot fire through the registered key today: `desk.path`'s fallback
+ * is `null` and its `stringValidator` rejects an empty or whitespace-only override, so unset,
+ * `''` and `'   '` all arrive here as `null`. It is kept because an empty string is the one
+ * value that would otherwise resolve to the working directory itself, and this function must
+ * never name a directory cards would land in by accident.
  *
  * @param store the open store the configuration lives in
- * @returns the deck directory, or `null` when `desk.path` is unset or empty
+ * @returns an absolute deck directory, or `null` when `desk.path` names no desk
  *
  * @example
  * deskDeck(store);   // null, until the user configures a desk
  * @example
  * // after configure({ op: 'set', key: 'desk.path', value: 'D:/desk' })
- * deskDeck(store);   // 'D:/desk/cards'
+ * deskDeck(store);   // always absolute, in the platform's own separator: 'D:\desk\cards' on Windows
  */
 export function deskDeck(store: Store): string | null {
   const path = effectiveValue(store, DESK_PATH_KEY);
-  return path === null || path === '' ? null : join(path, 'cards');
+  return path === null || path === '' ? null : resolve(path, 'cards');
 }
 
 /** The raw zod shape backing `render_card`'s `inputSchema`. */
@@ -155,6 +165,12 @@ function answersKept(store: Store): number {
 /**
  * Handles `render_card`: draw one card onto the desk's answer band and say where it landed.
  *
+ * The catch is deliberately broad rather than narrowed to `RangeError` the way `chart_tools`'
+ * `guarded` is: an audit refusal arrives as a plain `Error`, and it is one of the failures a
+ * model can act on. The cost is that a filesystem failure it *cannot* route around — an
+ * `EACCES` on the deck, a full disk — also comes back as calm text rather than a protocol
+ * fault. Named here because it is a real trade, not an oversight.
+ *
  * @param store the open store, for `desk.path` and `desk.answer_cards`
  * @param kit   the loaded card kit the type is built from
  * @param args  the type, title, data, and optional band ord
@@ -223,8 +239,13 @@ export function handleRenderCard(
  */
 export function handleListCardTypes(kit: CardKit, args: ListCardTypesArgs): ToolReply {
 
+  // Only the lookup sits inside the try. `JSON.stringify` has a `RangeError` of its own —
+  // 'Invalid string length', on a catalogue too large to serialise — and reporting that as an
+  // unknown category would name the wrong failure.
+  let groups: readonly CategoryGroup[];
+
   try {
-    return reply(JSON.stringify(listCardTypes(kit, args.category), null, 2));
+    groups = listCardTypes(kit, args.category);
   } catch (error) {
     if (error instanceof RangeError) {
       return reply(
@@ -233,6 +254,8 @@ export function handleListCardTypes(kit: CardKit, args: ListCardTypesArgs): Tool
     }
     throw error;
   }
+
+  return reply(JSON.stringify(groups, null, 2));
 
 }
 
