@@ -54,6 +54,17 @@ describe('pixel and readPixel', () => {
     expect(readPixel(canvas(), 0, 16)).toBeNull();
   });
 
+  test('a non-finite coordinate is skipped, not written at some corrupted index', () => {
+    const region = canvas();
+    pixel(region, Number.NaN, 5, INK);
+    pixel(region, 5, Number.NaN, INK);
+    pixel(region, Infinity, 5, INK);
+    pixel(region, 5, -Infinity, INK);
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) { expect(readPixel(region, x, y)).toEqual([...WHITE]); }
+    }
+  });
+
 });
 
 describe('lines and rectangles', () => {
@@ -133,6 +144,36 @@ describe('polyline', () => {
     expect(readPixel(region, 0, 10)).toEqual([...INK]);
     expect(readPixel(region, 5, 2)).toEqual([...INK]);
     expect(readPixel(region, 10, 8)).toEqual([...INK]);
+  });
+
+  test('a NaN point drops both the segment into it and the segment out of it', () => {
+    const region = canvas();
+    // (0,0)-(3,3) is an ordinary finite segment; (3,3)-(NaN,5) and (NaN,5)-(9,9) both
+    // touch the dropped point, so neither is drawn — (9,9) is never reached.
+    polyline(region, [[0, 0], [3, 3], [Number.NaN, 5], [9, 9]], INK);
+    expect(readPixel(region, 0, 0)).toEqual([...INK]);
+    expect(readPixel(region, 3, 3)).toEqual([...INK]);
+    expect(readPixel(region, 9, 9)).toEqual([...WHITE]);
+  });
+
+  test('Infinity and -Infinity points are dropped the same way, and finite segments still draw', () => {
+    const region = canvas();
+    // Two ordinary finite segments bracket a run of non-finite points; the call must
+    // terminate (the historical bug was an infinite loop here) and still draw both
+    // finite segments despite the gap between them.
+    polyline(region, [[1, 1], [3, 3], [Infinity, 5], [-Infinity, 7], [6, 6], [9, 9]], INK);
+    expect(readPixel(region, 1, 1)).toEqual([...INK]);
+    expect(readPixel(region, 3, 3)).toEqual([...INK]);
+    expect(readPixel(region, 6, 6)).toEqual([...INK]);
+    expect(readPixel(region, 9, 9)).toEqual([...INK]);
+  });
+
+  test('a lone non-finite point draws nothing rather than corrupting an index', () => {
+    const region = canvas();
+    expect(() => polyline(region, [[Number.NaN, Number.NaN]], INK)).not.toThrow();
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) { expect(readPixel(region, x, y)).toEqual([...WHITE]); }
+    }
   });
 
 });

@@ -1,12 +1,14 @@
 /**
- * Tests for the desk panel server (`src/scripts/desk/panel.mjs`).
+ * Tests for the desk panel (`src/scripts/desk/panel.mjs`) and its request guard.
  *
- * `panel.mjs` is a `createServer` script, not a module of exported functions — its whole
- * contract is what it serves over HTTP. So these tests boot a real child process against a
- * fresh scratch desk directory, on a `SELF_EXPRESSION_DESK_PORT` picked at random per run
- * (the panel's own default, 7373, is a real desk's port — port 0 is not used here because
- * `PORT = Number(env) || 7373` treats "0" as absent and falls back to the default), and talk
- * to it with real `fetch` calls rather than importing anything from it.
+ * `requestAllowed` (`src/scripts/desk/deskguard.mjs`) is tested first as a pure function
+ * against plain header objects — no socket needed, per its own contract. The wiring into
+ * `panel.mjs` is then tested against a real child process listening on an OS-assigned port
+ * (`SELF_EXPRESSION_DESK_PORT=0`), talking to it with real `fetch` calls: the property
+ * under test is what a real HTTP client's `text/plain` cross-origin POST can and cannot do
+ * to a running desk, which a mocked request object cannot show. That same live panel is
+ * what proves the card kit is inlined ahead of the cards, since that is a fact about the
+ * page the server assembles rather than about anything it exports.
  */
 
 import { describe, test, expect, afterEach } from 'vitest';
@@ -16,9 +18,62 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { requestAllowed } from '../../scripts/desk/deskguard.mjs';
+
 /** Absolute path of `src/scripts/desk`, the mechanism every desk shares. */
 const DESK_SRC = fileURLToPath(new URL('../../scripts/desk', import.meta.url));
 const PANEL    = join(DESK_SRC, 'panel.mjs');
+
+describe('requestAllowed', () => {
+  const PORT     = 7373;
+  const okHost   = `127.0.0.1:${PORT}`;
+  const okOrigin = `http://127.0.0.1:${PORT}`;
+
+  test.each([
+    ['GET / with the literal host',                 { method: 'GET', url: '/', headers: { host: okHost } },                    true],
+    ['GET / with the localhost alias',               { method: 'GET', url: '/', headers: { host: `localhost:${PORT}` } },       true],
+    ['GET / with a rebound hostname (DNS rebinding)', { method: 'GET', url: '/', headers: { host: `evil.example:${PORT}` } },    false],
+    ['GET / with no Host header at all',             { method: 'GET', url: '/', headers: {} },                                  false],
+    ['GET / with the right host but wrong port',     { method: 'GET', url: '/', headers: { host: '127.0.0.1:9999' } },          false],
+
+    ['POST /input, same-origin, application/json',
+      { method: 'POST', url: '/input', headers: { host: okHost, origin: okOrigin, 'content-type': 'application/json' } }, true],
+    ['POST /input, foreign Origin, application/json',
+      { method: 'POST', url: '/input', headers: { host: okHost, origin: 'http://evil.example', 'content-type': 'application/json' } }, false],
+    ['POST /input, same-origin, text/plain (the no-cors hole)',
+      { method: 'POST', url: '/input', headers: { host: okHost, origin: okOrigin, 'content-type': 'text/plain' } }, false],
+    ['POST /input, no Origin header, application/json (a non-browser client)',
+      { method: 'POST', url: '/input', headers: { host: okHost, 'content-type': 'application/json' } }, true],
+    ['POST /input, application/json with a charset suffix',
+      { method: 'POST', url: '/input', headers: { host: okHost, origin: okOrigin, 'content-type': 'application/json; charset=utf-8' } }, true],
+    ['OPTIONS preflight to /desk-config',
+      { method: 'OPTIONS', url: '/desk-config', headers: { host: okHost, origin: okOrigin } }, false],
+
+    ['GET /stream, same-origin',
+      { method: 'GET', url: '/stream', headers: { host: okHost, origin: okOrigin } }, true],
+    ['GET /stream, foreign Origin (an EventSource leak)',
+      { method: 'GET', url: '/stream', headers: { host: okHost, origin: 'http://evil.example' } }, false],
+    ['GET /stream, no Origin header',
+      { method: 'GET', url: '/stream', headers: { host: okHost } }, true],
+
+    ['GET /edition, foreign Origin — Origin is not checked on a plain GET',
+      { method: 'GET', url: '/edition', headers: { host: okHost, origin: 'http://evil.example' } }, true],
+  ])('%s', (_label, req, ok) => {
+    expect(requestAllowed(req, PORT).ok).toBe(ok);
+  });
+
+  test('names which check failed', () => {
+    expect(requestAllowed({ method: 'GET', url: '/', headers: { host: 'nope:1' } }, PORT))
+      .toEqual({ ok: false, reason: 'host' });
+    expect(requestAllowed({ method: 'POST', url: '/input',
+      headers: { host: okHost, origin: 'http://evil.example', 'content-type': 'application/json' } }, PORT))
+      .toEqual({ ok: false, reason: 'origin' });
+    expect(requestAllowed({ method: 'POST', url: '/input',
+      headers: { host: okHost, 'content-type': 'text/plain' } }, PORT))
+      .toEqual({ ok: false, reason: 'content-type' });
+  });
+
+});
 
 describe('panel.mjs, over a real socket', () => {
 
@@ -43,8 +98,8 @@ describe('panel.mjs, over a real socket', () => {
   });
 
   /**
-   * Start a real `panel.mjs` child process against a fresh scratch desk directory, on a
-   * randomly chosen port, and resolve once its own startup log confirms it is listening.
+   * Start a real `panel.mjs` child process against a fresh scratch desk directory, on an
+   * OS-assigned port, and resolve once its own startup log confirms it is listening.
    *
    * @returns the base URL it actually bound to, with no trailing slash
    *
@@ -54,11 +109,10 @@ describe('panel.mjs, over a real socket', () => {
    */
   function startPanel(): Promise<string> {
     desk = mkdtempSync(join(tmpdir(), 'se-desk-panel-'));
-    const port = 20000 + Math.floor(Math.random() * 20000);   // clear of the real desk's 7373
     return new Promise((settle, fail) => {
       const proc = spawn(process.execPath, [PANEL, desk as string], {
         windowsHide: true,
-        env: { ...process.env, SELF_EXPRESSION_DESK_PORT: String(port),
+        env: { ...process.env, SELF_EXPRESSION_DESK_PORT: '0',
                SELF_EXPRESSION_AFFECT_LOG: join(desk as string, 'no-such-log.sqlite3') },
       });
       child = proc;
@@ -100,9 +154,30 @@ describe('panel.mjs, over a real socket', () => {
     return res.text();
   }
 
+  test('a text/plain POST from a foreign Origin is refused with 403', async () => {
+    const base = await startPanel();
+    const res = await fetch(`${base}/desk-config`, {
+      method:  'POST',
+      headers: { 'content-type': 'text/plain;charset=UTF-8', origin: 'http://evil.example' },
+      body:    JSON.stringify({ gone: ['some-card'] }),
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).toMatch(/forbidden/);
+  }, 15000);
+
+  test('a well-formed same-origin JSON POST succeeds', async () => {
+    const base = await startPanel();
+    const res = await fetch(`${base}/geometry`, {
+      method:  'POST',
+      headers: { 'content-type': 'application/json', origin: base },
+      body:    JSON.stringify({ w: 800, h: 600, dpr: 1, paneW: 800, paneH: 600 }),
+    });
+    expect(res.status).toBe(204);
+  }, 15000);
+
   test('the desk page inlines the card kit ahead of the cards', async () => {
     const base = await startPanel();
-    const page = await getText(base + '/desk');
+    const page = await getText(`${base}/desk`);
     const kitCss = readFileSync(join(DESK_SRC, 'cardkit', 'kit.css'), 'utf8').slice(0, 80);
     const kitJs  = readFileSync(join(DESK_SRC, 'cardkit', 'kit.js'),  'utf8').slice(0, 80);
     expect(page).toContain(kitCss);

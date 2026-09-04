@@ -7,7 +7,7 @@ import type { Store }            from '../channels/store.js';
 import { recordEntry }           from '../channels/entries.js';
 import { buildServer }           from '../mcp/server.js';
 import {
-  handleRenderHistoryPng, renderHistoryToFile,
+  handleRenderHistoryPng, renderHistoryToFile, resolveRenderPath,
 } from '../mcp/chart_tools.js';
 
 const VERSION = '0.2.0';
@@ -56,13 +56,27 @@ describe('renderHistoryToFile', () => {
     expect(result.seriesCount).toBe(1);
   }));
 
-  test('an explicit out overrides the whole path', () => withStore((s, dir) => {
+  test('an explicit out names a file inside renders/, not an arbitrary path', () => withStore((s, dir) => {
     seed(s);
-    const out    = join(dir, 'elsewhere', 'chart.png');
-    const result = renderHistoryToFile(s, { out }, WHEN);
-    expect(result.path).toBe(out);
-    expect(existsSync(out)).toBe(true);
-    expect(readFileSync(out).subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
+    const result = renderHistoryToFile(s, { out: 'chart.png' }, WHEN);
+    expect(result.path).toBe(join(dir, 'renders', 'chart.png'));
+    expect(existsSync(result.path)).toBe(true);
+    expect(readFileSync(result.path).subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
+  }));
+
+  test('an out reaching outside renders/ is refused, not written', () => withStore((s, dir) => {
+    seed(s);
+    const escape = join(dir, 'elsewhere', 'chart.png');
+    expect(() => renderHistoryToFile(s, { out: escape }, WHEN)).toThrow(RangeError);
+    expect(existsSync(escape)).toBe(false);
+  }));
+
+  test('a second render to the same out is refused unless overwrite is true', () => withStore((s, dir) => {
+    seed(s);
+    renderHistoryToFile(s, { out: 'chart.png' }, WHEN);
+    expect(() => renderHistoryToFile(s, { out: 'chart.png' }, WHEN)).toThrow(/already exists/);
+    expect(() => renderHistoryToFile(s, { out: 'chart.png', overwrite: true }, WHEN)).not.toThrow();
+    expect(existsSync(join(dir, 'renders', 'chart.png'))).toBe(true);
   }));
 
   test('an empty store still renders a file — five empty panels are an answer', () => withStore(s => {
@@ -116,10 +130,56 @@ describe('handleRenderHistoryPng', () => {
   }));
 
   test('a write failure is reported as error text, not a protocol fault', () => withStore((s, dir) => {
-    // A directory path as `out` cannot be written as a file.
+    // A directory path as `out` is not even a bare filename, so resolveRenderPath
+    // refuses it before any filesystem call is attempted.
     const out = text(handleRenderHistoryPng(s, { out: dir }, WHEN));
     expect(out).toMatch(/^error: /);
   }));
+
+  test('an out that escapes renders/ is reported as error text, never written', () => withStore(s => {
+    const out = text(handleRenderHistoryPng(s, { out: '../../etc/whoops.png' }, WHEN));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('bare filename');
+  }));
+
+});
+
+describe('resolveRenderPath', () => {
+
+  test('a bare filename lands under <dataDir>/renders/', () => {
+    expect(resolveRenderPath('/data', 'weekly.png')).toBe(join('/data', 'renders', 'weekly.png'));
+  });
+
+  test('an omitted out generates a timestamped default under renders/', () => {
+    const path = resolveRenderPath('/data');
+    expect(path.startsWith(join('/data', 'renders', 'history_'))).toBe(true);
+    expect(path.endsWith('.png')).toBe(true);
+  });
+
+  test.each([
+    ['../x.png',        '..'],
+    ['C:/x.png',        'C:'],
+    ['/x.png',          'leading slash'],
+    ['a/b.png',         'subdirectory'],
+    ['a\\b.png',        'backslash'],
+    ['',                'empty'],
+    ['   ',             'blank'],
+  ])('rejects %p (%s)', (out: string) => {
+    expect(() => resolveRenderPath('/data', out)).toThrow(RangeError);
+  });
+
+  test('rejects a name with no .png extension', () => {
+    expect(() => resolveRenderPath('/data', 'chart.jpg')).toThrow(/\.png/);
+  });
+
+  test.each(['CON.png', 'con.png', 'PRN.PNG', 'nul.png', 'COM1.png', 'LPT9.png'])(
+    'rejects the Windows-reserved device name %p',
+    (out) => { expect(() => resolveRenderPath('/data', out)).toThrow(/reserved/); }
+  );
+
+  test('the .png extension check is case-insensitive', () => {
+    expect(resolveRenderPath('/data', 'chart.PNG')).toBe(join('/data', 'renders', 'chart.PNG'));
+  });
 
 });
 

@@ -7,7 +7,7 @@ import {
   recordEntry, validate, hasClosingSignature, previousSignature, recentEntries,
   recentChecklists, seriesPercents, forecastOutcomes, anchorProblems, storedQuote,
   anchoredEntries, correctionProblems, effectiveCorrectionKind, standingOf, register,
-  localHour, isoWeekKey, signatureHistory, needWeekly, checklistSeriesTop,
+  localHour, isoWeekKey, signatureHistory, needWeekly, checklistSeriesTop, retractedAmong,
 } from '../channels/entries.js';
 import { anchorHash, ANCHOR_QUOTE_MAX } from '../channels/anchors.js';
 import { writeConfig } from '../channels/store.js';
@@ -376,30 +376,53 @@ describe('hasClosingSignature', () => {
   test('is false when the turn has not signed off', () => withStore(s => {
     recordEntry(s, { channel: 'signature', text: 'open', session: 's1',
                      promptId: 'p1', position: 'open' }, VERSION);
-    expect(hasClosingSignature(s, 'p1')).toBe(false);
+    expect(hasClosingSignature(s, 's1', 'p1')).toBe(false);
   }));
 
   test('is true once a close lands for that turn', () => withStore(s => {
     recordEntry(s, { channel: 'signature', text: 'done', session: 's1',
                      promptId: 'p1', position: 'close' }, VERSION);
-    expect(hasClosingSignature(s, 'p1')).toBe(true);
+    expect(hasClosingSignature(s, 's1', 'p1')).toBe(true);
   }));
 
-  test('a mid signature also satisfies the gate', () => withStore(s => {
+  test('a mid signature does not satisfy the gate — a lurch is not an ending', () => withStore(s => {
     recordEntry(s, { channel: 'signature', text: 'lurch', session: 's1',
                      promptId: 'p1', position: 'mid' }, VERSION);
-    expect(hasClosingSignature(s, 'p1')).toBe(true);
+    expect(hasClosingSignature(s, 's1', 'p1')).toBe(false);
   }));
 
   test("another turn's close does not satisfy this one — the bug the time window had", () => withStore(s => {
     recordEntry(s, { channel: 'signature', text: 'prev', session: 's1',
                      promptId: 'p1', position: 'close' }, VERSION);
-    expect(hasClosingSignature(s, 'p2')).toBe(false);
+    expect(hasClosingSignature(s, 's1', 'p2')).toBe(false);
+  }));
+
+  test('the same prompt id in another session does not satisfy this one — identity is the pair', () => withStore(s => {
+    recordEntry(s, { channel: 'signature', text: 'theirs', session: 's2',
+                     promptId: 'p1', position: 'close' }, VERSION);
+    expect(hasClosingSignature(s, 's1', 'p1')).toBe(false);
+    expect(hasClosingSignature(s, 's2', 'p1')).toBe(true);
   }));
 
   test('a non-signature channel does not satisfy the gate', () => withStore(s => {
     recordEntry(s, { channel: 'need', text: 'ask', session: 's1', promptId: 'p1' }, VERSION);
-    expect(hasClosingSignature(s, 'p1')).toBe(false);
+    expect(hasClosingSignature(s, 's1', 'p1')).toBe(false);
+  }));
+
+  test('an absent session narrows nothing — no row can carry the NULL it would match', () => withStore(s => {
+    recordEntry(s, { channel: 'signature', text: 'done', session: 's1',
+                     promptId: 'p1', position: 'close' }, VERSION);
+    expect(hasClosingSignature(s, undefined, 'p1')).toBe(true);
+    expect(hasClosingSignature(s, '',        'p1')).toBe(true);
+    expect(hasClosingSignature(s, undefined, 'p2')).toBe(false);
+  }));
+
+  test('a retracted close still counts — the turn signed, and taking the words back is not un-signing', () => withStore(s => {
+    const close = recordEntry(s, { channel: 'signature', text: 'done', session: 's1',
+                                   promptId: 'p1', position: 'close' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'that was not the reading', session: 's1',
+                     promptId: 'p1', correctsId: close, correctsKind: 'retracts' }, VERSION);
+    expect(hasClosingSignature(s, 's1', 'p1')).toBe(true);
   }));
 
 });
@@ -580,6 +603,9 @@ describe('isoWeekKey', () => {
 });
 
 const WHEN = new Date('2026-08-27T21:15:04.000Z');
+
+/** A window lower bound comfortably before {@link WHEN}, for the panel readers. */
+const SINCE = '2026-08-01T00:00:00.000Z';
 
 describe('signatureHistory', () => {
 
@@ -1047,6 +1073,140 @@ describe('marked read surfaces (#16)', () => {
     recordEntry(s, { channel: 'divergence', text: 'a detail', session: 's1',
                      correctsId: amended, correctsKind: 'amends' }, VERSION);
     expect(previousSignature(s, 's1')?.['face']).toBe('😌');
+  }));
+
+  // The panel readers below feed the history PNG. They query the same columns the recall
+  // path does, and the contract is that the two never disagree — a sparkline must not
+  // replay a number its author took back just because it reached it by a different query.
+
+  /** Record one checklist snapshot in the window, returning its id. */
+  function snapshot(s: Store, seriesKey: string, percent: number): number {
+    return recordEntry(s, { channel: 'checklist', text: 'x', session: 's1',
+                            seriesKey, percent }, VERSION, WHEN).id;
+  }
+
+  /** Strike an earlier row, in the window. */
+  function strike(s: Store, target: number, kind: 'retracts' | 'amends'): number {
+    return recordEntry(s, { channel: 'divergence', text: `${kind} ${String(target)}`,
+                            session: 's1', correctsId: target, correctsKind: kind }, VERSION, WHEN).id;
+  }
+
+  test('checklistSeriesTop drops a retracted snapshot, agreeing with seriesPercents', () => withStore(s => {
+    // The issue's own evidence case: logged at 31, taken back, re-logged at 62.
+    strike(s, snapshot(s, 'atlas', 31), 'retracts');
+    snapshot(s, 'atlas', 62);
+
+    expect(seriesPercents(s, 'atlas')).toEqual([62]);
+    expect(checklistSeriesTop(s, SINCE, 5)).toEqual([{ seriesKey: 'atlas', percents: [62] }]);
+  }));
+
+  test('checklistSeriesTop keeps an amended snapshot — a refined detail is not a withdrawal', () => withStore(s => {
+    strike(s, snapshot(s, 'atlas', 31), 'amends');
+    snapshot(s, 'atlas', 62);
+
+    expect(seriesPercents(s, 'atlas')).toEqual([31, 62]);
+    expect(checklistSeriesTop(s, SINCE, 5)).toEqual([{ seriesKey: 'atlas', percents: [31, 62] }]);
+  }));
+
+  test('a withdrawn snapshot does not make its series look busier than it was', () => withStore(s => {
+    // 'padded' logs three and takes two back; 'real' logs two that stand. Counting rows
+    // rather than surviving rows would rank 'padded' first on snapshots it disowned.
+    strike(s, snapshot(s, 'padded', 10), 'retracts');
+    strike(s, snapshot(s, 'padded', 20), 'retracts');
+    snapshot(s, 'padded', 30);
+    snapshot(s, 'real', 40);
+    snapshot(s, 'real', 50);
+
+    expect(checklistSeriesTop(s, SINCE, 5)).toEqual([
+      { seriesKey: 'real',   percents: [40, 50] },
+      { seriesKey: 'padded', percents: [30]     },
+    ]);
+  }));
+
+  test('a series whose every snapshot was retracted leaves the panel, not an empty line', () => withStore(s => {
+    strike(s, snapshot(s, 'ghost', 99), 'retracts');
+    snapshot(s, 'atlas', 62);
+
+    expect(checklistSeriesTop(s, SINCE, 5)).toEqual([{ seriesKey: 'atlas', percents: [62] }]);
+  }));
+
+  test('signatureHistory drops a retracted signature and keeps an amended one', () => withStore(s => {
+    const wrong  = recordEntry(s, { channel: 'signature', text: 'misrecorded', session: 's1',
+                                    stem: 'spark' }, VERSION, WHEN).id,
+          fine   = recordEntry(s, { channel: 'signature', text: 'nearly', session: 's1',
+                                    stem: 'flow' }, VERSION, WHEN).id,
+          stands = recordEntry(s, { channel: 'signature', text: 'as recorded', session: 's1',
+                                    stem: 'still' }, VERSION, WHEN).id;
+    strike(s, wrong, 'retracts');
+    strike(s, fine,  'amends');
+
+    expect(signatureHistory(s, SINCE).map(row => row.id)).toEqual([fine, stands]);
+    expect(signatureHistory(s, SINCE).map(row => row.stem)).toEqual(['flow', 'still']);
+  }));
+
+  test('forecastOutcomes drops a pair whose resolution was retracted', () => withStore(s => {
+    const kept = recordEntry(s, { channel: 'confidence', text: 'f1', session: 's1',
+                                  confidence: 'predicted' }, VERSION).id,
+          lost = recordEntry(s, { channel: 'confidence', text: 'f2', session: 's1',
+                                  confidence: 'predicted' }, VERSION).id;
+    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1',
+                     correctsId: kept, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
+    const wrongCall = recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1',
+                                       correctsId: lost, correctsKind: 'resolves',
+                                       outcome: 'miss' }, VERSION).id;
+    strike(s, wrongCall, 'retracts');
+
+    expect(forecastOutcomes(s)).toEqual(['hit']);
+  }));
+
+  test('forecastOutcomes drops a pair whose forecast was retracted — never predicted, never scored', () => withStore(s => {
+    const kept    = recordEntry(s, { channel: 'confidence', text: 'f1', session: 's1',
+                                     confidence: 'predicted' }, VERSION).id,
+          disowned = recordEntry(s, { channel: 'confidence', text: 'f2', session: 's1',
+                                      confidence: 'predicted' }, VERSION).id;
+    recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1',
+                     correctsId: kept, correctsKind: 'resolves', outcome: 'hit' }, VERSION);
+    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1',
+                     correctsId: disowned, correctsKind: 'resolves', outcome: 'miss' }, VERSION);
+    strike(s, disowned, 'retracts');
+
+    expect(forecastOutcomes(s)).toEqual(['hit']);
+  }));
+
+  test('forecastOutcomes keeps a pair amended at either end, with its recorded outcome', () => withStore(s => {
+    const a = recordEntry(s, { channel: 'confidence', text: 'f1', session: 's1',
+                               confidence: 'predicted' }, VERSION).id,
+          b = recordEntry(s, { channel: 'confidence', text: 'f2', session: 's1',
+                               confidence: 'predicted' }, VERSION).id;
+    const ra = recordEntry(s, { channel: 'confidence', text: 'r1', session: 's1',
+                                correctsId: a, correctsKind: 'resolves', outcome: 'hit' }, VERSION).id;
+    recordEntry(s, { channel: 'confidence', text: 'r2', session: 's1',
+                     correctsId: b, correctsKind: 'resolves', outcome: 'miss' }, VERSION);
+    strike(s, ra, 'amends');   // the resolution's wording refined
+    strike(s, b,  'amends');   // the forecast's wording refined
+
+    expect(forecastOutcomes(s)).toEqual(['hit', 'miss']);
+  }));
+
+});
+
+describe('retractedAmong', () => {
+
+  test('names the retracted rows and nothing else', () => withStore(s => {
+    const taken = recordEntry(s, { channel: 'idea', text: 'wrong',  session: 's1' }, VERSION).id,
+          fixed = recordEntry(s, { channel: 'idea', text: 'nearly', session: 's1' }, VERSION).id,
+          held  = recordEntry(s, { channel: 'idea', text: 'right',  session: 's1' }, VERSION).id;
+    recordEntry(s, { channel: 'divergence', text: 'no', session: 's1',
+                     correctsId: taken, correctsKind: 'retracts' }, VERSION);
+    recordEntry(s, { channel: 'divergence', text: 'detail', session: 's1',
+                     correctsId: fixed, correctsKind: 'amends' }, VERSION);
+
+    expect([...retractedAmong(s, [taken, fixed, held])]).toEqual([taken]);
+  }));
+
+  test('an empty request and an unknown id both yield nothing', () => withStore(s => {
+    expect(retractedAmong(s, []).size).toBe(0);
+    expect(retractedAmong(s, [9999]).size).toBe(0);
   }));
 
 });

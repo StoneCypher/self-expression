@@ -53,7 +53,9 @@ src/scripts/desk/                 the mechanism — checked in, identical everyw
 node src/scripts/desk/panel.mjs <desk directory>
 ```
 
-The desk directory can also come from `SELF_EXPRESSION_DESK`, and falls back to the working
+The desk directory can also come from `SELF_EXPRESSION_DESK`; with neither, the server prints a
+usage line and exits rather than adopting the working directory — a desk is deliberately not a
+default location, because `gone` deletes card directories beneath it.
 directory. `SELF_EXPRESSION_DESK_PORT` moves it off 7373, which is what a second desk needs.
 `SELF_EXPRESSION_AFFECT_LOG` points at the affect log the history charts read; with no log
 present the server says so once and the rest of the desk works unchanged, because one

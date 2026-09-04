@@ -30,8 +30,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z }         from 'zod';
 
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve }   from 'node:path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join }                        from 'node:path';
 
 import {
   renderSparkline, renderBraille, renderWinLoss,
@@ -1022,8 +1022,12 @@ const HISTORY_PNG_SHAPE = {
   scale: z.union([z.literal(1), z.literal(2)]).optional().describe(
     'output magnification: 1 (960×720) or 2 (default; 1920×1440, crisper text)'),
   out: z.string().optional().describe(
-    "optional: exact output file path, overriding the default " +
-    "<dataDir>/renders/history_<utc>.png beside the database"),
+    'optional: a bare filename (no directory separators, no .., must end in .png) ' +
+    'naming the render inside <dataDir>/renders/, overriding the default ' +
+    'history_<utc>.png; refused if it already exists unless overwrite is true'),
+  overwrite: z.boolean().optional().describe(
+    'when out names a file that already exists, pass true to replace it; otherwise ' +
+    'the render is refused rather than silently overwriting a prior file'),
 };
 
 /**
@@ -1040,6 +1044,7 @@ export interface HistoryPngArgs {
   seriesKey?: string | undefined;
   scale?: 1 | 2 | undefined;
   out?: string | undefined;
+  overwrite?: boolean | undefined;
 }
 
 // Fails to compile if HistoryPngArgs drifts from HISTORY_PNG_SHAPE — see expectType's docblock.
@@ -1057,6 +1062,69 @@ export interface HistoryRenderResult {
   readonly seriesCount     : number;
 }
 
+/** Windows device names reserved regardless of extension (case-insensitive). */
+const WINDOWS_RESERVED_NAMES: ReadonlySet<string> = new Set([
+  'CON', 'PRN', 'AUX', 'NUL',
+  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+]);
+
+/**
+ * Resolves `render_history_png`'s `out` argument to a full path confined to
+ * `<dataDir>/renders/` — the one place the PNG write's destination is decided, so the
+ * security boundary (never write outside that directory, e.g. `out:
+ * "C:/Users/x/.claude/settings.json"`) is a single pure function directly testable
+ * without touching the filesystem, rather than a `resolve(args.out)` that trusted
+ * caller input outright.
+ *
+ * `out`, when supplied, must be a bare filename: no `/` or `\`, no `..` substring, no
+ * drive letter, case-insensitively ending in `.png`, and not a Windows-reserved device
+ * name (`CON`, `PRN`, `NUL`, `COM1`-`9`, `LPT1`-`9`, with or without the `.png` suffix —
+ * Windows resolves those regardless of extension). When `out` is omitted, a
+ * timestamped `history_<utc>.png` name is generated instead (colons hyphenated for
+ * Windows).
+ *
+ * @param dataDir the store's data directory; renders always land in its `renders`
+ *   subdirectory
+ * @param out     caller-supplied bare filename, or `undefined` for a generated name
+ * @returns the absolute path the PNG should be written to
+ *
+ * @example
+ *   resolveRenderPath('/data', 'weekly.png')   // => '/data/renders/weekly.png'
+ *   resolveRenderPath('/data', '../x.png')     // throws RangeError
+ *
+ * @throws {RangeError} When `out` is not a bare `.png` filename confined to the
+ *   renders directory — a path separator, a `..` substring, a drive letter, an empty
+ *   or non-`.png` name, or a Windows-reserved device name.
+ */
+export function resolveRenderPath(dataDir: string, out?: string): string {
+
+  const rendersDir = join(dataDir, 'renders');
+
+  if (out === undefined) {
+    const stamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z').replaceAll(':', '-');
+    return join(rendersDir, `history_${stamp}.png`);
+  }
+
+  if (out.trim() === '' || /[/\\]/.test(out) || out.includes('..') || /^[a-zA-Z]:/.test(out)) {
+    throw new RangeError(
+      `resolveRenderPath: 'out' must be a bare filename with no path (got ${JSON.stringify(out)}); ` +
+      'renders always land under <dataDir>/renders/'
+    );
+  }
+
+  if (!/\.png$/i.test(out)) {
+    throw new RangeError(`resolveRenderPath: 'out' must end in .png (got ${JSON.stringify(out)})`);
+  }
+
+  if (WINDOWS_RESERVED_NAMES.has(out.slice(0, -'.png'.length).toUpperCase())) {
+    throw new RangeError(`resolveRenderPath: '${out}' is a Windows-reserved device name`);
+  }
+
+  return join(rendersDir, out);
+
+}
+
 /**
  * Query the store, render the history PNG, and write it to disk — the one
  * impure step of the raster pipeline, shared verbatim by the MCP tool and the
@@ -1065,7 +1133,9 @@ export interface HistoryRenderResult {
  * The default output path is `<dataDir>/renders/history_<utc>.png` beside the
  * database, so `SELF_EXPRESSION_HOME` relocates both together; the timestamp
  * (colons hyphenated for Windows) keeps concurrent renders from racing on one
- * filename. An explicit `out` overrides the whole path.
+ * filename. An explicit `out` names a file inside that same `renders/` directory
+ * instead — see {@link resolveRenderPath} for the bare-filename policy it enforces —
+ * and is refused if it already exists unless `overwrite` is `true`.
  *
  * @param store the store to query; also anchors the default output directory
  * @param args   the validated tool arguments
@@ -1077,11 +1147,13 @@ export interface HistoryRenderResult {
  *   // => { path: '…/.self-expression/renders/history_2026-08-27T21-15-04Z.png',
  *   //      signatureCount: 412, weekCount: 5, seriesCount: 3 }
  *
- * @throws {RangeError} When `days` is not a positive integer (via `renderHistoryPng`).
- * @throws {Error}      When the output directory cannot be created or the file
- *                      cannot be written.
+ * @throws {RangeError} When `days` is not a positive integer (via `renderHistoryPng`),
+ *                      or when `out` fails {@link resolveRenderPath}'s path policy.
+ * @throws {Error}      When the resolved path already exists and `overwrite` is not
+ *                      `true`, or when the file cannot be written.
  *
  * @see ../raster/compose.js
+ * @see resolveRenderPath
  * @see handleRenderHistoryPng
  */
 export function renderHistoryToFile(
@@ -1110,11 +1182,18 @@ export function renderHistoryToFile(
     { chart: args.chart, scale: args.scale },
   );
 
-  const fileStamp = when.toISOString().replace(/\.\d{3}Z$/, 'Z').replaceAll(':', '-');
+  const dataDir = dirname(store.path);
 
   const path = args.out === undefined
-    ? join(dirname(store.path), 'renders', `history_${fileStamp}.png`)
-    : resolve(args.out);
+    ? resolveRenderPath(dataDir, `history_${when.toISOString().replace(/\.\d{3}Z$/, 'Z').replaceAll(':', '-')}.png`)
+    : resolveRenderPath(dataDir, args.out);
+
+  // Overwrite protection only guards a caller-named `out` — the generated timestamped
+  // default is already collision-resistant by design (see the docblock above), and a
+  // same-instant re-render in a test or a fast loop legitimately replaces it.
+  if (args.out !== undefined && existsSync(path) && args.overwrite !== true) {
+    throw new Error(`renderHistoryToFile: '${path}' already exists; pass overwrite: true to replace it`);
+  }
 
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, png);
@@ -1284,7 +1363,9 @@ export function registerChartTools(server: McpServer, store: Store): void {
       'rolling mean, a daily uncertainty strip, a weekly need rate, and the busiest ' +
       "checklist series' percent trends. Reach for this to actually look at months of " +
       'history instead of pulling hundreds of rows into context. The result is a path, ' +
-      'never image data — then use the Read tool on the returned path to view the image.',
+      'never image data — then use the Read tool on the returned path to view the image. ' +
+      "Renders always land in <dataDir>/renders/; 'out', if given, is a bare filename " +
+      "there (no path, no ..), and an existing file is refused unless 'overwrite' is true.",
     inputSchema: HISTORY_PNG_SHAPE,
   }, (args) => handleRenderHistoryPng(store, args));
 

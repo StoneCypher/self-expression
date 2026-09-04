@@ -20,6 +20,14 @@
  *    posture is "the only verb is INSERT", and doctrine that is never tested is a
  *    promise. Every row's complete bytes are snapshotted and compared again after
  *    arbitrarily many later writes and after every marked read surface has run.
+ *
+ * 4. **Every analytics reader agrees with the surviving-row set.** README's contract is
+ *    that analytics exclude retracted rows and keep amended ones, and that "a sparkline
+ *    never replays a number its author took back". Four readers answer overlapping
+ *    questions off the same table — {@link seriesPercents} and {@link checklistSeriesTop}
+ *    literally read the same `percent` column for the same sparkline — and the failure
+ *    this catches is exactly the one that shipped: one of them quietly not applying the
+ *    filter, so the recall path and the history PNG disagreed about what was withdrawn.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -32,6 +40,7 @@ import { openStore, closeStore } from '../channels/store.js';
 import type { Store }            from '../channels/store.js';
 import {
   recordEntry, standingOf, register, recentEntries, seriesPercents, previousSignature,
+  checklistSeriesTop, signatureHistory, forecastOutcomes,
 } from '../channels/entries.js';
 import type { EntryStatus } from '../channels/entries.js';
 
@@ -337,5 +346,221 @@ describe('append-only — stochastic', () => {
 
     });
   }, 60_000);
+
+});
+
+// ── analytics readers vs. the surviving-row set ─────────────────────────────────────
+
+/** The series identities a generated history draws from, before per-run prefixing. */
+const SERIES_KEYS = ['alpha', 'beta', 'gamma'] as const;
+
+/** One generated analytics write: what kind of row it is, and what it points at. */
+type AnalyticsStep =
+  | { readonly op: 'snapshot';  readonly series: string; readonly percent: number }
+  | { readonly op: 'signature' }
+  | { readonly op: 'forecast' }
+  | { readonly op: 'resolve';   readonly link: number; readonly outcome: 'hit' | 'miss' | 'void' }
+  | { readonly op: 'strike';    readonly link: number; readonly kind: 'retracts' | 'amends' };
+
+/**
+ * A history mixing the row shapes the analytics readers see, in which every link names a
+ * **strictly earlier** index.
+ *
+ * The first row can never carry a link, and `resolve`/`strike` fall back to a plain
+ * forecast whenever there is nothing behind them to point at — the same backwards-only
+ * discipline {@link historyArb} keeps, for the same reason.
+ *
+ * A `resolve` may legally name a row that is not a forecast; that is deliberate, because
+ * {@link forecastOutcomes} is supposed to ignore exactly those.
+ */
+const analyticsArb: fc.Arbitrary<AnalyticsStep[]> = fc.array(
+  fc.record({
+    pick    : fc.nat({ max: 99 }),
+    series  : fc.constantFrom(...SERIES_KEYS),
+    percent : fc.integer({ min: 0, max: 100 }),
+    where   : fc.nat({ max: 1000 }),
+    kind    : fc.constantFrom<'retracts' | 'amends'>('retracts', 'amends'),
+    outcome : fc.constantFrom<'hit' | 'miss' | 'void'>('hit', 'miss', 'void'),
+  }),
+  { minLength: 1, maxLength: 14 },
+).map((raw): AnalyticsStep[] => raw.map((item, index): AnalyticsStep => {
+
+  const linkable = index > 0,
+        link     = linkable ? item.where % index : 0;
+
+  if (item.pick < 34)              { return { op: 'snapshot', series: item.series, percent: item.percent }; }
+  if (item.pick < 50)              { return { op: 'signature' }; }
+  if (item.pick < 66 || !linkable) { return { op: 'forecast' }; }
+  if (item.pick < 83)              { return { op: 'resolve', link, outcome: item.outcome }; }
+
+  return { op: 'strike', link, kind: item.kind };
+
+}));
+
+/**
+ * The generated analytics history seen as the plain correction history
+ * {@link referenceStanding} understands, so that reference is reused rather than
+ * re-derived — a second copy of it would be a second chance to be wrong the same way.
+ */
+function asCorrectionHistory(steps: readonly AnalyticsStep[]): Step[] {
+  return steps.map((step): Step =>
+    step.op === 'strike'    ? { link: step.link, kind: step.kind }
+    : step.op === 'resolve' ? { link: step.link, kind: 'resolves' }
+    :                         { link: null });
+}
+
+/**
+ * Write one generated analytics history through the real write path.
+ *
+ * @param prefix prepended to every series key, so a run's series cannot collide with an
+ *               earlier run's on a shared store — {@link seriesPercents} is keyed by
+ *               series and not by time, so a time window alone would not fence them.
+ * @returns the row ids in history order
+ */
+function writeAnalytics(
+  s       : Store,
+  steps   : readonly AnalyticsStep[],
+  session : string,
+  when    : Date,
+  prefix  : string,
+): number[] {
+
+  const ids: number[] = [];
+
+  const backwards = (link: number): number => {
+    const target = ids[link];
+    if (target === undefined) { throw new Error('the generator produced a forward link'); }
+    return target;
+  };
+
+  for (const [index, step] of steps.entries()) {
+    switch (step.op) {
+
+      case 'snapshot':
+        ids.push(recordEntry(s, { channel: 'checklist', text: `snap ${String(index)}`, session,
+                                  seriesKey: `${prefix}${step.series}`, percent: step.percent },
+          VERSION, when).id);
+        break;
+
+      case 'signature':
+        ids.push(recordEntry(s, { channel: 'signature', text: `sig ${String(index)}`, session,
+                                  stem: 'flow' }, VERSION, when).id);
+        break;
+
+      case 'forecast':
+        ids.push(recordEntry(s, { channel: 'confidence', text: `forecast ${String(index)}`, session,
+                                  confidence: 'predicted' }, VERSION, when).id);
+        break;
+
+      case 'resolve':
+        ids.push(recordEntry(s, { channel: 'confidence', text: `resolve ${String(index)}`, session,
+                                  correctsId: backwards(step.link), correctsKind: 'resolves',
+                                  outcome: step.outcome }, VERSION, when).id);
+        break;
+
+      case 'strike':
+        ids.push(recordEntry(s, { channel: 'divergence', text: `strike ${String(index)}`, session,
+                                  correctsId: backwards(step.link), correctsKind: step.kind,
+                                  verbatim: `the words of ${String(step.link)}` }, VERSION, when).id);
+        break;
+
+    }
+  }
+
+  return ids;
+
+}
+
+/** A day and an hour in milliseconds, and the instant runs are laid out from. */
+const DAY   = 86_400_000,
+      HOUR  = 3_600_000,
+      EPOCH = Date.UTC(2026, 0, 1);
+
+describe('analytics readers — stochastic agreement with the surviving rows', () => {
+
+  it('seriesPercents, checklistSeriesTop, and signatureHistory all report exactly what survives', () => {
+    withStore(s => {
+
+      // One shared store, with each run written into its own day-wide window under its own
+      // series-key prefix, so runs cannot see each other through the time bound or the
+      // series bound.
+      let run = 0;
+
+      fc.assert(
+        fc.property(analyticsArb, (steps) => {
+
+          run += 1;
+          const when   = new Date(EPOCH + run * DAY),
+                since  = new Date(EPOCH + run * DAY - HOUR).toISOString(),
+                prefix = `r${String(run)}-`,
+                ids    = writeAnalytics(s, steps, `an-${String(run)}`, when, prefix);
+
+          const standing = referenceStanding(asCorrectionHistory(steps)),
+                alive    = (index: number): boolean => standing.get(index + 1) !== 'retracted';
+
+          // The surviving snapshots, in recording order, grouped by series key.
+          const surviving = new Map<string, number[]>();
+
+          for (const [index, step] of steps.entries()) {
+            if (step.op !== 'snapshot' || !alive(index)) { continue; }
+            const key    = `${prefix}${step.series}`,
+                  bucket = surviving.get(key);
+            if (bucket === undefined) { surviving.set(key, [step.percent]); }
+            else                      { bucket.push(step.percent); }
+          }
+
+          // Key by key, including keys whose every snapshot was taken back.
+          for (const key of SERIES_KEYS) {
+            expect(seriesPercents(s, `${prefix}${key}`))
+              .toEqual(surviving.get(`${prefix}${key}`) ?? []);
+          }
+
+          // And the panel reader is exactly those same series, busiest first, ties by key
+          // — the agreement the history PNG was missing.
+          expect(checklistSeriesTop(s, since, 10)).toEqual(
+            [...surviving.entries()]
+              .sort(([keyA, a], [keyB, b]) =>
+                b.length - a.length || (keyA < keyB ? -1 : keyA > keyB ? 1 : 0))
+              .map(([seriesKey, percents]) => ({ seriesKey, percents })));
+
+          expect(signatureHistory(s, since).map(row => row.id)).toEqual(
+            ids.filter((_, index) => steps[index]?.op === 'signature' && alive(index)));
+
+        }),
+        { numRuns: 40 }
+      );
+
+    });
+  }, 60_000);
+
+  it('forecastOutcomes counts exactly the resolutions whose forecast and resolution both survive', () => {
+
+    // A fresh store per run: forecastOutcomes is scoped by neither session nor time, so a
+    // shared store would let earlier runs into the answer.
+    fc.assert(
+      fc.property(analyticsArb, (steps) => {
+        withStore(s => {
+
+          writeAnalytics(s, steps, 'outcomes', new Date(EPOCH), 'k-');
+
+          const standing = referenceStanding(asCorrectionHistory(steps)),
+                alive    = (index: number): boolean => standing.get(index + 1) !== 'retracted',
+                expected : string[] = [];
+
+          for (const [index, step] of steps.entries()) {
+            if (step.op !== 'resolve')               { continue; }
+            if (steps[step.link]?.op !== 'forecast') { continue; }   // never a forecast, never scored
+            if (!alive(index) || !alive(step.link))  { continue; }
+            expected.push(step.outcome);
+          }
+
+          expect(forecastOutcomes(s)).toEqual(expected);
+
+        });
+      }),
+      { numRuns: 30 }
+    );
+
+  }, 120_000);
 
 });

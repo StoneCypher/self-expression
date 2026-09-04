@@ -118,6 +118,33 @@ describe('handleLogChecklist', () => {
 
 });
 
+describe('handleLogChecklist — the checklist channel enforces the same gates express does', () => {
+
+  test('a disabled checklist channel refuses to record, and nothing is written', () => withStore(s => {
+    writeConfig(s, 'channels.enabled', 'signature,need');
+    const out = text(handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: 'k' }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain("'checklist'");
+    expect(out).toContain('disabled');
+    expect(s.db.prepare('SELECT COUNT(*) AS n FROM entries').get().n).toBe(0);
+  }));
+
+  test('a lowered channels.checklist.max_chars refuses a normal block, and nothing is written', () => withStore(s => {
+    writeConfig(s, 'channels.checklist.max_chars', '1');
+    const out = text(handleLogChecklist(s, VERSION, { block: block(1, 0, 0), title: 'T', seriesKey: 'k' }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('channels.checklist.max_chars');
+    expect(s.db.prepare('SELECT COUNT(*) AS n FROM entries').get().n).toBe(0);
+  }));
+
+  test('default config still logs — the new gates do not regress the common path', () => withStore(s => {
+    const out = text(handleLogChecklist(s, VERSION, { block: block(2, 1, 1), title: 'T', seriesKey: 'k' }));
+    expect(out).not.toMatch(/^error: /);
+    expect(s.db.prepare('SELECT COUNT(*) AS n FROM entries').get().n).toBe(1);
+  }));
+
+});
+
 describe('handleRecallChecklists', () => {
 
   test('returns recent checklist rows oldest first, with the checklist columns', () => withStore(s => {

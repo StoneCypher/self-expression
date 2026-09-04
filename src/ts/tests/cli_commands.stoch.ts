@@ -2,11 +2,19 @@ import * as fc                    from 'fast-check';
 import { parseCommand, run }      from '../cli_commands.js';
 import type { CliStreams }        from '../cli_commands.js';
 
-/** The tokens that mean something; everything else must fall through to `unknown`. */
-const RESERVED = new Set(['mcp', 'help', '--help', '-h', 'hook', 'render', 'messages']);
+/**
+ * The tokens that mean something; everything else must fall through to `unknown`.
+ *
+ * Mirrors the literal comparisons in {@link parseCommand} one for one — `mcp`, `hook`,
+ * `render`, `messages`, `notes`, and the three spellings of help. Kept as a checklist
+ * against that function's source rather than derived from it, because `parseCommand`
+ * has no exported command table to derive from; a command added there without a
+ * matching addition here is exactly the drift this list exists to catch.
+ */
+const RESERVED = new Set(['mcp', 'help', '--help', '-h', 'hook', 'render', 'messages', 'notes']);
 
 /** The subcommands whose later arguments are grammar rather than noise. */
-const TAKES_ARGUMENTS = new Set(['hook', 'render', 'messages']);
+const TAKES_ARGUMENTS = new Set(['hook', 'render', 'messages', 'notes']);
 
 describe('stochastic cli parsing', () => {
 

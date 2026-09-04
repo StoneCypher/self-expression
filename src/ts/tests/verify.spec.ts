@@ -167,6 +167,31 @@ describe('verifyChecklist — catching what the eye misses', () => {
     expect(verdict.failures.join('\n')).toContain('🐛 listed but no such item exists');
   });
 
+  test('a zero-parsed-item block never reports NaN% computed — nothing pending reads as 100%', () => {
+    // Confirmed bug: a summary line pasted with no item lines above it (nItems parsed
+    // as 0) divided-by-zero to NaN, so *any* stated percent failed with the unhelpful
+    // 'NaN% computed' — even a header that (self-inconsistently) claims 1/0/0 (100%),
+    // where "nothing pending" (active 0) should read as complete.
+    const verdict = verifyChecklist('1/0/0 items (100%) ██████████');
+    expect(verdict.failures.join('\n')).not.toContain('NaN');
+    expect(verdict.passes).toContain('ok: percent 100% matches');
+    // The header/body mismatch (1 stated, 0 parsed) is still caught, just not as NaN.
+    expect(verdict.failures.join('\n')).toContain('sums to 1, but 0 items were parsed');
+  });
+
+  test('a zero-parsed-item block with a stated pending count expects 0%, not NaN', () => {
+    const verdict = verifyChecklist('0/1/0 items (0%) ░░░░░░░░░░');
+    expect(verdict.failures.join('\n')).not.toContain('NaN');
+    expect(verdict.passes).toContain('ok: percent 0% matches');
+  });
+
+  test('a zero-parsed-item block that mismatches its own tie-break still fails, not NaN', () => {
+    const verdict = verifyChecklist('1/0/0 items (0%) ░░░░░░░░░░');
+    expect(verdict.ok).toBe(false);
+    expect(verdict.failures.join('\n')).not.toContain('NaN');
+    expect(verdict.failures.join('\n')).toContain('percent 0% stated, 100% computed');
+  });
+
   test('nine or more distinct markers left inline are flagged', () => {
     // Canonically ordered so the placement rule is the only failure.
     const markers = ['✅', '🤖', '⏳', '🌐', '🛠️', '🔜', '❌', '❗', '🤔'];

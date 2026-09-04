@@ -17,6 +17,7 @@ import {
   handleConfigure, handleExpress, handleAnnotate, handleBeginTurn,
   enabledChannels, enabledConfidenceGrounds,
   registerTools, ENABLED_KEY, FORECAST_KEY, ANNOTATE_MAX_NOTES,
+  rejectEventOnlyWrite, startupBakedNotice,
 } from '../mcp/tools.js';
 import { buildServer } from '../mcp/server.js';
 import { handleLogChecklist } from '../mcp/checklist_tools.js';
@@ -76,6 +77,39 @@ describe('handleConfigure set — D2, validated and canonicalized', () => {
     expect(enabledChannels(s)).toEqual(['signature', 'need']);
   }));
 
+  test('image.enabled and forecast.enabled — also baked into a schema at registration — note the restart too', () => withStore(s => {
+    const image = text(handleConfigure(s, { op: 'set', key: 'image.enabled', value: 'true' }));
+    expect(image).toContain('image.enabled = true');
+    expect(image).toContain('next server start');
+
+    const forecast = text(handleConfigure(s, { op: 'set', key: FORECAST_KEY, value: 'false' }));
+    expect(forecast).toContain('forecast.enabled = false');
+    expect(forecast).toContain('next server start');
+  }));
+
+  test("audio.enabled and audio.tts_local — baked into the separate claudio process's own schema — name that process, not this one", () => withStore(s => {
+    const enabled = text(handleConfigure(s, { op: 'set', key: 'audio.enabled', value: 'true' }));
+    expect(enabled).toContain('audio.enabled = true');
+    expect(enabled).toContain('claudio');
+
+    const local = text(handleConfigure(s, { op: 'set', key: 'audio.tts_local', value: 'true' }));
+    expect(local).toContain('audio.tts_local = true');
+    expect(local).toContain('claudio');
+  }));
+
+  test('an ordinary key carries no startup-baked caveat', () => withStore(s => {
+    const out = text(handleConfigure(s, { op: 'set', key: 'retention.days', value: '30' }));
+    expect(out).not.toContain('next server start');
+    expect(out).not.toContain('claudio');
+  }));
+
+  test('unsetting a startup-baked key notes the restart too, not only setting it', () => withStore(s => {
+    handleConfigure(s, { op: 'set', key: ENABLED_KEY, value: 'signature,need' });
+    const out = text(handleConfigure(s, { op: 'unset', key: ENABLED_KEY }));
+    expect(out).toContain('channels.enabled unset');
+    expect(out).toContain('next server start');
+  }));
+
   test('ints canonicalize: leading zeros are stripped before storage', () => withStore(s => {
     handleConfigure(s, { op: 'set', key: 'retention.days', value: '090' });
     expect(readConfig(s, 'retention.days')).toBe('90');
@@ -128,6 +162,75 @@ describe('handleConfigure unset and get — D4', () => {
     expect(text(handleConfigure(s, { op: 'get' }))).toMatch(/^error: /);
     expect(text(handleConfigure(s, { op: 'set', key: 'gate.checklist' }))).toMatch(/^error: /);
     expect(readConfig(s, 'gate.checklist')).toBeNull();
+  }));
+
+});
+
+describe('rejectEventOnlyWrite — the pure helper behind the share.opted_in_utc guard', () => {
+
+  test('refuses the one event-only key, naming both directions of the real event', () => {
+    const out = rejectEventOnlyWrite('share.opted_in_utc');
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('share.enabled true');
+    expect(out).toContain('share.enabled false');
+  });
+
+  test('every other key, including share.enabled itself, is untouched', () => {
+    expect(rejectEventOnlyWrite('share.enabled')).toBeNull();
+    expect(rejectEventOnlyWrite('retention.days')).toBeNull();
+  });
+
+});
+
+describe('startupBakedNotice — the pure helper behind the restart caveat', () => {
+
+  test('names the five startup-baked keys, and no others', () => {
+    for (const key of [ENABLED_KEY, FORECAST_KEY, 'image.enabled', 'audio.enabled', 'audio.tts_local']) {
+      expect(startupBakedNotice(key)).not.toBe('');
+    }
+    expect(startupBakedNotice('retention.days')).toBe('');
+    expect(startupBakedNotice('messages.enabled')).toBe('');
+    expect(startupBakedNotice('mailbox.enabled')).toBe('');
+  });
+
+});
+
+describe('handleConfigure — share.opted_in_utc cannot be set or unset directly (issue: backdated opt-in)', () => {
+
+  test('a direct set is refused and the row stays unchanged — no backdating the opt-in', () => withStore(s => {
+    const out = text(handleConfigure(s, { op: 'set', key: 'share.opted_in_utc', value: '1970-01-01T00:00:00Z' }));
+    expect(out).toMatch(/^error: /);
+    expect(out).toContain('share.enabled true');
+    expect(readConfig(s, 'share.opted_in_utc')).toBeNull();
+  }));
+
+  test('a direct unset is refused even once the event has stamped a real moment', () => withStore(s => {
+    handleConfigure(s, { op: 'set', key: 'share.enabled', value: 'true' });
+    const stamped = readConfig(s, 'share.opted_in_utc');
+    expect(stamped).not.toBeNull();
+
+    const out = text(handleConfigure(s, { op: 'unset', key: 'share.opted_in_utc' }));
+    expect(out).toMatch(/^error: /);
+    expect(readConfig(s, 'share.opted_in_utc')).toBe(stamped);
+  }));
+
+  test('the share.enabled event path still stamps the moment on opt-in', () => withStore(s => {
+    const out = text(handleConfigure(s, { op: 'set', key: 'share.enabled', value: 'true' }));
+    expect(out).toContain('opt-in moment recorded');
+    expect(readConfig(s, 'share.opted_in_utc')).not.toBeNull();
+  }));
+
+  test('the share.enabled event path still clears the moment on opt-out', () => withStore(s => {
+    handleConfigure(s, { op: 'set', key: 'share.enabled', value: 'true' });
+    const out = text(handleConfigure(s, { op: 'set', key: 'share.enabled', value: 'false' }));
+    expect(out).toContain('opt-in moment cleared');
+    expect(readConfig(s, 'share.opted_in_utc')).toBeNull();
+  }));
+
+  test('get still reads the stamped moment — only writes are blocked', () => withStore(s => {
+    handleConfigure(s, { op: 'set', key: 'share.enabled', value: 'true' });
+    const out = text(handleConfigure(s, { op: 'get', key: 'share.opted_in_utc' }));
+    expect(out).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   }));
 
 });

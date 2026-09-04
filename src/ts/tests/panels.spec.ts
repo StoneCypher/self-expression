@@ -244,4 +244,13 @@ describe('drawChecklistSeries', () => {
     expect(countColor(surface, BLUE)).toBe(0);
   });
 
+  test('a non-finite percent is skipped rather than clamped, and never hangs', () => {
+    const surface = makeSurface(300, 200, WHITE);
+    // Used to hang: Math.min(100, Math.max(0, NaN)) is still NaN, which fed a
+    // never-terminating Bresenham walk in the surface layer.
+    expect(() => drawChecklistSeries(fullRegion(surface), [
+      { seriesKey: 'gappy', percents: [10, Number.NaN, 30, Infinity, -Infinity, 50] },
+    ])).not.toThrow();
+  });
+
 });

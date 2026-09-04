@@ -46,6 +46,7 @@ import type { NoteState, NoteEvent, Turn } from './vocabulary.js';
 import { stamp, dayPhrase }    from './time.js';
 import { effectiveValue }      from './config.js';
 import { postMessage, validateMessage } from './messages.js';
+import { hookObservedTurn }    from './context.js';
 import type { Store }          from './store.js';
 
 /** Config key gating the whole facility; only an effective `'true'` enables it. */
@@ -62,6 +63,17 @@ export const NOTE_REASON_MAX = 200;
 
 /** Milliseconds in one day, for TTL arithmetic. */
 const DAY_MS = 86_400_000;
+
+/**
+ * The note lifetime, in days, that applies when nobody configured one and nobody supplied
+ * an explicit `expiresUtc`.
+ *
+ * A named constant rather than a literal because two callers need the same number for the
+ * same note: {@link noteBudgets} resolves it for the write, and {@link validateNote}
+ * needs it to judge a `notBefore` against the expiry the note is *actually going to get*.
+ * A second literal there is how "queued but already doomed" got through the first time.
+ */
+export const DEFAULT_TTL_DAYS = 14;
 
 /** The rolling window `mailbox.daily_cap` is measured over, in milliseconds. */
 const CAP_WINDOW_MS = DAY_MS;
@@ -202,7 +214,7 @@ export function noteBudgets(store: Store): NoteBudgets {
     dailyCap       : budget(store, 'mailbox.daily_cap',        3),
     maxPending     : budget(store, 'mailbox.max_pending',     10),
     offerCap       : Math.max(budget(store, 'mailbox.offer_cap', 3), 1),
-    defaultTtlDays : Math.max(budget(store, 'mailbox.default_ttl_days', 14), 1),
+    defaultTtlDays : Math.max(budget(store, 'mailbox.default_ttl_days', DEFAULT_TTL_DAYS), 1),
   };
 }
 
@@ -232,7 +244,14 @@ const NOTE_SELECT = `
            ORDER BY e.id DESC LIMIT 1)                                AS last_offer_prompt,
          (SELECT e.turn FROM note_events e
            WHERE e.note_id = n.id AND e.event = 'offered'
-           ORDER BY e.id DESC LIMIT 1)                                AS last_offer_turn
+           ORDER BY e.id DESC LIMIT 1)                                AS last_offer_turn,
+         -- An offer's identity is the *pair* (session, prompt_id), never the prompt id
+         -- alone: prompt ids reach the model through ordinary reads, so a bare id is a
+         -- quotable token rather than a proof. Carried beside the other two so a single
+         -- read answers the whole authorisation question. See surfaceNote.
+         (SELECT e.session FROM note_events e
+           WHERE e.note_id = n.id AND e.event = 'offered'
+           ORDER BY e.id DESC LIMIT 1)                                AS last_offer_session
     FROM notes n JOIN messages m ON m.id = n.message_id`;
 
 /** The ledger facts a state derivation reads, isolated so the rule can be pure. */
@@ -253,7 +272,19 @@ export interface NoteFacts {
  *
  * Order matters and encodes the design's priorities: a recorded terminal event is the
  * last word (a withdrawn note stays withdrawn even after its TTL would have expired it),
- * then the two derived deaths, then the transient offer, then the resting state.
+ * then the mandatory TTL, then the transient offer, then death by exhausted offers, then
+ * the resting state.
+ *
+ * **The offer outranks the offer cap**, and that ordering is load-bearing rather than
+ * incidental. The cap counts *chances at an entrance*, and the final chance is a chance:
+ * a note offered for the third time under `offer_cap 3` was genuinely put in front of the
+ * model this turn, the hook said so on the record, and refusing to let it be surfaced
+ * would mean rendering text into a reply and then being unable to say so — the record
+ * claiming *less* than happened, which is the same class of lie as claiming more. Ranking
+ * the count first also made `offer_cap 1` — a legal setting, and the one a minimalist
+ * would pick — surface nothing at all, ever. Expiry by count therefore lands one turn
+ * later, when {@link lapseStaleOffers} lapses that final offer and the note stops being
+ * outstanding.
  *
  * @param facts   the ledger facts for one note
  * @param offerCap how many offers a note gets before it dies unsurfaced
@@ -269,6 +300,11 @@ export interface NoteFacts {
  *                     expiresUtc: '2099-01-01T00:00:00.000Z' }, 3, '2026-08-28T00:00:00.000Z')
  *   // => 'expired' — the offer cap is a real ceiling, not an intention
  *
+ * @example
+ *   deriveNoteState({ terminalEvent: null, lastEvent: 'offered', offerCount: 3,
+ *                     expiresUtc: '2099-01-01T00:00:00.000Z' }, 3, '2026-08-28T00:00:00.000Z')
+ *   // => 'offered' — the last chance is still a chance, until it lapses
+ *
  * @see ./vocabulary.js NOTE_STATES
  */
 export function deriveNoteState(facts: NoteFacts, offerCap: number, nowUtc: string): NoteState {
@@ -278,8 +314,8 @@ export function deriveNoteState(facts: NoteFacts, offerCap: number, nowUtc: stri
   }
 
   if (nowUtc > facts.expiresUtc)      { return 'expired'; }
-  if (facts.offerCount >= offerCap)   { return 'expired'; }
   if (facts.lastEvent === 'offered')  { return 'offered'; }
+  if (facts.offerCount >= offerCap)   { return 'expired'; }
 
   return 'queued';
 
@@ -334,6 +370,54 @@ function record(
          turn.turn ?? null, turn.promptId ?? null, turn.session ?? null);
 }
 
+/** The instants a note's window actually resolves to, defaults applied. */
+export interface NoteWindow {
+  /** The instant the note first becomes offerable, defaulted to `when`. */
+  readonly notBefore  : string;
+  /** The instant the note dies, defaulted to `when` plus the TTL. */
+  readonly expiresUtc : string;
+  /** Whether the expiry above is the default rather than a supplied one. */
+  readonly defaulted  : boolean;
+}
+
+/**
+ * The two instants a note actually gets, with both defaults already applied — the single
+ * answer {@link validateNote} judges and {@link composeNote} writes.
+ *
+ * One function because the bug it forecloses was two: validation looked at the *supplied*
+ * expiry and composition computed the *effective* one afterwards, so a `notBefore` past
+ * the default TTL passed every check and was queued already dead. A note's window has one
+ * definition or it has none.
+ *
+ * Unparseable input is treated as absent here, so this can run before validation without
+ * throwing; `validateNote` reports the parse failure separately.
+ *
+ * @param defaultTtlDays the configured lifetime applied when no `expiresUtc` was supplied
+ *
+ * @example
+ *   noteWindow({ text: 't', reason: 'r', session: 's1', notBefore: '2027-01-01T00:00:00Z' },
+ *              new Date('2026-08-28T12:00:00Z'), 14)
+ *   // => { notBefore: '2027-01-01…', expiresUtc: '2026-09-11…', defaulted: true }
+ *   //    — ripens long after it dies, which is what validation now catches
+ */
+function noteWindow(input: NoteInput, when: Date, defaultTtlDays: number): NoteWindow {
+
+  const instant = (value: string | undefined): Date | null => {
+          if (value === undefined) { return null; }
+          const at = new Date(value);
+          return Number.isNaN(at.getTime()) ? null : at;
+        },
+        ripens  = instant(input.notBefore),
+        dies    = instant(input.expiresUtc);
+
+  return {
+    notBefore  : (ripens ?? when).toISOString(),
+    expiresUtc : (dies ?? new Date(when.getTime() + defaultTtlDays * DAY_MS)).toISOString(),
+    defaulted  : dies === null,
+  };
+
+}
+
 /**
  * Check a proposed note against the facility's rules, returning every problem found
  * rather than throwing on the first — a caller supplying two bad values learns about
@@ -341,8 +425,16 @@ function record(
  *
  * The queue-depth rule needs the store, so it lives in {@link composeNote}.
  *
- * @param input the proposed note
- * @param when  the clock the defaults are computed against
+ * The ripeness-versus-expiry rule is judged against the note's **effective** window (see
+ * {@link noteWindow}), not against what the caller happened to type. `notBefore` a year
+ * out with no `expiresUtc` is exactly as doomed as one paired with a near expiry, and the
+ * caller who supplied neither expiry is the one least likely to spot it.
+ *
+ * @param input          the proposed note
+ * @param when           the clock the defaults are computed against
+ * @param defaultTtlDays the lifetime a defaulted expiry gets, so the check judges the
+ *                       expiry the note will really have; defaults to
+ *                       {@link DEFAULT_TTL_DAYS} for callers with no store in hand
  *
  * @example
  *   validateNote({ text: 'run reconcile first', reason: 'the deploy window opens then',
@@ -351,8 +443,17 @@ function record(
  * @example
  *   validateNote({ text: 'x', reason: '', session: 's1' }, new Date())
  *   // => ['reason must not be empty — a note with no stated reason is unauditable, …']
+ *
+ * @example
+ *   validateNote({ text: 'x', reason: 'r', session: 's1', notBefore: '2027-01-01T00:00:00Z' },
+ *                 new Date('2026-08-28T12:00:00Z'), 14)
+ *   // => ['expiresUtc … must be after notBefore … could never be offered …']
  */
-export function validateNote(input: NoteInput, when: Date = new Date()): string[] {
+export function validateNote(
+  input          : NoteInput,
+  when           : Date   = new Date(),
+  defaultTtlDays : number = DEFAULT_TTL_DAYS,
+): string[] {
 
   // The text, session, and expiry rules are the messagebox's own — a note *is* a
   // message — so they are borrowed rather than restated, and cannot drift from it.
@@ -383,21 +484,30 @@ export function validateNote(input: NoteInput, when: Date = new Date()): string[
     problems.push(`notBefore must parse as an ISO instant; received '${input.notBefore}'`);
   }
 
-  const notBefore = input.notBefore === undefined || Number.isNaN(Date.parse(input.notBefore))
-          ? when.toISOString() : new Date(input.notBefore).toISOString(),
-        expires   = input.expiresUtc === undefined || Number.isNaN(Date.parse(input.expiresUtc))
-          ? null : new Date(input.expiresUtc).toISOString();
+  const window = noteWindow(input, when, defaultTtlDays);
 
-  if (expires !== null && expires <= notBefore) {
+  if (window.expiresUtc <= window.notBefore) {
     problems.push(
-      `expiresUtc ('${expires}') must be after notBefore ('${notBefore}') — a note that ` +
-      'dies before it ripens could never be offered, and silently queueing one would be ' +
-      'the false-belief-of-delivery failure in a new costume');
+      `expiresUtc ('${window.expiresUtc}') must be after notBefore ('${window.notBefore}') — ` +
+      'a note that dies before it ripens could never be offered, and silently queueing one ' +
+      'would be the false-belief-of-delivery failure in a new costume' +
+      (window.defaulted
+        ? ` (no expiresUtc was supplied, so it defaulted to now plus the ${String(defaultTtlDays)}-` +
+          'day TTL; give an explicit expiresUtc, or bring notBefore forward)'
+        : ''));
   }
 
   return problems;
 
 }
+
+/**
+ * How many notes one page of a state-filtered {@link listNotes} walk reads.
+ *
+ * Comfortably above the 200-note ceiling a single call can return, so the common case is
+ * one round trip and the paging only ever costs anything on a store big enough to need it.
+ */
+const LIST_PAGE = 256;
 
 /** The live-note predicate: no terminal event, not expired, offers not exhausted. */
 const LIVE = `
@@ -481,6 +591,15 @@ export function noteView(store: Store, noteId: number, when: Date = new Date()):
  * rather than deniable as vibes" only holds if the notes that *died* are as visible as
  * the ones that landed, so expired and withdrawn notes are listed too.
  *
+ * A filtered listing walks the table in pages until it has `limit` matches or runs out
+ * of notes. It cannot do the filtering in SQL, because state is derived from the ledger
+ * and the clock rather than stored — that is the invariant keeping a stored state from
+ * ever disagreeing with the events justifying it, and it is worth a paged walk. What it
+ * is *not* worth is the previous shape: fetch the newest `limit * 4` rows, filter those,
+ * and return whatever survived. With thirty notes and the five oldest withdrawn,
+ * `{ state: 'withdrawn', limit: 5 }` returned nothing at all, and an audit surface that
+ * quietly answers "none" is worse than one that is slow.
+ *
  * @param limit most notes returned; default 20, capped at 200
  * @param state optional state filter; omit for everything
  *
@@ -496,11 +615,29 @@ export function listNotes(
   const budgets = noteBudgets(store),
         nowUtc  = when.toISOString(),
         limit   = Math.min(Math.max(query.limit ?? 20, 1), 200),
-        rows    = store.db.prepare(`${NOTE_SELECT} ORDER BY n.id DESC LIMIT ?`).all(limit * 4),
-        views   = rows.map(row => toView(row, budgets.offerCap, nowUtc));
+        page    = store.db.prepare(`${NOTE_SELECT} ORDER BY n.id DESC LIMIT ? OFFSET ?`);
 
-  return (query.state === undefined ? views : views.filter(v => v.state === query.state))
-    .slice(0, limit);
+  if (query.state === undefined) {
+    return page.all(limit, 0).map(row => toView(row, budgets.offerCap, nowUtc));
+  }
+
+  const found: NoteView[] = [];
+
+  for (let offset = 0; found.length < limit; offset += LIST_PAGE) {
+
+    const rows = page.all(LIST_PAGE, offset);
+
+    for (const row of rows) {
+      const view = toView(row, budgets.offerCap, nowUtc);
+      if (view.state === query.state) { found.push(view); }
+      if (found.length === limit)     { return found; }
+    }
+
+    if (rows.length < LIST_PAGE) { break; }
+
+  }
+
+  return found;
 
 }
 
@@ -567,7 +704,7 @@ export function composeNote(
   }
 
   const budgets  = noteBudgets(store),
-        problems = validateNote(input, when);
+        problems = validateNote(input, when, budgets.defaultTtlDays);
 
   const pending = pendingNotes(store, when),
         // A note that would replace an existing one in its series does not grow the
@@ -587,11 +724,9 @@ export function composeNote(
     throw new Error(`cannot compose note:\n  - ${problems.join('\n  - ')}`);
   }
 
-  const notBefore = input.notBefore === undefined
-          ? when.toISOString() : new Date(input.notBefore).toISOString(),
-        expires   = input.expiresUtc === undefined
-          ? new Date(when.getTime() + budgets.defaultTtlDays * DAY_MS).toISOString()
-          : new Date(input.expiresUtc).toISOString();
+  // The same window validation just judged — one definition, so what was checked and what
+  // is written cannot drift apart.
+  const { notBefore, expiresUtc: expires } = noteWindow(input, when, budgets.defaultTtlDays);
 
   const ledger = { turn: input.turn, promptId: input.promptId, session: input.session };
 
@@ -697,13 +832,20 @@ export function sweepExpired(store: Store, when: Date = new Date()): number {
   const budgets = noteBudgets(store),
         nowUtc  = when.toISOString();
 
+  // Death by exhausted offers waits for the outstanding offer to lapse, exactly as
+  // {@link deriveNoteState} does — otherwise the sweep would kill a note the hook put in
+  // front of the model this very turn, and a store that swept would disagree with a store
+  // that did not, which is the one thing this bookkeeping must never do.
   const doomed = store.db.prepare(`
     ${NOTE_SELECT}
      WHERE NOT EXISTS (SELECT 1 FROM note_events e
                         WHERE e.note_id = n.id AND e.event IN ${TERMINAL_EVENTS})
        AND (m.expires_utc <= ?
-            OR (SELECT COUNT(*) FROM note_events e
-                 WHERE e.note_id = n.id AND e.event = 'offered') >= ?)`)
+            OR ((SELECT COUNT(*) FROM note_events e
+                  WHERE e.note_id = n.id AND e.event = 'offered') >= ?
+                AND COALESCE((SELECT e.event FROM note_events e
+                               WHERE e.note_id = n.id
+                               ORDER BY e.id DESC LIMIT 1), 'composed') <> 'offered'))`)
     .all(nowUtc, budgets.offerCap);
 
   for (const row of doomed) { record(store, Number(row['id']), 'expired', {}, when); }
@@ -751,8 +893,11 @@ export function lapseStaleOffers(store: Store, promptId: string, when: Date = ne
  * makes "deliver only on a human's turn" structural: since `surfaced` requires a
  * matching `offered` row, and no `offered` row can exist outside a reply turn, there is
  * no sequence of operations — tool calls, wakeups, retries — that produces a delivery
- * claim the hook did not authorize. A turn with no `promptId` is refused for the same
- * reason: there would be nothing for a later surfacing to match against.
+ * claim the hook did not authorize. A turn with **neither** a `promptId` nor a `session`
+ * is refused for the same reason: an offer's identity is that pair, so a turn missing
+ * half of it leaves nothing for a later surfacing to match against — and an offer nobody
+ * could ever surface is worse than no offer, because the model would render the words and
+ * then be unable to say that it had.
  *
  * The allowance is `min(surface_budget, daily_cap - surfaced in the last 24 hours)`, so
  * an offer can never be made that the daily cap would have to refuse afterward.
@@ -760,7 +905,8 @@ export function lapseStaleOffers(store: Store, promptId: string, when: Date = ne
  * @param turn the hook-observed turn; `turn.turn` must be `'reply'`
  * @param when injectable clock
  * @returns the notes offered, in the order they should be surfaced; empty when the
- *          facility is off, the turn is not a reply, nothing is ripe, or budget is spent
+ *          facility is off, the turn is not a reply, the turn carries no `promptId` or no
+ *          `session`, nothing is ripe, or budget is spent
  *
  * @example
  *   offerRipeNotes(store, { turn: 'reply', promptId: 'p-1', session: 's1' })
@@ -777,6 +923,10 @@ export function offerRipeNotes(store: Store, turn: NoteTurn, when: Date = new Da
   if (turn.turn !== 'reply')   { return []; }
   if (turn.promptId === '')    { return []; }
 
+  const session = turn.session ?? '';
+
+  if (session === '') { return []; }
+
   const budgets = noteBudgets(store);
 
   lapseStaleOffers(store, turn.promptId, when);
@@ -791,7 +941,7 @@ export function offerRipeNotes(store: Store, turn: NoteTurn, when: Date = new Da
 
   for (const note of offered) {
     record(store, note.id, 'offered',
-           { turn: 'reply', promptId: turn.promptId, session: turn.session }, when);
+           { turn: 'reply', promptId: turn.promptId, session }, when);
   }
 
   return offered.map(note => ({ ...note, state: 'offered' as const,
@@ -807,26 +957,45 @@ export function offerRipeNotes(store: Store, turn: NoteTurn, when: Date = new Da
  * text was rendered into a reply the human explicitly prompted", and the design never
  * lets the record say more than that.
  *
- * The check is the whole point: the note must carry an `offered` event whose `turn` is
- * `'reply'` — written by the hook, not asserted by the model — and whose `prompt_id`
- * matches this turn. A claim about any other turn, or about a note nobody offered, is
- * refused rather than recorded.
+ * The check is the whole point, and it is five conditions rather than one, because each
+ * of the four weaker versions was reachable by a sequence of ordinary tool calls:
+ *
+ * 1. **The note is not already terminal.** Surfaced, withdrawn, and expired stay so.
+ * 2. **The offer is still outstanding** — the note's most recent event is `offered`, not
+ *    a `declined` that {@link lapseStaleOffers} wrote when the turn moved on. Matching
+ *    the last offer's `prompt_id` alone was not enough: lapsing leaves that column
+ *    untouched, so a lapsed offer went on answering "yes, that was your turn" forever.
+ * 3. **The offer's identity matches, as a pair.** `(session, prompt_id)`, both non-empty,
+ *    both equal. A prompt id on its own is a token the model can read out of an ordinary
+ *    reply and quote back; the session is what stops one being redeemed from somewhere
+ *    else entirely.
+ * 4. **The harness observed that turn.** `turn_context` must hold a row for the same pair
+ *    with `source = 'hook'`. `begin_turn` will record any turn the model names — correct
+ *    for a hookless host, and fatal here — so a volunteered row is not evidence and does
+ *    not authorise. This is the condition that makes "the hook authorised it" true of the
+ *    *turn*, not merely of the offer.
+ * 5. **The daily cap still has room.** Rechecked at the moment of the claim, because the
+ *    cap can be lowered, and the window rolls, between the offer and the report.
  *
  * @param noteId the note being surfaced
- * @param turn   the turn claiming it, as the hook observed it
+ * @param turn   the turn claiming it, as the hook observed it; `session` and `promptId`
+ *               are both required and are checked against the offer, never trusted
  * @param when   injectable clock
  * @returns the note's view, now `surfaced`
  *
  * @example
- *   offerRipeNotes(store, { turn: 'reply', promptId: 'p-1' });
- *   surfaceNote(store, 1, { turn: 'reply', promptId: 'p-1' }).state   // => 'surfaced'
+ *   offerRipeNotes(store, { turn: 'reply', promptId: 'p-1', session: 's1' });
+ *   surfaceNote(store, 1, { turn: 'reply', promptId: 'p-1', session: 's1' }).state
+ *   // => 'surfaced'
  *
- * @throws {Error} If the note does not exist, has already reached a terminal state, or
- *                 was not offered on this exact turn — the message says which, because
- *                 "it looked delivered" is the failure this whole facility exists to
- *                 prevent.
+ * @throws {Error} If the note does not exist, has already reached a terminal state, has
+ *                 no outstanding offer, was offered to a different turn or session, was
+ *                 offered on a turn no hook observed, or would break the daily cap — the
+ *                 message says which, because "it looked delivered" is the failure this
+ *                 whole facility exists to prevent.
  *
  * @see offerRipeNotes
+ * @see ./context.js hookObservedTurn
  */
 export function surfaceNote(
   store  : Store,
@@ -850,20 +1019,55 @@ export function surfaceNote(
       `cannot surface note:\n  - #${String(noteId)} is '${view.state}', which is terminal`);
   }
 
-  const offerTurn   = row['last_offer_turn'],
-        offerPrompt = row['last_offer_prompt'];
+  const offerTurn    = row['last_offer_turn'],
+        offerPrompt  = row['last_offer_prompt'],
+        offerSession = row['last_offer_session'],
+        lastEvent    = row['last_event'],
+        claimPrompt  = turn.promptId,
+        claimSession = turn.session ?? '';
 
-  if (offerTurn !== 'reply' || offerPrompt !== turn.promptId || turn.promptId === '') {
+  if (offerTurn !== 'reply' || offerPrompt !== claimPrompt || claimPrompt === '') {
     throw new Error(
       `cannot surface note:\n  - #${String(noteId)} was not offered on this turn ` +
       `(offered on '${String(offerPrompt ?? 'never')}', claimed for ` +
-      `'${turn.promptId === '' ? 'no turn at all' : turn.promptId}'). Only a note the ` +
+      `'${claimPrompt === '' ? 'no turn at all' : claimPrompt}'). Only a note the ` +
       'UserPromptSubmit hook offered this turn can be surfaced — that gate is what keeps ' +
       'the record from ever claiming a delivery the platform cannot evidence');
   }
 
+  if (offerSession !== claimSession || claimSession === '') {
+    throw new Error(
+      `cannot surface note:\n  - #${String(noteId)} was offered to session ` +
+      `'${String(offerSession ?? 'none')}', not to ` +
+      `'${claimSession === '' ? 'no session at all' : claimSession}'. An offer's identity ` +
+      'is the pair (session, prompt id); a prompt id on its own is a token, not a proof');
+  }
+
+  if (lastEvent !== 'offered') {
+    throw new Error(
+      `cannot surface note:\n  - #${String(noteId)} has no offer outstanding (its last ` +
+      `ledger event is '${String(lastEvent ?? 'none')}'). The offer for '${claimPrompt}' ` +
+      'lapsed when that turn ended; a note gets its chance on the turn it was offered and ' +
+      'not afterwards, which is what stops a stale offer authorising a claim forever');
+  }
+
+  if (!hookObservedTurn(store, claimSession, claimPrompt)) {
+    throw new Error(
+      `cannot surface note:\n  - no UserPromptSubmit hook ever observed turn ` +
+      `'${claimPrompt}' of session '${claimSession}', so nothing authorises surfacing ` +
+      `#${String(noteId)} there. begin_turn records a turn you name; the delivery gate ` +
+      'wants a turn the harness saw, and those are deliberately different facts');
+  }
+
+  if (surfacedRecently(store, when) >= budgets.dailyCap) {
+    throw new Error(
+      `cannot surface note:\n  - the rolling 24-hour cap of ${String(budgets.dailyCap)} ` +
+      'surfaced note(s) is already spent (configure set mailbox.daily_cap <n>). The note ' +
+      'keeps its place in the queue; scarcity is the mechanism, not an accident');
+  }
+
   record(store, noteId, 'surfaced',
-         { turn: 'reply', promptId: turn.promptId, session: turn.session }, when);
+         { turn: 'reply', promptId: claimPrompt, session: claimSession }, when);
 
   return { ...view, state: 'surfaced' };
 

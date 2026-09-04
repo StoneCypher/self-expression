@@ -149,7 +149,7 @@ export function handleReadMessages(store: Store, args: ReadMessagesArgs): ToolRe
       "every concurrent job's coordination traffic; the box comes from the dispatch prompt");
   }
 
-  const context = latestContext(store),
+  const context = latestContext(store, args.session),
         reader: Reader = {
           reader   : 'model',
           session  : ctxStr(context, 'session') ?? args.session ?? 'no-hook',

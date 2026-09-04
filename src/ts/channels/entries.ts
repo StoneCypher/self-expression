@@ -567,15 +567,54 @@ export function recordEntry(
  * passed a slow turn on the *previous* turn's signature and blocked a turn that took
  * longer than the window despite having done the right thing.
  *
+ * The turn's identity is the **pair** (`session`, `prompt_id`) — the same pair
+ * {@link ../channels/context.js contextForTurn} recognises a turn by. Keying on
+ * `prompt_id` alone let two sessions satisfy each other's gate, which is not a remote
+ * coincidence: a host with no turn-start hook is told to invent a turn id, and `p1` is
+ * what anybody invents.
+ *
+ * The position must be exactly `close`. A `mid` signature marks a genuine mid-turn
+ * lurch — it does not end the turn — so accepting it let a turn stop having never signed
+ * off, which is the one thing this gate exists to prevent.
+ *
+ * An absent `session` deliberately does **not** become `session IS NULL`.
+ * `entries.session` is `NOT NULL` and {@link validate} rejects a blank one, so that
+ * predicate matches no row that was ever written, and the gate would block every stop on
+ * a host that reports no session. Unconstrained is the fail-open reading, and it is what
+ * the gate did before the pair became the key.
+ *
+ * **A retracted close still counts.** The question is whether this turn looked at itself
+ * and said something, not whether what it said still stands: the turn *did* sign, and
+ * taking back a signature's content is not un-signing it. The alternative re-arms the
+ * gate on a turn that has already ended — and with `stop_hook_active` capping the gate at
+ * one block per turn, that is a refusal nobody can act on.
+ *
+ * @param session  the session the turn belongs to; `undefined` or `''` narrows nothing
+ * @param promptId the turn identifier
+ *
  * @example
- *   hasClosingSignature(store, 'prompt-abc')  // => true
+ *   hasClosingSignature(store, 'sess-1', 'prompt-abc')  // => true
+ *   hasClosingSignature(store, 'sess-2', 'prompt-abc')  // => false — a different turn
+ *
+ * @see ../channels/context.js contextForTurn
+ * @see ../mcp/hooks.js onStop
  */
-export function hasClosingSignature(store: Store, promptId: string): boolean {
+export function hasClosingSignature(
+  store    : Store,
+  session  : string | undefined,
+  promptId : string,
+): boolean {
+
+  const scoped = session !== undefined && session !== '';
+
   const row = store.db.prepare(
     `SELECT 1 AS found FROM entries
-      WHERE prompt_id = ? AND channel = 'signature' AND position IN ('close','mid')
-      LIMIT 1`).get(promptId);
+      WHERE prompt_id = ? AND channel = 'signature' AND position = 'close'
+        ${scoped ? 'AND session = ?' : ''}
+      LIMIT 1`).get(...(scoped ? [promptId, session] : [promptId]));
+
   return row !== undefined;
+
 }
 
 /**
@@ -765,6 +804,40 @@ export function standingOf(store: Store, ids: readonly number[]): Standing[] {
 
 }
 
+/**
+ * Which of `ids` have been retracted — the one standing filter every read surface shares.
+ *
+ * Exists so the readers cannot drift apart. {@link seriesPercents} and
+ * {@link checklistSeriesTop} ask the same question of the same `percent` column for the
+ * same sparkline, and while each carried its own copy of this filter one of them silently
+ * lost it: the recall path dropped a withdrawn snapshot and the history PNG replayed it
+ * anyway, so the same number was both taken back and drawn. One helper, one answer, one
+ * place to change when the chain semantics gain a case.
+ *
+ * Retracted only — **an amended row is not in the set**. An amendment means the claim
+ * stood and a detail was refined, so the datum keeps its slot; see {@link standingOf}.
+ *
+ * Costs one batched {@link standingOf} query however many ids are passed, and no query at
+ * all for an empty list.
+ *
+ * @param ids the rows to judge; unknown ids are simply not retracted
+ * @returns the subset of `ids` whose computed standing is `retracted`
+ *
+ * @example
+ *   retractedAmong(store, [171, 172])  // => Set(1) { 171 }
+ *   retractedAmong(store, [])          // => Set(0) {}
+ *
+ * @see standingOf
+ * @see seriesPercents
+ * @see checklistSeriesTop
+ */
+export function retractedAmong(store: Store, ids: readonly number[]): Set<number> {
+  return new Set(
+    standingOf(store, ids)
+      .filter(standing => standing.status === 'retracted')
+      .map(standing => standing.id));
+}
+
 /** The retracted or amended claim, as the register presents it. */
 export interface RegisterOriginal {
   readonly id      : number;
@@ -785,11 +858,50 @@ export interface RegisterRow {
   readonly kind        : 'retracts' | 'amends';
   /** The strike's UTC timestamp — when the claim was taken back, not when it was made. */
   readonly at          : string;
-  /** The struck row, or `null` for a prose-only retraction of something never recorded. */
+  /**
+   * The struck row, or `null` when there is none to show: a prose-only retraction of
+   * something never recorded, or a target that retention has since pruned out from
+   * under a strike that survived it.
+   */
   readonly original    : RegisterOriginal | null;
   /** The exact words being withdrawn, when the strike quoted them. */
   readonly verbatim    : string | null;
   readonly replacement : RegisterReplacement;
+}
+
+/**
+ * The struck row as the register presents it, or `null` when the `LEFT JOIN` found none.
+ *
+ * Two histories reach here with no original: a prose-only retraction, which never had a
+ * `corrects_id` to begin with, and a strike whose target was pruned by retention while
+ * the strike itself — being newer — stayed. Both are honestly "there is no original row
+ * to show"; the alternative, reading the join's NULLs as columns, would render an
+ * original numbered `0` whose every field was the literal string `'null'`.
+ *
+ * @param row one joined register row, with the original's columns aliased `original_*`
+ *
+ * @example
+ *   registerOriginal({ original_id: 171, original_channel: 'checklist',
+ *                      original_ts: '2026-08-01T…', original_text: 'Atlas 31%' })
+ *   // => { id: 171, channel: 'checklist', tsUtc: '2026-08-01T…', text: 'Atlas 31%' }
+ *   registerOriginal({ original_id: null })  // => null
+ *
+ * @see register
+ * @see ./retention.js pruneExpired
+ */
+function registerOriginal(row: Record<string, unknown>): RegisterOriginal | null {
+
+  const id = row['original_id'];
+
+  if (id === null || id === undefined) { return null; }
+
+  return {
+    id      : Number(id),
+    channel : String(row['original_channel']),
+    tsUtc   : String(row['original_ts']),
+    text    : String(row['original_text']),
+  };
+
 }
 
 /** How the register may be narrowed. Every field is optional; all of them combine. */
@@ -827,6 +939,11 @@ export const REGISTER_DEFAULT_LIMIT = 20;
  *   whole anchor. These are `divergence` entries carrying a quote and no link; they are
  *   reported as `retracts`, because a quote withdrawn with no target to still stand is
  *   exactly what the design calls a prose-only retraction.
+ *
+ * A row-backed strike can *become* originalless: retention prunes by age, and a strike is
+ * always newer than what it strikes, so a horizon can take the original and leave the
+ * strike. Such a row keeps its link and its `verbatim` and reports `original: null` —
+ * see {@link registerOriginal}.
  *
  * Strikes that have themselves been retracted do not appear — the register is the
  * *current* state of taken-back claims — but they remain in the table, reachable by
@@ -872,7 +989,7 @@ export function register(store: Store, options: RegisterOptions = {}): RegisterR
 
   // Resolve each row's meaning once, here, so the kind filter, the standing check, and
   // the rendering below can never disagree about what a given strike is.
-  const candidates: { row: Record<string, unknown>; target: number | null; kind: 'retracts' | 'amends' }[] = [];
+  const candidates: { row: Record<string, unknown>; kind: 'retracts' | 'amends' }[] = [];
 
   for (const row of rows) {
 
@@ -889,27 +1006,19 @@ export function register(store: Store, options: RegisterOptions = {}): RegisterR
     if (kind !== 'retracts' && kind !== 'amends')                { continue; }
     if (options.kind !== undefined && options.kind !== kind)     { continue; }
 
-    candidates.push({ row, target, kind });
+    candidates.push({ row, kind });
 
   }
 
-  const gone = new Set(
-    standingOf(store, candidates.map(entry => Number(entry.row['strike_id'])))
-      .filter(standing => standing.status === 'retracted')
-      .map(standing => standing.id));
+  const gone = retractedAmong(store, candidates.map(entry => Number(entry.row['strike_id'])));
 
   return candidates
     .filter(entry => !gone.has(Number(entry.row['strike_id'])))
     .slice(0, options.limit ?? REGISTER_DEFAULT_LIMIT)
-    .map(({ row, target, kind }): RegisterRow => ({
+    .map(({ row, kind }): RegisterRow => ({
       kind,
       at          : String(row['strike_ts']),
-      original    : target === null ? null : {
-        id      : Number(row['original_id']),
-        channel : String(row['original_channel']),
-        tsUtc   : String(row['original_ts']),
-        text    : String(row['original_text']),
-      },
+      original    : registerOriginal(row),
       verbatim    : text(row['verbatim']),
       replacement : {
         id      : Number(row['strike_id']),
@@ -962,10 +1071,7 @@ export function previousSignature(store: Store, session: string): Record<string,
 
   if (rows.length === 0) { return null; }
 
-  const gone = new Set(
-    standingOf(store, rows.map(row => Number(row['id'])))
-      .filter(standing => standing.status === 'retracted')
-      .map(standing => standing.id));
+  const gone = retractedAmong(store, rows.map(row => Number(row['id'])));
 
   return rows.find(row => !gone.has(Number(row['id']))) ?? null;
 
@@ -1058,22 +1164,41 @@ export function anchoredEntries(store: Store, kind: AnchorKind, target: string):
  * `hits / (hits + misses)`, voids excluded, because a dissolved premise says nothing
  * about judgment.
  *
- * @returns each resolution's outcome, ascending by the resolving entry's id
+ * **Documented exclusion (#16): a pair is dropped when *either* end is retracted.** A
+ * calibration number is the most damaging place for a withdrawn claim to survive — it is
+ * a score, and a score computed partly from claims their author took back is a
+ * measurement of nothing. Retracting the *resolution* says "that is not how it turned
+ * out"; retracting the *forecast* says "I never actually predicted that". Neither should
+ * still move the hit rate. **An amendment on either end keeps the pair**, with its
+ * recorded `outcome` unchanged: {@link standingOf} reports standing, never a replacement
+ * value, and an amended claim stood.
+ *
+ * @returns each surviving resolution's outcome, ascending by the resolving entry's id
  *
  * @example
  *   forecastOutcomes(store)  // => ['hit', 'hit', 'miss', 'void']
  *
  * @see recordEntry
+ * @see retractedAmong
  */
 export function forecastOutcomes(store: Store): ForecastOutcome[] {
+
   const rows = store.db.prepare(
-    `SELECT resolution.outcome AS outcome
+    `SELECT resolution.id AS resolution_id, forecast.id AS forecast_id,
+            resolution.outcome AS outcome
        FROM entries resolution
        JOIN entries forecast ON resolution.corrects_id = forecast.id
       WHERE resolution.outcome IS NOT NULL
         AND forecast.confidence = 'predicted'
       ORDER BY resolution.id ASC`).all();
-  return rows.map(row => String(row['outcome']) as ForecastOutcome);
+
+  const gone = retractedAmong(store,
+    rows.flatMap(row => [Number(row['resolution_id']), Number(row['forecast_id'])]));
+
+  return rows
+    .filter(row => !gone.has(Number(row['resolution_id'])) && !gone.has(Number(row['forecast_id'])))
+    .map(row => String(row['outcome']) as ForecastOutcome);
+
 }
 
 /**
@@ -1136,10 +1261,7 @@ export function seriesPercents(store: Store, seriesKey: string): number[] {
       WHERE series_key = ? AND percent IS NOT NULL
       ORDER BY id ASC`).all(seriesKey);
 
-  const gone = new Set(
-    standingOf(store, rows.map(row => Number(row['id'])))
-      .filter(standing => standing.status === 'retracted')
-      .map(standing => standing.id));
+  const gone = retractedAmong(store, rows.map(row => Number(row['id'])));
 
   return rows.filter(row => !gone.has(Number(row['id']))).map(row => Number(row['percent']));
 
@@ -1209,14 +1331,24 @@ export function isoWeekKey(when: Date): string {
  * A thin read over the existing `idx_entries_channel` index — no new columns,
  * no new indexes.
  *
+ * **Documented exclusion (#16): retracted signatures are dropped.** This is an analytics
+ * read — it feeds the stem punch-strip, the delta lane, and the uncertainty strip — and
+ * the contract those panels rest on is that a chart never replays a reading its author
+ * took back. {@link previousSignature} already refuses to make a withdrawn signature the
+ * next delta's baseline; a panel that plotted the same row anyway would be the same
+ * falsehood, drawn instead of stated. **Amended signatures are kept**: the reading stood
+ * and a detail was refined. The row itself is untouched, and {@link recentEntries} still
+ * returns it, marked.
+ *
  * @param sinceUtc inclusive ISO UTC lower bound of the window
- * @returns one row per signature, ascending by id
+ * @returns one row per standing signature, ascending by id
  *
  * @example
  *   signatureHistory(store, '2026-05-29T00:00:00.000Z')
  *   // => [{ id: 1, tsUtc: '2026-08-18T16:14:00.000Z', hourLocal: 9, stem: 'flow', … }]
  *
  * @see localHour
+ * @see retractedAmong
  * @see ../raster/panels.js
  */
 export function signatureHistory(store: Store, sinceUtc: string): SignatureRow[] {
@@ -1227,7 +1359,9 @@ export function signatureHistory(store: Store, sinceUtc: string): SignatureRow[]
       WHERE channel = 'signature' AND ts_utc >= ?
       ORDER BY id ASC`).all(sinceUtc);
 
-  return rows.map(row => ({
+  const gone = retractedAmong(store, rows.map(row => Number(row['id'])));
+
+  return rows.filter(row => !gone.has(Number(row['id']))).map(row => ({
     id        : Number(row['id']),
     tsUtc     : String(row['ts_utc']),
     hourLocal : localHour(String(row['ts_local'])),
@@ -1293,6 +1427,15 @@ export function needWeekly(store: Store, sinceUtc: string): NeedWeekRow[] {
  * panel's data. Series keys are the stable identities of #27, so the labels
  * drawn from them cannot fork when a title is reworded.
  *
+ * **Documented exclusion (#16): retracted snapshots are dropped**, by exactly the filter
+ * {@link seriesPercents} applies — the two read the same `percent` column for the same
+ * sparkline, and the moment they disagreed the recall path reported `[62]` while the
+ * history PNG drew `[31, 62]`, replaying a number its author had taken back. The
+ * exclusion applies to the **ranking as well as the history**: a withdrawn snapshot does
+ * not make a series look busier than it was, and a series whose every in-range snapshot
+ * was retracted drops out entirely rather than appearing as an empty line. **Amended
+ * snapshots are kept**, keeping their slot and their recorded percent.
+ *
  * @param sinceUtc inclusive ISO UTC lower bound of the window
  * @param n        how many series to return, busiest first; a positive integer
  *
@@ -1301,27 +1444,34 @@ export function needWeekly(store: Store, sinceUtc: string): NeedWeekRow[] {
  *   // => [{ seriesKey: 'coverage', percents: [62, 71, 84] }, …]
  *
  * @see seriesPercents
+ * @see retractedAmong
  */
 export function checklistSeriesTop(store: Store, sinceUtc: string, n = 5): ChecklistSeriesRow[] {
 
-  const keys = store.db.prepare(
-    `SELECT series_key, COUNT(*) AS rows_in_range FROM entries
+  // One read of the whole window rather than a ranking query plus one history query per
+  // series: the standing filter has to be applied before the ranking, so the ranking
+  // cannot be delegated to SQL's COUNT — and the surviving rows are exactly what the
+  // histories are built from anyway.
+  const rows = store.db.prepare(
+    `SELECT id, series_key, percent FROM entries
       WHERE channel = 'checklist' AND series_key IS NOT NULL AND percent IS NOT NULL AND ts_utc >= ?
-      GROUP BY series_key
-      ORDER BY rows_in_range DESC, series_key ASC
-      LIMIT ?`).all(sinceUtc, n);
+      ORDER BY id ASC`).all(sinceUtc);
 
-  const history = store.db.prepare(
-    `SELECT percent FROM entries
-      WHERE channel = 'checklist' AND series_key = ? AND percent IS NOT NULL AND ts_utc >= ?
-      ORDER BY id ASC`);
+  const gone   = retractedAmong(store, rows.map(row => Number(row['id']))),
+        series = new Map<string, number[]>();
 
-  return keys.map(keyRow => {
-    const seriesKey = String(keyRow['series_key']);
-    return {
-      seriesKey,
-      percents: history.all(seriesKey, sinceUtc).map(row => Number(row['percent'])),
-    };
-  });
+  for (const row of rows) {
+    if (gone.has(Number(row['id']))) { continue; }
+    const key    = String(row['series_key']),
+          bucket = series.get(key);
+    if (bucket === undefined) { series.set(key, [Number(row['percent'])]); }
+    else                      { bucket.push(Number(row['percent'])); }
+  }
+
+  return [...series.entries()]
+    .sort(([keyA, a], [keyB, b]) =>
+      b.length - a.length || (keyA < keyB ? -1 : keyA > keyB ? 1 : 0))
+    .slice(0, Math.max(0, n))
+    .map(([seriesKey, percents]) => ({ seriesKey, percents }));
 
 }

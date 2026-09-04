@@ -197,6 +197,37 @@ export function settleAttempt(
 }
 
 /**
+ * Note on a `pending` row that its request was abandoned, **without settling it**.
+ *
+ * The row deliberately keeps the `pending` outcome, which is the whole point: an
+ * abandoned request is one the provider may have received, run, and billed, and
+ * `pending` is the only outcome that says "unknown, therefore assumed billed" and so
+ * keeps counting against the caps. Settling it as `error` — the obvious thing, and the
+ * bug this function replaces — would make a facility whose every call times out
+ * spend without any cap ever engaging.
+ *
+ * The `WHERE outcome = 'pending'` guard means a row that settled first (a slow reply
+ * that landed after the abandonment was noticed) keeps the truth it learned.
+ *
+ * @param ledger - the open ledger
+ * @param id     - the row id {@link recordAttempt} returned
+ * @param detail - what happened, in the words the user will see
+ *
+ * @example
+ *   markAbandoned(ledger, 7, 'abandoned after 120000ms without an answer');
+ *
+ * @see settleAttempt
+ * @see BILLABLE_OUTCOMES
+ */
+export function markAbandoned(ledger: ImageLedger, id: number, detail: string): void {
+
+  ledger.db.prepare(
+    "UPDATE generations SET detail = ? WHERE id = ? AND outcome = 'pending'"
+  ).run(clean(detail), id);
+
+}
+
+/**
  * Record one attempt that never reached the network: a spent cap, a missing
  * credential, or the no-rewording rule.
  *
@@ -282,29 +313,38 @@ export function billableSince(ledger: ImageLedger, sinceUtc: string): number {
 }
 
 /**
- * The prompts a provider's content policy refused at or after `sinceUtc`, newest first.
+ * The prompts **one provider's** content policy refused at or after `sinceUtc`, newest
+ * first.
  *
  * This is what makes "never retried with a reworded prompt" a rule the server enforces
  * rather than a rule the model is asked to remember. Read from the ledger rather than
  * from process memory so a restart does not launder a refusal.
  *
+ * Scoped to a provider because a content policy belongs to a vendor, not to the world.
+ * A refusal by a hosted model says nothing about what a local Automatic1111 with no
+ * content policy at all would do, and an unscoped query would let one vendor's refusal
+ * fence off a subject on every endpoint the user owns for a day — which is not the
+ * rule the facility promises and not a rule anyone agreed to.
+ *
  * @param sinceUtc - ISO 8601 UTC lower bound, inclusive
+ * @param provider - whose policy did the refusing; only that provider's rows are returned
  * @param limit    - most rows to consider; the rule only needs the recent ones
  *
  * @example
- *   policyRefusalsSince(ledger, '2026-08-28T10:00:00.000Z')
+ *   policyRefusalsSince(ledger, '2026-08-28T10:00:00.000Z', 'nanobanana')
  *   // => [{ utc: '2026-08-28T11:04:00.000Z', prompt: 'a … scene' }]
  */
 export function policyRefusalsSince(
   ledger   : ImageLedger,
   sinceUtc : string,
+  provider : ImageProviderId,
   limit             = 20,
 ): RefusedPrompt[] {
 
   const rows = ledger.db.prepare(
     "SELECT asked_utc, prompt FROM generations WHERE outcome = 'policy_refused' " +
-    'AND asked_utc >= ? ORDER BY asked_utc DESC LIMIT ?'
-  ).all(sinceUtc, limit);
+    'AND provider = ? AND asked_utc >= ? ORDER BY asked_utc DESC LIMIT ?'
+  ).all(provider, sinceUtc, limit);
 
   return rows.map(row => ({ utc: String(row['asked_utc']), prompt: String(row['prompt']) }));
 

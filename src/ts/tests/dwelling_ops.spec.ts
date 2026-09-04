@@ -5,7 +5,7 @@ import { join }                from 'node:path';
 import { openDwelling, closeDwelling } from '../dwelling/store.js';
 import type { DwellingStore }          from '../dwelling/store.js';
 import {
-  keep, unkeep, pin, setTag, addLink, addGuestbook, visit,
+  keep, unkeep, pin, setTag, addLink, addGuestbook, visit, VISIT_SECTION_LIMIT,
 } from '../dwelling/ops.js';
 
 function withHouse<T>(fn: (s: DwellingStore) => T): T {
@@ -190,6 +190,29 @@ describe('visit', () => {
     const seen = visit(s, 0);
     expect(seen.sizeWarning).toContain('warning:');
     expect(seen.sizeWarning).toContain('0 GB');
+  }));
+
+  test('caps every section at VISIT_SECTION_LIMIT, newest first', () => withHouse(s => {
+    const total = VISIT_SECTION_LIMIT + 5;
+
+    // one transaction: 75 separate fsyncs on a cold file-backed database can blow the
+    // 5 s test timeout under a saturated coverage run; the ops themselves are unchanged
+    s.db.exec('BEGIN');
+    for (let n = 0; n < total; n++) { keep(s, { kind: 'quote', title: `pinned ${n}`, body: 'b', pinned: true }); }
+    for (let n = 0; n < total; n++) { keep(s, { kind: 'quote', title: `recent ${n}`, body: 'b' }); }
+    for (let n = 0; n < total; n++) { addGuestbook(s, { author: 'John', text: `entry ${n}` }); }
+    s.db.exec('COMMIT');
+
+    const seen = visit(s, 10);
+
+    expect(seen.pinned).toHaveLength(VISIT_SECTION_LIMIT);
+    expect(seen.recent).toHaveLength(VISIT_SECTION_LIMIT);
+    expect(seen.guestbook).toHaveLength(VISIT_SECTION_LIMIT);
+
+    // newest first: the very last row written in each section leads its array
+    expect(seen.pinned[0]?.title).toBe(`pinned ${String(total - 1)}`);
+    expect(seen.recent[0]?.title).toBe(`recent ${String(total - 1)}`);
+    expect(seen.guestbook[0]?.text).toBe(`entry ${String(total - 1)}`);
   }));
 
 });

@@ -10,6 +10,7 @@ import {
   AUDIO_HOURLY_BUDGET_KEY, AUDIO_ATTENTION_BUDGET_KEY, CEILING_ENV_VAR,
   DEFAULT_CEILING, DEFAULT_MIN_GAP_SECONDS, DEFAULT_HOURLY_BUDGET, DEFAULT_ATTENTION_BUDGET,
   audioConfig, motifWavKey, motifWavPath, AUDIO_WAV_KEYS,
+  parseCeilingEnv, CEILING_ENV_PARSE_FAILURE, isValidWavPath,
 } from '../claudio/config.js';
 import { LEITMOTIFS } from '../claudio/vocabulary.js';
 
@@ -76,10 +77,10 @@ describe('the ceiling the assistant can never raise', () => {
     expect(audioConfig(s, { [CEILING_ENV_VAR]: '25' }).ceiling).toBe(25);
   }));
 
-  test('a malformed environment value is ignored, never treated as zero', () => withStore(s => {
+  test('a malformed environment value fails CLOSED to the most restrictive ceiling, never open', () => withStore(s => {
     writeConfig(s, AUDIO_CEILING_KEY, '60');
-    for (const junk of ['loud', '', '  ', '3.5', '-2', '101']) {
-      expect(audioConfig(s, { [CEILING_ENV_VAR]: junk }).ceiling).toBe(60);
+    for (const junk of ['loud', 'abc', 'NaN', '1e999', '-0.5', '1.5', '101', '-2']) {
+      expect(audioConfig(s, { [CEILING_ENV_VAR]: junk }).ceiling, junk).toBe(CEILING_ENV_PARSE_FAILURE);
     }
   }));
 
@@ -90,20 +91,118 @@ describe('the ceiling the assistant can never raise', () => {
 
 });
 
+describe('parseCeilingEnv — the assistant-proof clamp fails closed, not open', () => {
+
+  test('unset offers no restriction: the config row alone governs', () => {
+    expect(parseCeilingEnv(undefined)).toBe(100);
+  });
+
+  test.each(['', '  ', 'abc', 'NaN', '1e999', '-0.5', '1.5', '101', '-2'])(
+    'fails closed for the unparseable value %j',
+    (junk) => {
+      expect(parseCeilingEnv(junk)).toBe(CEILING_ENV_PARSE_FAILURE);
+    },
+  );
+
+  test.each(['0', '30', '50', '100'])('parses a valid integer string %j as itself', (good) => {
+    expect(parseCeilingEnv(good)).toBe(Number(good));
+  });
+
+  test('whitespace around a valid value is tolerated', () => {
+    expect(parseCeilingEnv('  42  ')).toBe(42);
+  });
+
+  test('writes one stderr line naming the bad value, but stays silent when unset or valid', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      parseCeilingEnv(undefined);
+      parseCeilingEnv('50');
+      expect(spy).not.toHaveBeenCalled();
+
+      parseCeilingEnv('nonsense');
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(String(spy.mock.calls[0]?.[0])).toContain('nonsense');
+      expect(String(spy.mock.calls[0]?.[0])).toContain(CEILING_ENV_VAR);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+});
+
+describe('isValidWavPath', () => {
+
+  test('accepts an absolute Windows path ending .wav', () => {
+    expect(isValidWavPath('C:\\x\\y.wav')).toBe(true);
+  });
+
+  test('accepts an absolute POSIX path ending .wav', () => {
+    expect(isValidWavPath('/x/y.wav')).toBe(true);
+  });
+
+  test('the extension check is case-insensitive', () => {
+    expect(isValidWavPath('C:\\x\\y.WAV')).toBe(true);
+    expect(isValidWavPath('/x/y.WaV')).toBe(true);
+  });
+
+  test('refuses a UNC path in either slash convention', () => {
+    expect(isValidWavPath('\\\\server\\share\\x.wav')).toBe(false);
+    expect(isValidWavPath('//server/share/x.wav')).toBe(false);
+  });
+
+  test('refuses a relative path in either slash convention', () => {
+    expect(isValidWavPath('x\\y.wav')).toBe(false);
+    expect(isValidWavPath('x/y.wav')).toBe(false);
+    expect(isValidWavPath('..\\y.wav')).toBe(false);
+    expect(isValidWavPath('../y.wav')).toBe(false);
+  });
+
+  test('refuses a non-.wav extension, including a disguised one', () => {
+    expect(isValidWavPath('C:\\x\\y.mp3')).toBe(false);
+    expect(isValidWavPath('/x/y.exe')).toBe(false);
+    expect(isValidWavPath('C:\\x\\y.wav.exe')).toBe(false);
+  });
+
+  test('refuses an embedded NUL', () => {
+    expect(isValidWavPath('C:\\x\\y\u0000.wav')).toBe(false);
+  });
+
+  test('refuses embedded control characters', () => {
+    expect(isValidWavPath('C:\\x\\y\t.wav')).toBe(false);
+    expect(isValidWavPath('/x/y\n.wav')).toBe(false);
+  });
+
+});
+
 describe('motif waveform resolution', () => {
 
   test('defaults to the vendored asset beside the others', () => withStore(s => {
     expect(motifWavPath(s, 'spark', join('a', 'b'))).toBe(join('a', 'b', 'spark.wav'));
   }));
 
-  test('a configured override replaces the vendored path for that meaning only', () => withStore(s => {
+  test('a valid absolute Windows override replaces the vendored path for that meaning only', () => withStore(s => {
     writeConfig(s, motifWavKey('spark'), 'D:\\sounds\\my-spark.wav');
     expect(motifWavPath(s, 'spark', 'assets')).toBe('D:\\sounds\\my-spark.wav');
     expect(motifWavPath(s, 'attention', 'assets')).toBe(join('assets', 'attention.wav'));
   }));
 
+  test('a valid absolute POSIX override is accepted too', () => withStore(s => {
+    writeConfig(s, motifWavKey('spark'), '/sounds/my-spark.wav');
+    expect(motifWavPath(s, 'spark', 'assets')).toBe('/sounds/my-spark.wav');
+  }));
+
   test('a whitespace-only override behaves as unset', () => withStore(s => {
     writeConfig(s, motifWavKey('spark'), '   ');
+    expect(motifWavPath(s, 'spark', 'assets')).toBe(join('assets', 'spark.wav'));
+  }));
+
+  test.each([
+    ['a relative path',     'my-spark.wav'],
+    ['a UNC path',          '\\\\server\\share\\spark.wav'],
+    ['the wrong extension', 'C:\\sounds\\spark.mp3'],
+    ['an embedded NUL',     'C:\\sounds\\spark\u0000.wav'],
+  ])('an override that is %s behaves as unset — never handed to the player unvalidated', (_label, bad) => withStore(s => {
+    writeConfig(s, motifWavKey('spark'), bad);
     expect(motifWavPath(s, 'spark', 'assets')).toBe(join('assets', 'spark.wav'));
   }));
 

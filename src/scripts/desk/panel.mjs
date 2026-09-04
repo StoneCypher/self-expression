@@ -38,6 +38,7 @@ import { fileURLToPath }  from 'node:url';
 import { homedir }        from 'node:os';
 
 import { assemble, removeCard }  from './deskcards.mjs';
+import { requestAllowed }        from './deskguard.mjs';
 
 /** Where the mechanism lives: the shell, the panel, the icons. Shared by every desk. */
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -45,15 +46,34 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 /**
  * Where this desk lives: its cards and all of its state.
  *
- * Taken from the first argument, then `SELF_EXPRESSION_DESK`, then the working directory.
- * A desk is deliberately not a default location: two desks on one machine are normal, and
- * a desk that guessed where it lived would be a desk that could silently answer for the
- * wrong one.
+ * Taken from the first argument, then `SELF_EXPRESSION_DESK`. A desk is deliberately not a
+ * default location: two desks on one machine are normal, and a desk that guessed where it
+ * lived would be a desk that could silently answer for the wrong one — started with no
+ * argument and no environment variable in an unexpected directory, a guessed desk would
+ * make that directory's `cards/` deletable by `desk-config`'s `gone` list. So there is no
+ * guess: with neither given, the process prints how to fix that and exits rather than
+ * picking somewhere.
  */
-const DESK = resolve(process.argv[2] ?? process.env.SELF_EXPRESSION_DESK ?? process.cwd());
+const deskArg = process.argv[2] ?? process.env.SELF_EXPRESSION_DESK;
+if (!deskArg) {
+  console.error('usage: node src/scripts/desk/panel.mjs <desk directory>');
+  console.error('   or: SELF_EXPRESSION_DESK=<desk directory> node src/scripts/desk/panel.mjs');
+  process.exit(1);
+}
+const DESK = resolve(deskArg);
 
-/** The port. Overridable because a second desk on the same machine needs a second port. */
-const PORT = Number(process.env.SELF_EXPRESSION_DESK_PORT) || 7373;
+/**
+ * The port. Overridable because a second desk on the same machine needs a second port, and
+ * because a test wants an OS-assigned ephemeral one.
+ *
+ * Read as a string first and only defaulted when unset: `Number(x) || 7373` would silently
+ * turn a requested port `0` (Node's "pick any free port" convention, which is exactly what
+ * a test needs) back into `7373`, since `0` is falsy.
+ */
+const PORT = (() => {
+  const raw = process.env.SELF_EXPRESSION_DESK_PORT;
+  return raw !== undefined && raw !== '' ? Number(raw) : 7373;
+})();
 
 /**
  * The affect log the panel charts, opened read-only.
@@ -236,7 +256,24 @@ function questions() {
   catch { return []; }
 }
 
-createServer((req, res) => {
+/**
+ * The port the server is actually bound to.
+ *
+ * Equal to `PORT` unless `PORT` is `0`, in which case the OS picked one and this is
+ * updated from `server.address()` once `listen` reports it. The request guard checks
+ * against this, not `PORT`, since a `Host`/`Origin` check against a nominal `0` would
+ * refuse every request.
+ */
+let boundPort = PORT;
+
+const server = createServer((req, res) => {
+
+  const allowed = requestAllowed(req, boundPort);
+  if (!allowed.ok) {
+    res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(`forbidden: ${allowed.reason}\n`);
+    return;
+  }
 
   if (req.method === 'POST' && req.url === '/input') {
     const chunks = [];
@@ -476,7 +513,25 @@ createServer((req, res) => {
 
   res.end(page);
 
-}).listen(PORT, '127.0.0.1', () => {
-  console.log(`panel: http://127.0.0.1:${PORT}/`);
+});
+
+/**
+ * Two desks on one machine are normal (see the file docstring), so the second one to start
+ * on a given port must say so and exit rather than crash: `listen` emits `'error'` rather
+ * than throwing, and an `EventEmitter` with no `'error'` listener turns an unhandled one
+ * into an uncaught exception — that is the failure this replaces.
+ */
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`panel: port ${PORT} is already in use — is another desk already running there?`);
+  } else {
+    console.error(`panel: failed to start (${err.message})`);
+  }
+  process.exit(1);
+});
+
+server.listen(PORT, '127.0.0.1', () => {
+  boundPort = server.address().port;
+  console.log(`panel: http://127.0.0.1:${boundPort}/`);
   console.log(`desk:  ${DESK}`);
 });
