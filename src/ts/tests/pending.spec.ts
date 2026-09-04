@@ -54,8 +54,8 @@ describe('fingerprint', () => {
 
   test('is order-independent and empty for no items', () => {
     const now = new Date('2026-08-30T10:00:00Z'),
-          a: PendingItem = { kind: 'desk_intent', key: 'q1', label: 'x', since: '2026-08-30T06:00:00Z' },
-          b: PendingItem = { kind: 'message', key: '5', label: 'y', since: '2026-08-30T09:00:00Z' };
+          a: PendingItem = { kind: 'desk_intent', key: 'q1', since: '2026-08-30T06:00:00Z' },
+          b: PendingItem = { kind: 'message', key: '5', since: '2026-08-30T09:00:00Z' };
     expect(fingerprint([a, b], now, 4)).toBe(fingerprint([b, a], now, 4));
     expect(fingerprint([], now, 4)).toBe('');
   });
@@ -65,9 +65,9 @@ describe('fingerprint', () => {
 describe('describePending', () => {
 
   test('pluralises and names the tool', () => {
-    const msg: PendingItem   = { kind: 'message', key: '1', label: 'x', since: 'S' },
-          desk1: PendingItem = { kind: 'desk_intent', key: 'q1', label: 'x', since: 'S' },
-          desk2: PendingItem = { kind: 'desk_intent', key: 'q2', label: 'x', since: 'S' };
+    const msg: PendingItem   = { kind: 'message', key: '1', since: 'S' },
+          desk1: PendingItem = { kind: 'desk_intent', key: 'q1', since: 'S' },
+          desk2: PendingItem = { kind: 'desk_intent', key: 'q2', since: 'S' };
     expect(describePending([msg, desk1, desk2])).toBe(
       'pending: 2 desk requests, 1 unread message (self-expression claim_pending)');
     expect(describePending([desk1])).toBe(
@@ -95,7 +95,7 @@ describe('the desk source', () => {
     writeQuestions(deskDir, rows);
 
     expect(collectPending(s, 'sess-1', now).filter(i => i.kind === 'desk_intent')).toEqual([
-      { kind: 'desk_intent', key: 'q1', label: 'merge #21?', since: '2026-08-30T08:05:00.000Z' },
+      { kind: 'desk_intent', key: 'q1', since: '2026-08-30T08:05:00.000Z' },
     ]);
 
   })));
@@ -110,7 +110,7 @@ describe('the message source', () => {
 
     const items = collectPending(s, 'sess-1', now).filter(i => i.kind === 'message');
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ kind: 'message', label: 'resume at step 3' });
+    expect(items[0]).toMatchObject({ kind: 'message', since: now.toISOString() });
   }));
 
 });

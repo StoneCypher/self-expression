@@ -33,11 +33,10 @@ const DATE_BOUNDS = {
   noInvalidDate: true,
 };
 
-/** One arbitrary {@link PendingItem}; keys and labels are unconstrained strings. */
+/** One arbitrary {@link PendingItem}; keys are unconstrained strings. */
 const pendingItemArb: fc.Arbitrary<PendingItem> = fc.record({
   kind  : fc.constantFrom<PendingItem['kind']>('message', 'desk_intent'),
   key   : fc.string({ maxLength: 24 }),
-  label : fc.string({ maxLength: 24 }),
   since : fc.date(DATE_BOUNDS).map(d => d.toISOString()),
 });
 

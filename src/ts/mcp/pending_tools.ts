@@ -162,11 +162,11 @@ export function claimSession(store: Store, args: ClaimArgs): string {
 /**
  * One item `claim_pending` took, reported back with the text that was waiting in it.
  *
- * The same four fields {@link ../channels/pending.js PendingItem} carries, with one
- * deliberate difference: `label` is the item's **whole** text, not the notice's
- * 60-character summary. The claim is the moment the session actually receives the thing,
- * and truncating it here would leave the caller having consumed a message it can only
- * read the first line of.
+ * {@link ../channels/pending.js PendingItem}'s three fields plus `label`, the item's
+ * **whole** text. The notice itself never quotes an item — it counts by kind — so the
+ * text is read here, from the row, at the one moment it is needed: the claim is when the
+ * session actually receives the thing, and handing back anything less than all of it
+ * would leave the caller having consumed a message it can only read the first line of.
  */
 export interface ClaimedItem {
   readonly kind  : PendingItem['kind'];

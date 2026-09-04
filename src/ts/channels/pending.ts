@@ -41,9 +41,6 @@ import { openIntents, readQuestions }   from './desk_questions.js';
 import { unreadRows }                   from './messages.js';
 import type { Store }                   from './store.js';
 
-/** Longest a pending item's label may run before it is cut, in characters. */
-const LABEL_MAX = 60;
-
 /**
  * The environment a pending source may consult — the same injectable shape every other
  * env-reading function in this codebase accepts, so a source can be tested without
@@ -55,14 +52,17 @@ export type Env = Readonly<Record<string, string | undefined>>;
 /**
  * One thing waiting on a session: a desk request nobody has claimed, or an unread
  * self-addressed message.
+ *
+ * Identity and timing only, deliberately — no text. The notice counts by kind and never
+ * quotes an item, and `claim_pending` reads the item's full text from its own row at the
+ * moment it takes it. A summary carried here would be a second copy of that text, stale
+ * the instant the row changed and read by nobody.
  */
 export interface PendingItem {
   /** Which source produced this item. */
   readonly kind  : 'message' | 'desk_intent';
   /** Stable identity within `kind` — a message id, or a desk question id. */
   readonly key   : string;
-  /** Short human-readable description, at most {@link LABEL_MAX} characters. */
-  readonly label : string;
   /** ISO instant the item started waiting — a message's `ts_utc`, a desk row's queue moment. */
   readonly since : string;
 }
@@ -87,11 +87,6 @@ export interface PendingSource {
   collect(store: Store, session: string, now: Date, env: Env): PendingItem[];
 }
 
-/** Cut a label to {@link LABEL_MAX} characters — a notice line, not the full text. */
-function truncateLabel(text: string): string {
-  return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX) : text;
-}
-
 /**
  * The desk source: every open (queued, unclaimed, undismissed) desk question, from
  * `desk.path`'s `questions.json`.
@@ -111,7 +106,6 @@ const deskSource: PendingSource = {
     return openIntents(readQuestions(path)).map((row): PendingItem => ({
       kind  : 'desk_intent',
       key   : row.id,
-      label : truncateLabel(row.text),
       since : row.queuedAt ?? row.asked,
     }));
 
@@ -132,15 +126,11 @@ const messageSource: PendingSource = {
 
     if (effectiveValue(store, 'messages.enabled') === 'false') { return []; }
 
-    return unreadRows(store, session, now).map((row): PendingItem => {
-      const text = row['text'];
-      return {
-        kind  : 'message',
-        key   : String(row['id']),
-        label : truncateLabel(typeof text === 'string' ? text : ''),
-        since : String(row['ts_utc']),
-      };
-    });
+    return unreadRows(store, session, now).map((row): PendingItem => ({
+      kind  : 'message',
+      key   : String(row['id']),
+      since : String(row['ts_utc']),
+    }));
 
   },
 };
@@ -286,7 +276,7 @@ export function nagEpoch(since: string, now: Date, nagHours: number): number {
  * @param nagHours hours per nag interval; the effective `pending.nag_hours`
  *
  * @example
- *   fingerprint([{ kind: 'message', key: '5', label: 'x', since: '…' }], new Date(), 4)
+ *   fingerprint([{ kind: 'message', key: '5', since: '…' }], new Date(), 4)
  *   // => 'message:5@0'
  *   fingerprint([], new Date(), 4)  // => ''
  *
@@ -310,9 +300,9 @@ export function fingerprint(items: readonly PendingItem[], now: Date, nagHours: 
  *
  * @example
  *   describePending([
- *     { kind: 'message', key: '1', label: 'x', since: 'S' },
- *     { kind: 'desk_intent', key: 'q1', label: 'x', since: 'S' },
- *     { kind: 'desk_intent', key: 'q2', label: 'x', since: 'S' },
+ *     { kind: 'message', key: '1', since: 'S' },
+ *     { kind: 'desk_intent', key: 'q1', since: 'S' },
+ *     { kind: 'desk_intent', key: 'q2', since: 'S' },
  *   ])
  *   // => 'pending: 2 desk requests, 1 unread message (self-expression claim_pending)'
  */
