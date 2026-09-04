@@ -142,9 +142,10 @@
     font-size: 12px; line-height: 1; filter: grayscale(.55); opacity: .75;
   }
   .inbox button.act:hover { filter: none; opacity: 1; background: transparent; }
-  /* A claimed row's disposition is already made, by a session that took it. The buttons
-     stay in place rather than vanishing — a row that changes width when someone else
-     acts on it is a row that moves under your cursor — but they are visibly dead. */
+  /* A claimed row has already been routed, so its two queue buttons — up next, to agents
+     — are dead. They stay in place rather than vanishing, because a row that changes
+     width when someone else acts on it is a row that moves under your cursor. The bin
+     stays live: retiring a row is the desk owner's, not the claiming session's. */
   .inbox button.act:disabled,
   .inbox button.act:disabled:hover { opacity: .2; filter: grayscale(1); cursor: default; }
 
@@ -437,9 +438,14 @@ DESK.inits.push(function () {
         ].forEach(function (spec) {
           var b = document.createElement('button');
           b.className = 'act'; b.textContent = spec[0]; b.title = spec[1];
-          /* Dead while claimed: re-queueing or dropping a row out from under the session
-             holding it would silently undo work already under way. */
-          b.disabled = !!claim;
+          /* The two queue buttons go dead while claimed: re-routing a row out from under
+             the session holding it would silently undo work already under way. The bin
+             does not, and must not — nothing in the plugin ever clears `claimed`, task
+             rows never get the × kill button, and a claimed row still counts in "waiting
+             on you", so disabling it too would leave every claimed request on the desk
+             forever with no way to retire it but hand-editing questions.json. Dropping is
+             a delete, not a re-route, and it stays the desk owner's to make. */
+          b.disabled = !!claim && spec[2] !== 'drop';
           b.onclick = function () { act(q.id, spec[2]); };
           li.appendChild(b);
         });

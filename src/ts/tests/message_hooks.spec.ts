@@ -10,6 +10,8 @@ import { pendingNotice }         from '../channels/pending.js';
 import {
   mailboxLine, onSessionStart, onUserPromptSubmit, handleHook,
 } from '../mcp/hooks.js';
+import { claimSession, withPendingNotice } from '../mcp/pending_tools.js';
+import type { ToolReply }                 from '../mcp/chart_tools.js';
 
 const VERSION = '0.2.1';
 
@@ -213,14 +215,32 @@ describe('onUserPromptSubmit — pending segment (#98)', () => {
         .not.toContain('pending:');
     })));
 
-  test('a hook that spoke leaves the tool carrier quiet — one fingerprint, every carrier', () =>
+  test('a hook that spoke leaves the tool carrier quiet, under the identity the hook recorded', () =>
     withStore(s => withDesk(deskDir => {
       writeConfig(s, 'desk.path', deskDir);
       writeQuestions(deskDir, [queued('q1', 'merge #21?', NOW)]);
 
       expect(additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW)))
         .toContain('pending: 1 desk request');
-      expect(pendingNotice(s, 'sess-1', NOW)).toBeNull();
+
+      // The hook payload's session and the tool layer's *observed* session are one value,
+      // because this hook is what wrote the context row `claimSession` reads back. Asserted
+      // rather than assumed: if the hook ever normalises or renames what it records, the
+      // two carriers would quietly start fingerprinting under different keys and each
+      // would speak the same notice once — which is exactly the fatigue #98 exists to
+      // prevent, and exactly the failure a hardcoded session on both sides would hide.
+      expect(claimSession(s, {})).toBe('sess-1');
+
+      // So the very next tool reply, resolving its session the way the real tool layer
+      // does, finds the fingerprint already moved and appends nothing.
+      const out: ToolReply = { content: [{ type: 'text', text: 'recorded #1' }] };
+      expect(withPendingNotice(s, claimSession(s, {}), out, NOW).content[0]?.text)
+        .toBe('recorded #1');
+
+      // The control, so "unchanged" is a fact about identity and not about the carrier
+      // being inert here: a *different* session has been told nothing, and is told now.
+      expect(withPendingNotice(s, 'sess-2', out, NOW).content[0]?.text)
+        .toContain('pending: 1 desk request');
     })));
 
   test('a broken pending table costs the segment and nothing else', () =>
