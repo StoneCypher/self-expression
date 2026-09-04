@@ -1,10 +1,10 @@
-# self-expression v0.6.3
+# self-expression v0.6.4
 
-> Version 0.6.3 was built on Thursday, September 3, 2026 at GMT-07:00 `1788496057841` from hash `0d5fd2a`.
+> Version 0.6.4 was built on Thursday, September 3, 2026 at GMT-07:00 `1788496968166` from hash `e770cc8`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788496057841 Thursday, September 3, 2026 at GMT-07:00 95.11 360 91 0d5fd2a 52.86 65.06 65.03 64.71 260 2592 89.52 93.8 95.46 2332 0.6.3 -->
+<!-- Supported embeds: 1788496968166 Thursday, September 3, 2026 at GMT-07:00 95.11 360 91 e770cc8 52.89 65.08 65.13 64.73 260 2593 89.52 93.8 95.46 2333 0.6.4 -->
 
 
 
@@ -257,6 +257,7 @@ The registered keys:
 | `dwelling.enabled` | bool | `false` | Whether the dwelling facility (#45) is active; requires `dwelling.path`. |
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
+| `desk.path` | string | *(none)* | Absolute directory of the desk (#93, #98) — the same one the desk server is started on. Deliberately no default: a desk is a place the user chose, not one the plugin picks. |
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | enum | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
@@ -1040,7 +1041,7 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2332</td>
+    <td>2333</td>
     <td>95.11<small>%</small></td>
     <td>89.52<small>%</small></td>
     <td>93.8<small>%</small></td>
@@ -1049,10 +1050,10 @@ dwelling can `keep` the path.
   <tr>
     <th>Stochastic</th>
     <td>260</td>
-    <td>65.06<small>%</small></td>
-    <td>52.86<small>%</small></td>
-    <td>65.03<small>%</small></td>
-    <td>64.71<small>%</small></td>
+    <td>65.08<small>%</small></td>
+    <td>52.89<small>%</small></td>
+    <td>65.13<small>%</small></td>
+    <td>64.73<small>%</small></td>
   </tr>
 </table>
 
