@@ -509,6 +509,9 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'dwelling.path', kind: 'string', fallback: null,
     description: 'absolute directory the dwelling database lives in; deliberately no default — required when dwelling.enabled is true',
     validate: stringValidator(1024) },
+  { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
+    description: 'dwelling file size, in gigabytes, at which a visit warns the user',
+    validate: intValidator(0, 1048576) },
   { key: 'desk.path', kind: 'string', fallback: null,
     description:
       'absolute directory of the desk (#93, #98) — the same one the desk server is started on; ' +
@@ -519,9 +522,6 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
       'how many render_card answer cards the desk keeps before the oldest ages out (#93); ' +
       'a card worth keeping gets pinned (fixed: true) and is never counted',
     validate: intValidator(1, 100) },
-  { key: 'dwelling.size_warn_gb', kind: 'int', fallback: '10',
-    description: 'dwelling file size, in gigabytes, at which a visit warns the user',
-    validate: intValidator(0, 1048576) },
   { key: 'audio.enabled', kind: 'bool', fallback: 'false',
     description: "whether the claudio audio facility (#44) offers its tools; only exactly 'true' enables — read at claudio server startup for the schema, and re-checked per strike",
     validate: validateBool },

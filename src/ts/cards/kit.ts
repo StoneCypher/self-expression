@@ -25,6 +25,11 @@ export interface CardMeta {
   readonly shape: string;
   readonly category: string;
   readonly defaults: Readonly<Record<string, unknown>>;
+  /**
+   * True for a container type that legitimately emits several `<section>`s — one per card it
+   * holds. It is fed to `kit.audit`'s section-count rule, which otherwise insists on exactly
+   * one section per card and would refuse every container in the catalogue.
+   */
   readonly contains?: boolean;
 }
 
@@ -71,6 +76,10 @@ export interface CardTypeModule {
 /**
  * One category's entry in the catalogue: the question it answers and the types that answer it,
  * each summarised enough to describe without loading the type itself.
+ *
+ * A member's `settings` is `Object.keys(meta.defaults)` — the names of the knobs that type
+ * accepts, with neither their values nor their meanings, since the defaults are the type's own
+ * business and only the names help a caller know what it may pass.
  *
  * @example
  * const group: CategoryGroup = { key: 'geographic', label: 'Geographic', question: 'Where?',
@@ -198,20 +207,33 @@ export async function loadKit(kitDir: string): Promise<CardKit> {
 
 /**
  * The `render_card` tool description, generated from the catalogue so it cannot drift from it:
- * the trigger sentence, then one block per category headed by its question, then one line per
- * type within that category.
+ * the trigger sentence, then the mechanics, then one block per category headed by its question,
+ * then one line per type within that category.
+ *
+ * The preamble names the taste document — the `self-expression://conventions/answer-cards`
+ * resource — right where the decision is made. This description is read at exactly the moment a
+ * model is choosing between a card and a sentence, and the catalogue can only answer "which
+ * type"; when a card is the honest answer at all is a separate question with a separate document,
+ * and the point of decision is the only place a pointer to it is worth anything.
+ *
+ * The trigger sentence stays first: it is what a model skims, and the mechanics and the pointer
+ * are of no use to a model that has not yet decided to reach for a card.
  *
  * @param kit a loaded kit, as {@link loadKit} yields
  * @returns the full description text
  *
  * @example
  * describeKit(kit).startsWith(RENDER_CARD_TRIGGER);   // true
+ *
+ * @see RENDER_CARD_TRIGGER
  */
 export function describeKit(kit: CardKit): string {
   const blocks = kit.groups.map(g =>
     `${g.label} — ${g.question}\n` + g.members.map(m => `- ${m.name} — ${m.summary}`).join('\n'));
   return `${RENDER_CARD_TRIGGER}\n\nOne call: render_card({ type, title, data }). The id and ord are derived; ` +
-         `cards land in the answer band and age out unless kept. Types, by the question they answer:\n\n` +
+         `cards land in the answer band and age out unless kept. When a card is the honest answer — and ` +
+         `when three numbers are just a sentence — is the self-expression://conventions/answer-cards ` +
+         `resource, not this list. Types, by the question they answer:\n\n` +
          blocks.join('\n\n');
 }
 

@@ -25,9 +25,20 @@ describe('panel.mjs, over a real socket', () => {
   let child: ChildProcessWithoutNullStreams | null = null;
   let desk:  string | null = null;
 
-  afterEach(() => {
-    child?.kill();
+  /* The panel holds recursive `watch` handles on its desk directory for the lifetime of the
+     process, so removing that directory while the child is still alive is a race: on Windows the
+     open handles make `rmSync` fail outright, and everywhere else the dying watcher can fire
+     against paths that no longer exist. `kill()` only *requests* the exit — waiting for the
+     `exit` event is what makes the teardown ordered rather than hopeful. A child that has already
+     exited never emits it again, hence the `exitCode`/`signalCode` check before the wait. */
+  afterEach(async () => {
+    const proc = child;
     child = null;
+    if (proc !== null) {
+      if (proc.exitCode === null && proc.signalCode === null) {
+        await new Promise<void>(done => { proc.once('exit', () => { done(); }); proc.kill(); });
+      }
+    }
     if (desk) { rmSync(desk, { recursive: true, force: true }); desk = null; }
   });
 
@@ -52,17 +63,26 @@ describe('panel.mjs, over a real socket', () => {
       });
       child = proc;
       let out = '';
+      /* Cleared the moment the port is reported. Left pending it keeps the event loop alive for
+         its full eight seconds after a test that has already passed, which is time added to every
+         run of this file for a deadline that can no longer fire usefully. */
+      const deadline = setTimeout(
+        () => { fail(new Error(`panel.mjs did not report a port in time: ${out}`)); }, 8000);
       const onData = (chunk: Buffer) => {
         out += chunk.toString('utf8');
         const m = /panel: http:\/\/127\.0\.0\.1:(\d+)\//.exec(out);
-        if (m?.[1]) { proc.stdout.off('data', onData); settle(`http://127.0.0.1:${m[1]}`); }
+        if (m?.[1]) {
+          clearTimeout(deadline);
+          proc.stdout.off('data', onData);
+          settle(`http://127.0.0.1:${m[1]}`);
+        }
       };
       proc.stdout.on('data', onData);
       proc.on('error', fail);
       proc.on('exit', code => {
+        clearTimeout(deadline);
         if (code !== null && code !== 0) fail(new Error(`panel.mjs exited ${code}: ${out}`));
       });
-      setTimeout(() => fail(new Error(`panel.mjs did not report a port in time: ${out}`)), 8000);
     });
   }
 

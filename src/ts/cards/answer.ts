@@ -20,10 +20,12 @@ import { join } from 'node:path';
 import type { CardKit, CardSpec, CardTypeModule } from './kit.js';
 
 /** The first ord an answer card can take. Every hand-placed card sits below this. */
-export const ANSWER_ORD_BASE = 1000;
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types -- annotated so the exported type is `number`, not the literal
+export const ANSWER_ORD_BASE: number = 1000;
 
 /** How much of the ord space belongs to answers: the band is `[ANSWER_ORD_BASE, ANSWER_ORD_BASE + ANSWER_ORD_SPAN)`. */
-export const ANSWER_ORD_SPAN = 1000;
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types -- annotated so the exported type is `number`, not the literal
+export const ANSWER_ORD_SPAN: number = 1000;
 
 /**
  * What a card id must look like: it becomes a directory name, so it must not be able to become
@@ -303,11 +305,15 @@ function ordForRender(deck: string, req: RenderRequest): number {
  * inside `kit.writeCard` — so a card that fails its audit never gets a directory at all. The
  * `card.json` rewrite that adds the `answer` stamp is a second write after `kit.writeCard`
  * finishes (which itself writes `card.json` last, after html/css/js): between those two writes
- * the card briefly exists on disk without its answer stamp, so if this process died in that
- * exact window the card would be found and inert rather than counted as an answer. That window
- * is one `writeFileSync` wide and considered acceptable — the alternative is duplicating
- * `kit.writeCard`'s own file-writing here to fold the stamp into its single write, which would
- * make this module responsible for the deck's on-disk format instead of the kit.
+ * the card briefly exists on disk without its answer stamp. Its non-crash half is closed — if
+ * the read, the parse or the stamping write throws, the directory is removed before the error
+ * propagates, so a failure here leaves nothing behind rather than an unstamped card that
+ * {@link listAnswerCards} would skip and {@link ageOutAnswers} would therefore never remove.
+ * What remains is process death inside that window, which no amount of `catch` reaches: the
+ * card would be found, inert and permanent. That residue is one `writeFileSync` wide and
+ * considered acceptable — the alternative is duplicating `kit.writeCard`'s own file-writing
+ * here to fold the stamp into its single write, which would make this module responsible for
+ * the deck's on-disk format instead of the kit.
  *
  * When `req.ord` is omitted and the band has been used up — the 1000th render on one desk —
  * {@link renumberAnswerCards} packs the surviving answers back down to `ANSWER_ORD_BASE` and the
@@ -359,12 +365,19 @@ export function writeAnswerCard(
   mkdirSync(deck, { recursive: true });
   const dir = kit.writeCard(mod, spec, deck);
 
-  const raw: unknown = JSON.parse(readFileSync(join(dir, 'card.json'), 'utf8'));
-  if (typeof raw !== 'object' || raw === null) {
-    throw new Error(`writeAnswerCard: ${join(dir, 'card.json')} did not parse to an object`);
+  try {
+    const raw: unknown = JSON.parse(readFileSync(join(dir, 'card.json'), 'utf8'));
+    if (typeof raw !== 'object' || raw === null) {
+      throw new Error(`writeAnswerCard: ${join(dir, 'card.json')} did not parse to an object`);
+    }
+    const stamped = { ...(raw as Record<string, unknown>), answer: { at: now.toISOString() } };
+    writeFileSync(join(dir, 'card.json'), JSON.stringify(stamped, null, 2) + '\n');
+  } catch (e) {
+    // An unstamped card is worse than no card: it is not an answer, so age-out never reaches it,
+    // and it would sit in the band forever holding an ord nothing accounts for.
+    rmSync(dir, { recursive: true, force: true });
+    throw e;
   }
-  const stamped = { ...(raw as Record<string, unknown>), answer: { at: now.toISOString() } };
-  writeFileSync(join(dir, 'card.json'), JSON.stringify(stamped, null, 2) + '\n');
 
   const agedOut = ageOutAnswers(deck, keep);
   return { id, dir, ord, agedOut };

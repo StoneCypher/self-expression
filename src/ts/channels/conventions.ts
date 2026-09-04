@@ -303,15 +303,15 @@ export function availableConventions(root: string | null): readonly ConventionDo
  * whether a skill by that name is loaded.
  *
  * Only the core document is named as the one to read. The rest are listable, and a model
- * that needs the marker vocabulary will find it; leading with all seven would invite
- * reading all seven.
+ * that needs the marker vocabulary will find it; leading with all eight would invite
+ * reading all eight.
  *
  * @param docs the documents actually available, from {@link availableConventions}
  * @returns the sentence, or `null` when no documents are available to point at
  *
  * @example
  *   conventionsPointer(availableConventions('/pkg'))
- *   // => 'The conventions these tools assume are served as MCP resources (7 documents) …'
+ *   // => 'The conventions these tools assume are served as MCP resources (8 documents) …'
  *   conventionsPointer([])   // => null
  *
  * @see ../mcp/server.js buildServer

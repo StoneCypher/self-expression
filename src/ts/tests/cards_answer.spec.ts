@@ -13,6 +13,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { tmpdir } from 'node:os';
 
 import { loadKit } from '../cards/kit.js';
+import type { CardKit } from '../cards/kit.js';
 import {
   ANSWER_ORD_BASE, ANSWER_ORD_SPAN, CARD_ID_PATTERN, slugTitle, deriveCardId,
   listAnswerCards, nextAnswerOrd, renumberAnswerCards, writeAnswerCard, ageOutAnswers,
@@ -371,6 +372,61 @@ describe('writeAnswerCard', () => {
     } finally {
       rmSync(deck, { recursive: true, force: true });
       rmSync(kitCopy, { recursive: true, force: true });
+    }
+  });
+
+  // A card that got a directory but never got its `answer` stamp is worse than no card at all:
+  // `listAnswerCards` skips it, so `ageOutAnswers` can never remove it, and it squats on a band
+  // ord forever. A kit whose `writeCard` leaves unparsable JSON is the cheapest way to reach
+  // that window on purpose.
+  test('a card.json the stamp cannot parse takes its own directory down and rethrows', async () => {
+    const deck = tempDeck();
+    try {
+      const real = await loadKit(MINI);
+      const kit: CardKit = {
+        ...real,
+        writeCard(mod, spec, into) {
+          const dir = join(into, spec.id);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, 'card.json'), `{ "type": "${mod.meta.name}", truncated`);
+          return dir;
+        },
+      };
+
+      const id = deriveCardId('tally', 'Half Written', NOW);
+      expect(() => writeAnswerCard(
+        kit, deck, { type: 'tally', title: 'Half Written', data: { value: 1, target: 2 } }, 8, NOW,
+      )).toThrow(SyntaxError);
+
+      expect(existsSync(join(deck, id))).toBe(false);
+      expect(listAnswerCards(deck)).toEqual([]);
+    } finally {
+      rmSync(deck, { recursive: true, force: true });
+    }
+  });
+
+  test('a card.json that parses to a non-object is refused by name, and leaves nothing behind', async () => {
+    const deck = tempDeck();
+    try {
+      const real = await loadKit(MINI);
+      const kit: CardKit = {
+        ...real,
+        writeCard(mod, spec, into) {
+          const dir = join(into, spec.id);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, 'card.json'), JSON.stringify(mod.meta.name));   // a bare string
+          return dir;
+        },
+      };
+
+      const id = deriveCardId('tally', 'Not An Object', NOW);
+      expect(() => writeAnswerCard(
+        kit, deck, { type: 'tally', title: 'Not An Object', data: { value: 1, target: 2 } }, 8, NOW,
+      )).toThrow(/did not parse to an object/);
+
+      expect(existsSync(join(deck, id))).toBe(false);
+    } finally {
+      rmSync(deck, { recursive: true, force: true });
     }
   });
 });
