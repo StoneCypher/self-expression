@@ -1,10 +1,10 @@
-# self-expression v0.6.4
+# self-expression v0.7.0
 
-> Version 0.6.4 was built on Thursday, September 3, 2026 at GMT-07:00 `1788496968166` from hash `e770cc8`.
+> Version 0.7.0 was built on Thursday, September 3, 2026 at GMT-07:00 `1788498003507` from hash `0fb6969`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788496968166 Thursday, September 3, 2026 at GMT-07:00 95.11 360 91 e770cc8 52.89 65.08 65.13 64.73 260 2593 89.52 93.8 95.46 2333 0.6.4 -->
+<!-- Supported embeds: 1788498003507 Thursday, September 3, 2026 at GMT-07:00 95.02 360 91 0fb6969 52.45 64.36 63.87 64.11 263 2647 89.42 93.73 95.37 2384 0.7.0 -->
 
 
 
@@ -258,6 +258,7 @@ The registered keys:
 | `dwelling.path` | string | *(none)* | Absolute directory the dwelling database lives in. Deliberately no default — the location is the user's explicit offer. |
 | `dwelling.size_warn_gb` | int | `10` | Dwelling file size, in gigabytes, at which a visit warns the user. |
 | `desk.path` | string | *(none)* | Absolute directory of the desk (#93, #98) — the same one the desk server is started on. Deliberately no default: a desk is a place the user chose, not one the plugin picks. |
+| `desk.answer_cards` | int | `8` | How many `render_card` answer cards the desk keeps before the oldest ages out (#93). A card worth keeping gets pinned (`"fixed": true`) and is never counted. |
 | `share.enabled` | bool | `false` | Whether the public-aggregation export is available. Off by default; only the exact value `true` enables — the inverse posture of `privacy.*`. |
 | `share.opted_in_utc` | string | *(none)* | The most recent opt-in moment. Stamped automatically when `share.enabled` is set `true`, cleared on opt-out; only rows recorded at or after it are ever exported. |
 | `share.time_granularity` | enum | `hour` | How far exported timestamps are coarsened: `hour` or `day`. |
@@ -357,10 +358,11 @@ off disk at request time so there is exactly one copy of every word:
 | `self-expression://conventions/status-checklists` | how a multi-item status report is written |
 | `self-expression://conventions/checklist-markers` | the marker vocabulary and its canonical order |
 | `self-expression://conventions/checklist-visuals` | the inline visual vocabulary |
+| `self-expression://conventions/answer-cards` | when a card is the honest answer, and when three numbers are a sentence |
 
 Resources rather than a longer `instructions` string, deliberately: `instructions`
 is delivered unconditionally on every connection to every host, and the documents
-run to roughly 88 KB. Sending them would be wasteful anywhere and actively wrong
+run to roughly 90 KB. Sending them would be wasteful anywhere and actively wrong
 on the three hosts that already load these exact files, where the model would
 receive the same text twice from two channels with no way to tell it is one
 source. So `instructions` carries only a three-sentence pointer that names the
@@ -896,6 +898,29 @@ and threw on every load. Removing a directory cannot miss two of three edits.
 | Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log |
 | Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
 
+### Drawing an answer onto it (issue #93)
+
+Two tools reach the desk from a session — and they exist only when the card kit shipped
+beside the bundle actually loaded. A catalogue that could not be read has no honest
+description to advertise, so the tools are **absent** rather than present-and-refusing,
+the same posture `generate_image` takes toward a missing credential.
+
+| Tool | What it does |
+|---|---|
+| `render_card` | Draw one card onto the desk: `type`, `title`, the type's own `data`, and an optional `ord`. The id and the placement are derived; the reply names the card, its ord, its directory, and anything the write aged out. Its **description is generated from the catalogue at registration time**, so the types offered to the model and the types that exist cannot drift apart. |
+| `list_card_types` | The catalogue grouped by the question each category answers — for when you are holding a question rather than a chart name. Omit `category` for type names alone; name one to see the data `shape`s and settings in that group. |
+
+Answer cards live in their own **band**, ords `[1000, 2000)`, so they always read below
+every hand-placed card and never renumber one. The newest `desk.answer_cards` survive and
+the rest are removed outright, oldest first. Pinning a card (`"fixed": true`) takes it out
+of the count entirely — it stops being an answer and becomes something the desk's owner
+keeps. Both tools register whenever the card kit loaded, independent of `desk.path`; until
+`desk.path` is set, `render_card` refuses to write and answers by naming the key and the
+call that sets it rather than guessing at a directory, and it names the same desk server:
+`self-expression-desk <dir>`. The desk now ships — `src/scripts/desk` is in the package's
+`files` list and `panel.mjs` carries its own `bin` entry — so the directory `render_card`
+writes into is one an installed copy of this plugin can also show.
+
 &nbsp;
 
 &nbsp;
@@ -1041,19 +1066,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2333</td>
-    <td>95.11<small>%</small></td>
-    <td>89.52<small>%</small></td>
-    <td>93.8<small>%</small></td>
-    <td>95.46<small>%</small></td>
+    <td>2384</td>
+    <td>95.02<small>%</small></td>
+    <td>89.42<small>%</small></td>
+    <td>93.73<small>%</small></td>
+    <td>95.37<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>260</td>
-    <td>65.08<small>%</small></td>
-    <td>52.89<small>%</small></td>
-    <td>65.13<small>%</small></td>
-    <td>64.73<small>%</small></td>
+    <td>263</td>
+    <td>64.36<small>%</small></td>
+    <td>52.45<small>%</small></td>
+    <td>63.87<small>%</small></td>
+    <td>64.11<small>%</small></td>
   </tr>
 </table>
 

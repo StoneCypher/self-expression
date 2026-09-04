@@ -96,6 +96,9 @@ jobs:
       - name: Run lite build
         run: npm run build -- --profile=ci-lite
 
+      - name: card kit catalogue check
+        run: npm run check:cards
+
 
 
   # Push to main (or #fullbuild PR): full artifact build on the canonical

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * The desk server: a local panel that shows a standing surface and takes input back.
  *
@@ -84,6 +85,7 @@ const DB = process.env.SELF_EXPRESSION_AFFECT_LOG
         ?? join(homedir(), '.claude', 'affect-log.sqlite3');
 
 const SHELL  = join(HERE, 'desk-shell.html');    // structure only; cards fill it
+const KIT    = join(HERE, 'cardkit');           // kit.js / kit.css, shared by every kit-built card
 const HTML   = join(HERE, 'panel.html');         // the un-converted second surface
 const DECK   = join(DESK, 'cards');
 const BOARD  = join(DESK, 'board.md');
@@ -127,6 +129,11 @@ function watchOrSay(path, recursive = false) {
 }
 
 watchOrSay(SHELL);
+/* The kit is part of the page, and — because it is inlined rather than linked — editing it
+   changes every card's behaviour, so open desks must renew. Watched by file, not by walking
+   `cardkit/` recursively: a recursive watch on sixty type modules fires on every save under it. */
+watchOrSay(join(KIT, 'kit.css'));
+watchOrSay(join(KIT, 'kit.js'));
 watchOrSay(HTML);
 /* The deck is part of the page, so a card appearing, changing or being deleted is a change
    to the desk exactly as an edit to the shell is. */
@@ -482,6 +489,17 @@ const server = createServer((req, res) => {
      no window in which a dismissed card is briefly visible. */
   let page = isDesk ? assemble(readFileSync(SHELL, 'utf8'), DECK)
                     : readFileSync(HTML, 'utf8');
+
+  /* The kit is inlined rather than linked. A `<script src>` would keep its contents out of
+     the page, so editing the kit would change every card's behaviour without the open desks
+     being told the code had moved. Replacements are functions so `$&` in the kit stays text. */
+  for (const [slot, file] of [['<!--KIT-CSS-->', 'kit.css'], ['<!--KIT-JS-->', 'kit.js']]) {
+    if (!page.includes(slot)) continue;
+    let body = '';
+    try { body = readFileSync(join(KIT, file), 'utf8'); }
+    catch { body = `/* cardkit: ${file} is missing */`; }
+    page = page.replace(slot, () => body);
+  }
 
   /* An import map has to be inline and ahead of every module it governs, so it is
      substituted here rather than fetched. */

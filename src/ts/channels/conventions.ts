@@ -13,7 +13,7 @@
  *
  * **Resources, not a longer `instructions` string, and the reasoning is the point.**
  * `instructions` is delivered unconditionally to every host on every connection. The
- * conventions run to roughly 88 KB across seven documents; spending that on every
+ * conventions run to roughly 90 KB across eight documents; spending that on every
  * handshake would be wasteful on any host and actively wrong on Claude Code, Codex, and
  * Gemini, which already load these exact files as skills — the model would receive the
  * same text twice, from two channels, with no way to tell that they are one source.
@@ -116,6 +116,11 @@ export const CONVENTION_DOCS: readonly ConventionDoc[] = [
     description:
       'The inline visual vocabulary a checklist may carry: bars, sparklines, and the rest, ' +
       'with the rules for when each earns its place.' },
+  { id: 'answer-cards', title: 'Answer cards', skill: null,
+    path: ['src', 'doc_md', 'reference', 'answer-cards.md'],
+    description:
+      'When a card is the honest answer and when three numbers are a sentence: the taste ' +
+      'channel for render_card, kept apart from the mechanism on purpose.' },
 ];
 
 /**
@@ -292,21 +297,21 @@ export function availableConventions(root: string | null): readonly ConventionDo
  *
  * Short on purpose. This rides the handshake on **every** host, including the three that
  * already load these files as skills, so it must cost almost nothing there — and it must
- * actively tell such a host to stop, because the failure mode is the model reading 88 KB
+ * actively tell such a host to stop, because the failure mode is the model reading 90 KB
  * it already has and treating two copies of one file as two sources that might disagree.
  * The check it asks the model to make is one the model can genuinely make: it knows
  * whether a skill by that name is loaded.
  *
  * Only the core document is named as the one to read. The rest are listable, and a model
- * that needs the marker vocabulary will find it; leading with all seven would invite
- * reading all seven.
+ * that needs the marker vocabulary will find it; leading with all eight would invite
+ * reading all eight.
  *
  * @param docs the documents actually available, from {@link availableConventions}
  * @returns the sentence, or `null` when no documents are available to point at
  *
  * @example
  *   conventionsPointer(availableConventions('/pkg'))
- *   // => 'The conventions these tools assume are served as MCP resources (7 documents) …'
+ *   // => 'The conventions these tools assume are served as MCP resources (8 documents) …'
  *   conventionsPointer([])   // => null
  *
  * @see ../mcp/server.js buildServer

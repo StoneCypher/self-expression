@@ -17,6 +17,7 @@
  * @see ./checklist_tools.js
  * @see ./diagram_tools.js
  * @see ./share_tools.js
+ * @see ./card_tools.js
  */
 
 import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -38,6 +39,9 @@ import { registerMessageTools } from './message_tools.js';
 import { registerNoteTools } from './note_tools.js';
 import { registerDiagramTools } from './diagram_tools.js';
 import { registerShareTools } from './share_tools.js';
+import { registerCardTools } from './card_tools.js';
+import { defaultKitDir, loadKit } from '../cards/kit.js';
+import type { CardKit } from '../cards/kit.js';
 import { maybeOpenDwelling, registerDwellTool } from './dwell_tool.js';
 import { closeDwelling } from '../dwelling/store.js';
 import type { DwellingStore } from '../dwelling/store.js';
@@ -116,19 +120,32 @@ export function serverInstructions(
  * invite the model to keep trying. Absent is the honest state, and the stderr note is
  * where a user who meant to enable it finds out which variable is empty.
  *
+ * The card tools (issue #93) are absent for the same reason, and one more: `render_card`'s
+ * description is *generated from the catalogue it was handed*, so a kit that did not load
+ * has no honest description to advertise. Registering nothing beats registering a tool that
+ * names types it cannot build.
+ *
  * @param dwelling - an open dwelling to register, `null` for none, or omit to resolve
  *                   from configuration; a caller who passes one also owns closing it
  * @param root     - the package root the convention documents are read from; omit to
  *                   discover it from the running script and the working directory
  * @param images   - an open image ledger plus its dependencies, `null` for none, or omit
  *                   to resolve from configuration; a caller who passes one owns closing it
+ * @param cards    - a **loaded** card kit to register `render_card` and `list_card_types`
+ *                   against, or `null`/omitted for neither. This function is synchronous and
+ *                   loading a kit is not, so unlike `dwelling` and `images` there is no
+ *                   "resolve it from here" case: pass a loaded kit — {@link startStdio} is
+ *                   where the load happens
  *
  * @example
  *   const server = buildServer(store, '0.2.0');
+ * @example
+ *   const server = buildServer(store, '0.2.0', null, root, null, await loadKit(defaultKitDir(root)));
  *
  * @see serverInstructions
  * @see ./resources.js registerConventionResources
  * @see ./image_tools.js imageFacility
+ * @see ./card_tools.js registerCardTools
  */
 export function buildServer(
   store    : Store,
@@ -136,6 +153,7 @@ export function buildServer(
   dwelling?: DwellingStore | null,
   root?    : string | null,
   images?  : { readonly ledger: ImageLedger; readonly deps: ImageDeps } | null,
+  cards?   : CardKit | null,
 ): McpServer {
 
   const where   = root === undefined ? defaultConventionsRoot() : root,
@@ -161,6 +179,8 @@ export function buildServer(
   const picture = images === undefined ? resolveImageFacility(store) : images;
   if (picture !== null) { registerImageTools(server, store, picture.ledger, picture.deps, version); }
 
+  if (cards !== undefined && cards !== null) { registerCardTools(server, store, cards); }
+
   return server;
 
 }
@@ -183,6 +203,32 @@ export function resolveImageFacility(
 
   return ledger === null ? null : { ledger, deps: defaultImageDeps(env) };
 
+}
+
+/**
+ * The card kit from the package root, or `null` with one stderr line when it cannot load —
+ * a server without cards still serves everything else.
+ *
+ * Failing open is the whole point: the kit is ~90 dynamically imported files shipped beside
+ * the bundle, and a packaging accident that loses them should cost the desk's cards, not the
+ * expression channels, the messagebox, and the notes.
+ *
+ * @param root the package root the kit is read from, as {@link defaultKitDir} lays it out
+ * @returns the loaded kit, or `null` when loading threw
+ *
+ * @example
+ *   await loadKitOrNote('/opt/self-expression');   // a CardKit, or null with a stderr note
+ *
+ * @see ../cards/kit.js loadKit
+ */
+async function loadKitOrNote(root: string): Promise<CardKit | null> {
+  try {
+    return await loadKit(defaultKitDir(root));
+  } catch (error) {
+    process.stderr.write(
+      `${SERVER_NAME}: card kit unavailable, render_card not registered: ${String(error)}\n`);
+    return null;
+  }
 }
 
 /**
@@ -214,7 +260,8 @@ export async function startStdio(version: string, dbFile?: string, bundleDir?: s
         house     = maybeOpenDwelling(store),
         root      = bundleDir === undefined ? undefined : packageRoot(bundleDir),
         picture   = resolveImageFacility(store),
-        server    = buildServer(store, version, house, root, picture),
+        kit       = root === undefined ? null : await loadKitOrNote(root),
+        server    = buildServer(store, version, house, root, picture, kit),
         transport = new StdioServerTransport();
 
   // The image facility's one legible line (issue #78): silent when off, a warning

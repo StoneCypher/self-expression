@@ -91,6 +91,38 @@ markup, and it arrives when its manifest does.
 
 &nbsp;
 
+## Answer cards
+
+Cards above are hand-placed. An answer card is written by the MCP server's `render_card`
+tool instead — a session draws an answer onto the desk rather than describing it, and the
+id and the ord are derived, not chosen. Answers live in their own band, ords `[1000,
+2000)`, so they always read below every hand-placed card and never renumber one
+(issue #93).
+
+Answers age out. The desk keeps the newest `desk.answer_cards` (default 8) non-pinned
+answers and removes the rest, oldest first, the moment another one is written. Pinning a
+card (`"fixed": true` in its `card.json`, the same field a hand-placed card can carry) takes
+it out of the count entirely — it stops being an answer and becomes something the desk's
+owner decided to keep, and that decision is the owner's, never the model's. `render_card`
+and `list_card_types` are registered whenever a card kit loaded beside the running server,
+independent of `desk.path`; until `desk.path` is set, `render_card` refuses to write and
+answers by naming the key that turns it on rather than guessing at a directory. This is the
+mechanism; the taste — when a card is the honest answer and when three numbers are a
+sentence — lives apart, in `src/doc_md/reference/answer-cards.md`.
+
+**Do not run the kit's `node newcard.mjs rebuild --deck <desk>/cards` on a live desk.** Rebuild
+regenerates every `card.json` from its recorded `spec`, which means writing each one from
+scratch — and `answer` and `fixed` are not part of what it writes. It strips both from every card
+on the deck: every answer stops being an answer, so age-out can no longer see it, and every
+pinned card silently stops being pinned. It is a tool for a deck of hand-placed cards that needs
+a type improvement applied, not for a desk `render_card` writes to.
+
+The desk this writes onto is the one this file describes, started the same way:
+`self-expression-desk <desk directory>` once installed, or `node
+src/scripts/desk/panel.mjs <desk directory>` from a checkout.
+
+&nbsp;
+
 ## Why a card is a directory
 
 Cards used to be markup inside one large HTML document. Adding one was an edit; removing one

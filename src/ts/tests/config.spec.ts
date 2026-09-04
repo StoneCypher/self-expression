@@ -23,7 +23,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the desk path, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the two desk keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -36,7 +36,7 @@ describe('CONFIG_KEYS registry', () => {
       'channels.idea.max_chars', 'channels.load.max_chars', 'channels.need.max_chars',
       'channels.pattern.max_chars', 'channels.signature.max_chars',
       'channels.taste.max_chars', 'channels.unanswerable.max_chars',
-      'desk.path',
+      'desk.answer_cards', 'desk.path',
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
       'gifts.enabled',
@@ -115,6 +115,15 @@ describe('CONFIG_KEYS registry', () => {
     expect(configKey('desk.path')).toMatchObject({ kind: 'string', fallback: null });
     expect(configKey('desk.path')?.validate('C:/somewhere/desk').ok).toBe(true);
     expect(configKey('desk.path')?.validate('').ok).toBe(false);
+  });
+
+  test('desk.answer_cards keeps eight by default and refuses a count outside 1..100 (#93)', () => {
+    expect(configKey('desk.answer_cards')).toMatchObject({ kind: 'int', fallback: '8' });
+    expect(configKey('desk.answer_cards')?.validate('1').ok).toBe(true);
+    expect(configKey('desk.answer_cards')?.validate('100').ok).toBe(true);
+    // Zero would age out every answer the moment it was written, which is why the floor is 1.
+    expect(configKey('desk.answer_cards')?.validate('0').ok).toBe(false);
+    expect(configKey('desk.answer_cards')?.validate('101').ok).toBe(false);
   });
 
   test('gate.checklist is reserved with the same shape gate.signature has', () => {
