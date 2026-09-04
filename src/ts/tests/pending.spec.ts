@@ -197,6 +197,31 @@ describe('pendingNotice', () => {
 
     })));
 
+  test('messages.enabled=false keeps the notice silent about mail, desk requests aside', () =>
+    withStore(s => withDesk(deskDir => {
+
+      const now = new Date('2026-08-30T10:00:00Z');
+
+      writeConfig(s, 'desk.path', deskDir);
+      postMessage(s, { audience: 'self', text: 'unread but muted', session: 'S' }, VERSION, now);
+      writeConfig(s, 'messages.enabled', 'false');
+
+      // Mail is the only thing pending and the messagebox is switched off, so there is
+      // nothing to say — and nothing is stored, because a fingerprint written here would
+      // have to be un-written the moment the switch came back on.
+      expect(pendingNotice(s, 'S', now)).toBeNull();
+      expect(lastFingerprint(s, 'S')).toBeNull();
+
+      // The other source still speaks for itself, and still says nothing about the mail.
+      writeQuestions(deskDir, [
+        { id: 'q1', text: 'ask', asked: now.toISOString(), queued: 'next', queuedAt: now.toISOString() },
+      ]);
+      const notice = pendingNotice(s, 'S', now);
+      expect(notice).toMatch(/1 desk request/);
+      expect(notice).not.toMatch(/unread message/);
+
+    })));
+
   test('never says "clear" when the only reason the set looks empty is a failed source', () =>
     withStore(s => withDesk(deskDir => {
 
