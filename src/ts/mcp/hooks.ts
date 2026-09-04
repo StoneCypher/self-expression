@@ -24,6 +24,7 @@ import type { WindowPosture, WindowSurface }     from '../channels/config.js';
 import { CHANNELS }                                from '../channels/vocabulary.js';
 import { unreadCounts, readMessages }              from '../channels/messages.js';
 import { offerRipeNotes, renderHeldNote }          from '../channels/notes.js';
+import { pendingNotice }                           from '../channels/pending.js';
 import type { Store }                              from '../channels/store.js';
 import { clockTime, zoneAbbreviation, partOfDay }  from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
@@ -304,6 +305,54 @@ export function mailboxLine(store: Store, session: string | undefined, now: Date
 }
 
 /**
+ * The pending-notice segment (issue #98) — the desk requests and unread notes waiting on
+ * this session — or `null` when there is nothing new to say.
+ *
+ * **The hook is one carrier of the notice among several, and they share one voice.**
+ * {@link ../channels/pending.js pendingNotice} records the fingerprint it spoke the
+ * moment it speaks, and every carrier — this hook, and the four tool replies
+ * {@link ./pending_tools.js withPendingNotice} decorates — reads and writes that one row.
+ * So a hook that spoke leaves the next tool reply silent, and vice versa: the session
+ * hears about a change exactly once, from whichever carrier reached it first.
+ *
+ * The session handed in is the hook payload's `session_id`, which is *the same value* the
+ * tool layer resolves as its observed session — {@link onUserPromptSubmit} is what writes
+ * that context row in the first place, and
+ * {@link ./pending_tools.js claimSession} reads it straight back out. The two carriers
+ * therefore fingerprint against one identity without having to agree about anything.
+ *
+ * Fails open in the same shape the `mailboxLine` call site uses: anything thrown — a
+ * missing `pending_notice` table, an unreadable store — costs this segment and nothing
+ * else, because a notice that could wedge a turn would be worse than no notice at all.
+ * That is one layer above {@link ../channels/pending.js collectPending}'s per-source
+ * fail-open, which already absorbs a corrupt `questions.json`.
+ *
+ * @param store   the open store, or `null` on a host where it could not be opened
+ * @param session the hook-observed session; an absent one yields `null`, because the
+ *                fingerprint that makes the notice speak-once is keyed per session and
+ *                there is no honest key for a turn with no identity
+ * @param now     the instant the pending set is evaluated and stamped against
+ *
+ * @example
+ *   pendingSegment(store, 'sess-1', new Date())
+ *   // => 'pending: 1 desk request (self-expression claim_pending)'
+ *   pendingSegment(store, 'sess-1', new Date())
+ *   // => null  — the same carrier, or any other, already said it
+ *
+ * @see ../channels/pending.js pendingNotice
+ * @see ./pending_tools.js withPendingNotice
+ */
+function pendingSegment(store: Store | null, session: string | undefined, now: Date): string | null {
+
+  if (store === null)                                { return null; }
+  if (typeof session !== 'string' || session === '') { return null; }
+
+  try { return pendingNotice(store, session, now); }
+  catch { return null; }   // fail open: every other segment still gets delivered
+
+}
+
+/**
  * The context line's held-note segment (issue #43) — or `null` when nothing is offered.
  *
  * **This is the entire delivery vehicle for self-initiated speech, and it exists only
@@ -514,6 +563,12 @@ export const OPEN_REMINDER_CLOCKLESS =
  * present only when something is actually unread and both `messages.*` keys allow it.
  * It fails open separately too: a mailbox error costs the count line and nothing else.
  *
+ * The pending notice ({@link pendingSegment}, issue #98) follows the count, and says
+ * something different with it: not how much mail is unread, but what is *waiting on this
+ * session* across the desk and the messagebox — and only on the turns that set actually
+ * changed. It shares its speak-once fingerprint with the tool-reply carrier, so a turn
+ * this hook spoke on leaves the next `express` or `recall` reply quiet.
+ *
  * On a session's **first** turn only, the retraction replay ({@link retractionReplayLine},
  * issue #16) follows the reminder: the recently taken-back claims, so a resumed session
  * does not carry known falsehoods forward. Turn index 1 — a session this store has never
@@ -594,6 +649,13 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     } catch { /* fail open: the clock, flags, lengths, windows, and reminder still get delivered */ }
   }
 
+  // The pending notice (#98), right after the mailbox count it complements: the count
+  // says how much mail is unread, this says what is *waiting on the session* across the
+  // desk and the messagebox, and only when that set changed. `pendingSegment` carries its
+  // own fail-open catch, so there is no try here.
+  const pendingLine = pendingSegment(store, payload.session_id, now),
+        pending     = pendingLine === null ? '' : ` ${pendingLine}`;
+
   // The retraction replay (#16), on the first turn this store has seen of this session
   // and no other. Fails open on its own terms: an error here costs the replay segment and
   // nothing else, which is the right trade — a hook that could wedge a turn over a
@@ -630,8 +692,8 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: keep the clock */ }
   }
 
-  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${windows}${mail}`
-                         : `${flags}${lengths}${windows}${mail}`.trimStart(),
+  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${windows}${mail}${pending}`
+                         : `${flags}${lengths}${windows}${mail}${pending}`.trimStart(),
         reminder = clock ? OPEN_REMINDER : OPEN_REMINDER_CLOCKLESS;
 
   return {
@@ -694,26 +756,87 @@ export function onStop(store: Store | null, payload: HookPayload): HookOutput {
 }
 
 /**
- * `SessionStart`: hand a resumed or compacted session its unread notes to self —
- * the compaction-survival mechanism, and the reason the messagebox earns the word
- * "memory" (issue #41).
+ * A resumed session's unread notes to self, rendered for injection — or `null` when
+ * there are none (issue #41).
  *
- * Fires only on `source: 'compact'` or `'resume'` — the one moment the notes are
- * guaranteed relevant and guaranteed forgotten. On `startup` it stays silent: a fresh
- * session has no past self. Injects the **full text** of the session's unread `self`
- * messages as `additionalContext` and receipts them (`reader: 'model'`) as delivered,
- * so nothing is handed over twice. Governed by `messages.enabled` alone — not
- * `messages.notify`, which gates only the per-turn count line — because compaction
- * recovery is the point of the facility.
+ * Reading is delivery here: {@link ../channels/messages.js readMessages} receipts every
+ * row it returns as `reader: 'model'`, so a note handed over once is never handed over
+ * twice. Governed by `messages.enabled` alone — not `messages.notify`, which gates only
+ * the per-turn count line — because compaction recovery is the point of the facility.
  *
- * Fails open like every handler: no store, a read error, or a receipt error yields
+ * Fails open on its own terms, which is why it is a segment rather than the body of
+ * {@link onSessionStart}: a read or receipt error costs the notes and leaves the pending
+ * notice free to go out on its own.
+ *
+ * @param session the resumed session whose `self` mail is being delivered
+ * @param turnId  the hook's `prompt_id`, stamped into the delivery receipts
+ * @param now     the instant the read and its receipts are dated
+ *
+ * @example
+ *   selfNotesSegment(store, 's1', 'p1', new Date())
+ *   // => 'Unread notes from your earlier self in this session (now delivered):\n- [2:05 pm] …'
+ *
+ * @see ../channels/messages.js readMessages
+ */
+function selfNotesSegment(
+  store   : Store,
+  session : string,
+  turnId  : string | undefined,
+  now     : Date,
+): string | null {
+
+  try {
+
+    if (effectiveValue(store, 'messages.enabled') === 'false') { return null; }
+
+    const notes = readMessages(store,
+      { reader: 'model', session, promptId: turnId },
+      { audience: 'self', limit: 100 }, now);
+
+    if (notes.length === 0) { return null; }
+
+    const rendered = notes
+      .map(note => `- [${String(note['ts_local'])}] ${String(note['text'])}`)
+      .join('\n');
+
+    return `Unread notes from your earlier self in this session (now delivered):\n${rendered}`;
+
+  } catch {
+
+    return null;   // fail open: the pending notice still gets delivered
+
+  }
+
+}
+
+/**
+ * `SessionStart`: hand a resumed or compacted session its unread notes to self and
+ * whatever is still waiting on it — the compaction-survival mechanism, and the reason
+ * the messagebox earns the word "memory" (issues #41, #98).
+ *
+ * Fires only on `source: 'compact'` or `'resume'` — the one moment both segments are
+ * guaranteed relevant and guaranteed forgotten. On `startup` it stays silent and takes
+ * nothing: a fresh session has no past self, and a notice spoken into a session that
+ * never asked would burn the fingerprint that makes the first real turn informative.
+ *
+ * Two segments, joined by a blank line and each independently fail-open. First the
+ * unread `self` notes ({@link selfNotesSegment}), injected in **full text** and receipted
+ * as delivered. Then the pending notice ({@link pendingSegment}, issue #98) — the desk
+ * requests and unread mail still waiting — computed *after* the notes read precisely
+ * because that read receipted them: notes this very call just delivered are no longer
+ * pending, and naming them again would tell the session to go fetch what it is already
+ * holding. Sharing the notice's fingerprint row with every other carrier is what keeps
+ * the following tool replies quiet about what was just said here.
+ *
+ * Fails open like every handler: no store, no session, or both segments empty yields
  * `null` (inject nothing) rather than wedging the session start.
  *
  * @example
  *   onSessionStart(store, { session_id: 's1', source: 'compact' }, new Date())
  *   // => { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: '…' } }
  *
- * @see ../channels/messages.js readMessages
+ * @see selfNotesSegment
+ * @see pendingSegment
  */
 export function onSessionStart(store: Store | null, payload: HookPayload, now: Date): HookOutput {
 
@@ -723,33 +846,19 @@ export function onSessionStart(store: Store | null, payload: HookPayload, now: D
   const session = payload.session_id;
   if (typeof session !== 'string' || session === '') { return null; }
 
-  try {
+  const segments = [
+    selfNotesSegment(store, session, payload.prompt_id, now),
+    pendingSegment(store, session, now),
+  ].filter((segment): segment is string => segment !== null);
 
-    if (effectiveValue(store, 'messages.enabled') === 'false') { return null; }
+  if (segments.length === 0) { return null; }
 
-    const notes = readMessages(store,
-      { reader: 'model', session, promptId: payload.prompt_id },
-      { audience: 'self', limit: 100 }, now);
-
-    if (notes.length === 0) { return null; }
-
-    const rendered = notes
-      .map(note => `- [${String(note['ts_local'])}] ${String(note['text'])}`)
-      .join('\n');
-
-    return {
-      hookSpecificOutput: {
-        hookEventName    : 'SessionStart',
-        additionalContext:
-          `Unread notes from your earlier self in this session (now delivered):\n${rendered}`,
-      },
-    };
-
-  } catch {
-
-    return null;   // fail open on every error path
-
-  }
+  return {
+    hookSpecificOutput: {
+      hookEventName    : 'SessionStart',
+      additionalContext: segments.join('\n\n'),
+    },
+  };
 
 }
 

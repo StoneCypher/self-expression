@@ -142,6 +142,11 @@
     font-size: 12px; line-height: 1; filter: grayscale(.55); opacity: .75;
   }
   .inbox button.act:hover { filter: none; opacity: 1; background: transparent; }
+  /* A claimed row's disposition is already made, by a session that took it. The buttons
+     stay in place rather than vanishing — a row that changes width when someone else
+     acts on it is a row that moves under your cursor — but they are visibly dead. */
+  .inbox button.act:disabled,
+  .inbox button.act:disabled:hover { opacity: .2; filter: grayscale(1); cursor: default; }
 
   /* Retire a row without answering it. Faint like the card Xes, for the same reason. */
   .inbox button.kill {
@@ -369,6 +374,20 @@ DESK.inits.push(function () {
   function dismiss(id)      { send({ id: id, dismiss: true }); }
   function act(id, what)    { send({ id: id, action: what }); }
 
+  /* How long ago, in one token. A claimed row already carries a session name and three
+     buttons; a full timestamp would cost more width than the answer is worth, and the
+     question a glance actually asks is "recently, or has this been sitting?". An
+     unparseable or future stamp reads as "just now" rather than as NaN. */
+  function sinceText(iso) {
+    var then = Date.parse(iso);
+    if (isNaN(then)) return 'just now';
+    var mins = Math.floor((Date.now() - then) / 60000);
+    if (mins < 1)    return 'just now';
+    if (mins < 60)   return mins + 'm ago';
+    if (mins < 1440) return Math.floor(mins / 60) + 'h ago';
+    return Math.floor(mins / 1440) + 'd ago';
+  }
+
   function paint(open) {
     var el = list();
     if (!el) return;
@@ -398,6 +417,18 @@ DESK.inits.push(function () {
           tag.textContent = q.queued === 'agents' ? 'to agents' : 'up next';
           li.appendChild(tag);
         }
+        /* A session claimed this one (#98), which is the moment it leaves the pending set
+           and stops being something anyone else should pick up. Same label style as the
+           queue tag, because it answers the same question — what is happening to this row
+           — and it names who, so two sessions on one desk stay distinguishable. */
+        var claim = q.claimed;
+        if (claim) {
+          var ctag = document.createElement('span');
+          ctag.className = 'qd';
+          ctag.textContent = 'claimed · ' + String(claim.session || '?').slice(0, 8) +
+                             ' · ' + sinceText(claim.at);
+          li.appendChild(ctag);
+        }
         /* Emoji rather than words: three buttons per row, and at this size a label would
            cost more width than the whole rest of the line. */
         [['⏭️', 'do this next', 'next'],
@@ -406,6 +437,9 @@ DESK.inits.push(function () {
         ].forEach(function (spec) {
           var b = document.createElement('button');
           b.className = 'act'; b.textContent = spec[0]; b.title = spec[1];
+          /* Dead while claimed: re-queueing or dropping a row out from under the session
+             holding it would silently undo work already under way. */
+          b.disabled = !!claim;
           b.onclick = function () { act(q.id, spec[2]); };
           li.appendChild(b);
         });
@@ -446,8 +480,14 @@ DESK.inits.push(function () {
     return fetch('/questions', { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        var open = (d.questions || []).filter(function (q) { return !q.answer; }),
-            key  = JSON.stringify(open);
+        /* A claimed row's badge says how long ago it was taken, and that goes stale if the
+           list never changes again — a claim from an hour ago would still read "just now".
+           So while any claim is on screen the key carries the current minute and the list
+           repaints once a minute to let it tick. With no claims the key is exactly what it
+           always was, and an unchanged desk still never repaints. */
+        var open   = (d.questions || []).filter(function (q) { return !q.answer; }),
+            claims = open.some(function (q) { return q.claimed; }),
+            key    = JSON.stringify(open) + (claims ? '|' + Math.floor(Date.now() / 60000) : '');
         if (key !== shown) { shown = key; paint(open); }   // repaint only on real change
       })
       .catch(function () {});
