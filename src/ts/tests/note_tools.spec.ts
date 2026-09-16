@@ -24,7 +24,19 @@ import { handleBeginTurn }     from '../mcp/tools.js';
 import { buildServer }         from '../mcp/server.js';
 
 const VERSION = '0.2.1';
-const NOW     = new Date('2026-08-28T12:00:00Z');
+
+// Anchored to the real clock rather than to a calendar date, and that is load-bearing.
+// These specs write notes through the clock-injected path (`composeNote(..., NOW)`) but
+// read several of them back through the MCP handlers — `handleListNotes`, `noteReport`,
+// `handleWithdrawNote` — which take no clock and derive state against the real present.
+// A literal NOW therefore rots on a timer: once the default TTL elapsed past that fixed
+// instant every note written at it turned 'expired' on read, and nine specs began failing
+// on the calendar rather than on a change to the code. Holding NOW a small offset behind
+// the present keeps the written-to-read relationship the specs actually assert about
+// constant forever. Notes land freshly written, ripe, and well inside their TTL.
+//
+// The real asymmetry is in the handler layer, not here; see the note in note_tools.ts.
+const NOW     = new Date(Date.now() - 60_000);
 
 function withStore<T>(fn: (s: Store) => T): T {
   const dir = mkdtempSync(join(tmpdir(), 'se-notetools-')),
