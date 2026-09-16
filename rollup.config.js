@@ -3,6 +3,8 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 import commonjs    from '@rollup/plugin-commonjs';
 import dts         from 'rollup-plugin-dts';
 
+import { isAbsolute } from 'node:path';
+
 
 
 // The raster PNG encoder (src/ts/raster/encoder.ts, issue #7) imports node:zlib
@@ -135,11 +137,20 @@ const iife_config = {
 // Bundling them is not merely wasteful but broken: the SDK's dependency tree pulls in
 // express, hono, ajv and jose, and ajv imports JSON, which Rollup cannot parse without
 // an extra plugin. node:sqlite must be external regardless, being a builtin.
+//
+// The absolute test is isAbsolute, not a leading slash. Rollup hands this predicate
+// ids that are already resolved, and on Windows a resolved id is a drive-letter path
+// — C:\...\cli_commands.js — which begins with neither '.' nor '/'. A leading-slash
+// check therefore reads every one of our own modules as a bare specifier and makes it
+// external, and the emitted bin is left requiring './cli_commands.js' and './mcp/*',
+// files the bundle was supposed to contain and no step ever writes. The result does
+// not load at all. It is invisible on POSIX, where resolved ids do start with '/',
+// so CI (ubuntu-latest) cannot catch it; only a Windows build shows it.
 const cli_config = {
 
   input: 'build/ts/cli.js',
 
-  external: (id) => !id.startsWith('.') && !id.startsWith('/'),
+  external: (id) => !id.startsWith('.') && !isAbsolute(id),
 
   output: {
     file      : 'build/rollup/cli.cjs',
@@ -160,7 +171,7 @@ const claudio_config = {
 
   input: 'build/ts/claudio_cli.js',
 
-  external: (id) => !id.startsWith('.') && !id.startsWith('/'),
+  external: (id) => !id.startsWith('.') && !isAbsolute(id),
 
   output: {
     file      : 'build/rollup/claudio.cjs',
