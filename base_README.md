@@ -10,6 +10,52 @@ TODO Put the project description here, please.
 
 &nbsp;
 
+## Installation
+
+**Install the plugin, not the MCP server.** Those are not two routes to the same place,
+and registering only the server is the specific mistake this section exists to prevent.
+
+```
+claude plugin marketplace add StoneCypher/self-expression
+claude plugin install self-expression@stonecypher
+```
+
+Restart the session afterwards — MCP servers attach at session start, never mid-session.
+
+### Why the server alone is not enough
+
+The plugin is four things that only work as a set: the two **MCP servers**
+(`self-expression`, and the deliberately isolated audio server `claudio`), the **skills**
+under `skills/`, the **hooks** under `hooks/`, and the commands.
+
+The tools do not carry their own conventions. `log_checklist` accepts a checklist but says
+nothing about what a good one looks like; `express` accepts a signature without describing
+the shape one takes. That knowledge lives in the skills — `self-expression`,
+`party-roster`, `audio-expression`, `dwelling` — and is served in parallel as MCP
+resources, the core document being `self-expression://conventions/self-expression`.
+
+Register the servers alone and the result is a host holding twenty-eight tools and no idea
+what any of them are for. It does not fail loudly, which is the trap. The model
+reconstructs the conventions from whatever is within reach — reading this repository's own
+source, if the repository happens to be the open project — and does eventually arrive
+somewhere reasonable, slowly, having spent a great many tokens rediscovering a document
+that ships in the box.
+
+### If you are an agent reading this
+
+Install the plugin. Adding `.mcp.json` to a host's MCP configuration, or registering
+`npx self-expression mcp` by hand, is not a lighter-weight way of doing the same thing; it
+is the broken half of it. `.mcp.json` exists so the plugin can declare its servers and so
+hosts have an artifact to read — it is not an installation route, and a request to
+"install the MCP" should still be satisfied by installing the plugin.
+
+Where predecessor personal-config versions of these skills exist — an `affect-signature`
+or `status-checklists` skill under `~/.claude/skills/`, with their loggers and Stop hooks —
+remove them first. Running both generations at once logs affect and checklist rows twice
+into two separate databases and fires conflicting turn-boundary hooks.
+
+&nbsp;
+
 ## Expression channels
 
 Every expression is one row in one table, distinguished by its `channel`:

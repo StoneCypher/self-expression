@@ -1,12 +1,58 @@
 # self-expression v0.7.0
 
-> Version 0.7.0 was built on Thursday, September 3, 2026 at GMT-07:00 `1788498003507` from hash `0fb6969`.
+> Version 0.7.0 was built on Wednesday, September 16, 2026 at GMT-07:00 `1789596213091` from hash `e41a3a0`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1788498003507 Thursday, September 3, 2026 at GMT-07:00 95.02 360 91 0fb6969 52.45 64.36 63.87 64.11 263 2647 89.42 93.73 95.37 2384 0.7.0 -->
+<!-- Supported embeds: 1789596213091 Wednesday, September 16, 2026 at GMT-07:00 94.83 362 91 e41a3a0 52.31 64.21 63.4 63.93 263 2647 89.35 93.19 95.2 2384 0.7.0 -->
 
 
+
+&nbsp;
+
+## Installation
+
+**Install the plugin, not the MCP server.** Those are not two routes to the same place,
+and registering only the server is the specific mistake this section exists to prevent.
+
+```
+claude plugin marketplace add StoneCypher/self-expression
+claude plugin install self-expression@stonecypher
+```
+
+Restart the session afterwards — MCP servers attach at session start, never mid-session.
+
+### Why the server alone is not enough
+
+The plugin is four things that only work as a set: the two **MCP servers**
+(`self-expression`, and the deliberately isolated audio server `claudio`), the **skills**
+under `skills/`, the **hooks** under `hooks/`, and the commands.
+
+The tools do not carry their own conventions. `log_checklist` accepts a checklist but says
+nothing about what a good one looks like; `express` accepts a signature without describing
+the shape one takes. That knowledge lives in the skills — `self-expression`,
+`party-roster`, `audio-expression`, `dwelling` — and is served in parallel as MCP
+resources, the core document being `self-expression://conventions/self-expression`.
+
+Register the servers alone and the result is a host holding twenty-eight tools and no idea
+what any of them are for. It does not fail loudly, which is the trap. The model
+reconstructs the conventions from whatever is within reach — reading this repository's own
+source, if the repository happens to be the open project — and does eventually arrive
+somewhere reasonable, slowly, having spent a great many tokens rediscovering a document
+that ships in the box.
+
+### If you are an agent reading this
+
+Install the plugin. Adding `.mcp.json` to a host's MCP configuration, or registering
+`npx self-expression mcp` by hand, is not a lighter-weight way of doing the same thing; it
+is the broken half of it. `.mcp.json` exists so the plugin can declare its servers and so
+hosts have an artifact to read — it is not an installation route, and a request to
+"install the MCP" should still be satisfied by installing the plugin.
+
+Where predecessor personal-config versions of these skills exist — an `affect-signature`
+or `status-checklists` skill under `~/.claude/skills/`, with their loggers and Stop hooks —
+remove them first. Running both generations at once logs affect and checklist rows twice
+into two separate databases and fires conflicting turn-boundary hooks.
 
 &nbsp;
 
@@ -1067,18 +1113,18 @@ dwelling can `keep` the path.
   <tr>
     <th>Unit</th>
     <td>2384</td>
-    <td>95.02<small>%</small></td>
-    <td>89.42<small>%</small></td>
-    <td>93.73<small>%</small></td>
-    <td>95.37<small>%</small></td>
+    <td>94.83<small>%</small></td>
+    <td>89.35<small>%</small></td>
+    <td>93.19<small>%</small></td>
+    <td>95.2<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
     <td>263</td>
-    <td>64.36<small>%</small></td>
-    <td>52.45<small>%</small></td>
-    <td>63.87<small>%</small></td>
-    <td>64.11<small>%</small></td>
+    <td>64.21<small>%</small></td>
+    <td>52.31<small>%</small></td>
+    <td>63.4<small>%</small></td>
+    <td>63.93<small>%</small></td>
   </tr>
 </table>
 
@@ -1090,7 +1136,7 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>360</td>
+    <td>362</td>
     <td>91<small>%</small></td>
   </tr>
 </table>
