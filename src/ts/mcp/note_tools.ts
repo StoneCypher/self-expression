@@ -13,6 +13,17 @@
  * a note — a prompted note is a performed note — so the tools are an available option
  * and never an obligation.
  *
+ * **These handlers take no clock.** Every layer beneath them does — `composeNote`,
+ * `noteView`, `listNotes` and `deriveNoteState` all accept the instant to judge against,
+ * which is what makes note state pure and property-testable. The handlers instead let
+ * each call default to the real present. That is right for production, where the present
+ * is what a tool call means, but it makes them the one seam a test cannot control: a spec
+ * may write a note at a chosen instant and then read it back through here against real
+ * time. `note_tools.spec.ts` was pinned to a literal 2026-08-28 and silently went red
+ * weeks later when the default TTL elapsed past that date in the real world, with no
+ * change to any code. Should these ever grow a `when` parameter, thread it through to the
+ * calls below rather than reaching for a global clock mock.
+ *
  * @see ../channels/notes.js
  * @see ./hooks.js heldNotesLine
  */
