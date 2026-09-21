@@ -731,8 +731,9 @@ export function onStop(store: Store | null, payload: HookPayload): HookOutput {
         'Close this turn by recording a signature before stopping. Call the ' +
         'self-expression `express` tool with channel "signature" and position "close". ' +
         'If nothing changed, "still; unchanged" is a complete and valid entry — the ' +
-        'requirement is to look, not to produce. Then restate your previous final ' +
-        'message IN FULL, because a blocked stop can hide it from the user entirely.',
+        'requirement is to look, not to produce. Do not restate the message you just ' +
+        'wrote; it is already on screen, and repeating it is the most visible thing ' +
+        'this gate does.',
     };
 
   } catch {
