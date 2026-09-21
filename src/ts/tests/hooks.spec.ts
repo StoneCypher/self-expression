@@ -551,6 +551,18 @@ describe('onStop', () => {
     expect(String(out?.['reason'])).toContain('still; unchanged');
   }));
 
+  test('the block never asks for the message to be restated', () => withStore(s => {
+    // It used to, on the theory that a blocked stop hides the response. It does not on
+    // Claude Code — the message, the block, and the compliance all render in sequence —
+    // so the instruction reliably produced a visible duplicate of a message already on
+    // screen. A gate whose loudest effect is repeating the turn it interrupted is worse
+    // than the missing signature it exists to catch.
+    onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p1' }, NOW);
+    const reason = String(onStop(s, { session_id: 'sess-1', prompt_id: 'p1' })?.['reason']);
+    expect(reason).not.toMatch(/restate your previous/i);
+    expect(reason).not.toMatch(/IN FULL/);
+  }));
+
   test('finds the turn from context when the payload omits prompt_id', () => withStore(s => {
     onUserPromptSubmit(s, { session_id: 'sess-1', prompt_id: 'p9' }, NOW);
     expect(onStop(s, { session_id: 'sess-1' })?.['decision']).toBe('block');
