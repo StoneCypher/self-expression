@@ -8,20 +8,31 @@
  * The downstream cloc_report.cjs step that reads both reports stays in
  * the npm script (it must wait for both passes to complete).
  *
+ * The reports live under ./build/cloc/, never under ./coverage/ (#126). The
+ * cloc stage runs in parallel with the test stage, and vitest's coverage
+ * run cleans ./coverage/ when it starts. With the reports there, a clean
+ * that landed between these writes and cloc_report.cjs's read deleted them,
+ * and the build failed with ENOENT on a nondeterministic fraction of runs.
+ * ./build/ is only wiped by the clean step before stage 1, so no
+ * concurrent step can remove it.
+ *
  * @example
  *   // Invoked by the `cloc` npm script:
  *   node src/build_js/run_cloc.js
- *   // Writes ./coverage/cloc/report_wt.json (with tests) and
- *   //        ./coverage/cloc/report_nt.json (without tests)
+ *   // Writes ./build/cloc/report_wt.json (with tests) and
+ *   //        ./build/cloc/report_nt.json (without tests)
  */
 
 import { spawn } from 'child_process';
 
 const CLOC_BASE_ARGS = ['--quiet', './src/**', '--exclude-list-file=./.clocignore', '--3', '--json'];
 
+/** Where both reports go; must match the directory cloc_report.cjs reads from. */
+const CLOC_OUT_DIR = './build/cloc';
+
 const PASSES = [
-  { extraArgs: [],                       out: './coverage/cloc/report_wt.json' },
-  { extraArgs: ['--exclude-dir=tests'],  out: './coverage/cloc/report_nt.json' },
+  { extraArgs: [],                       out: `${CLOC_OUT_DIR}/report_wt.json` },
+  { extraArgs: ['--exclude-dir=tests'],  out: `${CLOC_OUT_DIR}/report_nt.json` },
 ];
 
 /**

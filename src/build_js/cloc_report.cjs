@@ -17,8 +17,12 @@ const hpad_width = 2,
       hpad       = ' '.repeat(hpad_width),
       min_head   = 5;
 
-const wt = JSON.parse( readFileSync('./coverage/cloc/report_wt.json') ),
-      nt = JSON.parse( readFileSync('./coverage/cloc/report_nt.json') );
+// Written by run_cloc.js. Kept under build/, not coverage/, because vitest's coverage
+// run cleans coverage/ concurrently with this stage (#126).
+const CLOC_OUT_DIR = './build/cloc';
+
+const wt = JSON.parse( readFileSync(`${CLOC_OUT_DIR}/report_wt.json`) ),
+      nt = JSON.parse( readFileSync(`${CLOC_OUT_DIR}/report_nt.json`) );
 
 const uniq = (arr) =>
   arr.filter((v, i, a) =>
