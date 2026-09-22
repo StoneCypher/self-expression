@@ -15,7 +15,7 @@ TODO Put the project description here, please.
 **Install the plugin, not the MCP server.** Those are not two routes to the same place,
 and registering only the server is the specific mistake this section exists to prevent.
 
-```
+```bash
 claude plugin marketplace add StoneCypher/self-expression
 claude plugin install self-expression@stonecypher
 ```
