@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join }   from 'node:path';
 import {
   ALL_DDL, TABLE_DDL, ALL_INDEX_DDL, TURN_CONTEXT_DDL, TURN_CONTEXT_SOURCE_COLUMN,
-  SCHEMA_VERSION, check, entriesDdl,
+  SCHEMA_VERSION, check, entriesDdl, FORMAT_FINDINGS_DDL, FINDINGS_INDEX_DDL,
 } from '../channels/schema.js';
 import {
   CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
@@ -306,8 +306,15 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 7 — the turn_context.source shape', () => {
-    expect(SCHEMA_VERSION).toBe(7);
+  test('is 8 — the format_findings shape', () => {
+    expect(SCHEMA_VERSION).toBe(8);
+  });
+
+  test('format_findings is in the fresh-install DDL, constraint-free, with its index', () => {
+    expect(TABLE_DDL).toContain(FORMAT_FINDINGS_DDL);
+    expect(FORMAT_FINDINGS_DDL).toContain('CREATE TABLE IF NOT EXISTS format_findings');
+    expect(FORMAT_FINDINGS_DDL).not.toContain('CHECK');
+    expect(ALL_INDEX_DDL).toEqual(expect.arrayContaining([...FINDINGS_INDEX_DDL]));
   });
 
   test('turn_context declares source, and still bakes no CHECK into that table', () => {

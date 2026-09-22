@@ -15,7 +15,9 @@
  * receipt whose message survived must survive too, because deleting it would
  * resurrect the message as unread. Message expiry (`expires_utc`) is not retention:
  * it only stops delivery, and only this horizon ever deletes. The held-note tables
- * (#43) hang off `messages` and prune by orphanhood on the same terms. `meta` and
+ * (#43) hang off `messages` and prune by orphanhood on the same terms. The format-check
+ * findings log prunes by age on the same horizon: it holds excerpts of assistant text,
+ * and a horizon that kept them forever would not be one. `meta` and
  * `config` are never touched.
  *
  * Pruning runs with foreign keys suspended, because a correction is always newer than
@@ -40,6 +42,8 @@ export interface Pruned {
   readonly notes        : number;
   /** Note ledger rows removed because their note was pruned — never by their own age. */
   readonly noteEvents   : number;
+  /** Format-check findings removed by age, on the same horizon as everything else. */
+  readonly formatFindings : number;
 }
 
 /** Milliseconds in one day, for the horizon arithmetic. */
@@ -48,6 +52,7 @@ const DAY_MS = 86_400_000;
 /** What a disabled — or already-clean — pass reports. */
 const NOTHING_PRUNED: Pruned = Object.freeze({
   entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0,
+  formatFindings: 0,
 });
 
 /**
@@ -99,7 +104,8 @@ function deleteOlderThan(store: Store, horizon: string): Pruned {
         notes       = store.db.prepare(
           'DELETE FROM notes WHERE message_id IN (SELECT id FROM messages WHERE ts_utc < ?)')
           .run(horizon),
-        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon);
+        messages    = store.db.prepare('DELETE FROM messages     WHERE ts_utc < ?').run(horizon),
+        findings    = store.db.prepare('DELETE FROM format_findings WHERE ts_utc < ?').run(horizon);
 
   return {
     entries      : Number(entries.changes),
@@ -108,6 +114,7 @@ function deleteOlderThan(store: Store, horizon: string): Pruned {
     messageReads : Number(reads.changes),
     notes        : Number(notes.changes),
     noteEvents   : Number(noteEvents.changes),
+    formatFindings : Number(findings.changes),
   };
 
 }

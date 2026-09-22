@@ -76,9 +76,14 @@ import {
  * `ALTER TABLE … ADD COLUMN`. Pre-existing rows keep NULL, which honestly reads as
  * "written by a version that had only the hook path"; nothing is backfilled.
  *
+ * v8 (format enforcement): the `format_findings` table, where the Stop hook logs what its
+ * format checks found — the list lint, the visible close line, the open line — and what
+ * it did about each. Purely additive like v2→v3 and v4→v5, and constraint-free like
+ * `turn_context`, so the step only creates the table and its index.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -406,6 +411,50 @@ CREATE TABLE IF NOT EXISTS note_events (
   session    TEXT
 )`;
 
+/**
+ * One thing the Stop hook's format checks found in a turn, and what it did about it.
+ *
+ * This is the measurement half of shipping the list lint in report-only mode: before a
+ * check is allowed to block a stop, its false-positive rate has to be knowable, and it
+ * is knowable only if every would-have-blocked is written down. So every finding lands
+ * here whatever the mode, with `action` saying whether it `blocked`, was only
+ * `reported`, or `warned` the user.
+ *
+ * Deliberately **no `CHECK` clauses**, the `turn_context` choice rather than the
+ * `entries` one: the set of checks is young and will grow, and a closed vocabulary baked
+ * into a constraint would turn every new check into a table rebuild. The vocabularies are
+ * enforced in TypeScript at the one writer.
+ *
+ * `excerpt` is at most a short slice of the assistant's own message — the first line of a
+ * flagged list — and never the human's words, file contents, or tool inputs.
+ *
+ * @see ./findings.js
+ */
+// eslint-disable-next-line @typescript-eslint/no-inferrable-types
+export const FORMAT_FINDINGS_DDL: string = `
+CREATE TABLE IF NOT EXISTS format_findings (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts_utc      TEXT    NOT NULL,
+  session     TEXT,
+  prompt_id   TEXT,
+  check_name  TEXT    NOT NULL,
+  kind        TEXT    NOT NULL,
+  severity    TEXT    NOT NULL,
+  action      TEXT    NOT NULL,
+  items       INTEGER,
+  line        INTEGER,
+  excerpt     TEXT
+)`;
+
+/**
+ * Indices for `format_findings`, kept apart for the same reason
+ * {@link MESSAGE_INDEX_DDL} is: an earlier version's migration step must never reference
+ * a table outside its own version's shape.
+ */
+export const FINDINGS_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX IF NOT EXISTS idx_findings_check ON format_findings(check_name, ts_utc)',
+];
+
 /** Indices covering the queries the gates and the analyses actually run. */
 export const INDEX_DDL: readonly string[] = [
   'CREATE INDEX IF NOT EXISTS idx_entries_prompt  ON entries(prompt_id)',
@@ -478,11 +527,12 @@ export const TABLE_DDL: readonly string[] = [
   MESSAGE_READS_DDL,
   NOTES_DDL,
   NOTE_EVENTS_DDL,
+  FORMAT_FINDINGS_DDL,
 ];
 
-/** Every index the current schema declares — entries, messagebox, and held notes. */
+/** Every index the current schema declares — entries, messagebox, held notes, and format findings. */
 export const ALL_INDEX_DDL: readonly string[] =
-  [...INDEX_DDL, ...MESSAGE_INDEX_DDL, ...NOTE_INDEX_DDL];
+  [...INDEX_DDL, ...MESSAGE_INDEX_DDL, ...NOTE_INDEX_DDL, ...FINDINGS_INDEX_DDL];
 
 /**
  * Every statement needed to bring an **empty** database to the current schema, in

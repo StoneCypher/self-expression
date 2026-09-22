@@ -20,6 +20,8 @@ import { buildV2, insertV2 }                          from './helpers/v2_fixture
 import { buildV3, insertV3 }                          from './helpers/v3_fixture.js';
 import { buildV4, insertV4, insertV4Message, V4_ENTRIES_DDL } from './helpers/v4_fixture.js';
 import { buildV6, insertV6Context }                          from './helpers/v6_fixture.js';
+import { buildV7 }                                           from './helpers/v7_fixture.js';
+import { recordFinding, recentFindings }                     from '../channels/findings.js';
 
 const VERSION = '0.2.0';
 
@@ -625,6 +627,50 @@ describe('openStore on a v6 database (MCP portability: turn_context.source)', ()
     expect(hasColumn(db, 'turn_context', 'source')).toBe(false);
     expect(hasColumn(db, 'turn_context', 'session')).toBe(true);
     db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+});
+
+describe('openStore on a v7 database (format findings)', () => {
+
+  /** Whether a table exists in the database. */
+  function hasTable(db: { prepare: (sql: string) => { get: (...a: unknown[]) => unknown } },
+                    table: string): boolean {
+    return db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table) !== undefined;
+  }
+
+  test('the fixture really is v7: no format_findings table', () => {
+    const dir = tmp(), db = buildV7(join(dir, 'log.sqlite3'));
+    expect(hasTable(db, 'format_findings')).toBe(false);
+    expect(hasTable(db, 'turn_context')).toBe(true);
+    db.close(); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('opening it migrates to the current version, and findings can be written', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3'),
+          v7  = buildV7(path);
+    v7.prepare("INSERT INTO turn_context (ts_utc, session, prompt_id, source) VALUES ('2026-09-01T00:00:00Z','s1','p-1','hook')").run();
+    v7.close();
+
+    const s = openStore(path);
+    expect(readMeta(s, 'schema_version')).toBe(String(SCHEMA_VERSION));
+    expect(hasTable(s.db, 'format_findings')).toBe(true);
+    expect(latestContext(s, 's1')?.['prompt_id']).toBe('p-1');   // the old rows are untouched
+    const id = recordFinding(s, { check: 'lists', kind: 'ordered-list', severity: 'violation',
+                                  action: 'reported', items: 3, line: 1, excerpt: '1. a' });
+    expect(recentFindings(s, 1)[0]?.['id']).toBe(id);
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('creates idx_findings_check, and re-running the step is a no-op', () => {
+    const dir = tmp(), path = join(dir, 'log.sqlite3');
+    buildV7(path).close();
+
+    const s = openStore(path);
+    expect(s.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_findings_check'").get())
+      .toBeDefined();
+    expect(() => { migrate(s.db, 7, 8); }).not.toThrow();
+    closeStore(s); rmSync(dir, { recursive: true, force: true });
   });
 
 });

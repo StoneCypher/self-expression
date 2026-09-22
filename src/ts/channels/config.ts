@@ -135,6 +135,27 @@ export type WindowPosture = typeof WINDOW_POSTURES[number];
  */
 export const DEFAULT_WINDOW_POSTURE: WindowPosture = 'ask';
 
+/** Config key selecting the Stop-hook list lint's mode. */
+export const LIST_GATE_KEY = 'gate.lists';
+
+/**
+ * The list lint's three modes: `off` runs nothing, `report` logs every finding to
+ * `format_findings` and never blocks, `block` lets a numbered-list violation block the
+ * stop. Bullet-list findings are only ever logged, in every mode but `off`.
+ *
+ * @see listGateMode
+ */
+export const LIST_GATE_MODES = ['off', 'report', 'block'] as const;
+
+/** One list-lint mode. */
+export type ListGateMode = typeof LIST_GATE_MODES[number];
+
+/**
+ * The shipped mode: `report`. A lint that has never run against real messages does not
+ * get to block anyone's stop until its false-positive rate is known.
+ */
+export const DEFAULT_LIST_GATE_MODE: ListGateMode = 'report';
+
 /**
  * The outcome of validating one proposed config value: either the canonical text to
  * store, or a description of what would have been accepted — never a bare "no".
@@ -480,6 +501,25 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'gate.checklist', kind: 'bool', fallback: 'true',
     description: 'reserved for the checklist gate (D8); registered now so its name and default are settled before anything reads it',
     validate: validateBool },
+  { key: LIST_GATE_KEY, kind: 'enum', choices: LIST_GATE_MODES, fallback: DEFAULT_LIST_GATE_MODE,
+    description:
+      'the Stop-hook list lint, which parses the final message as Markdown and flags prose ' +
+      'lists of 2-10 items that should be number-square lists (code, HTML, and blockquotes ' +
+      'are never inspected): off, report (log to format_findings, never block), or block ' +
+      '(numbered lists block the stop; bullet lists are only ever logged). Report by ' +
+      'default, so false positives can be measured before anything blocks',
+    validate: choiceValidator(LIST_GATE_MODES) },
+  { key: 'gate.signature_line', kind: 'bool', fallback: 'true',
+    description:
+      'whether the Stop gate also blocks when a close signature was recorded but the ' +
+      "message's last non-empty line is not the rendered signature line carrying that text",
+    validate: validateBool },
+  { key: 'gate.open_line', kind: 'bool', fallback: 'true',
+    description:
+      "whether the Stop hook checks the turn's first text for a rendered open signature " +
+      'and a matching recorded open; it only ever warns, because a backdated open is worse ' +
+      'than a missing one',
+    validate: validateBool },
   { key: 'retention.days', kind: 'int', fallback: '0',
     description: 'prune entries and turn context older than this many days at server startup; 0 never prunes',
     validate: intValidator(0, 3650) },
@@ -798,6 +838,33 @@ export function windowPosture(store: Store, surface: string): WindowPosture {
   return (WINDOW_POSTURES as readonly string[]).includes(raw ?? '')
     ? raw as WindowPosture
     : DEFAULT_WINDOW_POSTURE;
+
+}
+
+/**
+ * The list-lint mode in force.
+ *
+ * Reads through {@link effectiveValue}, so a hand-edited or unknown value lands on
+ * {@link DEFAULT_LIST_GATE_MODE} — `report`, which never blocks, so the tolerant reading
+ * is also the safe direction (D5).
+ *
+ * @param store the open store to resolve against
+ * @returns the mode, never outside {@link LIST_GATE_MODES}
+ *
+ * @example
+ *   listGateMode(store)                    // => 'report' on a fresh install
+ *   writeConfig(store, 'gate.lists', 'block');
+ *   listGateMode(store)                    // => 'block'
+ *
+ * @see ../mcp/hooks.js onStop
+ */
+export function listGateMode(store: Store): ListGateMode {
+
+  const raw = effectiveValue(store, LIST_GATE_KEY);
+
+  return (LIST_GATE_MODES as readonly string[]).includes(raw ?? '')
+    ? raw as ListGateMode
+    : DEFAULT_LIST_GATE_MODE;
 
 }
 

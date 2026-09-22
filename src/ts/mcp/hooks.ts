@@ -19,7 +19,8 @@ import { hasClosingSignature, register }           from '../channels/entries.js'
 import type { RegisterRow }                        from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
 import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS,
-         windowPosture, WINDOW_SURFACES }        from '../channels/config.js';
+         windowPosture, WINDOW_SURFACES,
+         listGateMode }                          from '../channels/config.js';
 import type { WindowPosture, WindowSurface }     from '../channels/config.js';
 import { CHANNELS }                                from '../channels/vocabulary.js';
 import { unreadCounts, readMessages }              from '../channels/messages.js';
@@ -27,6 +28,13 @@ import { offerRipeNotes, renderHeldNote }          from '../channels/notes.js';
 import type { Store }                              from '../channels/store.js';
 import { clockTime, zoneAbbreviation, partOfDay }  from '../channels/time.js';
 import { privacyFlags }                            from '../channels/privacy.js';
+import { lintLists, listBlockReason, EXCERPT_MAX }  from '../channels/format_lint.js';
+import type { MarkdownParser, ListFinding }        from '../channels/format_lint.js';
+import { recordFinding }                           from '../channels/findings.js';
+import type { FindingInput }                       from '../channels/findings.js';
+import { parseSignatureLine, sameSignatureText, lastNonEmptyLine,
+         firstNonEmptyLine, turnSignature }       from '../channels/signature_line.js';
+import { firstAssistantTextOfTurn, readTail }      from '../channels/transcript.js';
 
 /**
  * The subset of a hook payload these handlers read, named for what the harness actually
@@ -63,8 +71,19 @@ export interface HookPayload {
    * {@link onStop} allows unconditionally when this is `true` — see there for why.
    */
   readonly stop_hook_active?       : boolean;
-  /** `Stop`: the turn's final assistant text. Documented for shape; never read, never stored. */
+  /**
+   * `Stop`: the turn's final assistant text. Read by the format checks in {@link onStop}
+   * — the visible close line and the list lint — and never stored, except that the list
+   * lint logs the first line of a flagged list (at most {@link EXCERPT_MAX} characters) to
+   * `format_findings`.
+   */
   readonly last_assistant_message? : string;
+  /**
+   * `Stop` (and every other event): the host's JSONL transcript. Only its tail is read,
+   * and only the current turn's first **assistant** text is taken from it, for the open
+   * check; see {@link ../channels/transcript.js}.
+   */
+  readonly transcript_path?        : string;
   /** `UserPromptSubmit`: the host's session title. Documented for shape; never read, never stored. */
   readonly session_title?          : string;
 }
@@ -203,6 +222,23 @@ export function channelLengths(store: Store): string {
       exceptions.map(entry => `${entry.channel}:${String(entry.limit)}`).join(' ');
 
 }
+
+/**
+ * The context line's format-grammar reminder: the three renderings the conventions ask
+ * for and a model most often drops — the visible signature line, number-square lists,
+ * and diff-block channel lines.
+ *
+ * A reminder, not a specification: the skill carries the grammar, and this segment only
+ * names it at the moment of writing, beside `conventions:` and `lengths:`. It is a
+ * constant because it is injected on every turn and must stay short; nothing about it
+ * varies with configuration.
+ *
+ * @example
+ *   FORMAT_SEGMENT   // => 'format: sig-line, number-square lists, diff channels'
+ *
+ * @see onUserPromptSubmit
+ */
+export const FORMAT_SEGMENT = 'format: sig-line, number-square lists, diff channels';
 
 /**
  * How each window surface is named in the posture line.
@@ -532,6 +568,11 @@ export const OPEN_REMINDER_CLOCKLESS =
  * that same transport, carrying the configured per-channel text ceilings to a skill
  * that cannot read config. It fails open on its own terms too.
  *
+ * Beside the lengths rides the static format reminder ({@link FORMAT_SEGMENT}) — the
+ * signature line, number-square lists, diff channels — named at the moment of writing
+ * because the Stop hook now checks the first two. It needs no store, so it is present
+ * even when the database is unreachable.
+ *
  * After the lengths comes the window-posture segment ({@link windowPostureLine}), which
  * states what the user has said about opening an external browser window and about
  * opening an editor tab — two keys, because the two impositions are not the same size.
@@ -611,6 +652,10 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: the clock, flags, and reminder still get delivered */ }
   }
 
+  // Static, so it needs no store and cannot fail; it sits beside the lengths because
+  // both are about how the lines a model writes are meant to look.
+  const format = ` ${FORMAT_SEGMENT}.`;
+
   let windows = '';
   if (store !== null) {
     try { windows = ` ${windowPostureLine(store)}.`; }
@@ -661,8 +706,8 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
     catch { /* fail open: keep the clock */ }
   }
 
-  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${windows}${mail}`
-                         : `${flags}${lengths}${windows}${mail}`.trimStart(),
+  const head     = clock ? `${describeMoment(now)}${flags}${lengths}${format}${windows}${mail}`
+                         : `${flags}${lengths}${format}${windows}${mail}`.trimStart(),
         reminder = clock ? OPEN_REMINDER : OPEN_REMINDER_CLOCKLESS;
 
   return {
@@ -699,42 +744,57 @@ export function onUserPromptSubmit(store: Store | null, payload: HookPayload, no
  * worse than a signature that goes unwritten. This is the fail-open principle in the file
  * header applied to the one failure the handler can see coming.
  *
+ * **The format checks.** Recording a close is not the same as showing one, and a list
+ * the conventions want as number squares is not caught by any record. So four checks run,
+ * each failing open on its own ({@link guarded}), and their verdicts merge into a single
+ * output — one block per turn means one reason carrying every refusal:
+ *
+ * - {@link closeRecordCheck} — the original gate; blocks (`gate.signature`).
+ * - {@link closeLineCheck} — the last line must render the recorded close; blocks
+ *   (`gate.signature_line`).
+ * - {@link listCheck} — the Markdown list lint; report-only by default (`gate.lists`).
+ * - {@link openLineCheck} — the open line and record; warns, never blocks
+ *   (`gate.open_line`).
+ *
+ * Every finding is written to `format_findings`, whatever was done about it.
+ *
+ * @param deps the list lint's parser, the transcript reader, and a clock; see {@link StopDeps}
+ *
  * @example
  *   onStop(store, {})                            // => null when the turn already signed off
  *   onStop(store, {})                            // => { decision: 'block', reason: '…' } when it did not
  *   onStop(store, { stop_hook_active: true })    // => null; the gate already spoke this turn
+ *   onStop(store, { last_assistant_message: 'done, no line' })
+ *   // => { decision: 'block', reason: '… End the message with exactly this line …' } after a recorded close
  */
-export function onStop(store: Store | null, payload: HookPayload): HookOutput {
+export function onStop(store: Store | null, payload: HookPayload, deps: StopDeps = {}): HookOutput {
 
   if (store === null)           { return null; }
   if (payload.stop_hook_active) { return null; }   // already blocked once; never twice
 
   try {
 
-    if (readConfig(store, 'gate.signature') === 'false') { return null; }
+    const turn = stopTurn(store, payload);
+    if (turn === null) { return null; }
 
-    // The turn's identity is the pair (session, prompt_id), so both halves are recovered:
-    // the payload's when the host supplies them, else the observed turn-context row's.
-    // A `p1` invented by a hookless host in one session must not close a `p1` in another.
-    const context  = latestContext(store, payload.session_id),
-          promptId = payload.prompt_id
-            ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined),
-          session  = payload.session_id
-            ?? (typeof context?.['session']   === 'string' ? context['session']   : undefined);
+    const now     = deps.now ?? new Date(),
+          message = payload.last_assistant_message,
+          checks  = [
+            guarded(() => closeRecordCheck(store, turn)),
+            guarded(() => closeLineCheck(store, turn, message)),
+            guarded(() => listCheck(store, message, deps.parse)),
+            guarded(() => openLineCheck(store, turn, payload.transcript_path,
+                                        deps.readTranscript ?? readTail)),
+          ],
+          outcome = mergeOutcomes(checks);
 
-    if (promptId === undefined || promptId === '')     { return null; }
-    if (hasClosingSignature(store, session, promptId)) { return null; }
+    for (const finding of outcome.findings) {
+      try {
+        recordFinding(store, { ...finding, session: turn.session, promptId: turn.promptId }, now);
+      } catch { /* fail open: an unloggable finding still gets its verdict */ }
+    }
 
-    return {
-      decision: 'block',
-      reason:
-        'Close this turn by recording a signature before stopping. Call the ' +
-        'self-expression `express` tool with channel "signature" and position "close". ' +
-        'If nothing changed, "still; unchanged" is a complete and valid entry — the ' +
-        'requirement is to look, not to produce. Do not restate the message you just ' +
-        'wrote; it is already on screen, and repeating it is the most visible thing ' +
-        'this gate does.',
-    };
+    return stopOutput(outcome);
 
   } catch {
 
@@ -742,6 +802,321 @@ export function onStop(store: Store | null, payload: HookPayload): HookOutput {
 
   }
 
+}
+
+/** What the Stop hook's format checks can be handed that the payload does not carry. */
+export interface StopDeps {
+  /**
+   * The Markdown parser for the list lint. Absent skips the lint — the command-line entry
+   * loads the parser lazily, so a missing dependency degrades to no lint instead of to a
+   * binary that cannot start.
+   */
+  readonly parse?          : MarkdownParser | undefined;
+  /** Reads a transcript's tail; defaults to {@link readTail}. `null` means unreadable. */
+  readonly readTranscript? : ((path: string) => string | null) | undefined;
+  /** Injectable clock for the findings log. */
+  readonly now?            : Date | undefined;
+}
+
+/** The turn a stop belongs to: the pair (`session`, `promptId`). */
+export interface StopTurn {
+  readonly session  : string | undefined;
+  readonly promptId : string;
+}
+
+/**
+ * Recover the stopping turn's identity, or `null` when no turn is known.
+ *
+ * The payload's fields when the host supplies them, else the observed turn-context row's.
+ * A `p1` invented by a hookless host in one session must not close a `p1` in another,
+ * which is why both halves are recovered rather than the prompt id alone.
+ *
+ * @example
+ *   stopTurn(store, { session_id: 's1', prompt_id: 'p1' })   // => { session: 's1', promptId: 'p1' }
+ *   stopTurn(store, {})                                      // => null on an empty store
+ */
+export function stopTurn(store: Store, payload: HookPayload): StopTurn | null {
+
+  const context  = latestContext(store, payload.session_id),
+        promptId = payload.prompt_id
+          ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined),
+        session  = payload.session_id
+          ?? (typeof context?.['session']   === 'string' ? context['session']   : undefined);
+
+  if (promptId === undefined || promptId === '') { return null; }
+
+  return { session, promptId };
+
+}
+
+/** A finding as a check produces it, before the turn identity is stamped on. */
+export type CheckFinding = Omit<FindingInput, 'session' | 'promptId'>;
+
+/**
+ * What one Stop-hook check concluded: refusal paragraphs (any one blocks the stop),
+ * warning sentences for the user, and findings for the log.
+ */
+export interface CheckOutcome {
+  readonly blocks   : readonly string[];
+  readonly warnings : readonly string[];
+  readonly findings : readonly CheckFinding[];
+}
+
+/** The outcome of a check that found nothing, or was skipped. */
+export const NO_OUTCOME: CheckOutcome = Object.freeze({ blocks: [], warnings: [], findings: [] });
+
+/**
+ * Run one check, failing open on its own: a check that throws contributes nothing, and
+ * the others still run. A parser bug in the list lint must never cost the close gate.
+ *
+ * @example
+ *   guarded(() => { throw new Error('x'); })   // => NO_OUTCOME
+ */
+export function guarded(check: () => CheckOutcome): CheckOutcome {
+  try { return check(); } catch { return NO_OUTCOME; }
+}
+
+/**
+ * Combine several checks' outcomes into one, preserving order.
+ *
+ * @example
+ *   mergeOutcomes([{ blocks: ['a'], warnings: [], findings: [] }, NO_OUTCOME]).blocks   // => ['a']
+ */
+export function mergeOutcomes(outcomes: readonly CheckOutcome[]): CheckOutcome {
+  return {
+    blocks   : outcomes.flatMap(outcome => outcome.blocks),
+    warnings : outcomes.flatMap(outcome => outcome.warnings),
+    findings : outcomes.flatMap(outcome => outcome.findings),
+  };
+}
+
+/**
+ * Turn a merged outcome into the hook's stdout: a block when anything refuses, carrying
+ * every refusal in one reason — there is only ever one block per turn, so it must say
+ * everything at once — and the warnings as a `systemMessage` for the user.
+ *
+ * @example
+ *   stopOutput(NO_OUTCOME)   // => null
+ *   stopOutput({ blocks: [], warnings: ['w'], findings: [] })   // => { systemMessage: 'self-expression: w' }
+ */
+export function stopOutput(outcome: CheckOutcome): HookOutput {
+
+  const message = outcome.warnings.length === 0
+    ? undefined
+    : `self-expression: ${outcome.warnings.join(' ')}`;
+
+  if (outcome.blocks.length > 0) {
+    return {
+      decision : 'block',
+      reason   : outcome.blocks.join('\n\n'),
+      ...(message === undefined ? {} : { systemMessage: message }),
+    };
+  }
+
+  return message === undefined ? null : { systemMessage: message };
+
+}
+
+/** The refusal for a turn that never recorded a close. Unchanged in substance since v0.1. */
+export const CLOSE_RECORD_REASON: string =
+  'Close this turn by recording a signature before stopping. Call the ' +
+  'self-expression `express` tool with channel "signature" and position "close", then ' +
+  'end your message with the signature line it returns. ' +
+  'If nothing changed, "still; unchanged" is a complete and valid entry — the ' +
+  'requirement is to look, not to produce. Do not restate the message you just ' +
+  'wrote; it is already on screen, and repeating it is the most visible thing ' +
+  'this gate does.';
+
+/**
+ * The original gate: a finished turn must have recorded a close signature.
+ *
+ * Only a `close` satisfies it: a `mid` marks a lurch and does not end the turn. Governed
+ * by `gate.signature`; only the exact value `'false'` turns it off.
+ *
+ * @example
+ *   closeRecordCheck(store, { session: 's1', promptId: 'p1' }).blocks   // => [CLOSE_RECORD_REASON] when unsigned
+ *
+ * @see ../channels/entries.js hasClosingSignature
+ */
+export function closeRecordCheck(store: Store, turn: StopTurn): CheckOutcome {
+
+  if (readConfig(store, 'gate.signature') === 'false')          { return NO_OUTCOME; }
+  if (hasClosingSignature(store, turn.session, turn.promptId)) { return NO_OUTCOME; }
+
+  return { blocks: [CLOSE_RECORD_REASON], warnings: [], findings: [] };
+
+}
+
+/**
+ * The visible close check: when a close was recorded, the message's last non-empty line
+ * must be a signature line carrying the recorded text.
+ *
+ * This is what the record-only gate could not see. A close recorded through `express`
+ * but never rendered left the reader with no signature at all, and the gate passed it.
+ * Now the last line is parsed against the signature grammar, and its text must equal the
+ * newest recorded close's text; otherwise the stop is blocked with the exact line to
+ * paste, rendered from the record by the same function `express` uses.
+ *
+ * Skipped — fail open — when `gate.signature_line` is exactly `'false'`, when no close
+ * was recorded (the record check already speaks to that), or when the host sent no final
+ * message to look at.
+ *
+ * @param message the payload's `last_assistant_message`
+ *
+ * @example
+ *   closeLineCheck(store, turn, 'Done.\n\n`[9:14 am PDT]` 🙂 `»` flow; clear plan')
+ *   // => NO_OUTCOME when that is the recorded close's text
+ *
+ * @see ../channels/signature_line.js parseSignatureLine
+ */
+export function closeLineCheck(store: Store, turn: StopTurn, message: string | undefined): CheckOutcome {
+
+  if (readConfig(store, 'gate.signature_line') === 'false') { return NO_OUTCOME; }
+  if (message === undefined || message.trim() === '')       { return NO_OUTCOME; }
+
+  const recorded = turnSignature(store, turn.session, turn.promptId, 'close');
+  if (recorded === null) { return NO_OUTCOME; }
+
+  const last   = lastNonEmptyLine(message),
+        parsed = last === null ? null : parseSignatureLine(last);
+
+  if (parsed !== null && sameSignatureText(parsed.text, recorded.text)) { return NO_OUTCOME; }
+
+  const kind = parsed === null ? 'close-line-missing' : 'close-line-mismatch';
+
+  return {
+    blocks: [
+      (parsed === null
+        ? 'The close signature was recorded, but the message does not end with its ' +
+          'visible line. '
+        : 'The message ends with a signature line whose text differs from the close ' +
+          'that was recorded. ') +
+      'End the message with exactly this line, as the last line, and nothing after it:\n\n' +
+      `${recorded.line}\n\n` +
+      'Do not restate the rest of the message.',
+    ],
+    warnings : [],
+    findings : [{ check: 'close-line', kind, severity: 'violation', action: 'blocked',
+                  excerpt: clip(last ?? '') }],
+  };
+
+}
+
+/**
+ * The list lint, in whatever mode `gate.lists` selects.
+ *
+ * Every finding is logged. In `block` mode, ordered-list violations also refuse the stop;
+ * bullet-list warnings never do, in any mode. In `report` mode — the default — nothing
+ * ever blocks: the log is the whole output, so the false-positive rate can be measured
+ * before blocking is ever switched on. Skipped when the mode is `off`, when no parser was
+ * supplied, or when there is no message.
+ *
+ * @param parse the Markdown parser; absent skips the lint
+ *
+ * @example
+ *   listCheck(store, '1. a\n2. b\n', fromMarkdown).findings[0]?.action   // => 'reported'
+ *
+ * @see ../channels/format_lint.js lintLists
+ */
+export function listCheck(
+  store   : Store,
+  message : string | undefined,
+  parse   : MarkdownParser | undefined,
+): CheckOutcome {
+
+  const mode = listGateMode(store);
+
+  if (mode === 'off' || parse === undefined)          { return NO_OUTCOME; }
+  if (message === undefined || message.trim() === '') { return NO_OUTCOME; }
+
+  const found      = lintLists(message, parse),
+        blocking   = mode === 'block' ? found.filter(f => f.severity === 'violation') : [],
+        findings   = found.map((f: ListFinding): CheckFinding => ({
+          check    : 'lists',
+          kind     : f.kind,
+          severity : f.severity,
+          action   : blocking.includes(f) ? 'blocked' : 'reported',
+          items    : f.items,
+          line     : f.line,
+          excerpt  : f.excerpt,
+        }));
+
+  return {
+    blocks   : blocking.length > 0 ? [listBlockReason(blocking)] : [],
+    warnings : [],
+    findings,
+  };
+
+}
+
+/**
+ * The open check: the turn's first assistant text should begin with a rendered open
+ * signature, and a matching open should have been recorded. **It only ever warns.**
+ *
+ * Blocking here would be worse than useless: the only thing a block could produce is an
+ * open written after the fact, and a backdated before-measurement looks like data and is
+ * not. So a finding is logged and the user gets a one-line `systemMessage`; the turn ends
+ * normally.
+ *
+ * The first text is read from the host transcript's tail, because the Stop payload only
+ * carries the last message. Skipped — fail open — when `gate.open_line` is exactly
+ * `'false'`, when there is no transcript, or when the turn's start is not in the tail
+ * that was read.
+ *
+ * @param path the payload's `transcript_path`
+ * @param read reads a transcript tail; `null` means unreadable
+ *
+ * @example
+ *   openLineCheck(store, turn, '/t.jsonl', () => transcriptWithNoOpen).warnings
+ *   // => ['this turn began without a rendered open signature line.']
+ *
+ * @see ../channels/transcript.js firstAssistantTextOfTurn
+ */
+export function openLineCheck(
+  store : Store,
+  turn  : StopTurn,
+  path  : string | undefined,
+  read  : (path: string) => string | null,
+): CheckOutcome {
+
+  if (readConfig(store, 'gate.open_line') === 'false') { return NO_OUTCOME; }
+  if (path === undefined || path === '')               { return NO_OUTCOME; }
+
+  const tail  = read(path),
+        first = tail === null ? null : firstAssistantTextOfTurn(tail);
+
+  if (first === null) { return NO_OUTCOME; }
+
+  const line     = firstNonEmptyLine(first),
+        parsed   = line === null ? null : parseSignatureLine(line),
+        recorded = turnSignature(store, turn.session, turn.promptId, 'open');
+
+  const [kind, sentence] =
+      parsed === null && recorded === null
+        ? ['open-missing',        'this turn began without an open signature, rendered or recorded.']
+    : parsed === null
+        ? ['open-line-missing',   'this turn recorded an open signature but never rendered its line.']
+    : recorded === null
+        ? ['open-record-missing', 'this turn rendered an open signature line but never recorded it with express.']
+    : !sameSignatureText(parsed.text, recorded.text)
+        ? ['open-mismatch',       'the rendered open signature differs from the one recorded.']
+        : [null, null];
+
+  if (kind === null) { return NO_OUTCOME; }
+
+  return {
+    blocks   : [],
+    warnings : [sentence],
+    findings : [{ check: 'open-line', kind, severity: 'warning', action: 'warned',
+                  excerpt: clip(line ?? '') }],
+  };
+
+}
+
+/** Cap a logged excerpt at {@link EXCERPT_MAX} characters. */
+function clip(text: string): string {
+  const trimmed = text.trim();
+  return trimmed.length > EXCERPT_MAX ? `${trimmed.slice(0, EXCERPT_MAX - 1)}…` : trimmed;
 }
 
 /**
@@ -810,18 +1185,21 @@ export function onSessionStart(store: Store | null, payload: HookPayload, now: D
  * Unknown names allow rather than erroring, so a hooks file referencing a handler this
  * version does not implement degrades to doing nothing.
  *
+ * @param deps passed to {@link onStop}: the list lint's parser and the transcript reader
+ *
  * @example
- *   handleHook('stop', store, payload, new Date())
+ *   handleHook('stop', store, payload, new Date(), { parse: fromMarkdown })
  */
 export function handleHook(
   name    : string,
   store   : Store | null,
   payload : HookPayload,
   now     : Date = new Date(),
+  deps    : StopDeps = {},
 ): HookOutput {
 
   if (name === 'user-prompt-submit') { return onUserPromptSubmit(store, payload, now); }
-  if (name === 'stop')               { return onStop(store, payload); }
+  if (name === 'stop')               { return onStop(store, payload, { ...deps, now }); }
   if (name === 'session-start')      { return onSessionStart(store, payload, now); }
 
   return null;

@@ -19,6 +19,7 @@ import type { RenderCommand, MessagesCommand, NotesCommand } from './cli_command
 import { startStdio }    from './mcp/server.js';
 import { handleHook }    from './mcp/hooks.js';
 import type { HookPayload } from './mcp/hooks.js';
+import type { MarkdownParser } from './channels/format_lint.js';
 import { renderHistoryToFile } from './mcp/chart_tools.js';
 import { readMessages, formatMessages } from './channels/messages.js';
 import { noteReport }    from './mcp/note_tools.js';
@@ -60,6 +61,25 @@ async function readStdin(): Promise<string> {
 }
 
 /**
+ * Load the Markdown parser the Stop hook's list lint uses, or `undefined` when it cannot
+ * be loaded.
+ *
+ * A dynamic `import()` rather than a static one, for two reasons. The parser is ESM-only
+ * and this bin is a CommonJS bundle, so a static import would compile to a `require` of
+ * an ES module, which only newer Node versions allow. And a static import is resolved
+ * when the bundle loads: an install missing the dependency would fail to start the MCP
+ * server and every hook, where this way it only skips the lint.
+ */
+async function loadMarkdownParser(): Promise<MarkdownParser | undefined> {
+  try {
+    const { fromMarkdown } = await import('mdast-util-from-markdown');
+    return (text: string) => fromMarkdown(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Run one hook: read its payload, dispatch, write whatever it decided.
  *
  * Every failure path allows the turn. A hook that cannot open the database still emits
@@ -77,7 +97,8 @@ async function runHook(name: string): Promise<void> {
   let store: Store | null = null;
   try { store = openStore(); } catch { /* allow */ }
 
-  const output = handleHook(name, store, payload);
+  const parse  = name === 'stop' ? await loadMarkdownParser() : undefined,
+        output = handleHook(name, store, payload, new Date(), { parse });
 
   if (output !== null) { process.stdout.write(JSON.stringify(output)); }
 
