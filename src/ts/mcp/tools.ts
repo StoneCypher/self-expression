@@ -48,6 +48,7 @@ import { latestContext, recordContextOnce, noContextNotice, NO_HOOK_SESSION,
 import { privacyFlags }                                                      from '../channels/privacy.js';
 import { stamp }                                                             from '../channels/time.js';
 import { renderAnnotations }                                                 from '../charts/annotations.js';
+import { signatureLineFor, hasEarlierSignature }                            from '../channels/signature_line.js';
 import type { AnnotationNote } from '../charts/annotations.js';
 import type { Store }     from '../channels/store.js';
 import type { ToolReply } from './chart_tools.js';
@@ -461,6 +462,15 @@ export function adoptAnchorTarget(
  * read the database months later; it was invisible to the one participant who could have
  * closed it.
  *
+ * A **signature** reply also carries the exact visible line to paste, rendered from the
+ * row just written ({@link signatureEcho}), with where it goes for its position. The Stop
+ * hook checks the message against that same rendering.
+ *
+ * @example
+ *   handleExpress(store, '0.2.1', { channel: 'signature', text: 'flow; clear plan',
+ *                                   position: 'close', face: '🙂' })
+ *   // => 'recorded #3 …\n\nend the message with this line, as its last line:\n`[9:14 am PDT]` 🙂 `»` flow; clear plan'
+ *
  * @example
  *   handleExpress(store, '0.2.1', { channel: 'need', text: 'merge #21?' })
  *   // => { content: [{ type: 'text', text: 'recorded #1 …' }] }
@@ -555,7 +565,67 @@ export function handleExpress(
   return reply(
     `recorded #${String(written.id)} ${written.uuid}` +
     correctionEcho(args.correctsKind, args.correctsId, link.channel) +
-    noContextNotice(session));
+    noContextNotice(session) +
+    (args.channel === 'signature' ? signatureEcho(store, written.id, session, args) : ''));
+
+}
+
+/**
+ * Where the rendered signature line goes, by position — the instruction that rides
+ * above the line in `express`'s reply.
+ *
+ * @example
+ *   SIGNATURE_PLACEMENT.close   // => 'end the message with this line, as its last line:'
+ */
+export const SIGNATURE_PLACEMENT: Readonly<Record<Position, string>> = {
+  open  : 'begin your first text of this turn with this line:',
+  mid   : 'render this line where the lurch happened:',
+  close : 'end the message with this line, as its last line:',
+};
+
+/**
+ * The part of an `express` reply that hands back the visible signature line, rendered
+ * from the row just written — the signature counterpart of the block `annotate` returns.
+ *
+ * The model used to compose the line itself from the grammar, and a recorded signature
+ * with no visible line was the result often enough to need a gate. Returning the exact
+ * line to paste removes the composing, and it is rendered by the same function the Stop
+ * hook uses to check the line, so what `express` hands out is by construction what the
+ * gate accepts.
+ *
+ * The delta comes from the record, not from memory: the arrow is shown only when the
+ * session had an earlier signature, and when it did but no `delta` was supplied the reply
+ * says so, naming the earlier row so the comparison can be made against it.
+ *
+ * @param id      the signature row just written
+ * @param session the session it was written under
+ * @param args    the call's arguments, for its position and whether a delta was given
+ * @returns the text to append to the reply, beginning with a blank line
+ *
+ * @example
+ *   signatureEcho(store, 42, 'sess-1', { channel: 'signature', text: 'flow', position: 'close' })
+ *   // => '\n\nend the message with this line, as its last line:\n`[9:14 am PDT]` 🙂 `»` flow'
+ *
+ * @see ../channels/signature_line.js signatureLineFor
+ */
+export function signatureEcho(
+  store   : Store,
+  id      : number,
+  session : string,
+  args    : Pick<ExpressArgs, 'position' | 'delta'>,
+): string {
+
+  const line = signatureLineFor(store, id);
+  if (line === null) { return ''; }
+
+  const placement = SIGNATURE_PLACEMENT[args.position ?? 'close'],
+        earlier   = hasEarlierSignature(store, session, id),
+        nudge     = earlier && args.delta === undefined
+          ? '\n(no delta given, so no arrow is shown; recall returns the previous signature ' +
+            'to compare against, and delta up/down/steady adds it)'
+          : '';
+
+  return `\n\n${placement}\n${line}${nudge}`;
 
 }
 
@@ -1277,7 +1347,9 @@ export function registerTools(server: McpServer, store: Store, pluginVersion: st
       'pressure, concurrency, latency: the machinery\'s state, not the mood, fired when ' +
       'notable rather than on a schedule; taste is a scarce aesthetic observation about ' +
       'the work itself, observing with nothing proposed. "Nothing notable" is always a ' +
-      'valid signature — the requirement is to look, not to produce. ' +
+      'valid signature — the requirement is to look, not to produce. For a signature ' +
+      'the reply hands back the exact visible line; paste it verbatim rather than ' +
+      'composing one — first in the turn for an open, as the very last line for a close. ' +
       'To take a claim back, record the correction and link it: correctsId names the ' +
       'earlier entry, correctsKind says retracts or amends, and verbatim quotes the wrong ' +
       'words exactly. Nothing is ever rewritten — the original stays exactly as written ' +
