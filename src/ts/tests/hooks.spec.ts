@@ -12,6 +12,7 @@ import {
   windowPostureLine, windowClause, WINDOW_SURFACE_NOUNS,
   renderReplayItem, retractionReplayLine,
   REPLAY_WINDOW_DAYS, REPLAY_MAX_ITEMS, REPLAY_QUOTE_MAX,
+  FORMAT_SEGMENT,
 } from '../mcp/hooks.js';
 import { configKey, channelMaxCharsKey, DEFAULT_CHANNEL_MAX_CHARS,
          WINDOW_SURFACES, WINDOW_POSTURES, windowPostureKey } from '../channels/config.js';
@@ -363,7 +364,8 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     // The conventions flags are config transport, not time presentation (#42), so they
     // still lead the clockless line; only the clock sentence is suppressed.
     expect(context).toBe(
-      `${conventionFlags(s)}. ${channelLengths(s)}. ${windowPostureLine(s)}. ${OPEN_REMINDER_CLOCKLESS}`);
+      `${conventionFlags(s)}. ${channelLengths(s)}. ${FORMAT_SEGMENT}. ${windowPostureLine(s)}. ` +
+      OPEN_REMINDER_CLOCKLESS);
     expect(context).not.toContain('2:05 pm');
     expect(context).not.toContain('Turn starting');
     expect(context).not.toContain('timestamp above');   // the shipped wording must not dangle
@@ -371,9 +373,10 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
 
   test("'false' with no store yields exactly the clockless reminder — nothing dangles", () => {
     // No store means no config read at all, so the suppression path cannot fire; this
-    // pins the other boundary: flags absent, clock present, reminder intact.
+    // pins the other boundary: flags absent, clock present, reminder intact. The format
+    // reminder is static and needs no store, so it survives.
     const context = additionalContext(onUserPromptSubmit(null, { session_id: 'x' }, NOW));
-    expect(context).toBe(`${describeMoment(NOW)} ${OPEN_REMINDER}`);
+    expect(context).toBe(`${describeMoment(NOW)} ${FORMAT_SEGMENT}. ${OPEN_REMINDER}`);
   });
 
   test("context recording is unaffected — the write is observational, not presentational", () => withStore(s => {
@@ -392,11 +395,11 @@ describe('onUserPromptSubmit — time.hook (issue #30, D9)', () => {
     expect(context).toContain(OPEN_REMINDER);
   }));
 
-  test('unset keeps the clock, with the conventions flags, lengths, and windows between clock and reminder', () => withStore(s => {
+  test('unset keeps the clock, with the conventions flags, lengths, format, and windows between clock and reminder', () => withStore(s => {
     const context = additionalContext(onUserPromptSubmit(s, { session_id: 'sess-1' }, NOW));
     expect(context).toBe(
       `${describeMoment(NOW)} ${conventionFlags(s)}. ${channelLengths(s)}. ` +
-      `${windowPostureLine(s)}. ${OPEN_REMINDER}`);
+      `${FORMAT_SEGMENT}. ${windowPostureLine(s)}. ${OPEN_REMINDER}`);
   }));
 
 });

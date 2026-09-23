@@ -1,6 +1,6 @@
 {
   "name": "self-expression",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "self-expression plugin for agents like claude opus, codex, gemini, and deepseek",
   "keywords": [
     "self-expression",
@@ -92,6 +92,7 @@
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@types/mdast": "^4.0.4",
     "@types/node": "^26.3.0",
     "@vitest/coverage-v8": "^4.1.10",
     "better_git_changelog": "^1.6.21",
@@ -114,6 +115,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "mdast-util-from-markdown": "^2.0.3",
     "zod": "^4.4.3"
   }
 }

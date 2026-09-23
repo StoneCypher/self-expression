@@ -12,6 +12,7 @@ import {
   effectiveValue, effectiveConfig,
   WINDOW_SURFACES, WINDOW_POSTURES, DEFAULT_WINDOW_POSTURE,
   windowPosture, windowPostureKey,
+  LIST_GATE_KEY, DEFAULT_LIST_GATE_MODE, listGateMode,
 } from '../channels/config.js';
 import { CHANNELS } from '../channels/vocabulary.js';
 
@@ -23,7 +24,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the two desk keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the two desk keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys, and the three format-gate keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -38,7 +39,8 @@ describe('CONFIG_KEYS registry', () => {
       'channels.taste.max_chars', 'channels.unanswerable.max_chars',
       'desk.answer_cards', 'desk.path',
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
-      'forecast.enabled', 'format.version', 'gate.checklist', 'gate.signature',
+      'forecast.enabled', 'format.version', 'gate.checklist', 'gate.lists',
+      'gate.open_line', 'gate.signature', 'gate.signature_line',
       'gifts.enabled',
       'image.api_key_env', 'image.automatic1111.api_key_env', 'image.daily_cap',
       'image.enabled', 'image.local_base_url', 'image.model',
@@ -55,6 +57,24 @@ describe('CONFIG_KEYS registry', () => {
       'window.browser', 'window.editor',
     ]);
   });
+
+  test('the list lint ships report-only, and the signature-line checks ship on', () => {
+    expect(configKey(LIST_GATE_KEY)).toMatchObject({ kind: 'enum', fallback: 'report',
+                                                     choices: ['off', 'report', 'block'] });
+    expect(DEFAULT_LIST_GATE_MODE).toBe('report');
+    expect(configKey('gate.signature_line')).toMatchObject({ kind: 'bool', fallback: 'true' });
+    expect(configKey('gate.open_line')).toMatchObject({ kind: 'bool', fallback: 'true' });
+  });
+
+  test('listGateMode reads report by default, obeys a valid value, and falls back on junk', () => withStore(s => {
+    expect(listGateMode(s)).toBe('report');
+    writeConfig(s, LIST_GATE_KEY, 'block');
+    expect(listGateMode(s)).toBe('block');
+    writeConfig(s, LIST_GATE_KEY, 'off');
+    expect(listGateMode(s)).toBe('off');
+    writeConfig(s, LIST_GATE_KEY, 'loudly');
+    expect(listGateMode(s)).toBe('report');
+  }));
 
   test('every privacy key defaults to recording — the switch acts only when set (#18 included)', () => {
     for (const key of ['privacy.store_cwd', 'privacy.store_prompt_len', 'privacy.store_quotes']) {

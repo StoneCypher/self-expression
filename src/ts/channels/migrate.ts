@@ -30,6 +30,7 @@ import {
   MESSAGES_DDL, MESSAGE_READS_DDL, MESSAGE_INDEX_DDL,
   NOTES_DDL, NOTE_EVENTS_DDL, NOTE_INDEX_DDL,
   TURN_CONTEXT_SOURCE_COLUMN,
+  FORMAT_FINDINGS_DDL, FINDINGS_INDEX_DDL,
 } from './schema.js';
 
 /**
@@ -323,6 +324,34 @@ function migrateV6toV7(db: DatabaseSync): void {
 }
 
 /**
+ * The v7→v8 step: create the `format_findings` table and its index, where the Stop
+ * hook's format checks log what they found.
+ *
+ * Purely additive, like v2→v3 and v4→v5: no existing table changes shape and no row
+ * moves, so a v7 database is unchanged afterward apart from one empty table. Each
+ * statement is `IF NOT EXISTS`-idempotent, which also makes this safe when `openStore`
+ * has already applied `TABLE_DDL` before walking the chain.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v7 database exactly as it was.
+ *
+ * @see ./schema.js FORMAT_FINDINGS_DDL
+ */
+function migrateV7toV8(db: DatabaseSync): void {
+
+  db.exec('BEGIN');
+  try {
+    db.exec(FORMAT_FINDINGS_DDL);
+    for (const statement of FINDINGS_INDEX_DDL) { db.exec(statement); }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
@@ -333,6 +362,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 4, to: 5, apply: migrateV4toV5 },
   { from: 5, to: 6, apply: migrateV5toV6 },
   { from: 6, to: 7, apply: migrateV6toV7 },
+  { from: 7, to: 8, apply: migrateV7toV8 },
 ];
 
 /**

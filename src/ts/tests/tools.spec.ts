@@ -17,8 +17,9 @@ import {
   handleConfigure, handleExpress, handleAnnotate, handleBeginTurn,
   enabledChannels, enabledConfidenceGrounds,
   registerTools, ENABLED_KEY, FORECAST_KEY, ANNOTATE_MAX_NOTES,
-  rejectEventOnlyWrite, startupBakedNotice,
+  rejectEventOnlyWrite, startupBakedNotice, SIGNATURE_PLACEMENT,
 } from '../mcp/tools.js';
+import { parseSignatureLine, signatureLineFor } from '../channels/signature_line.js';
 import { buildServer } from '../mcp/server.js';
 import { handleLogChecklist } from '../mcp/checklist_tools.js';
 import { renderChecklistSummary } from '../charts/checklist.js';
@@ -1085,6 +1086,72 @@ describe('express and annotate — saying the gap out loud, not only recording i
       { channel: 'dissent', text: 'one', anchorKind: 'file', anchorTarget: 'a.ts', anchorSpan: 'L1' },
     ]}));
     expect(out).not.toContain(NO_HOOK_SESSION);
+  }));
+
+});
+
+describe('express — handing back the visible signature line', () => {
+
+  /** The rendered line an express reply carries: the last line of the reply, or ''. */
+  function echoedLine(out: string): string {
+    return out.split('\n').find(line => line.startsWith('`[')) ?? '';
+  }
+
+  test('a close signature reply carries the exact line, and says it goes last', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out  = text(handleExpress(s, VERSION, { channel: 'signature', text: 'flow; clear plan',
+                                                  position: 'close', face: '🙂', contextEmoji: '🧭',
+                                                  cctype: 'feat' })),
+          line = echoedLine(out);
+    expect(out).toContain(SIGNATURE_PLACEMENT.close);
+    expect(line).toMatch(/^`\[\d{1,2}:\d{2} [ap]m \S+\]` 🙂 🧭 - feat `»` flow; clear plan$/u);
+    expect(parseSignatureLine(line)?.text).toBe('flow; clear plan');
+  }));
+
+  test('the line is the one the Stop gate accepts — same renderer, same row', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleExpress(s, VERSION, { channel: 'signature', text: 'still; unchanged',
+                                                 position: 'close' }));
+    expect(echoedLine(out)).toBe(signatureLineFor(s, recordedId({ content: [{ type: 'text', text: out }] })));
+  }));
+
+  test("an open says where it goes, and a session's first signature shows no arrow", () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleExpress(s, VERSION, { channel: 'signature', text: 'still; fresh',
+                                                 position: 'open', face: '🙂', delta: 'up' }));
+    expect(out).toContain(SIGNATURE_PLACEMENT.open);
+    expect(echoedLine(out)).not.toContain('⬆️');
+    expect(out).not.toContain('no delta given');
+  }));
+
+  test('after the first, a given delta shows its arrow', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    handleExpress(s, VERSION, { channel: 'signature', text: 'still; fresh', position: 'open' });
+    const out = text(handleExpress(s, VERSION, { channel: 'signature', text: 'flow; better',
+                                                 position: 'close', face: '🙂', delta: 'up' }));
+    expect(echoedLine(out)).toContain('⬆️ 🙂');
+  }));
+
+  test('after the first, an omitted delta is named rather than silently dropped', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    handleExpress(s, VERSION, { channel: 'signature', text: 'still; fresh', position: 'open' });
+    const out = text(handleExpress(s, VERSION, { channel: 'signature', text: 'flow', position: 'close' }));
+    expect(out).toContain('no delta given');
+    expect(out).toContain('recall');
+  }));
+
+  test('uncertainty prefixes the face with no space', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleExpress(s, VERSION, { channel: 'signature', text: 'fog', position: 'close',
+                                                 face: '🤔', uncertain: true }));
+    expect(echoedLine(out)).toContain('❓🤔');
+  }));
+
+  test('non-signature channels carry no line', () => withStore(s => {
+    handleBeginTurn(s, { session: 'sess-1', promptId: 'p-1' });
+    const out = text(handleExpress(s, VERSION, { channel: 'need', text: 'which repo?' }));
+    expect(out).not.toContain('`»`');
+    expect(out).not.toContain(SIGNATURE_PLACEMENT.close);
   }));
 
 });

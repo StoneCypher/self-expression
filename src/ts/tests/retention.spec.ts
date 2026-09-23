@@ -9,6 +9,7 @@ import { recordContext } from '../channels/context.js';
 import { pruneExpired }  from '../channels/retention.js';
 import { postMessage, readMessages, unreadCounts } from '../channels/messages.js';
 import { composeNote, listNotes } from '../channels/notes.js';
+import { recordFinding, recentFindings } from '../channels/findings.js';
 
 const VERSION = '0.2.1';
 
@@ -48,7 +49,7 @@ describe('pruneExpired', () => {
 
   test('the default — 0 — disables pruning entirely', () => withStore(s => {
     seed(s);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, formatFindings: 0 });
     expect(counts(s)).toEqual({ entries: 4, context: 4 });
   }));
 
@@ -56,7 +57,7 @@ describe('pruneExpired', () => {
     seed(s);
     writeConfig(s, 'retention.days', 30);
     expect(pruneExpired(s, NOW))
-      .toEqual({ entries: 2, turnContext: 2, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+      .toEqual({ entries: 2, turnContext: 2, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, formatFindings: 0 });
     expect(counts(s)).toEqual({ entries: 2, context: 2 });
     const texts = s.db.prepare('SELECT text FROM entries ORDER BY id').all().map(r => r['text']);
     expect(texts).toEqual(['recent', 'today']);
@@ -83,7 +84,7 @@ describe('pruneExpired', () => {
   test('an invalid stored horizon behaves as unset — nothing is pruned (D5)', () => withStore(s => {
     seed(s);
     writeConfig(s, 'retention.days', 'sometimes');
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, formatFindings: 0 });
     expect(counts(s)).toEqual({ entries: 4, context: 4 });
   }));
 
@@ -91,7 +92,17 @@ describe('pruneExpired', () => {
     seed(s);
     writeConfig(s, 'retention.days', 30);
     pruneExpired(s, NOW);
-    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0 });
+    expect(pruneExpired(s, NOW)).toEqual({ entries: 0, turnContext: 0, messages: 0, messageReads: 0, notes: 0, noteEvents: 0, formatFindings: 0 });
+  }));
+
+  test('format findings ride the same horizon: old rows pruned, fresh rows kept', () => withStore(s => {
+    const finding = { check: 'lists', kind: 'ordered-list', severity: 'violation',
+                      action: 'reported' } as const;
+    recordFinding(s, { ...finding, excerpt: 'ancient' }, daysAgo(90));
+    recordFinding(s, { ...finding, excerpt: 'today' },   NOW);
+    writeConfig(s, 'retention.days', 30);
+    expect(pruneExpired(s, NOW).formatFindings).toBe(1);
+    expect(recentFindings(s).map(row => row['excerpt'])).toEqual(['today']);
   }));
 
   test('messages ride the same horizon (#41): old rows pruned, fresh rows kept', () => withStore(s => {
