@@ -1,10 +1,10 @@
-# self-expression v0.7.0
+# self-expression v0.8.0
 
-> Version 0.7.0 was built on Wednesday, September 16, 2026 at GMT-07:00 `1789596213091` from hash `e41a3a0`.
+> Version 0.8.0 was built on Wednesday, September 23, 2026 at GMT-07:00 `1790153770355` from hash `3521d24`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1789596213091 Wednesday, September 16, 2026 at GMT-07:00 94.83 362 91 e41a3a0 52.31 64.21 63.4 63.93 263 2647 89.35 93.19 95.2 2384 0.7.0 -->
+<!-- Supported embeds: 1790153770355 Wednesday, September 23, 2026 at GMT-07:00 95.05 360 91 3521d24 50.95 63.06 61.8 63.01 270 2747 89.41 93.89 95.4 2477 0.8.0 -->
 
 
 
@@ -280,7 +280,10 @@ The registered keys:
 | `channels.<name>.max_chars` | int | `200` | Longest `text`, in characters, `express` accepts on one channel — one key per channel, twelve in all. Range 1–2000; 2000 is the hard ceiling the static tool schema carries, matching `post_message`'s cap. Checked in the handler, so a change takes effect immediately. **Governs writes only**: rows already stored longer than a lowered limit are never truncated, hidden, or pruned. |
 | `gate.signature` | bool | `true` | Whether the Stop gate blocks a turn that never signed off. **One block per turn is the ceiling**: when the harness reports `stop_hook_active` — the turn is only still running because this gate blocked it once — the gate allows unconditionally. Otherwise a host that cannot reach the `express` tool would meet the same refusal forever, with no way to end the session from inside it. |
 | `gate.checklist` | bool | `true` | Reserved for the checklist gate; registered so its name and default are settled before anything reads it. |
-| `retention.days` | int | `0` | Prune `entries` and `turn_context` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
+| `gate.signature_line` | bool | `true` | Whether the Stop gate also blocks when a close was *recorded* but the final message's last non-empty line is not the rendered signature line carrying that text. The refusal quotes the exact line to paste. Skipped when the host sends no final message. |
+| `gate.open_line` | bool | `true` | Whether the Stop hook checks the turn's first assistant text for a rendered open signature and a matching recorded open. **Warns only** (a one-line message to you, plus a `format_findings` row), never blocks: a backdated open is worse than a missing one. Reads the tail of the host transcript, taking assistant text only. |
+| `gate.lists` | enum | `report` | The list lint. The final message is parsed as Markdown and only prose list nodes are inspected, so code blocks, inline code, HTML, and blockquotes are never touched. A numbered list of 2–10 items is a violation (it should be a number-square list); a bullet list is only ever a warning. `off` runs nothing; `report` logs every finding to `format_findings` and never blocks; `block` lets numbered-list violations block the stop. Ships as `report` so false positives can be measured first. |
+| `retention.days` | int | `0` | Prune `entries`, `turn_context`, and `format_findings` rows older than this many days at server startup. `0` never prunes. Pruning deletes; it does not archive. |
 | `retraction.replay` | bool | `true` | Whether a session's first turn is handed the recent retraction register (#16), so a resumed session does not carry known falsehoods forward. On by default — hiding what you already know is wrong is a strange thing to offer prominently, so this is the escape hatch rather than a personality choice. The window (14 days) and the cap (5 items) are code constants, not keys. |
 | `privacy.store_cwd` | bool | `true` | Record `cwd`, `project`, and `git_branch`. Suppressed at write time — never captured — when exactly `false`. |
 | `privacy.store_prompt_len` | bool | `true` | Record the prompt's length. Same write-time suppression. |
@@ -321,7 +324,42 @@ names only genuine deviations — and a `windows:` segment for the two window po
 The skill states its *recommended* length (≤70, because a signature that has to be read
 has stopped being a glance) as a constant, and takes its *ceiling* from that segment; a
 raised ceiling is headroom for the occasional line that earns it, never an invitation
-to fill it.
+to fill it. Beside the lengths rides a fixed `format: sig-line, number-square lists,
+diff channels` reminder, which names the three renderings most often dropped at the
+moment they are written.
+
+### Format enforcement — the visible line, not only the record
+
+Recording a signature and showing one are different acts, and a gate that checks only
+the record passes a turn whose reader saw no signature at all. So the Stop hook checks
+what was actually rendered, and `express` hands back the line to render:
+
+- **`express` returns the line.** A signature reply ends with the exact visible line —
+  `` `[9:14 am PDT]` ⬆️ 🙂 🧭 - feat `»` flow; clear plan `` — and where it goes (first
+  for an open, last for a close). The timestamp is the server's clock at the write, and
+  the arrow appears only when the session already has an earlier signature. The model
+  pastes the line instead of composing it, the same way `annotate` returns its block.
+- **The close line blocks** (`gate.signature_line`): with a close recorded, the final
+  message's last non-empty line must parse as a signature line whose text equals the
+  recorded text. The refusal quotes the line to paste.
+- **The open line warns** (`gate.open_line`): the first assistant text of the turn,
+  read from the transcript's tail, should start with a rendered open that matches a
+  recorded one. It never blocks — a backdated open is worse than none.
+- **The list lint reports** (`gate.lists`): the final message is parsed as Markdown
+  with `mdast-util-from-markdown`, never scanned with a regular expression, and only
+  prose `list` nodes outside blockquotes are inspected. Code of every kind, inline code,
+  and HTML are different node types with no list children, so a numbered line or a YAML
+  dash inside them cannot be flagged by construction.
+
+Every finding, whatever was done about it, is a row in the `format_findings` table
+(`check_name`, `kind`, `severity`, `action` of `blocked` / `reported` / `warned`, and a
+≤60-character excerpt of the assistant's own line). That table is how the list lint's
+false-positive rate is measured before anyone switches it to `block`:
+
+```sql
+SELECT kind, action, COUNT(*) FROM format_findings
+ WHERE check_name = 'lists' GROUP BY kind, action;
+```
 
 ### Window postures — two keys, and honestly advisory
 
@@ -1112,19 +1150,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2384</td>
-    <td>94.83<small>%</small></td>
-    <td>89.35<small>%</small></td>
-    <td>93.19<small>%</small></td>
-    <td>95.2<small>%</small></td>
+    <td>2477</td>
+    <td>95.05<small>%</small></td>
+    <td>89.41<small>%</small></td>
+    <td>93.89<small>%</small></td>
+    <td>95.4<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>263</td>
-    <td>64.21<small>%</small></td>
-    <td>52.31<small>%</small></td>
-    <td>63.4<small>%</small></td>
-    <td>63.93<small>%</small></td>
+    <td>270</td>
+    <td>63.06<small>%</small></td>
+    <td>50.95<small>%</small></td>
+    <td>61.8<small>%</small></td>
+    <td>63.01<small>%</small></td>
   </tr>
 </table>
 
@@ -1136,7 +1174,7 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Docblock coverage</th>
-    <td>362</td>
+    <td>360</td>
     <td>91<small>%</small></td>
   </tr>
 </table>
