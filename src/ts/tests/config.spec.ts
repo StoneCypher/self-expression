@@ -46,6 +46,7 @@ describe('CONFIG_KEYS registry', () => {
       'image.enabled', 'image.local_base_url', 'image.model',
       'image.nanobanana.api_key_env', 'image.openai.api_key_env', 'image.provider',
       'image.session_cap', 'image.timeout_seconds',
+      'inject.conventions',
       'mailbox.daily_cap', 'mailbox.default_ttl_days', 'mailbox.enabled',
       'mailbox.max_pending', 'mailbox.offer_cap', 'mailbox.surface_budget',
       'messages.enabled', 'messages.notify', 'onboarding.answered',

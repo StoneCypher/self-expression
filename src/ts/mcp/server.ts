@@ -25,6 +25,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { openStore, closeStore } from '../channels/store.js';
 import { onboardingInstructions } from '../channels/onboarding.js';
+import { injectMode }           from '../channels/config.js';
 import {
   availableConventions, conventionsPointer, defaultConventionsRoot, packageRoot,
 } from '../channels/conventions.js';
@@ -71,7 +72,14 @@ export const SERVER_NAME = 'self-expression';
  * host, which is exactly why the conventions themselves are resources and only the
  * pointer to them is here.
  *
- * @param store the open store, for the onboarding half
+ * The pointer's wording follows `inject.conventions`: unless it is `off`, a host with
+ * hooks may have injected the core document at session start, so the pointer tells the
+ * model to look for that block before reading anything. A host without hooks never has
+ * the block and still gets the read instruction. The config read fails open to the
+ * pre-injection wording, which is the one that can never tell a model to skip text it
+ * does not have.
+ *
+ * @param store the open store, for the onboarding half and the injection mode
  * @param docs  the convention documents actually available, for the pointer half
  *
  * @example
@@ -80,14 +88,21 @@ export const SERVER_NAME = 'self-expression';
  *
  * @see ../channels/onboarding.js onboardingInstructions
  * @see ../channels/conventions.js conventionsPointer
+ * @see ../channels/config.js injectMode
  */
 export function serverInstructions(
   store : Store,
   docs  : readonly ConventionDoc[],
 ): string | null {
-  const parts = [onboardingInstructions(store), conventionsPointer(docs)]
+
+  let injected = false;
+  try { injected = injectMode(store) !== 'off'; }
+  catch { /* fail open: the plain read instruction never points at a block that is absent */ }
+
+  const parts = [onboardingInstructions(store), conventionsPointer(docs, injected)]
     .filter((part): part is string => part !== null);
   return parts.length === 0 ? null : parts.join('\n\n');
+
 }
 
 /**

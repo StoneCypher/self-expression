@@ -24,6 +24,7 @@ import { renderHistoryToFile } from './mcp/chart_tools.js';
 import { readMessages, formatMessages } from './channels/messages.js';
 import { noteReport }    from './mcp/note_tools.js';
 import { openStore, closeStore } from './channels/store.js';
+import { packageRoot }   from './channels/conventions.js';
 import type { Store }    from './channels/store.js';
 
 /** Present in the CommonJS bundle Rollup emits; this file is never imported as ESM. */
@@ -83,7 +84,8 @@ async function loadMarkdownParser(): Promise<MarkdownParser | undefined> {
  * Run one hook: read its payload, dispatch, write whatever it decided.
  *
  * Every failure path allows the turn. A hook that cannot open the database still emits
- * the ambient clock; a hook that cannot parse its payload emits nothing at all. A bug
+ * the ambient clock; a hook that cannot parse its payload emits nothing at all (though
+ * `SessionStart` still injects the conventions, which need no payload field). A bug
  * in the enforcer must never be able to wedge a session, because the person it wedges
  * cannot debug it from inside the wedge.
  */
@@ -97,8 +99,11 @@ async function runHook(name: string): Promise<void> {
   let store: Store | null = null;
   try { store = openStore(); } catch { /* allow */ }
 
+  // The conventions the SessionStart hook injects are resolved from this bundle's own
+  // location — `<plugin root>/dist/cli.cjs`, one level below the root — and never from the
+  // working directory, which is whatever project the session happens to be open in.
   const parse  = name === 'stop' ? await loadMarkdownParser() : undefined,
-        output = handleHook(name, store, payload, new Date(), { parse });
+        output = handleHook(name, store, payload, new Date(), { parse, root: packageRoot(__dirname) });
 
   if (output !== null) { process.stdout.write(JSON.stringify(output)); }
 

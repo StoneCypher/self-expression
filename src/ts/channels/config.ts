@@ -157,6 +157,45 @@ export type ListGateMode = typeof LIST_GATE_MODES[number];
 export const DEFAULT_LIST_GATE_MODE: ListGateMode = 'report';
 
 /**
+ * The config key governing whether the `SessionStart` hook injects the core conventions
+ * document into the model's context.
+ *
+ * @see INJECT_MODES
+ * @see injectMode
+ */
+export const INJECT_CONVENTIONS_KEY = 'inject.conventions';
+
+/**
+ * The three answers `inject.conventions` accepts, from most to least injection.
+ *
+ * - `always` — inject on every `SessionStart`: `startup`, `resume`, `clear`, `compact`,
+ *   and any source a newer host adds. The default, because compaction is exactly the
+ *   moment the conventions are summarized away while the per-turn reminders survive.
+ * - `startup-only` — inject on a fresh `startup` and nowhere else, for someone who would
+ *   rather pay the size once and trust a resumed transcript to still carry it.
+ * - `off` — never inject; the conventions are then reached only as a skill or an MCP
+ *   resource, which is how the plugin behaved before this key existed.
+ *
+ * An `enum` rather than a `bool` because "only at startup" is a real third answer, not a
+ * compromise between the other two.
+ *
+ * @see INJECT_CONVENTIONS_KEY
+ */
+export const INJECT_MODES = ['always', 'startup-only', 'off'] as const;
+
+/** One injection mode: `'always'`, `'startup-only'`, or `'off'`. */
+export type InjectMode = typeof INJECT_MODES[number];
+
+/**
+ * The injection mode in force when nothing valid is stored.
+ *
+ * `always`, because the failure this key exists to fix is a model working for an hour
+ * from tool schemas alone — and a default of anything less leaves that failure in place
+ * for everyone who never opens the configuration.
+ */
+export const DEFAULT_INJECT_MODE: InjectMode = 'always';
+
+/**
  * The outcome of validating one proposed config value: either the canonical text to
  * store, or a description of what would have been accepted — never a bare "no".
  */
@@ -714,6 +753,15 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
       'which is exactly why it gets its own key rather than inheriting the browser answer. ' +
       'Advisory on the same terms as window.browser',
     validate: choiceValidator(WINDOW_POSTURES) },
+  { key: INJECT_CONVENTIONS_KEY, kind: 'enum', choices: INJECT_MODES,
+    fallback: DEFAULT_INJECT_MODE,
+    description:
+      'whether the SessionStart hook injects the core conventions document ' +
+      '(skills/self-expression/SKILL.md, frontmatter stripped) into context: always ' +
+      '(startup, resume, clear, and compact), startup-only, or off. Costs roughly nine ' +
+      'thousand tokens per injection; read at session start, so a change takes effect ' +
+      'from the next one',
+    validate: choiceValidator(INJECT_MODES) },
 ];
 
 /**
@@ -865,6 +913,36 @@ export function listGateMode(store: Store): ListGateMode {
   return (LIST_GATE_MODES as readonly string[]).includes(raw ?? '')
     ? raw as ListGateMode
     : DEFAULT_LIST_GATE_MODE;
+
+}
+
+/**
+ * The conventions-injection mode in force.
+ *
+ * Reads through {@link effectiveValue}, so a hand-edited row or a value from a newer
+ * version's larger vocabulary lands on {@link DEFAULT_INJECT_MODE} (D5). The return type
+ * is narrowed to {@link InjectMode} so callers can switch on it without re-checking.
+ *
+ * @param store the open store to resolve against
+ * @returns the mode in force, never outside {@link INJECT_MODES}
+ *
+ * @example
+ *   injectMode(store)                                   // => 'always' on a fresh install
+ *   writeConfig(store, 'inject.conventions', 'off');
+ *   injectMode(store)                                   // => 'off'
+ *   writeConfig(store, 'inject.conventions', 'sometimes');
+ *   injectMode(store)                                   // => 'always' — invalid behaves as unset
+ *
+ * @see INJECT_CONVENTIONS_KEY
+ * @see ../mcp/hooks.js onSessionStart
+ */
+export function injectMode(store: Store): InjectMode {
+
+  const raw = effectiveValue(store, INJECT_CONVENTIONS_KEY);
+
+  return (INJECT_MODES as readonly string[]).includes(raw ?? '')
+    ? raw as InjectMode
+    : DEFAULT_INJECT_MODE;
 
 }
 
