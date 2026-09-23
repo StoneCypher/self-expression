@@ -314,7 +314,7 @@ The registered keys:
 | `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
 | `window.browser` | enum | `ask` | May a page be opened in your **external browser**: `never`, `ask`, or `always`. Advisory, not enforced — see below. |
 | `window.editor` | enum | `ask` | May a page be opened as an **editor tab**: `never`, `ask`, or `always`. A separate key from `window.browser` on purpose. |
-| `inject.conventions` | enum | `always` | Whether the `SessionStart` hook injects the core conventions into context: `always` (on `startup`, `resume`, `clear`, and `compact`), `startup-only`, or `off`. Roughly 33.5 KB, about 8,500–10,000 tokens, per injection — see [Conventions injected at session start](#conventions-injected-at-session-start). Read at session start, so a change applies from the next one. |
+| `inject.conventions` | enum | `always` | Whether the `SessionStart` hook injects the core conventions into context: `always` (on `startup`, `resume`, `clear`, and `compact`), `startup-only`, or `off`. Roughly 37.7 KB, about 9,500–11,000 tokens, per injection — see [Conventions injected at session start](#conventions-injected-at-session-start). Read at session start, so a change applies from the next one. |
 
 Three of those families reach the *skills* and the model directly, neither of which can
 read configuration. The turn-start hook carries them on the context line it already
@@ -481,7 +481,7 @@ Self-expression conventions (injected at session start; these govern express, si
 - **From where.** Read off disk at session start, from the installed plugin root that the
   hook's own bundle sits in — never from the working directory, and never copied into
   code, so an edited skill is what gets injected.
-- **Cost.** The injected document is about 33.5 KB — roughly 8,500 to 10,000 tokens,
+- **Cost.** The injected document is about 37.7 KB — roughly 9,500 to 11,000 tokens,
   depending on the tokenizer — paid once per session start. With `always`, a session
   that compacts three times pays it four times. `startup-only` pays it once;
   `off` pays nothing, and leaves the conventions to the skill and the resources.
