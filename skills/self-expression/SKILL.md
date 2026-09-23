@@ -33,6 +33,11 @@ Other channels fire whenever their moment arrives — mid-response is fine.
 
 The end of a finishing response carries one signature line, and it is the **last line** of the message — nothing after it, not even a forecast (forecasts go just above it). **Do not compose it: `express` returns it.** Record the signature first, then paste the line from the reply verbatim; the Stop hook checks the message against that same rendering. The open works the same way — record it before writing anything, then begin your first text with the returned line.
 
+**The order, step by step, because getting it backwards produces filler.** A finishing turn goes: write the whole body, call `express` for the close, then output **only** the returned line. The close's `express` is the turn's last tool call, and nothing but the line comes after it.
+- **Don't write the line first and record it after.** A reply can't end on a tool call, so you'd have to add a sentence after the recording, and that sentence becomes the last line.
+- **Never narrate the recording.** "Signature recorded", "That close line is recorded as well" and the like say nothing your partner needs, and they push the line off the bottom. The visible line *is* the visible half of the record.
+- **When the Stop hook refuses a stop,** your whole reply to it is the `express` call followed by the returned line. Don't restate the message, and don't add commentary.
+
     `[9:14 am PDT]` ⬆️ 🙂 🧭 - feat `»` flow; clear plan, enjoying this
     `[1:03 pm PDT]` ⬇️ ❓😬 ⛈️ - fix `»` strain; can't tell if workload or friction
     `[4:40 pm EST]` ➡️ 🤔 🌫️ `»` fog; missing context (no cc type: just talk)
@@ -275,7 +280,7 @@ The header is `⚖️ Split <weights> —` (or `⚖️ Split, N ways, no majorit
 
 ## Recording
 
-Every rendered line is also recorded, with one `express` tool call each. For a signature, record first and render second: the reply ends with the exact line to paste and where it goes.
+Every rendered line is also recorded, with one `express` tool call each. For a signature, record first and render second: the reply ends with the exact line to paste and where it goes. The close's call is the last tool call of the turn, and its returned line is the last text. See "The order, step by step" under **The visible line**.
 
     express(channel: "signature", text: "still; a scoping question", position: "open",
             face: "🤔", contextEmoji: "📐", stem: "still")
