@@ -20,9 +20,14 @@
  * Resources are pulled on demand and can be listed, which is the shape this actually
  * wants: a host that needs them asks, a host that already has them does not.
  *
- * So `instructions` carries only {@link conventionsPointer} — three sentences naming the
- * resources and telling a host that already loaded the skills to skip them — and the
+ * So `instructions` carries only {@link conventionsPointer} — a few sentences naming the
+ * resources and telling a host that already has the text to skip them — and the
  * documents themselves are served as resources.
+ *
+ * **Injected, where a host has hooks.** Serving on demand still relies on the model
+ * deciding to read, and a model that never does works from the tool schemas alone. So the
+ * `SessionStart` hook also injects the core document ({@link injectedConventions}), read
+ * from the same file at run time; the pointer then tells the model to check for it.
  *
  * **One source, read at runtime.** Nothing here copies the prose. The registry names
  * files that already exist in the package, and {@link readConvention} reads them off
@@ -292,6 +297,150 @@ export function availableConventions(root: string | null): readonly ConventionDo
 }
 
 /**
+ * The opening words of the injected conventions block — the part a model can recognise
+ * in its own context.
+ *
+ * Shared by the hook that writes the block and by {@link conventionsPointer}, which tells
+ * a model to look for exactly these words before reading anything; one constant, so the
+ * two can never drift into describing different headings.
+ *
+ * @see INJECTED_CONVENTIONS_HEADER
+ */
+export const INJECTED_CONVENTIONS_MARK = 'Self-expression conventions (injected at session start';
+
+/**
+ * The one line framing the injected core document.
+ *
+ * It says what the block is, how it arrived, and what it governs, so a model meeting
+ * thirty-odd kilobytes of Markdown in its context knows it is the practice behind
+ * `express` rather than a stray file.
+ *
+ * @see injectedConventions
+ */
+export const INJECTED_CONVENTIONS_HEADER =
+  'Self-expression conventions (injected at session start; these govern express, signatures and channel lines):';
+
+/** The UTF-16 code unit of a byte-order mark, which an editor may leave before a fence. */
+const BYTE_ORDER_MARK = 0xFEFF;
+
+/** Matches the opening fence of YAML frontmatter, once any byte-order mark is skipped. */
+const FRONTMATTER_OPEN = /^---[ \t]*\r?\n/;
+
+/**
+ * Matches a closing frontmatter fence on its own line. Anchored by hand to the start of
+ * the text or a preceding `\n` rather than with the `m` flag, because `m` also treats
+ * U+2028 and U+2029 as line starts, and a YAML value is allowed to contain those.
+ */
+const FRONTMATTER_CLOSE = /(?:^|\n)---[ \t]*(?:\r?\n|$)/;
+
+/** Matches the blank lines between a closing fence and the body. */
+const LEADING_BLANK_LINES = /^(?:[ \t]*\r?\n)*/;
+
+/**
+ * The Markdown body of a document, with any leading YAML frontmatter removed.
+ *
+ * The frontmatter is the host's metadata — a skill's `name` and trigger `description` —
+ * and injecting it would hand the model a routing hint dressed as a convention. Only a
+ * block that opens on the very first line **and** closes is treated as frontmatter; a
+ * document with an unclosed fence, or a `---` rule further down, is returned unchanged,
+ * because stripping on a guess could delete the conventions themselves.
+ *
+ * @param text the whole file as read
+ * @returns the text after the closing fence and the blank lines under it, or `text`
+ *          itself when there is no complete frontmatter block
+ *
+ * @example
+ *   stripFrontmatter('---\nname: x\n---\n\n# Body\n')   // => '# Body\n'
+ *   stripFrontmatter('# No frontmatter\n---\nrule')     // => unchanged
+ *   stripFrontmatter('---\nname: x\n# never closed')    // => unchanged
+ */
+export function stripFrontmatter(text: string): string {
+
+  const start = text.charCodeAt(0) === BYTE_ORDER_MARK ? 1 : 0,
+        open  = FRONTMATTER_OPEN.exec(text.slice(start));
+  if (open === null) { return text; }
+
+  const rest  = text.slice(start + open[0].length),
+        close = FRONTMATTER_CLOSE.exec(rest);
+
+  return close === null
+    ? text
+    : rest.slice(close.index + close[0].length).replace(LEADING_BLANK_LINES, '');
+
+}
+
+/**
+ * The line naming the convention documents that are deliberately **not** injected.
+ *
+ * Only the core document rides the session start; the optional facilities' skills are
+ * listed by name so a model knows they exist and where to get them, without paying for
+ * text it may never need. Derived from {@link CONVENTION_DOCS} rather than written out,
+ * so a skill added to the registry is named here with no second edit.
+ *
+ * @returns the sentence, naming every skill-backed document other than the core one
+ *
+ * @example
+ *   notInjectedLine()
+ *   // => 'Not injected: the party-roster / audio-expression / dwelling / status-checklists
+ *   //     conventions, available as MCP resources at self-expression://conventions/<name>.'
+ */
+export function notInjectedLine(): string {
+  const others = CONVENTION_DOCS
+    .filter(doc => doc.skill !== null && doc.id !== 'self-expression')
+    .map(doc => doc.id);
+  return `Not injected: the ${others.join(' / ')} conventions, available as MCP resources at ` +
+    `${conventionUri('<name>')}.`;
+}
+
+/** What {@link injectedConventions} produced: the framed text, or why there is none. */
+export type InjectedConventions =
+  | { readonly ok: true;  readonly text: string }
+  | { readonly ok: false; readonly problem: string };
+
+/**
+ * The core conventions document, framed for injection as session-start context.
+ *
+ * Read off disk at call time from the installed package root — the same file the
+ * `self-expression://conventions/self-expression` resource serves and a skill-loading host
+ * reads — so there is still exactly one copy of every word. The frontmatter is stripped
+ * ({@link stripFrontmatter}); the result is framed by {@link INJECTED_CONVENTIONS_HEADER}
+ * and closed by {@link notInjectedLine}.
+ *
+ * Never throws. A missing root, an unreadable file, or a file with no body comes back as
+ * `{ ok: false, problem }`, because the caller is a hook and a hook must fail open: the
+ * right response to a packaging accident is to inject nothing and say why on stderr, not
+ * to stop a session from starting.
+ *
+ * @param root the package root to read from, or `null` when none could be resolved
+ * @returns the framed text, or the reason there is none
+ *
+ * @example
+ *   injectedConventions('/opt/self-expression')
+ *   // => { ok: true, text: 'Self-expression conventions (injected at session start; …):\n\n# Self-expression\n…' }
+ *   injectedConventions('/tmp/empty')
+ *   // => { ok: false, problem: 'cannot read /tmp/empty/skills/self-expression/SKILL.md' }
+ *
+ * @see ../mcp/hooks.js onSessionStart
+ */
+export function injectedConventions(root: string | null): InjectedConventions {
+
+  const core = conventionDoc('self-expression');
+
+  if (root === null || core === undefined) {
+    return { ok: false, problem: 'no package root was resolved, so there is no conventions file to read' };
+  }
+
+  const raw = readConvention(root, core);
+  if (raw === null) { return { ok: false, problem: `cannot read ${conventionPath(root, core)}` }; }
+
+  const body = stripFrontmatter(raw).trim();
+  if (body === '') { return { ok: false, problem: `${conventionPath(root, core)} has no body after its frontmatter` }; }
+
+  return { ok: true, text: `${INJECTED_CONVENTIONS_HEADER}\n\n${body}\n\n${notInjectedLine()}` };
+
+}
+
+/**
  * The pointer sentence the MCP `instructions` string carries, or `null` when there is
  * nothing to point at.
  *
@@ -306,17 +455,34 @@ export function availableConventions(root: string | null): readonly ConventionDo
  * that needs the marker vocabulary will find it; leading with all eight would invite
  * reading all eight.
  *
- * @param docs the documents actually available, from {@link availableConventions}
+ * **The injected case.** On a host with hooks, the `SessionStart` hook may already have
+ * put the core document in context ({@link injectedConventions}). The server cannot know
+ * whether that happened — it has no view of the host's hooks, and the hook and the
+ * handshake race at session start — so when injection is enabled the pointer names the
+ * block's heading ({@link INJECTED_CONVENTIONS_MARK}) and lets the model check its own
+ * context, which it can do reliably. A hookless host never sees that heading, and so falls
+ * through to the read instruction exactly as before; with injection off the clause is
+ * omitted, because advertising a block that will never arrive is noise.
+ *
+ * The skill clause says "full text" on purpose: a host listing a skill by name and
+ * description has not loaded it, and treating the listing as the loading is the precise
+ * mistake that left a model working from tool schemas alone.
+ *
+ * @param docs     the documents actually available, from {@link availableConventions}
+ * @param injected whether session-start injection is enabled, so the injected block may
+ *                 be in context; omit (or `false`) for the pre-injection wording
  * @returns the sentence, or `null` when no documents are available to point at
  *
  * @example
  *   conventionsPointer(availableConventions('/pkg'))
  *   // => 'The conventions these tools assume are served as MCP resources (8 documents) …'
+ *   conventionsPointer(availableConventions('/pkg'), true)
+ *   // => '… If your context already holds a block headed "Self-expression conventions (injected at session start…" …'
  *   conventionsPointer([])   // => null
  *
- * @see ../mcp/server.js buildServer
+ * @see ../mcp/server.js serverInstructions
  */
-export function conventionsPointer(docs: readonly ConventionDoc[]): string | null {
+export function conventionsPointer(docs: readonly ConventionDoc[], injected = false): string | null {
 
   if (docs.length === 0) { return null; }
 
@@ -326,10 +492,14 @@ export function conventionsPointer(docs: readonly ConventionDoc[]): string | nul
     `The conventions these tools assume are served as MCP resources ` +
     `(${String(docs.length)} document${docs.length === 1 ? '' : 's'}; the core one is ` +
     `${conventionUri('self-expression')}). ` +
+    (injected
+      ? `If your context already holds a block headed "${INJECTED_CONVENTIONS_MARK}…", ` +
+        'your host injected the core document; read nothing more. '
+      : '') +
     (skills.length === 0 ? '' :
-      `If your host already loaded the ${skills.join(' / ')} skill${skills.length === 1 ? '' : 's'}, ` +
-      'you have this text already — these resources are those same files, so read nothing ' +
-      'and carry on. ') +
+      `If your host already loaded the full text of the ${skills.join(' / ')} ` +
+      `skill${skills.length === 1 ? '' : 's'}, these resources are those same files, so read ` +
+      'nothing and carry on. ') +
     'Otherwise read the core document before using express: the tool schemas say what is ' +
     'accepted, not what good use looks like.'
   );

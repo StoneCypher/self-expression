@@ -212,6 +212,15 @@ as it delivers. `self` is fenced by hook-observed session, `agents` by a require
 which prunes messages by age and receipts only by orphanhood. The
 `self-expression messages` CLI subcommand is the human's own door.
 
+**`SessionStart` also injects the core conventions.** The same hook hands the model
+`skills/self-expression/SKILL.md`, frontmatter stripped, under a one-line framing, on
+every source by default (`inject.conventions`: `always` / `startup-only` / `off`). The
+file is resolved from the hook bundle's own package root, never the working directory,
+and read at run time, so nothing is copied into code. An unreadable file injects nothing
+and logs to stderr. When notes are also due they share one `additionalContext`, notes
+first. Only Claude Code wires this today; other hosts still reach the conventions as
+skills or as MCP resources, and the handshake pointer keeps telling them to read.
+
 **Held notes are a sidecar on the messagebox, and the hook is the only door
 (issue #43).** Self-initiated speech — agency over *when* to speak — hangs entirely from
 one asymmetry: an autonomous wakeup is a fine moment to *decide* something is worth saying

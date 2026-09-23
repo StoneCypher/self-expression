@@ -20,8 +20,10 @@ import type { RegisterRow }                        from '../channels/entries.js'
 import { readConfig }                              from '../channels/store.js';
 import { effectiveValue, channelMaxChars, DEFAULT_CHANNEL_MAX_CHARS,
          windowPosture, WINDOW_SURFACES,
-         listGateMode }                          from '../channels/config.js';
-import type { WindowPosture, WindowSurface }     from '../channels/config.js';
+         listGateMode, injectMode, DEFAULT_INJECT_MODE } from '../channels/config.js';
+import type { WindowPosture, WindowSurface,
+              InjectMode }                       from '../channels/config.js';
+import { injectedConventions }                   from '../channels/conventions.js';
 import { CHANNELS }                                from '../channels/vocabulary.js';
 import { unreadCounts, readMessages }              from '../channels/messages.js';
 import { offerRipeNotes, renderHeldNote }          from '../channels/notes.js';
@@ -1120,28 +1122,31 @@ function clip(text: string): string {
 }
 
 /**
- * `SessionStart`: hand a resumed or compacted session its unread notes to self —
- * the compaction-survival mechanism, and the reason the messagebox earns the word
- * "memory" (issue #41).
+ * The unread notes to self a resumed or compacted session is handed, rendered — or
+ * `null` when there are none to hand over (issue #41).
  *
  * Fires only on `source: 'compact'` or `'resume'` — the one moment the notes are
  * guaranteed relevant and guaranteed forgotten. On `startup` it stays silent: a fresh
- * session has no past self. Injects the **full text** of the session's unread `self`
- * messages as `additionalContext` and receipts them (`reader: 'model'`) as delivered,
- * so nothing is handed over twice. Governed by `messages.enabled` alone — not
- * `messages.notify`, which gates only the per-turn count line — because compaction
- * recovery is the point of the facility.
+ * session has no past self. Renders the **full text** of the session's unread `self`
+ * messages and receipts them (`reader: 'model'`) as delivered, so nothing is handed over
+ * twice. Governed by `messages.enabled` alone — not `messages.notify`, which gates only
+ * the per-turn count line — because compaction recovery is the point of the facility.
  *
- * Fails open like every handler: no store, a read error, or a receipt error yields
- * `null` (inject nothing) rather than wedging the session start.
+ * Fails open: no store, no session, a read error, or a receipt error yields `null`.
+ *
+ * @param store   the open store, or `null` when it could not be opened
+ * @param payload the `SessionStart` payload; `source` and `session_id` are what matter
+ * @param now     the moment of the session start, for expiry and receipts
+ * @returns the rendered block, or `null`
  *
  * @example
- *   onSessionStart(store, { session_id: 's1', source: 'compact' }, new Date())
- *   // => { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: '…' } }
+ *   unreadNotesBlock(store, { session_id: 's1', source: 'compact' }, new Date())
+ *   // => 'Unread notes from your earlier self in this session (now delivered):\n- [2:05 pm] resume at step 3'
  *
+ * @see onSessionStart
  * @see ../channels/messages.js readMessages
  */
-export function onSessionStart(store: Store | null, payload: HookPayload, now: Date): HookOutput {
+export function unreadNotesBlock(store: Store | null, payload: HookPayload, now: Date): string | null {
 
   if (store === null)                                             { return null; }
   if (payload.source !== 'compact' && payload.source !== 'resume') { return null; }
@@ -1163,13 +1168,7 @@ export function onSessionStart(store: Store | null, payload: HookPayload, now: D
       .map(note => `- [${String(note['ts_local'])}] ${String(note['text'])}`)
       .join('\n');
 
-    return {
-      hookSpecificOutput: {
-        hookEventName    : 'SessionStart',
-        additionalContext:
-          `Unread notes from your earlier self in this session (now delivered):\n${rendered}`,
-      },
-    };
+    return `Unread notes from your earlier self in this session (now delivered):\n${rendered}`;
 
   } catch {
 
@@ -1180,27 +1179,201 @@ export function onSessionStart(store: Store | null, payload: HookPayload, now: D
 }
 
 /**
+ * Whether a session start from `source` gets the conventions injected under `mode`.
+ *
+ * `always` answers yes to **every** source, including a missing one and ones a newer
+ * host adds (Claude Code already sends `fork`): the key's promise is "whenever a session
+ * starts", and a source this version has never heard of is still a session starting.
+ * `startup-only` answers yes to exactly `'startup'`. `off` answers no.
+ *
+ * @param mode   the injection mode in force
+ * @param source the payload's `source`, when the host sent one
+ * @returns `true` when the conventions should be injected
+ *
+ * @example
+ *   shouldInjectConventions('always', 'compact')        // => true
+ *   shouldInjectConventions('startup-only', 'compact')  // => false
+ *   shouldInjectConventions('startup-only', 'startup')  // => true
+ *   shouldInjectConventions('off', 'startup')           // => false
+ *
+ * @see ../channels/config.js INJECT_MODES
+ */
+export function shouldInjectConventions(mode: InjectMode, source: string | undefined): boolean {
+  if (mode === 'always')       { return true; }
+  if (mode === 'startup-only') { return source === 'startup'; }
+  return false;
+}
+
+/**
+ * Where {@link onSessionStart} finds the conventions, and where it reports trouble.
+ *
+ * Both are injectable so the handler stays testable without a real install: the CLI
+ * passes the installed package root, resolved from its own bundle directory; tests pass a
+ * temporary one, or a directory with nothing in it.
+ */
+export interface SessionStartOptions {
+  /**
+   * The installed plugin's package root, or `null`/absent for none. Absent means the
+   * caller did not opt in to injection at all, and nothing is read or logged; a root
+   * whose file cannot be read is a packaging fault, and is logged.
+   */
+  readonly root? : string | null;
+  /** Receives one line per failure. Defaults to stderr, the hook's diagnostics channel. */
+  readonly log?  : (line: string) => void;
+}
+
+/**
+ * The default failure log: one prefixed line on stderr, which Claude Code shows in its
+ * hook diagnostics and never feeds to the model.
+ *
+ * @param line the message, without a trailing newline
+ */
+function logToStderr(line: string): void {
+  process.stderr.write(`self-expression: ${line}\n`);
+}
+
+/**
+ * The injected conventions block for this session start, or `null` for none.
+ *
+ * Reads `inject.conventions` through the tolerant accessor, then the core document off
+ * disk under `options.root`. Fails open at every step: with no store the mode is the
+ * default (`always`), because an unreadable config is not a choice anyone made; a mode
+ * read that throws is treated the same way; and an unreadable conventions file injects
+ * nothing and logs why, rather than blocking the session.
+ *
+ * @param store   the open store, or `null`
+ * @param source  the payload's `source`
+ * @param options where the package root is and where failures go
+ * @returns the framed conventions text, or `null`
+ *
+ * @example
+ *   conventionsBlock(store, 'compact', { root: '/opt/self-expression' })
+ *   // => 'Self-expression conventions (injected at session start; …):\n\n…'
+ *
+ * @see ../channels/conventions.js injectedConventions
+ */
+export function conventionsBlock(
+  store   : Store | null,
+  source  : string | undefined,
+  options : SessionStartOptions,
+): string | null {
+
+  if (options.root === undefined) { return null; }
+
+  let mode: InjectMode = DEFAULT_INJECT_MODE;
+  if (store !== null) {
+    try { mode = injectMode(store); }
+    catch { /* fail open: the default mode, since an unreadable config chose nothing */ }
+  }
+
+  if (!shouldInjectConventions(mode, source)) { return null; }
+
+  const result = injectedConventions(options.root);
+  if (result.ok) { return result.text; }
+
+  try { (options.log ?? logToStderr)(`conventions not injected: ${result.problem}`); }
+  catch { /* a failing logger must not wedge the session start either */ }
+
+  return null;
+
+}
+
+/**
+ * `SessionStart`: hand the new context what it cannot have otherwise — the unread notes
+ * to self, and the core conventions.
+ *
+ * Two independent blocks, combined into one `additionalContext`:
+ *
+ * - **Unread notes to self** ({@link unreadNotesBlock}, issue #41), on `resume` and
+ *   `compact` only — the compaction-survival mechanism.
+ * - **The core conventions** ({@link conventionsBlock}), per `inject.conventions`: on
+ *   every source by default, because the failure it fixes is a model that never read them,
+ *   and the moment they are most reliably lost is compaction, which summarizes them away
+ *   while the per-turn reminders survive. Only the core document is injected; the other
+ *   skills are named and left as resources.
+ *
+ * The notes come first. They are short, specific to this session, and time-sensitive,
+ * and putting them under thirty-odd kilobytes of conventions would bury exactly the text
+ * that most needs to be seen.
+ *
+ * Fails open like every handler: each block fails on its own, and with neither the
+ * result is `null` (inject nothing) rather than a wedged session start.
+ *
+ * @param store   the open store, or `null` when it could not be opened
+ * @param payload the `SessionStart` payload
+ * @param now     the moment of the session start
+ * @param options the package root to read the conventions from, and the failure log;
+ *                omit the root to skip injection entirely
+ * @returns the hook output, or `null` when there is nothing to inject
+ *
+ * @example
+ *   onSessionStart(store, { session_id: 's1', source: 'compact' }, new Date(), { root })
+ *   // => { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'Unread notes …\n\nSelf-expression conventions …' } }
+ *
+ * @see unreadNotesBlock
+ * @see conventionsBlock
+ */
+export function onSessionStart(
+  store   : Store | null,
+  payload : HookPayload,
+  now     : Date,
+  options : SessionStartOptions = {},
+): HookOutput {
+
+  const parts = [unreadNotesBlock(store, payload, now), conventionsBlock(store, payload.source, options)]
+    .filter((part): part is string => part !== null);
+
+  if (parts.length === 0) { return null; }
+
+  return {
+    hookSpecificOutput: {
+      hookEventName    : 'SessionStart',
+      additionalContext: parts.join('\n\n'),
+    },
+  };
+
+}
+
+/**
+ * The dispatcher's per-handler options: the stop gate's dependencies and the session-start
+ * injection's, side by side, since their field names never overlap.
+ *
+ * @see handleHook
+ */
+export type HandleHookOptions = StopDeps & SessionStartOptions;
+
+/**
  * Dispatch a named hook.
  *
  * Unknown names allow rather than erroring, so a hooks file referencing a handler this
  * version does not implement degrades to doing nothing.
  *
- * @param deps passed to {@link onStop}: the list lint's parser and the transcript reader
+ * @param options each handler takes its own fields: `stop` the list lint's parser and the
+ *                transcript reader ({@link StopDeps}); `session-start` where the conventions
+ *                live and where failures are logged ({@link SessionStartOptions})
  *
  * @example
  *   handleHook('stop', store, payload, new Date(), { parse: fromMarkdown })
+ *   handleHook('session-start', store, payload, new Date(), { root: '/opt/self-expression' })
  */
 export function handleHook(
   name    : string,
   store   : Store | null,
   payload : HookPayload,
   now     : Date = new Date(),
-  deps    : StopDeps = {},
+  options : HandleHookOptions = {},
 ): HookOutput {
 
+  const { parse, readTranscript, root, log } = options;
+
   if (name === 'user-prompt-submit') { return onUserPromptSubmit(store, payload, now); }
-  if (name === 'stop')               { return onStop(store, payload, { ...deps, now }); }
-  if (name === 'session-start')      { return onSessionStart(store, payload, now); }
+  if (name === 'stop')               { return onStop(store, payload, { parse, readTranscript, now }); }
+  if (name === 'session-start')      {
+    return onSessionStart(store, payload, now, {
+      ...(root !== undefined ? { root } : {}),
+      ...(log  !== undefined ? { log }  : {}),
+    });
+  }
 
   return null;
 
