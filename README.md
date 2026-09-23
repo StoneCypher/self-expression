@@ -1,10 +1,10 @@
-# self-expression v0.8.0
+# self-expression v0.9.0
 
-> Version 0.8.0 was built on Wednesday, September 23, 2026 at GMT-07:00 `1790153770355` from hash `3521d24`.
+> Version 0.9.0 was built on Wednesday, September 23, 2026 at GMT-07:00 `1790181234675` from hash `a35c189`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1790153770355 Wednesday, September 23, 2026 at GMT-07:00 95.05 360 91 3521d24 50.95 63.06 61.8 63.01 270 2747 89.41 93.89 95.4 2477 0.8.0 -->
+<!-- Supported embeds: 1790181234675 Wednesday, September 23, 2026 at GMT-07:00 95.05 360 91 a35c189 50.95 63.06 61.8 63.01 270 2747 89.41 93.89 95.4 2477 0.9.0 -->
 
 
 
@@ -314,6 +314,7 @@ The registered keys:
 | `onboarding.answered` | list | *(none)* | Ids of onboarding questions resolved — answered or explicitly skipped (#40). Unknown ids are preserved, so a newer version's questions survive; unsetting it re-runs onboarding. |
 | `window.browser` | enum | `ask` | May a page be opened in your **external browser**: `never`, `ask`, or `always`. Advisory, not enforced — see below. |
 | `window.editor` | enum | `ask` | May a page be opened as an **editor tab**: `never`, `ask`, or `always`. A separate key from `window.browser` on purpose. |
+| `inject.conventions` | enum | `always` | Whether the `SessionStart` hook injects the core conventions into context: `always` (on `startup`, `resume`, `clear`, and `compact`), `startup-only`, or `off`. Roughly 37.7 KB, about 9,500–11,000 tokens, per injection — see [Conventions injected at session start](#conventions-injected-at-session-start). Read at session start, so a change applies from the next one. |
 
 Three of those families reach the *skills* and the model directly, neither of which can
 read configuration. The turn-start hook carries them on the context line it already
@@ -449,9 +450,51 @@ is delivered unconditionally on every connection to every host, and the document
 run to roughly 90 KB. Sending them would be wasteful anywhere and actively wrong
 on the three hosts that already load these exact files, where the model would
 receive the same text twice from two channels with no way to tell it is one
-source. So `instructions` carries only a three-sentence pointer that names the
+source. So `instructions` carries only a short pointer that names the
 resources and tells a host that already has the skills to read nothing, and the
 documents are pulled on demand by hosts that need them.
+
+### Conventions injected at session start
+
+A host that lists a skill has not necessarily loaded it. On Claude Code a skill arrives as
+a name and a one-line description, and its text reaches the model only if the model
+decides to open it — so a model can work for an hour from the tool schemas alone, never
+having read how a signature is built. Long sessions make it worse: compaction summarizes
+the conventions away, while the per-turn context line survives and keeps asking for
+signatures the model no longer knows how to write.
+
+So on a host with hooks, the `SessionStart` hook **injects the core conventions**
+(`skills/self-expression/SKILL.md`, the same file the
+`self-expression://conventions/self-expression` resource serves) as additional context,
+under one framing line:
+
+```text
+Self-expression conventions (injected at session start; these govern express, signatures and channel lines):
+```
+
+- **When.** On every session start by default — `startup`, `resume`, `clear` after
+  `/clear`, and `compact` after compaction, which is the moment the text is most
+  reliably lost. `inject.conventions` narrows this to `startup-only`, or turns it `off`.
+- **What.** Only the core document, with its YAML frontmatter stripped. The
+  `party-roster`, `audio-expression`, `dwelling`, and `status-checklists` conventions are
+  named in one closing line and left as resources.
+- **From where.** Read off disk at session start, from the installed plugin root that the
+  hook's own bundle sits in — never from the working directory, and never copied into
+  code, so an edited skill is what gets injected.
+- **Cost.** The injected document is about 37.7 KB — roughly 9,500 to 11,000 tokens,
+  depending on the tokenizer — paid once per session start. With `always`, a session
+  that compacts three times pays it four times. `startup-only` pays it once;
+  `off` pays nothing, and leaves the conventions to the skill and the resources.
+- **Failure.** If the file cannot be read, the hook injects nothing, writes one line to
+  stderr saying why, and lets the session start. Unread notes to self (see
+  [Messagebox](#messagebox)) are unaffected: when both are due, they arrive in one
+  block, notes first.
+
+The handshake pointer knows about this. Unless `inject.conventions` is `off`, it tells
+the model to look for that framing line in its own context before reading anything — the
+server cannot see whether the host ran the hook, but the model can see whether the block
+arrived. A host without hooks never has the block, and still gets the instruction to read
+the core document.
 
 **Turn context has a second door: `begin_turn`.** On Claude Code the
 `UserPromptSubmit` hook observes the session, the turn identity, the working
