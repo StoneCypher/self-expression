@@ -16,7 +16,9 @@ import {
   ISSUE_URL, REPO_NAME, PR_ACTIONS, AI_LABEL,
   isIssueUrl, resolveRepo, hiddenPrs, splitPullRequests, applyPrIntent, auditRow, readAudit,
   openerFor, openExternally, ghFailure, ghRunner, createPullRequestFeed, parseInbox,
-  applyInboxPost,
+  applyInboxPost, createViewerLookup, createIssueFeed, selectTickets, applyTicketIntent,
+  ticketLabels, ticketLimit, hiddenTickets, ticketPermalink,
+  DEFAULT_TICKET_LABELS, DEFAULT_TICKET_LIMIT, TICKET_ACTIONS, ISSUE_TTL_MS, PR_TTL_MS,
   type Runner, type RunResult, type DeskConfig,
 } from '../../scripts/desk/deskinbox.mjs';
 
@@ -472,6 +474,403 @@ describe('applyInboxPost', () => {
     applyInboxPost(start, { id: 'k', action: 'drop' }, AT);
     applyInboxPost(start, { id: 't', action: 'next' }, AT);
     expect(start).toEqual(before);
+  });
+});
+
+/** A `gh issue list` row, with the fields the ticket feed asks for. */
+interface GhIssue {
+  number: number;
+  title: string;
+  url?: string;
+  labels?: { name: string }[];
+  assignees?: { login: string }[];
+}
+
+const ISSUE_BASE = 'https://github.com/o/r/issues/';
+
+const issue = (number: number, extra: Partial<GhIssue> = {}): GhIssue =>
+  ({ number, title: `issue ${String(number)}`, url: ISSUE_BASE + String(number), labels: [], assignees: [], ...extra });
+
+const labelled = (number: number, ...names: string[]): GhIssue => issue(number, { labels: names.map(name => ({ name })) });
+
+/**
+ * A stub runner that answers `api user` with a login and `issue list` with rows, and records
+ * every argv it was given.
+ *
+ * @param login the login `api user` reports, or null to make that call fail
+ * @param rows  what `issue list` returns, or a RunResult to return verbatim
+ * @returns the runner and the list of calls it has seen
+ *
+ * @example
+ * const { run, calls } = stubIssues('me', [labelled(1, 'Question')]);
+ */
+function stubIssues(login: string | null, rows: GhIssue[] | RunResult): { run: Runner; calls: string[][] } {
+  const calls: string[][] = [];
+  const run: Runner = args => {
+    calls.push(args);
+    if (args[0] === 'api') {
+      return Promise.resolve(login === null ? { ok: false, error: 'gh failed: auth' }
+                                            : { ok: true, stdout: `${login}\n` });
+    }
+    return Promise.resolve(Array.isArray(rows) ? { ok: true, stdout: JSON.stringify(rows) } : rows);
+  };
+  return { run, calls };
+}
+
+describe('ticketLabels, ticketLimit, hiddenTickets', () => {
+  test('the defaults are the four owner-waiting labels and eight rows', () => {
+    expect(ticketLabels({})).toEqual(['Question', 'Needs answers', 'needs owner', 'Needs research']);
+    expect(ticketLabels(undefined)).toEqual([...DEFAULT_TICKET_LABELS]);
+    expect(ticketLimit({})).toBe(DEFAULT_TICKET_LIMIT);
+    expect(DEFAULT_TICKET_LIMIT).toBe(8);
+  });
+
+  test('a configured list replaces the defaults, trimmed, without blanks or case-only repeats', () => {
+    expect(ticketLabels({ ticketLabels: ['bug', ' BUG ', 3, '', '  ', 'triage'] })).toEqual(['bug', 'triage']);
+  });
+
+  test('an empty list is kept: only assigned issues qualify', () => {
+    expect(ticketLabels({ ticketLabels: [] })).toEqual([]);
+  });
+
+  test('a non-list ticketLabels falls back to the defaults', () => {
+    expect(ticketLabels({ ticketLabels: 'Question' as unknown as unknown[] })).toEqual([...DEFAULT_TICKET_LABELS]);
+  });
+
+  test.each([[3, 3], [0, 0], [50, 50], [999, 50], [-1, 8], [2.5, 8], ['4', 8], [null, 8]])(
+    'ticketLimit %j → %j', (given, want) => {
+      expect(ticketLimit({ ticketLimit: given })).toBe(want);
+    });
+
+  test('hiddenTickets keeps exact issue permalinks only', () => {
+    expect(hiddenTickets({ ticketHidden: [`${ISSUE_BASE}4`, 'https://github.com/o/r/pull/5', 'junk', 7] }))
+      .toEqual(new Set([`${ISSUE_BASE}4`]));
+    expect(hiddenTickets(undefined)).toEqual(new Set());
+  });
+});
+
+describe('ticketPermalink', () => {
+  test('a row\'s own valid url wins over its number', () => {
+    expect(ticketPermalink({ text: '#1 x', url: 'https://github.com/a/b/issues/712' }, 'o/r'))
+      .toBe('https://github.com/a/b/issues/712');
+  });
+
+  test('otherwise the leading #N resolves against the repo', () => {
+    expect(ticketPermalink({ text: '#134 restore the inbox' }, 'o/r')).toBe(`${ISSUE_BASE}134`);
+  });
+
+  test('with no repo, no number, or a bad url there is no permalink', () => {
+    expect(ticketPermalink({ text: '#134 restore the inbox' }, null)).toBeNull();
+    expect(ticketPermalink({ text: 'no number here' }, 'o/r')).toBeNull();
+    expect(ticketPermalink({ text: 'x', url: 'file:///C:/x' }, 'o/r')).toBeNull();
+    expect(ticketPermalink(null, 'o/r')).toBeNull();
+  });
+});
+
+describe('selectTickets', () => {
+  const opts = (extra: Partial<Parameters<typeof selectTickets>[1]> = {}) =>
+    ({ viewer: 'me', cfg: {}, repo: 'o/r', handWritten: new Set<string>(), ...extra });
+
+  test('an issue with a default label qualifies, matched without regard to case', () => {
+    const got = selectTickets([labelled(1, 'question'), labelled(2, 'NEEDS OWNER'), labelled(3, 'bug')], opts());
+    expect(got.tickets).toEqual([
+      { number: 1, title: 'issue 1', url: `${ISSUE_BASE}1`, labels: ['question'], assigned: false, intent: null },
+      { number: 2, title: 'issue 2', url: `${ISSUE_BASE}2`, labels: ['NEEDS OWNER'], assigned: false, intent: null },
+    ]);
+    expect(got.bench).toBe(0);
+  });
+
+  test('an issue assigned to the owner qualifies without a label', () => {
+    const got = selectTickets([issue(1, { assignees: [{ login: 'me' }] }), issue(2, { assignees: [{ login: 'you' }] })], opts());
+    expect(got.tickets).toEqual([expect.objectContaining({ number: 1, assigned: true, labels: [] })]);
+  });
+
+  test('with no viewer only labels qualify', () => {
+    const got = selectTickets([issue(1, { assignees: [{ login: 'me' }] }), labelled(2, 'Question')], opts({ viewer: null }));
+    expect(got.tickets.map(t => t.number)).toEqual([2]);
+    expect(got.tickets[0]?.assigned).toBe(false);
+  });
+
+  test('only the qualifying labels are reported', () => {
+    const got = selectTickets([labelled(1, 'bug', 'Question', 'docs')], opts());
+    expect(got.tickets[0]?.labels).toEqual(['Question']);
+  });
+
+  test('a configured label set replaces the defaults', () => {
+    const got = selectTickets([labelled(1, 'Question'), labelled(2, 'triage')], opts({ cfg: { ticketLabels: ['Triage'] } }));
+    expect(got.tickets.map(t => t.number)).toEqual([2]);
+  });
+
+  test('dropped issues are left out', () => {
+    const got = selectTickets([labelled(1, 'Question'), labelled(2, 'Question')],
+                              opts({ cfg: { ticketHidden: [`${ISSUE_BASE}1`] } }));
+    expect(got.tickets.map(t => t.number)).toEqual([2]);
+  });
+
+  test('an issue already on the desk by hand is not listed twice', () => {
+    const got = selectTickets([labelled(1, 'Question'), labelled(2, 'Question')],
+                              opts({ handWritten: new Set([`${ISSUE_BASE}2`]) }));
+    expect(got.tickets.map(t => t.number)).toEqual([1]);
+  });
+
+  test('a repeated permalink appears once', () => {
+    const got = selectTickets([labelled(1, 'Question'), labelled(1, 'Question')], opts());
+    expect(got.tickets).toHaveLength(1);
+  });
+
+  test('the limit shows the first rows in gh order and benches the rest', () => {
+    const rows = [5, 4, 3, 2, 1].map(n => labelled(n, 'Question'));
+    const got = selectTickets(rows, opts({ cfg: { ticketLimit: 2 } }));
+    expect(got.tickets.map(t => t.number)).toEqual([5, 4]);
+    expect(got.bench).toBe(3);
+  });
+
+  test('dropping a shown ticket promotes the next one off the bench', () => {
+    const rows = [5, 4, 3].map(n => labelled(n, 'Question'));
+    const cfg = applyTicketIntent({ ticketLimit: 2 }, `${ISSUE_BASE}5`, 'drop') as DeskConfig;
+    const got = selectTickets(rows, opts({ cfg }));
+    expect(got.tickets.map(t => t.number)).toEqual([4, 3]);
+    expect(got.bench).toBe(0);
+  });
+
+  test('a recorded intent is carried; drop and unknown intents read as none', () => {
+    const got = selectTickets([labelled(1, 'Question'), labelled(2, 'Question'), labelled(3, 'Question')],
+      opts({ cfg: { ticketIntent: { [`${ISSUE_BASE}1`]: 'agents', [`${ISSUE_BASE}2`]: 'explode', [`${ISSUE_BASE}3`]: 'drop' } } }));
+    expect(got.tickets.map(t => t.intent)).toEqual(['agents', null, null]);
+  });
+
+  test('a row without a usable url is linked from the repo, or skipped when there is none', () => {
+    const row = labelled(9, 'Question');
+    delete row.url;
+    expect(selectTickets([row], opts()).tickets[0]?.url).toBe(`${ISSUE_BASE}9`);
+    expect(selectTickets([row], opts({ repo: null })).tickets).toEqual([]);
+    expect(selectTickets([{ ...labelled(9, 'Question'), url: 'https://github.com/o/r/pull/9' }], opts()).tickets[0]?.url)
+      .toBe(`${ISSUE_BASE}9`);
+  });
+
+  test('malformed rows and a non-array are skipped rather than thrown on', () => {
+    expect(selectTickets({ not: 'a list' }, opts())).toEqual({ tickets: [], bench: 0 });
+    const got = selectTickets([null, { title: 'no number' }, { number: 0 }, { number: 1.5 },
+                               { number: 3, labels: 'nope', assignees: 'nope' }, labelled(4, 'Question')], opts());
+    expect(got.tickets.map(t => t.number)).toEqual([4]);
+  });
+});
+
+describe('applyTicketIntent', () => {
+  const url = `${ISSUE_BASE}9`;
+
+  test('next and agents are recorded under the permalink; nothing else changes', () => {
+    expect(applyTicketIntent({ name: 'd', prHidden: [3] }, url, 'next'))
+      .toEqual({ name: 'd', prHidden: [3], ticketIntent: { [url]: 'next' } });
+    expect(applyTicketIntent({ ticketIntent: { [url]: 'next' } }, url, 'agents')).toEqual({ ticketIntent: { [url]: 'agents' } });
+  });
+
+  test('drop hides the ticket, once, and forgets its intent', () => {
+    const once = applyTicketIntent({ ticketIntent: { [url]: 'next' } }, url, 'drop');
+    expect(once).toEqual({ ticketIntent: {}, ticketHidden: [url] });
+    expect(applyTicketIntent(once as DeskConfig, url, 'drop')?.ticketHidden).toEqual([url]);
+  });
+
+  test('does not modify its input', () => {
+    const cfg: DeskConfig = { ticketIntent: { [url]: 'next' }, ticketHidden: [] };
+    const before = structuredClone(cfg);
+    applyTicketIntent(cfg, url, 'drop');
+    applyTicketIntent(cfg, `${ISSUE_BASE}10`, 'agents');
+    expect(cfg).toEqual(before);
+  });
+
+  test.each([
+    [url, 'land'], [url, undefined], ['https://github.com/o/r/pull/9', 'next'], ['file:///x', 'drop'],
+    [`${url}#x`, 'next'], [9, 'next'], [null, 'drop'],
+  ])('refuses %j with action %j', (u, action) => {
+    expect(applyTicketIntent({}, u, action)).toBeNull();
+  });
+
+  test('TICKET_ACTIONS is exactly the rail\'s three verbs', () => {
+    expect([...TICKET_ACTIONS]).toEqual(['next', 'agents', 'drop']);
+  });
+});
+
+describe('createViewerLookup', () => {
+  test('asks once, then remembers a success', async () => {
+    const { run, calls } = stubIssues('me', []);
+    const whoami = createViewerLookup(run);
+    expect(await whoami()).toBe('me');
+    expect(await whoami()).toBe('me');
+    expect(calls).toEqual([['api', 'user', '--jq', '.login']]);
+  });
+
+  test('a failure is not remembered, so the next call asks again', async () => {
+    const { run, calls } = stubIssues(null, []);
+    const whoami = createViewerLookup(run);
+    expect(await whoami()).toBeNull();
+    expect(await whoami()).toBeNull();
+    expect(calls).toHaveLength(2);
+  });
+
+  test('concurrent callers share one run', async () => {
+    const { run, calls } = stubIssues('me', []);
+    const whoami = createViewerLookup(run);
+    expect(await Promise.all([whoami(), whoami(), whoami()])).toEqual(['me', 'me', 'me']);
+    expect(calls).toHaveLength(1);
+  });
+
+  test('a runner that rejects reads as an unknown owner', async () => {
+    const whoami = createViewerLookup(() => Promise.reject(new Error('boom')));
+    expect(await whoami()).toBeNull();
+  });
+
+  test('one lookup shared by both feeds asks GitHub once', async () => {
+    const calls: string[][] = [];
+    const run: Runner = args => {
+      calls.push(args);
+      return Promise.resolve({ ok: true, stdout: args[0] === 'api' ? 'me' : '[]' });
+    };
+    const whoami = createViewerLookup(run);
+    const readConfig = () => ({ repo: 'o/r' });
+    await createPullRequestFeed({ run, readConfig, env: undefined, whoami }).get();
+    await createIssueFeed({ run, readConfig, readInbox: () => ({ questions: [] }), env: undefined, whoami }).get();
+    expect(calls.filter(a => a[0] === 'api')).toHaveLength(1);
+  });
+});
+
+describe('createIssueFeed', () => {
+  /** A controllable clock. */
+  function clock(start = 1_000_000): { now: () => number; advance: (ms: number) => void } {
+    let t = start;
+    return { now: () => t, advance: ms => { t += ms; } };
+  }
+
+  const noInbox = () => ({ questions: [] });
+
+  test('asks gh for the configured repo\'s open issues and keeps the ones waiting on the owner', async () => {
+    const { run, calls } = stubIssues('me', [labelled(3, 'Question'), issue(2, { assignees: [{ login: 'me' }] }), labelled(1, 'bug')]);
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined }).get();
+    expect(got.repo).toBe('o/r');
+    expect(got.viewer).toBe('me');
+    expect(got.error).toBeNull();
+    expect(got.warning).toBeNull();
+    expect(got.tickets.map(t => t.number)).toEqual([3, 2]);
+    expect(got.labels).toEqual([...DEFAULT_TICKET_LABELS]);
+    expect(got.fetchedAt).toMatch(/^\d{4}-\d\d-\d\dT/);
+    expect(calls).toContainEqual(['issue', 'list', '--repo', 'o/r', '--state', 'open', '--limit', '200',
+                                  '--json', 'number,title,url,labels,assignees']);
+  });
+
+  test('with no repo it runs nothing and says so', async () => {
+    const { run, calls } = stubIssues('me', []);
+    const got = await createIssueFeed({ run, readConfig: () => ({}), readInbox: noInbox, env: undefined }).get();
+    expect(calls).toEqual([]);
+    expect(got).toEqual(expect.objectContaining({ repo: null, tickets: [], bench: 0, fetchedAt: null }));
+    expect(got.error).toMatch(/no repo configured/);
+  });
+
+  test('gh missing: the error is carried, the rail is empty, and nothing throws', async () => {
+    const { run } = stubIssues('me', { ok: false, error: 'gh is not installed or not on PATH (gh)' });
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined }).get();
+    expect(got).toEqual(expect.objectContaining({ repo: 'o/r', tickets: [], bench: 0,
+                                                  error: 'gh is not installed or not on PATH (gh)' }));
+  });
+
+  test('gh answering with something that is not a list is an error naming the command', async () => {
+    const { run } = stubIssues('me', { ok: true, stdout: '{"message":"Not Found"}' });
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined }).get();
+    expect(got.error).toBe('gh issue list returned something that is not a list');
+  });
+
+  test('a runner that rejects becomes an error rather than a failed request', async () => {
+    const run: Runner = () => Promise.reject(new Error('spawn exploded\nstack'));
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined }).get();
+    expect(got.error).toBe('gh failed: spawn exploded');
+    expect(got.tickets).toEqual([]);
+  });
+
+  test('an unknown owner still lists labelled issues, with a warning', async () => {
+    const { run } = stubIssues(null, [issue(1, { assignees: [{ login: 'me' }] }), labelled(2, 'Question')]);
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined }).get();
+    expect(got.tickets.map(t => t.number)).toEqual([2]);
+    expect(got.warning).toMatch(/only labelled issues/);
+    expect(got.error).toBeNull();
+  });
+
+  test('a hand-written ticket for the same issue wins; answered or non-ticket rows do not count', async () => {
+    const { run } = stubIssues('me', [1, 2, 3, 4].map(n => labelled(n, 'Question')));
+    const readInbox = () => ({ questions: [
+      { id: 'a', kind: 'ticket', text: '#1 by hand' },
+      { id: 'b', kind: 'ticket', text: 'elsewhere', url: `${ISSUE_BASE}2` },
+      { id: 'c', kind: 'ticket', text: '#3 done', answer: 'x' },
+      { id: 'd', kind: 'task', text: '#4 a task, not a ticket' },
+    ] });
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox, env: undefined }).get();
+    expect(got.tickets.map(t => t.number)).toEqual([3, 4]);
+  });
+
+  test('an unreadable inbox deduplicates against nothing rather than failing', async () => {
+    const { run } = stubIssues('me', [labelled(1, 'Question')]);
+    const readInbox = (): { questions: Record<string, unknown>[] } => { throw new Error('mid-write'); };
+    const got = await createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox, env: undefined }).get();
+    expect(got.tickets.map(t => t.number)).toEqual([1]);
+  });
+
+  test('caches gh\'s answer for the TTL, then asks again; failures are cached too', async () => {
+    const { run, calls } = stubIssues('me', [labelled(1, 'Question')]);
+    const c = clock();
+    const feed = createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined,
+                                   now: c.now, ttlMs: 1000 });
+    await feed.get();
+    c.advance(999);
+    await feed.get();
+    const lists = () => calls.filter(a => a[0] === 'issue').length;
+    expect(lists()).toBe(1);
+    c.advance(1);
+    await feed.get();
+    expect(lists()).toBe(2);
+
+    const failing = stubIssues('me', { ok: false, error: 'gh failed: x' });
+    const f2 = createIssueFeed({ run: failing.run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox,
+                                 env: undefined, now: clock().now, ttlMs: 1000 });
+    await f2.get();
+    await f2.get();
+    expect(failing.calls).toHaveLength(1);
+  });
+
+  test('concurrent calls during a refresh share one gh run', async () => {
+    const { run, calls } = stubIssues('me', [labelled(1, 'Question')]);
+    const feed = createIssueFeed({ run, readConfig: () => ({ repo: 'o/r' }), readInbox: noInbox, env: undefined });
+    const all = await Promise.all([feed.get(), feed.get(), feed.get()]);
+    expect(calls.filter(a => a[0] === 'issue')).toHaveLength(1);
+    for (const got of all) expect(got.tickets.map(t => t.number)).toEqual([1]);
+  });
+
+  test('a drop, an intent, or a new hand-written row shows at once, without waiting out the cache', async () => {
+    const { run, calls } = stubIssues('me', [1, 2, 3].map(n => labelled(n, 'Question')));
+    let cfg: DeskConfig = { repo: 'o/r' };
+    let questions: Record<string, unknown>[] = [];
+    const feed = createIssueFeed({ run, readConfig: () => cfg, readInbox: () => ({ questions }), env: undefined, now: clock().now });
+    expect((await feed.get()).tickets.map(t => t.number)).toEqual([1, 2, 3]);
+    cfg = applyTicketIntent(applyTicketIntent(cfg, `${ISSUE_BASE}1`, 'drop') as DeskConfig, `${ISSUE_BASE}2`, 'next') as DeskConfig;
+    questions = [{ id: 'k', kind: 'ticket', text: '#3 by hand' }];
+    const got = await feed.get();
+    expect(got.tickets).toEqual([expect.objectContaining({ number: 2, intent: 'next' })]);
+    expect(calls.filter(a => a[0] === 'issue')).toHaveLength(1);
+  });
+
+  test('changing the repo refetches; invalidate refetches; the environment overrides the config', async () => {
+    const { run, calls } = stubIssues('me', []);
+    let cfg: DeskConfig = { repo: 'o/one' };
+    const feed = createIssueFeed({ run, readConfig: () => cfg, readInbox: noInbox, env: undefined, now: clock().now });
+    await feed.get();
+    cfg = { repo: 'o/two' };
+    await feed.get();
+    feed.invalidate();
+    await feed.get();
+    const byEnv = await createIssueFeed({ run, readConfig: () => cfg, readInbox: noInbox, env: 'env/r' }).get();
+    expect(byEnv.repo).toBe('env/r');
+    expect(calls.filter(a => a[0] === 'issue').map(a => a[3])).toEqual(['o/one', 'o/two', 'o/two', 'env/r']);
+  });
+
+  test('the issue cache lasts as long as the PR cache', () => {
+    expect(ISSUE_TTL_MS).toBe(PR_TTL_MS);
   });
 });
 

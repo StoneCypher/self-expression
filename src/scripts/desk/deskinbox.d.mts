@@ -32,6 +32,10 @@ export interface DeskConfig {
   repo?: unknown;
   prHidden?: unknown[];
   prIntent?: Record<string, unknown>;
+  ticketLabels?: unknown[];
+  ticketLimit?: unknown;
+  ticketHidden?: unknown[];
+  ticketIntent?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -107,13 +111,88 @@ export declare function ghFailure(err: unknown, stderr: unknown, bin: string): s
 
 export declare function ghRunner(bin?: string): Runner;
 
+/** Resolves to the owner's GitHub login, or `null` when GitHub could not say. */
+export type Whoami = () => Promise<string | null>;
+
+export declare function createViewerLookup(run: Runner): Whoami;
+
 export declare function createPullRequestFeed(deps: {
   run: Runner;
   readConfig: () => DeskConfig;
   env: string | undefined;
   now?: () => number;
   ttlMs?: number;
+  whoami?: Whoami;
 }): { get: () => Promise<PrFeedResult>; invalidate: () => void };
+
+/** The labels that qualify an issue for the ticket rail when the config names none. */
+export declare const DEFAULT_TICKET_LABELS: readonly string[];
+
+/** How many tracker tickets the rail shows when the config does not say. */
+export declare const DEFAULT_TICKET_LIMIT: number;
+
+/** What the owner can ask for a ticket. */
+export type TicketAction = 'next' | 'agents' | 'drop';
+
+/** Every {@link TicketAction}, in the order the rail offers them. */
+export declare const TICKET_ACTIONS: readonly TicketAction[];
+
+/** How long one `gh issue list` answer is reused, in milliseconds. */
+export declare const ISSUE_TTL_MS: number;
+
+/** One tracker issue as the ticket rail shows it. */
+export interface InboxTicket {
+  number: number;
+  title: string;
+  url: string;
+  /** The qualifying labels this issue carries, as GitHub spells them. */
+  labels: string[];
+  assigned: boolean;
+  intent: Exclude<TicketAction, 'drop'> | null;
+}
+
+/** The rail's tracker rows, and how many more qualifying issues wait behind them. */
+export interface TicketSelection {
+  tickets: InboxTicket[];
+  bench: number;
+}
+
+/** What `/tickets` serves: the rows, plus anything the inbox must say instead of going blank. */
+export interface TicketFeedResult extends TicketSelection {
+  repo: string | null;
+  viewer: string | null;
+  labels: string[];
+  error: string | null;
+  warning: string | null;
+  fetchedAt: string | null;
+}
+
+export declare function ticketLabels(cfg: DeskConfig | null | undefined): string[];
+
+export declare function ticketLimit(cfg: DeskConfig | null | undefined): number;
+
+export declare function hiddenTickets(cfg: DeskConfig | null | undefined): Set<string>;
+
+export declare function ticketPermalink(row: Record<string, unknown> | null | undefined, repo: string | null): string | null;
+
+export declare function selectTickets(rows: unknown, opts: {
+  viewer: string | null;
+  cfg: DeskConfig | null | undefined;
+  repo: string | null;
+  handWritten?: Set<string>;
+}): TicketSelection;
+
+export declare function applyTicketIntent(cfg: DeskConfig, url: unknown, action: unknown): DeskConfig | null;
+
+export declare function createIssueFeed(deps: {
+  run: Runner;
+  readConfig: () => DeskConfig;
+  readInbox: () => { questions: Record<string, unknown>[] };
+  env: string | undefined;
+  now?: () => number;
+  ttlMs?: number;
+  whoami?: Whoami;
+}): { get: () => Promise<TicketFeedResult>; invalidate: () => void };
 
 export declare function parseInbox(text: string): InboxDoc;
 

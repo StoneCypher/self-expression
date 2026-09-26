@@ -206,7 +206,9 @@
   .dicon.queue .m { stroke: var(--ic-queue); }
   #prtheir .dicon.land .m { stroke: var(--ic-theirs); }
   /* Why a list is empty, when it is empty for a reason: no repo, no gh, gh failing. */
-  #prnote { color: oklch(0.72 0.12 60); }
+  #prnote, #ticketnote { color: oklch(0.72 0.12 60); }
+  /* The tracker's tickets continue the hand-written rail rather than starting a second one. */
+  #issuelist { margin-top: 0; }
 </style></head>
 <body>
 <script>
@@ -316,10 +318,15 @@ async function deskSwap() {
     </div>
 
     <!-- Tickets sit below everything else on purpose: they are suggestions, not obligations,
-         and should not compete with rows that are actually waiting. -->
+         and should not compete with rows that are actually waiting. Two sources, one rail:
+         the hand-written rows from questions.json first, then the tracker's open issues that
+         wait on you (by label or assignment), which the server never repeats. The note says
+         why the tracker half is empty when it is empty for a reason. -->
+    <div class="cap" id="ticketnote" hidden></div>
     <div id="ticketwrap" hidden>
       <div class="tickhead">tickets i&rsquo;d pick up next</div>
       <ul class="inbox tickets" id="ticketlist"></ul>
+      <ul class="inbox tickets" id="issuelist"></ul>
     </div>
   </section>
 </main>
@@ -447,7 +454,9 @@ DESK.inits.push(function () {
   function send(body) {
     fetch('/questions', { method: 'POST', headers: { 'content-type': 'application/json' },
                           body: JSON.stringify(body) })
-      .then(load).catch(function () {});
+      /* Tickets too: the server leaves out any tracker issue a hand-written row already
+         names, so dropping that row is what lets the tracker's copy show. */
+      .then(function () { load(); loadTickets(); }).catch(function () {});
   }
   function answer(id, text) { send({ id: id, answer: text }); }
   function dismiss(id)      { send({ id: id, dismiss: true }); }
@@ -549,9 +558,15 @@ DESK.inits.push(function () {
     actions(li, q);
   }
 
+  /* The rail shows while either half has a row: hand-written tickets or tracker ones. */
+  var handTickets = 0, trackerTickets = 0;
+  function showRail() {
+    var wrap = document.getElementById('ticketwrap');
+    if (wrap) wrap.hidden = !(handTickets + trackerTickets);
+  }
+
   function paint(open) {
-    var el = list(), tickEl = document.getElementById('ticketlist'),
-        wrap = document.getElementById('ticketwrap');
+    var el = list(), tickEl = document.getElementById('ticketlist');
     if (!el || !tickEl) return;
     el.innerHTML = '';
     tickEl.innerHTML = '';
@@ -567,7 +582,8 @@ DESK.inits.push(function () {
         asks    = open.filter(function (q) {
                     return !q.stuck && q.kind !== 'task' && q.kind !== 'ticket'; }),
         ordered = stuck.concat(tasks, asks, tickets);
-    if (wrap) wrap.hidden = !tickets.length;
+    handTickets = tickets.length;
+    showRail();
 
     ordered.forEach(function (q) {
       var li   = document.createElement('li'),
@@ -715,6 +731,9 @@ DESK.inits.push(function () {
         /* Ticket permalinks are built from the repo, so a repo that arrived or changed
            means the tickets must be drawn again. */
         if (repoChanged && lastOpen) { shown = JSON.stringify(lastOpen); paint(lastOpen); }
+        /* The ticket note defers to this one when both say the same thing, and the two
+           requests race, so the tickets are redrawn once the PR answer is known. */
+        if (lastTickets) paintTickets(lastTickets);
       })
       .catch(function () {
         paintPRs({ repo: DESK.repo, mine: [], theirs: [],
@@ -722,17 +741,80 @@ DESK.inits.push(function () {
       });
   }
 
+  /* The tracker's half of the ticket rail: open issues waiting on the owner, by label or by
+     assignment, chosen by the server. Their verbs are the hand-written tickets' verbs, but
+     they are recorded in the desk config under the issue's permalink (nothing is written to
+     GitHub), because there is no questions.json row to write them on. */
+  var lastTickets = null;
+  var TICKET_TAG  = { next: 'up next', agents: 'to agents' };
+
+  function trackerRow(t) {
+    var li = document.createElement('li');
+    li.className = 'tick' + (t.intent ? ' queued ' + t.intent : '');
+    li.appendChild(permalink('#' + t.number, t.url));
+    li.appendChild(document.createTextNode(' ' + t.title));
+
+    /* Why it is here: the owner's own disposition first, then whose it is, then the label. */
+    var word = TICKET_TAG[t.intent] || (t.assigned ? 'assigned to you' : '') ||
+               String((t.labels || [])[0] || '').toLowerCase();
+    if (word) {
+      var tag = document.createElement('span');
+      tag.className = 'qd'; tag.textContent = word;
+      li.appendChild(tag);
+    }
+
+    [[icon('queue', 'queue'), 'do this next', 'next'],
+     ['🤖', 'dispatch to agents', 'agents'],
+     ['🗑️', 'remove from this desk (it stays open on GitHub)', 'drop']
+    ].forEach(function (spec) {
+      li.appendChild(actBtn(spec, function () {
+        fetch('/ticket', { method: 'POST', headers: { 'content-type': 'application/json' },
+                           body: JSON.stringify({ url: t.url, action: spec[2] }) })
+          .then(loadTickets).catch(function () {});
+      }));
+    });
+    return li;
+  }
+
+  function paintTickets(d) {
+    var note = document.getElementById('ticketnote'), el = document.getElementById('issuelist');
+    if (note) {
+      /* One cause, one sentence: when the PR line already says gh is missing or no repo is
+         set, repeating it under the tickets adds nothing. */
+      var say = d.error && lastPRs && d.error === lastPRs.error ? '' : d.error || d.warning || '';
+      note.textContent = say ? 'tickets: ' + say : '';
+      note.hidden = !say;
+    }
+    if (!el) return;
+    el.innerHTML = '';
+    var rows = d.tickets || [];
+    rows.forEach(function (t) { el.appendChild(trackerRow(t)); });
+    trackerTickets = rows.length;
+    showRail();
+  }
+
+  function loadTickets() {
+    return fetch('/tickets', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { lastTickets = d; paintTickets(d); })
+      .catch(function () {
+        paintTickets({ tickets: [], error: 'the desk server did not answer', warning: null });
+      });
+  }
+
   /* On first paint and after every hot-swap. The swap replaces `<main>`, inbox and all, so
      the freshly swapped lists are empty while `shown` — a change-detector over the DATA —
      still matches: the next poll would decide nothing had changed and leave the inbox blank
      until a question happened to move. So the cache is dropped and the last known rows are
-     painted at once, then both lists reconcile with the server. */
+     painted at once, then every list reconciles with the server. */
   DESK.inits.push(function () {
     shown = null;
     if (lastOpen) { shown = JSON.stringify(lastOpen); paint(lastOpen); }
     if (lastPRs) paintPRs(lastPRs);
+    if (lastTickets) paintTickets(lastTickets);
     load();
     loadPRs();
+    loadTickets();
   });
 
   clearInterval(window.__inboxPoll);          // idempotent: one poll, however often this runs
@@ -741,6 +823,9 @@ DESK.inits.push(function () {
      PRs do not change on a three-second cadence. The server caches for the same minute. */
   clearInterval(window.__prPoll);
   window.__prPoll = setInterval(loadPRs, 60000);
+  /* Issues on the same minute, for the same reason. */
+  clearInterval(window.__ticketPoll);
+  window.__ticketPoll = setInterval(loadTickets, 60000);
 })();
 
 // First paint. After this, `deskSwap` re-runs the same list against the swapped subtree.

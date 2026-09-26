@@ -226,7 +226,8 @@ describe('panel.mjs, over a real socket', () => {
 
   test('the desk page carries both pull-request lists and the ticket rail', async () => {
     const page = await getText(`${await startPanel()}/desk`);
-    for (const id of ['prminewrap', 'prmine', 'prtheirwrap', 'prtheir', 'prnote', 'ticketwrap', 'ticketlist']) {
+    for (const id of ['prminewrap', 'prmine', 'prtheirwrap', 'prtheir', 'prnote', 'ticketwrap', 'ticketlist',
+                      'issuelist', 'ticketnote']) {
       expect(page).toContain(`id="${id}"`);
     }
     /* The repo is served, never baked into the page. */
@@ -279,6 +280,45 @@ describe('panel.mjs, over a real socket', () => {
     expect((await postJson(base, '/pr', { number: 'x', action: 'land' })).status).toBe(400);
     expect(() => readFileSync(join(desk as string, 'desk-config.json'))).toThrow();
     expect(auditRows().map(r => r['action'])).toEqual(['pr.intent.refused', 'pr.intent.refused']);
+  }, 15000);
+
+  test('/tickets with no repo configured says so rather than going blank', async () => {
+    const base = await startPanel();
+    const res  = await fetch(`${base}/tickets`);
+    expect(res.status).toBe(200);
+    const got = await res.json() as Record<string, unknown>;
+    expect(got).toEqual(expect.objectContaining({ repo: null, tickets: [], bench: 0 }));
+    expect(got['error']).toMatch(/no repo configured/);
+  }, 15000);
+
+  test('/tickets with a repo but no gh says gh is missing, and reports the configured labels', async () => {
+    const base = await startPanel({ 'desk-config.json': JSON.stringify({ repo: 'StoneCypher/self-expression',
+                                                                         ticketLabels: ['Question'] }) });
+    const got  = await (await fetch(`${base}/tickets`)).json() as Record<string, unknown>;
+    expect(got).toEqual(expect.objectContaining({ repo: 'StoneCypher/self-expression', tickets: [], labels: ['Question'] }));
+    expect(got['error']).toBe('gh is not installed or not on PATH (se-no-such-gh-binary-134)');
+  }, 15000);
+
+  test('a ticket intent is recorded under its permalink and audited; the PR intents survive', async () => {
+    const url  = 'https://github.com/StoneCypher/self-expression/issues/137';
+    const base = await startPanel({ 'desk-config.json': JSON.stringify({ name: 'mine', prIntent: { 135: 'land' } }) });
+    expect((await postJson(base, '/ticket', { url, action: 'agents' })).status).toBe(204);
+    expect((await postJson(base, '/ticket', { url: url.replace('137', '138'), action: 'drop' })).status).toBe(204);
+    const cfg = JSON.parse(readFileSync(join(desk as string, 'desk-config.json'), 'utf8')) as Record<string, unknown>;
+    expect(cfg).toEqual({ name: 'mine', prIntent: { 135: 'land' }, ticketIntent: { [url]: 'agents' },
+                          ticketHidden: [url.replace('137', '138')] });
+    expect(auditRows()).toEqual([
+      expect.objectContaining({ action: 'ticket.intent', url, intent: 'agents', note: 'recorded only; no GitHub write' }),
+      expect.objectContaining({ action: 'ticket.intent', intent: 'drop' }),
+    ]);
+  }, 15000);
+
+  test('a ticket intent that is not a verb, or not an issue permalink, is refused, audited, and not written', async () => {
+    const base = await startPanel();
+    expect((await postJson(base, '/ticket', { url: 'https://github.com/o/r/issues/1', action: 'land' })).status).toBe(400);
+    expect((await postJson(base, '/ticket', { url: 'https://github.com/o/r/pull/1', action: 'next' })).status).toBe(400);
+    expect(() => readFileSync(join(desk as string, 'desk-config.json'))).toThrow();
+    expect(auditRows().map(r => r['action'])).toEqual(['ticket.intent.refused', 'ticket.intent.refused']);
   }, 15000);
 
   test('/open refuses anything but a permalink, audits it, and /audit shows it', async () => {

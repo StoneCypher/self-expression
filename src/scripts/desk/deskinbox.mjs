@@ -1,7 +1,8 @@
 /**
- * The desk inbox's logic: the repo's open pull requests, the owner's intents for them, issue
- * permalinks, and the hand-written `questions.json` rows — everything the inbox decides, kept
- * apart from the HTTP server that serves it.
+ * The desk inbox's logic: the repo's open pull requests, the tracker issues that fill the
+ * ticket rail, the owner's intents for both, issue permalinks, and the hand-written
+ * `questions.json` rows — everything the inbox decides, kept apart from the HTTP server that
+ * serves it.
  *
  * Split out of `panel.mjs` for the same reason `deskguard.mjs` is: every decision here is a
  * function of its inputs, so it can be tested without a socket, and the one thing that
@@ -11,7 +12,8 @@
  *
  * Dependency-free like the rest of the desk: `node:child_process` and nothing else.
  *
- * @see ./panel.mjs — the routes that serve these (`/prs`, `/pr`, `/open`, `/audit`, `/questions`)
+ * @see ./panel.mjs — the routes that serve these (`/prs`, `/pr`, `/tickets`, `/ticket`, `/open`,
+ *      `/audit`, `/questions`)
  * @see ../../doc_md/desk.md — the inbox protocol, including pull requests and tickets
  */
 
@@ -358,6 +360,107 @@ export function ghRunner(bin = 'gh') {
 }
 
 /**
+ * Ask GitHub who the desk's owner is, once, and remember the answer.
+ *
+ * Both the pull-request feed and the issue feed need the owner's login — one to split PRs by
+ * authorship, the other to find issues assigned to the owner — and it does not change while
+ * the server runs, so one lookup serves both. Only a success is remembered: a lookup that
+ * failed (not signed in, offline) is tried again on the next refresh rather than leaving the
+ * desk anonymous for the rest of its life. Concurrent callers share one `gh api user` run.
+ *
+ * @param run a command runner, see {@link ghRunner}
+ * @returns `whoami()`, resolving to the owner's login, or `null` when GitHub could not say
+ *
+ * @example
+ * const whoami = createViewerLookup(ghRunner());
+ * await whoami();   // 'StoneCypher'
+ * await whoami();   // 'StoneCypher', with no second gh run
+ * @see createPullRequestFeed
+ * @see createIssueFeed
+ */
+export function createViewerLookup(run) {
+  let viewer   = null;
+  let inflight = null;
+
+  async function ask() {
+    const got = await run(['api', 'user', '--jq', '.login']);
+    const who = got.ok ? got.stdout.trim() : '';
+    if (who) viewer = who;
+    return who || null;
+  }
+
+  return () => {
+    if (viewer !== null) return Promise.resolve(viewer);
+    if (inflight === null) {
+      inflight = ask().catch(() => null).finally(() => { inflight = null; });
+    }
+    return inflight;
+  };
+}
+
+/**
+ * A per-repo cache of one `gh` answer, with concurrent refreshes coalesced into one run.
+ *
+ * The caching both inbox feeds share, kept in one place so the two cannot drift apart. The
+ * entry is refreshed when there is none, when the repo changed, or when it is `ttlMs` old or
+ * older. Callers that arrive while a refresh for the same repo is running wait on that
+ * refresh rather than starting their own. A refresh that rejects — a runner that broke its
+ * contract — is turned into an entry carrying an `error` sentence, so a caller always gets an
+ * entry and never a rejection.
+ *
+ * @param opts `now` (milliseconds clock), `ttlMs` (how long an entry is reused),
+ *             `refresh(repo)` (resolves to the entry's fields; `repo` and `at` are stamped here)
+ * @returns `{ get(repo), invalidate() }`; `get` resolves to `{ repo, at, …fields }`
+ *
+ * @example
+ * const cache = createRepoCache({ now: Date.now, ttlMs: 60_000,
+ *                                 refresh: async repo => ({ rows: [], error: null, warning: null }) });
+ * await cache.get('o/r');   // { rows: [], error: null, warning: null, repo: 'o/r', at: 1727… }
+ */
+function createRepoCache({ now, ttlMs, refresh }) {
+  let cache    = null;          // { repo, at, … }
+  let inflight = null;          // { repo, promise } while a refresh is running
+
+  async function get(repo) {
+    if (cache !== null && cache.repo === repo && now() - cache.at < ttlMs) return cache;
+    if (inflight === null || inflight.repo !== repo) {
+      /* A runner that rejects instead of answering broke its contract, but the inbox still
+         owes the owner a sentence rather than a 500, so the rejection becomes an error row. */
+      const promise = refresh(repo)
+        .catch(e => ({ rows: [], viewer: null, warning: null,
+                       error: `gh failed: ${String(e?.message ?? e).split('\n')[0]}` }))
+        .then(fields => ({ ...fields, repo, at: now() }))
+        .finally(() => { if (inflight?.promise === promise) inflight = null; });
+      inflight = { repo, promise };
+    }
+    cache = await inflight.promise;
+    return cache;
+  }
+
+  return { get, invalidate: () => { cache = null; } };
+}
+
+/**
+ * Run one `gh … list --json` and read its answer as a list of rows.
+ *
+ * @param run  a command runner
+ * @param args the full argv
+ * @param what the command's name, for the error sentence (`gh pr list`)
+ * @returns `{ rows, error }` — the parsed rows and `null`, or `[]` and a sentence
+ *
+ * @example
+ * await listRows(run, ['pr', 'list', …], 'gh pr list');   // { rows: [{ number: 135, … }], error: null }
+ */
+async function listRows(run, args, what) {
+  const list = await run(args);
+  if (!list.ok) return { rows: [], error: list.error };
+  let rows;
+  try { rows = JSON.parse(list.stdout); } catch { rows = null; }
+  return Array.isArray(rows) ? { rows, error: null }
+                             : { rows: [], error: `${what} returned something that is not a list` };
+}
+
+/**
  * The inbox's pull-request feed: `gh pr list`, cached, split by authorship, hidden PRs removed.
  *
  * Cached because the page asks every minute from every open tab, and `gh pr list` is a
@@ -373,7 +476,9 @@ export function ghRunner(bin = 'gh') {
  *
  * @param deps `run` (a command runner, see {@link ghRunner}), `readConfig` (returns the parsed
  *             desk config, `{}` when absent), `env` (the `SELF_EXPRESSION_DESK_REPO` value),
- *             `now` (milliseconds clock), `ttlMs` (cache span)
+ *             `now` (milliseconds clock), `ttlMs` (cache span), `whoami` (the owner lookup,
+ *             default a fresh {@link createViewerLookup} over `run`; pass one shared with the
+ *             issue feed so the owner is looked up once per server)
  * @returns `{ get, invalidate }`: `get()` resolves to
  *          `{ repo, viewer, mine, theirs, error, warning, fetchedAt }`; `invalidate()` makes
  *          the next `get()` ask GitHub again
@@ -383,34 +488,20 @@ export function ghRunner(bin = 'gh') {
  * await feed.get();
  * // { repo: 'StoneCypher/self-expression', viewer: 'StoneCypher',
  * //   mine: [{ number: 135, … }], theirs: [], error: null, warning: null, fetchedAt: … }
+ * @see createIssueFeed — the same caching, for the ticket rail
  */
-export function createPullRequestFeed({ run, readConfig, env, now = Date.now, ttlMs = PR_TTL_MS }) {
-  let viewer   = null;          // resolved once, then kept: the owner's login does not change
-  let cache    = null;          // { repo, at, rows, error, warning }
-  let inflight = null;          // { repo, promise } while a refresh is running
-
-  async function lookUpViewer() {
-    if (viewer !== null) return { viewer, warning: null };
-    const got = await run(['api', 'user', '--jq', '.login']);
-    const who = got.ok ? got.stdout.trim() : '';
-    if (who) { viewer = who; return { viewer, warning: null }; }
-    return { viewer: null,
-             warning: 'could not tell who you are on GitHub, so every pull request is listed as someone else\'s' };
-  }
-
-  async function refresh(repo) {
-    const list = await run(['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '50',
-                            '--json', PR_FIELDS]);
-    if (!list.ok) return { repo, at: now(), rows: [], error: list.error, warning: null };
-
-    let rows;
-    try { rows = JSON.parse(list.stdout); } catch { rows = null; }
-    if (!Array.isArray(rows)) {
-      return { repo, at: now(), rows: [], error: 'gh pr list returned something that is not a list', warning: null };
-    }
-    const who = await lookUpViewer();
-    return { repo, at: now(), rows, error: null, warning: who.warning };
-  }
+export function createPullRequestFeed({ run, readConfig, env, now = Date.now, ttlMs = PR_TTL_MS,
+                                        whoami = createViewerLookup(run) }) {
+  const cache = createRepoCache({ now, ttlMs, refresh: async repo => {
+    const { rows, error } = await listRows(run, ['pr', 'list', '--repo', repo, '--state', 'open',
+                                                 '--limit', '50', '--json', PR_FIELDS], 'gh pr list');
+    if (error !== null) return { rows, viewer: null, error, warning: null };
+    const viewer = await whoami();
+    return { rows, viewer, error: null,
+             warning: viewer === null
+               ? 'could not tell who you are on GitHub, so every pull request is listed as someone else\'s'
+               : null };
+  } });
 
   async function get() {
     const cfg = readConfig();
@@ -418,26 +509,275 @@ export function createPullRequestFeed({ run, readConfig, env, now = Date.now, tt
     if (repo === null) {
       return { repo: null, viewer: null, mine: [], theirs: [], error: problem, warning: null, fetchedAt: null };
     }
-
-    if (cache === null || cache.repo !== repo || now() - cache.at >= ttlMs) {
-      if (inflight === null || inflight.repo !== repo) {
-        /* A runner that rejects instead of answering broke its contract, but the inbox still
-           owes the owner a sentence rather than a 500, so the rejection becomes an error row. */
-        const promise = refresh(repo)
-          .catch(e => ({ repo, at: now(), rows: [], warning: null,
-                         error: `gh failed: ${String(e?.message ?? e).split('\n')[0]}` }))
-          .finally(() => { if (inflight?.promise === promise) inflight = null; });
-        inflight = { repo, promise };
-      }
-      cache = await inflight.promise;
-    }
-
-    const split = splitPullRequests(cache.rows, { viewer, cfg });
-    return { repo, viewer, ...split, error: cache.error, warning: cache.warning,
-             fetchedAt: new Date(cache.at).toISOString() };
+    const entry = await cache.get(repo);
+    const split = splitPullRequests(entry.rows, { viewer: entry.viewer, cfg });
+    return { repo, viewer: entry.viewer, ...split, error: entry.error, warning: entry.warning,
+             fetchedAt: new Date(entry.at).toISOString() };
   }
 
-  return { get, invalidate: () => { cache = null; } };
+  return { get, invalidate: cache.invalidate };
+}
+
+/**
+ * The labels that put an open issue in the ticket rail, when `desk-config.json` names none.
+ *
+ * Each marks an issue that is waiting on the owner rather than on the work: a question to
+ * answer, a decision to make, something to look into. Matched without regard to case, since
+ * trackers are inconsistent about it (`Needs answers` beside `needs owner`).
+ */
+export const DEFAULT_TICKET_LABELS = Object.freeze(['Question', 'Needs answers', 'needs owner', 'Needs research']);
+
+/** How many tracker tickets the rail shows at once when the config does not say. */
+export const DEFAULT_TICKET_LIMIT = 8;
+
+/** What the owner can ask for a ticket: the same three verbs the rail offers a hand-written one. */
+export const TICKET_ACTIONS = Object.freeze(['next', 'agents', 'drop']);
+
+/** How long one `gh issue list` answer is reused, in milliseconds; the same minute as the PRs. */
+export const ISSUE_TTL_MS = PR_TTL_MS;
+
+/** The fields `gh issue list` is asked for — every one the ticket rail reads, and no others. */
+const ISSUE_FIELDS = 'number,title,url,labels,assignees';
+
+/** Exactly a GitHub issue permalink — not a pull request's, which the PR lists already carry. */
+const ISSUE_PERMALINK = /^https:\/\/github\.com\/[\w.-]{1,39}\/[\w.-]{1,100}\/issues\/\d{1,7}$/;
+
+/**
+ * The labels that qualify an issue for the ticket rail on this desk.
+ *
+ * `desk-config.json`'s `ticketLabels` when it is a list, else {@link DEFAULT_TICKET_LABELS}.
+ * An empty list is a real choice — "only issues assigned to me" — and is kept, not defaulted.
+ * Non-strings and blanks are dropped, and so are repeats that differ only in case.
+ *
+ * @param cfg the parsed desk config
+ * @returns the label names, trimmed, in the order written
+ *
+ * @example
+ * ticketLabels({});                                   // ['Question', 'Needs answers', 'needs owner', 'Needs research']
+ * ticketLabels({ ticketLabels: ['bug', ' BUG ', 3] }); // ['bug']
+ * ticketLabels({ ticketLabels: [] });                 // []
+ */
+export function ticketLabels(cfg) {
+  if (!Array.isArray(cfg?.ticketLabels)) return [...DEFAULT_TICKET_LABELS];
+  const seen = new Set();
+  return cfg.ticketLabels
+    .filter(l => typeof l === 'string' && l.trim() !== '')
+    .map(l => l.trim())
+    .filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+/**
+ * How many tracker tickets the rail shows at once; the rest wait on the bench.
+ *
+ * @param cfg the parsed desk config, whose `ticketLimit` is consulted
+ * @returns an integer from 0 to 50; {@link DEFAULT_TICKET_LIMIT} when unset or not an integer
+ *
+ * @example
+ * ticketLimit({ ticketLimit: 3 });     // 3
+ * ticketLimit({ ticketLimit: 'x' });   // 8
+ * ticketLimit({ ticketLimit: 999 });   // 50
+ */
+export function ticketLimit(cfg) {
+  const n = cfg?.ticketLimit;
+  return Number.isInteger(n) && n >= 0 ? Math.min(50, n) : DEFAULT_TICKET_LIMIT;
+}
+
+/**
+ * The tracker tickets dropped from this desk, as a set of issue permalinks.
+ *
+ * @param cfg the parsed desk config, whose `ticketHidden` is consulted
+ * @returns the permalinks; anything that is not an exact issue permalink is ignored
+ *
+ * @example
+ * hiddenTickets({ ticketHidden: ['https://github.com/o/r/issues/4', 'junk'] });
+ * // Set { 'https://github.com/o/r/issues/4' }
+ */
+export function hiddenTickets(cfg) {
+  const list = Array.isArray(cfg?.ticketHidden) ? cfg.ticketHidden : [];
+  return new Set(list.filter(u => typeof u === 'string' && ISSUE_PERMALINK.test(u)));
+}
+
+/**
+ * The issue permalink a hand-written `questions.json` row points at, if any.
+ *
+ * The same rule the page uses to link a ticket's number: the row's own `url` when it is a
+ * valid permalink, otherwise its leading `#N` resolved against the desk's repo, otherwise
+ * nothing. Used to recognise a tracker issue that is already on the desk by hand.
+ *
+ * @param row  one `questions.json` row
+ * @param repo the desk's repo, or null
+ * @returns the permalink, or `null`
+ *
+ * @example
+ * ticketPermalink({ text: '#134 restore the inbox' }, 'o/r');   // 'https://github.com/o/r/issues/134'
+ * ticketPermalink({ text: '#134 restore the inbox' }, null);    // null
+ */
+export function ticketPermalink(row, repo) {
+  if (isIssueUrl(row?.url)) return row.url;
+  const m = /^#(\d{1,7})\s/.exec(typeof row?.text === 'string' ? row.text : '');
+  return m && repo ? `https://github.com/${repo}/issues/${m[1]}` : null;
+}
+
+/**
+ * Choose the tracker issues that belong in the ticket rail, and in what order.
+ *
+ * An open issue qualifies when it is assigned to the owner or carries one of the desk's
+ * {@link ticketLabels}. It is then left out when the owner dropped it (`ticketHidden`) or when
+ * a hand-written ticket row already points at the same permalink — each issue appears once,
+ * and the hand-written row wins because someone put it there on purpose. What remains keeps
+ * `gh`'s order (newest first); the first {@link ticketLimit} are shown and the rest are the
+ * bench, which is how dropping a ticket promotes the next one without anything being moved.
+ *
+ * With no `viewer`, assignment cannot be known, so only labels qualify.
+ *
+ * @param rows the parsed `gh issue list --json …` array; malformed entries are skipped
+ * @param opts `viewer` (the owner's login, or null), `cfg` (the desk config), `repo` (for rows
+ *             without a usable `url`), `handWritten` (permalinks already on the desk by hand)
+ * @returns `{ tickets, bench }`: the rows to show, each `{ number, title, url, labels,
+ *          assigned, intent }` with `labels` the qualifying ones only, and how many more wait
+ *
+ * @example
+ * selectTickets([{ number: 9, title: 'which?', url: 'https://github.com/o/r/issues/9',
+ *                  labels: [{ name: 'question' }], assignees: [] }],
+ *               { viewer: 'me', cfg: {}, repo: 'o/r', handWritten: new Set() });
+ * // { tickets: [{ number: 9, title: 'which?', url: 'https://github.com/o/r/issues/9',
+ * //               labels: ['question'], assigned: false, intent: null }], bench: 0 }
+ */
+export function selectTickets(rows, { viewer, cfg, repo, handWritten }) {
+  const wanted = new Set(ticketLabels(cfg).map(l => l.toLowerCase()));
+  const hidden = hiddenTickets(cfg);
+  const intent = cfg?.ticketIntent && typeof cfg.ticketIntent === 'object' ? cfg.ticketIntent : {};
+  const seen   = new Set();
+  const picked = [];
+
+  for (const issue of Array.isArray(rows) ? rows : []) {
+    if (!issue || !Number.isInteger(issue.number) || issue.number <= 0) continue;
+    const url = ISSUE_PERMALINK.test(issue.url ?? '') ? issue.url
+              : repo ? `https://github.com/${repo}/issues/${issue.number}` : null;
+    if (url === null || seen.has(url) || hidden.has(url) || handWritten?.has(url)) continue;
+
+    const labels   = (Array.isArray(issue.labels) ? issue.labels : [])
+                       .map(l => l?.name).filter(n => typeof n === 'string' && wanted.has(n.toLowerCase()));
+    const assigned = viewer !== null && viewer !== undefined &&
+                     (Array.isArray(issue.assignees) ? issue.assignees : []).some(a => a?.login === viewer);
+    if (!assigned && labels.length === 0) continue;
+
+    seen.add(url);
+    picked.push({
+      number: issue.number,
+      title:  typeof issue.title === 'string' ? issue.title : '',
+      url, labels, assigned,
+      intent: Object.hasOwn(intent, url) && TICKET_ACTIONS.includes(intent[url]) && intent[url] !== 'drop'
+                ? intent[url] : null,
+    });
+  }
+  const limit = ticketLimit(cfg);
+  return { tickets: picked.slice(0, limit), bench: Math.max(0, picked.length - limit) };
+}
+
+/**
+ * Record what the owner wants done with one tracker ticket, as a new desk config.
+ *
+ * Like {@link applyPrIntent}, this records and does nothing on GitHub. `next` and `agents`
+ * are written to `ticketIntent` under the issue's permalink; `drop` adds the permalink to
+ * `ticketHidden` and forgets its intent, and the issue stays open on GitHub. Keyed by
+ * permalink rather than number because the number alone would collide across repos, and a
+ * desk's repo can change.
+ *
+ * Pure: the input is not modified.
+ *
+ * @param cfg    the parsed desk config
+ * @param url    the issue's permalink
+ * @param action one of {@link TICKET_ACTIONS}
+ * @returns the updated config, or `null` when the permalink or the action is not acceptable
+ *
+ * @example
+ * applyTicketIntent({}, 'https://github.com/o/r/issues/9', 'agents');
+ * // { ticketIntent: { 'https://github.com/o/r/issues/9': 'agents' } }
+ * applyTicketIntent({}, 'https://github.com/o/r/pull/9', 'next');   // null — a PR, not an issue
+ */
+export function applyTicketIntent(cfg, url, action) {
+  if (typeof url !== 'string' || !ISSUE_PERMALINK.test(url) || !TICKET_ACTIONS.includes(action)) return null;
+
+  const next         = { ...cfg };
+  const ticketIntent = { ...(cfg?.ticketIntent && typeof cfg.ticketIntent === 'object' ? cfg.ticketIntent : {}) };
+
+  if (action === 'drop') {
+    delete ticketIntent[url];
+    next.ticketHidden = [...hiddenTickets(cfg).add(url)];
+  } else {
+    ticketIntent[url] = action;
+  }
+  next.ticketIntent = ticketIntent;
+  return next;
+}
+
+/**
+ * The inbox's ticket feed: `gh issue list`, cached, filtered to what waits on the owner.
+ *
+ * The tracker's half of the ticket rail; the hand-written half stays in `questions.json`.
+ * Cached and coalesced exactly as {@link createPullRequestFeed} is, and for the same reasons:
+ * what is cached is GitHub's answer, and the selection — labels, assignment, drops, intents,
+ * the hand-written rows it must not repeat — is recomputed on every call, so a drop or an
+ * edit to `questions.json` shows on the very next request.
+ *
+ * Failures are answers, never blanks: with no repo, no `gh`, or `gh` failing, `error` says
+ * which and `tickets` is empty. When GitHub cannot say who the owner is, labelled issues are
+ * still listed and `warning` says assigned ones cannot be.
+ *
+ * @param deps `run` (a command runner), `readConfig` (the parsed desk config), `readInbox`
+ *             (returns `{ questions }` from `questions.json`), `env` (the
+ *             `SELF_EXPRESSION_DESK_REPO` value), `now`, `ttlMs`, `whoami` (the owner lookup;
+ *             share the PR feed's)
+ * @returns `{ get, invalidate }`: `get()` resolves to
+ *          `{ repo, viewer, tickets, bench, labels, error, warning, fetchedAt }`
+ *
+ * @example
+ * const feed = createIssueFeed({ run: ghRunner(), readConfig, readInbox: inboxDoc, env: undefined });
+ * await feed.get();
+ * // { repo: 'StoneCypher/self-expression', viewer: 'StoneCypher',
+ * //   tickets: [{ number: 137, title: 'Desk inbox: fill ticket rows…', url: '…/issues/137',
+ * //               labels: [], assigned: true, intent: null }],
+ * //   bench: 0, labels: ['Question', …], error: null, warning: null, fetchedAt: '…' }
+ * @see selectTickets
+ */
+export function createIssueFeed({ run, readConfig, readInbox, env, now = Date.now, ttlMs = ISSUE_TTL_MS,
+                                  whoami = createViewerLookup(run) }) {
+  const cache = createRepoCache({ now, ttlMs, refresh: async repo => {
+    const { rows, error } = await listRows(run, ['issue', 'list', '--repo', repo, '--state', 'open',
+                                                 '--limit', '200', '--json', ISSUE_FIELDS], 'gh issue list');
+    if (error !== null) return { rows, viewer: null, error, warning: null };
+    const viewer = await whoami();
+    return { rows, viewer, error: null,
+             warning: viewer === null
+               ? 'could not tell who you are on GitHub, so only labelled issues are listed, not ones assigned to you'
+               : null };
+  } });
+
+  /** Permalinks of the hand-written ticket rows still on the desk; an unreadable inbox has none. */
+  function handWritten(repo) {
+    let questions = [];
+    try { questions = readInbox()?.questions ?? []; } catch { /* nothing to deduplicate against */ }
+    return new Set((Array.isArray(questions) ? questions : [])
+      .filter(q => q?.kind === 'ticket' && !q.answer)
+      .map(q => ticketPermalink(q, repo))
+      .filter(u => u !== null));
+  }
+
+  async function get() {
+    const cfg    = readConfig();
+    const labels = ticketLabels(cfg);
+    const { repo, problem } = resolveRepo(env, cfg);
+    if (repo === null) {
+      return { repo: null, viewer: null, tickets: [], bench: 0, labels, error: problem, warning: null, fetchedAt: null };
+    }
+    const entry = await cache.get(repo);
+    const chosen = selectTickets(entry.rows, { viewer: entry.viewer, cfg, repo, handWritten: handWritten(repo) });
+    return { repo, viewer: entry.viewer, ...chosen, labels, error: entry.error, warning: entry.warning,
+             fetchedAt: new Date(entry.at).toISOString() };
+  }
+
+  return { get, invalidate: cache.invalidate };
 }
 
 /**
