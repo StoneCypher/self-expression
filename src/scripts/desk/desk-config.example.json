@@ -1,5 +1,8 @@
 {
   "name": "your desk",
   "hidden": ["weather"],
-  "gone": []
+  "gone": [],
+  "repo": "your-account/your-repo",
+  "prIntent": { "135": "land", "137": "agent" },
+  "prHidden": [129]
 }

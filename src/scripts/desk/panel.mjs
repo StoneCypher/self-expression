@@ -26,19 +26,26 @@
  *   // Or by environment, which is what a launcher usually wants:
  *   SELF_EXPRESSION_DESK=~/.desks/mine SELF_EXPRESSION_DESK_PORT=7400 node src/scripts/desk/panel.mjs
  *
+ * @example
+ *   // With the inbox listing a repo's open pull requests (or set "repo" in desk-config.json):
+ *   SELF_EXPRESSION_DESK_REPO=StoneCypher/self-expression node src/scripts/desk/panel.mjs ~/.desks/mine
+ *
  * @see deskcards.mjs — the card deck: what a card is and why it is a directory
+ * @see deskinbox.mjs — the inbox: pull requests, intents, permalinks, questions
  * @see src/doc_md/desk.md — the conventions: dismissal tiers, inbox protocol, hot-swap
  */
 
 import { createServer }  from 'node:http';
 import { DatabaseSync }  from 'node:sqlite';
-import { readFileSync, appendFileSync, writeFileSync, watch }  from 'node:fs';
+import { readFileSync, appendFileSync, writeFileSync, renameSync, watch }  from 'node:fs';
 import { dirname, join, resolve }  from 'node:path';
 import { fileURLToPath }  from 'node:url';
 import { homedir }        from 'node:os';
 
 import { assemble, removeCard }  from './deskcards.mjs';
 import { requestAllowed }        from './deskguard.mjs';
+import { applyInboxPost, applyPrIntent, auditRow, createPullRequestFeed, ghRunner,
+         openExternally, parseInbox, readAudit }  from './deskinbox.mjs';
 
 /** Where the mechanism lives: the shell, the panel, the icons. Shared by every desk. */
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -95,6 +102,7 @@ const QUES   = join(DESK, 'questions.json');
 const GEOM   = join(DESK, 'geometry.json');
 const IMAP   = join(DESK, 'importmap.json');
 const VENDOR = join(DESK, 'vendor', 'node_modules');
+const AUDIT  = join(DESK, 'audit.jsonl');
 
 let received = 0;
 
@@ -238,6 +246,9 @@ function deleteCard(id) {
   return gone;
 }
 
+/** The last `questions.json` that parsed, served while a rewrite is half-way through. */
+let lastGoodInbox = null;
+
 /**
  * The inbox: every question the assistant has put to the desk's owner, with the answer
  * once one is given.
@@ -246,14 +257,115 @@ function deleteCard(id) {
  * what is outstanding, and a session can post a new question simply by writing the file,
  * with no endpoint and no running handle required.
  *
- * @returns the questions in the order they were asked; `[]` when the file is absent
+ * A read that lands mid-rewrite fails to parse, and answering `[]` for that is a lie the page
+ * cannot detect: "empty" and "unreadable" render identically, so the inbox would blink empty
+ * whenever anyone edited the file. The last good copy is served instead — stale by at most
+ * one poll. An absent file is different: it really is empty, and answers so.
+ *
+ * @returns `{ questions, reserve }` — the rows in the order they were asked, and the bench of
+ *          ticket suggestions; both `[]` when the file is absent
  *
  * @example
- * questions().filter(q => !q.answer);   // the ones still waiting on him
+ * inboxDoc().questions.filter(q => !q.answer);   // the ones still waiting on the owner
  */
-function questions() {
-  try { return JSON.parse(readFileSync(QUES, 'utf8')).questions ?? []; }
-  catch { return []; }
+function inboxDoc() {
+  let text;
+  try { text = readFileSync(QUES, 'utf8'); }
+  catch { lastGoodInbox = null; return { questions: [], reserve: [] }; }
+  try { lastGoodInbox = parseInbox(text); }
+  catch { /* mid-write: fall through to the last good copy */ }
+  return lastGoodInbox ?? { questions: [], reserve: [] };
+}
+
+/**
+ * Write JSON where a concurrent reader can never see a half-written file.
+ *
+ * `writeFileSync` truncates and then fills, so a reader polling every few seconds eventually
+ * catches the empty middle. Writing beside the target and renaming is atomic within a volume:
+ * readers see the whole old file or the whole new one.
+ *
+ * @param path the destination file
+ * @param data the value to serialise
+ * @returns nothing
+ *
+ * @example
+ * writeJson(QUES, { questions: [], reserve: [] });   // no reader ever observes a partial write
+ */
+function writeJson(path, data) {
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n');
+  renameSync(tmp, path);
+}
+
+/**
+ * The desk's configuration, or `{}` when there is none or it cannot be read.
+ *
+ * @returns the parsed `desk-config.json`
+ *
+ * @example
+ * readConfig().repo;   // 'StoneCypher/self-expression', when the desk names one
+ */
+function readConfig() {
+  try {
+    const cfg = JSON.parse(readFileSync(DCFG, 'utf8'));
+    return cfg !== null && typeof cfg === 'object' && !Array.isArray(cfg) ? cfg : {};
+  } catch { return {}; }
+}
+
+/**
+ * Record one state-changing action in the desk's `audit.jsonl`, append-only.
+ *
+ * The desk is reachable over loopback HTTP and never passes through the permission prompts or
+ * hooks that gate a session, which is most of why it feels quick. It also means its side
+ * effects — launching a browser, recording that a PR should land — happen with nothing
+ * watching. The log gates nothing; it makes what happened reviewable afterwards by someone
+ * who was not there. Refusals are logged too, and they are the more informative half.
+ *
+ * @param action dotted verb, e.g. `pr.intent`, `open.refused`
+ * @param detail whatever identifies the target; small and non-secret
+ * @returns nothing; a failed write is reported on the console and never fails the request
+ *
+ * @example
+ * audit('pr.intent', { number: 135, intent: 'land', note: 'recorded only; no GitHub write' });
+ */
+function audit(action, detail) {
+  const row = auditRow(action, detail, new Date().toISOString());
+  try { appendFileSync(AUDIT, JSON.stringify(row) + '\n'); }
+  catch (e) { console.log('AUDIT WRITE FAILED', action, e.message); }
+  console.log('audit:', action, JSON.stringify(detail));
+}
+
+/**
+ * The repo's open pull requests, as the inbox lists them.
+ *
+ * Which repo is `SELF_EXPRESSION_DESK_REPO`, else `desk-config.json`'s `repo`, else none — in
+ * which case the inbox says so rather than guessing. `SELF_EXPRESSION_DESK_GH` names the `gh`
+ * binary when it is not on the path. See `createPullRequestFeed` for the caching.
+ */
+const prFeed = createPullRequestFeed({
+  run:        ghRunner(process.env.SELF_EXPRESSION_DESK_GH || 'gh'),
+  readConfig,
+  env:        process.env.SELF_EXPRESSION_DESK_REPO,
+});
+
+/**
+ * Collect a request body and hand it over parsed, or `undefined` when it is not JSON.
+ *
+ * @param req  the incoming request
+ * @param then called once with the parsed body
+ * @returns nothing
+ *
+ * @example
+ * readJson(req, got => { … });
+ */
+function readJson(req, then) {
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    let got;
+    try { got = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { got = undefined; }
+    then(got);
+  });
 }
 
 /**
@@ -362,49 +474,80 @@ const server = createServer((req, res) => {
   }
 
   if (req.url === '/questions') {
-    if (req.method === 'POST') {              // he answers; the answer is for me to read
-      const chunks = [];
-      req.on('data', c => chunks.push(c));
-      req.on('end', () => {
+    if (req.method === 'POST') {              // the owner answers; the answer is for the assistant
+      readJson(req, got => {
+        /* The rules — one-way answers, drops that delete, tickets refilled from the bench —
+           live in `applyInboxPost`. Written back whole, `reserve` included, so answering a
+           question can never erase the bench, and atomically, so the page never reads a
+           half-written file. */
         try {
-          const got = JSON.parse(Buffer.concat(chunks).toString('utf8')),
-                all = questions(),
-                q   = all.find(x => x.id === got.id);
-
-          /* One-way and idempotent: a second click on an answered question is a stray
-             double-click, not a change of mind. Changing an answer is a conversation. */
-          /* Task rows carry actions rather than answers. Two of the three are instructions
-             to the assistant and want to persist and stay visible; the third is a deletion,
-             and a deletion is a deletion — the row leaves the file rather than acquiring a
-             tombstone field. */
-          if (q && got.action === 'drop') {
-            writeFileSync(QUES, JSON.stringify(
-              { questions: all.filter(x => x.id !== q.id) }, null, 2) + '\n');
-            console.log(`DROP    ${q.id}   (${q.text})`);
-          } else if (q && (got.action === 'next' || got.action === 'agents')) {
-            q.queued   = got.action;
-            q.queuedAt = new Date().toISOString();
-            writeFileSync(QUES, JSON.stringify({ questions: all }, null, 2) + '\n');
-            console.log(`${got.action === 'next' ? 'NEXT  ' : 'AGENTS'}  ${q.id}   (${q.text})`);
-          } else if (q && !q.answer && got.dismiss) {
-            q.answer     = '(dismissed as stale)';
-            q.dismissed  = true;
-            q.answeredAt = new Date().toISOString();
-            writeFileSync(QUES, JSON.stringify({ questions: all }, null, 2) + '\n');
-            console.log(`STALE   ${q.id} dismissed   (${q.text})`);
-          } else if (q && !q.answer && typeof got.answer === 'string' && got.answer) {
-            q.answer     = got.answer.slice(0, 200);
-            q.answeredAt = new Date().toISOString();
-            writeFileSync(QUES, JSON.stringify({ questions: all }, null, 2) + '\n');
-            console.log(`ANSWER  ${q.id} → ${q.answer}   (${q.text})`);
+          const { doc, event } = applyInboxPost(inboxDoc(), got, new Date().toISOString());
+          if (event) {
+            writeJson(QUES, doc);
+            lastGoodInbox = doc;
+            console.log('inbox:', JSON.stringify(event));
           }
-        } catch { /* a bad post is not worth a 500 */ }
+        } catch (e) { console.log('inbox: could not write', e.message); }
         res.writeHead(204); res.end();
       });
       return;
     }
+    const body = JSON.stringify({ questions: inboxDoc().questions });
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ questions: questions() }));
+    res.end(body);
+    return;
+  }
+
+  /* The repo's open pull requests, split by whose account opened them. Never a blank: with
+     no repo, no `gh`, or `gh` failing, the answer carries an `error` the inbox shows. */
+  if (req.url === '/prs') {
+    prFeed.get().then(
+      data => { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+                res.end(JSON.stringify(data)); },
+      e    => { res.writeHead(500, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ repo: null, viewer: null, mine: [], theirs: [], warning: null,
+                                         fetchedAt: null, error: `could not list pull requests: ${e.message}` })); });
+    return;
+  }
+
+  /* Records what the owner wants done with a PR, and deliberately does NOT do it: `land`
+     means merging into a protected branch, which is a thing to be asked about every time
+     rather than a side effect of a click. `drop` only hides the row on this desk. */
+  if (req.method === 'POST' && req.url === '/pr') {
+    readJson(req, got => {
+      const next = got && typeof got === 'object' ? applyPrIntent(readConfig(), got.number, got.action) : null;
+      if (next === null) {
+        audit('pr.intent.refused', { body: JSON.stringify(got ?? null).slice(0, 200) });
+        res.writeHead(400); res.end();
+        return;
+      }
+      try { writeJson(DCFG, next); }
+      catch (e) { res.writeHead(500); res.end(); console.log('pr: could not write', e.message); return; }
+      audit('pr.intent', { number: Number(got.number), intent: got.action, note: 'recorded only; no GitHub write' });
+      res.writeHead(204); res.end();
+    });
+    return;
+  }
+
+  /* The owner clicked a permalink. Only exact issue/PR permalinks are opened; see
+     `openExternally` for why this is narrow and why it is not a plain link. */
+  if (req.method === 'POST' && req.url === '/open') {
+    readJson(req, got => {
+      const ok = openExternally(got && typeof got === 'object' ? got.url : undefined, { audit });
+      res.writeHead(ok ? 204 : 400); res.end();
+    });
+    return;
+  }
+
+  /* The audit log is readable over the same wire that writes it — a record only its author
+     can inspect is not much of a record. Read-only: no route edits or truncates it. */
+  if (req.url === '/audit' || req.url.startsWith('/audit?')) {
+    const want = Number(new URL(req.url, 'http://x').searchParams.get('n'));
+    let text = '';
+    try { text = readFileSync(AUDIT, 'utf8'); } catch { /* nothing has happened yet */ }
+    const body = JSON.stringify(readAudit(text, want));
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(body);
     return;
   }
 
@@ -438,7 +581,7 @@ const server = createServer((req, res) => {
                so the list is a record of failures rather than a growing pile. */
             cfg.gone = want.filter(id => !deleteCard(id));
           }
-          writeFileSync(DCFG, JSON.stringify(cfg, null, 2) + '\n');
+          writeJson(DCFG, cfg);
         } catch { /* a bad post is not worth a 500 */ }
         res.writeHead(204); res.end();
       });
@@ -471,24 +614,23 @@ const server = createServer((req, res) => {
     return;
   }
 
-  res.writeHead(200, {
-    'content-type': 'text/html; charset=utf-8',
-    'cache-control': 'no-store',
-    // 'wasm-unsafe-eval' permits WebAssembly compilation and nothing else — notably NOT
-    // eval() or new Function(). A vendored library compiled to wasm needs it; without
-    // this the module resolves, instantiation is refused, and the failure is silent.
-    'content-security-policy':
-      "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-      "font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; " +
-      "connect-src 'self'",
-  });
   const isDesk = req.url.startsWith('/desk');
 
   /* Assembled per request rather than stored: the deck on disk is the only truth, so a
      card that was deleted is simply not there to render. There is no hiding step, and so
-     no window in which a dismissed card is briefly visible. */
-  let page = isDesk ? assemble(readFileSync(SHELL, 'utf8'), DECK)
-                    : readFileSync(HTML, 'utf8');
+     no window in which a dismissed card is briefly visible.
+
+     Read before the status line is written, like every other route: a shell that is
+     missing or mid-save must be reportable as a failure, not thrown after a 200 is out. */
+  let page;
+  try {
+    page = isDesk ? assemble(readFileSync(SHELL, 'utf8'), DECK)
+                  : readFileSync(HTML, 'utf8');
+  } catch (e) {
+    res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(`could not assemble the page: ${e.message}\n`);
+    return;
+  }
 
   /* The kit is inlined rather than linked. A `<script src>` would keep its contents out of
      the page, so editing the kit would change every card's behaviour without the open desks
@@ -511,6 +653,17 @@ const server = createServer((req, res) => {
       `<script type="importmap">${JSON.stringify({ imports }, null, 1)}</script>`);
   }
 
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    // 'wasm-unsafe-eval' permits WebAssembly compilation and nothing else — notably NOT
+    // eval() or new Function(). A vendored library compiled to wasm needs it; without
+    // this the module resolves, instantiation is refused, and the failure is silent.
+    'content-security-policy':
+      "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; " +
+      "connect-src 'self'",
+  });
   res.end(page);
 
 });
