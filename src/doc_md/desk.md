@@ -25,7 +25,7 @@ src/scripts/desk/                 the mechanism — checked in, identical everyw
 ├── deskcards.mjs                 the card deck: list, render, remove, assemble
 ├── deskcards.d.mts               hand-written types, so the tests see the contract
 ├── deskguard.mjs                 the request guard: host, origin, content type
-├── deskinbox.mjs                 the inbox: pull requests, intents, permalinks, questions
+├── deskinbox.mjs                 the inbox: pull requests, tracker tickets, intents, permalinks, questions
 ├── deskinbox.d.mts               its hand-written types
 ├── desk-shell.html               structure only, with three card placeholders
 ├── panel.html                    the second surface, still monolithic
@@ -39,10 +39,10 @@ src/scripts/desk/                 the mechanism — checked in, identical everyw
 │       ├── card.html             one <section data-card="sankey"> …
 │       ├── card.css              rules this card owns, and nothing else
 │       └── card.js               a DESK.inits.push(…) builder
-├── desk-config.json              the desk's name, put-away list, repo, and PR intents
+├── desk-config.json              the desk's name, put-away list, repo, ticket labels, PR and ticket intents
 ├── questions.json                the inbox: what is waiting on the desk's owner
 ├── inbox.jsonl                   append-only record of what the owner sent back
-├── audit.jsonl                   append-only record of PR intents and opened links
+├── audit.jsonl                   append-only record of PR and ticket intents and opened links
 ├── geometry.json                 the last frame the page measured of itself
 ├── board.md                      whatever the desk wants to show as text
 ├── importmap.json                bare specifiers this desk resolves
@@ -61,7 +61,7 @@ The desk directory can also come from `SELF_EXPRESSION_DESK`; with neither, the 
 usage line and exits rather than adopting the working directory — a desk is deliberately not a
 default location, because `gone` deletes card directories beneath it.
 `SELF_EXPRESSION_DESK_PORT` moves it off 7373, which is what a second desk needs.
-`SELF_EXPRESSION_DESK_REPO` names the GitHub repo whose pull requests the inbox lists, and
+`SELF_EXPRESSION_DESK_REPO` names the GitHub repo whose pull requests and issues the inbox lists, and
 overrides `desk-config.json`'s `repo`; `SELF_EXPRESSION_DESK_GH` names the `gh` binary when it
 is not on the path.
 `SELF_EXPRESSION_AFFECT_LOG` points at the affect log the history charts read; with no log
@@ -248,6 +248,9 @@ guessed tracker is worse than none. The rail is a fixed-size shortlist rather th
 that drains: dropping a ticket promotes the next one off `questions.json`'s `reserve` bench,
 and when the bench is empty the rail simply shrinks.
 
+Hand-written tickets are only half of the rail. The other half is filled from the tracker —
+see *Tickets from the tracker* below — and follows the hand-written rows in the same rail.
+
 Every write to `questions.json` is atomic (written beside the file and renamed over it), and a
 read that lands mid-edit serves the last good copy, so the inbox never blinks empty because
 someone was saving the file.
@@ -289,6 +292,58 @@ no GitHub write"`), along with refusals. The desk is reachable over loopback and
 through a session's permission prompts, so its side effects are logged to be reviewable
 afterwards by someone who was not there; `/audit` serves the newest rows.
 
+&nbsp;
+
+## Tickets from the tracker
+
+When the desk names a repo, the ticket rail also lists that repo's **open issues that are
+waiting on the owner**, so a fresh desk's inbox shows issues without anyone writing them into
+`questions.json` by hand. An open issue qualifies when either is true:
+
+- it is **assigned to the owner** (the GitHub account `gh` is signed in as), or
+- it carries one of the desk's **ticket labels**, matched without regard to case. These are
+  `desk-config.json`'s `ticketLabels`, or by default `Question`, `Needs answers`, `needs
+  owner` and `Needs research`. `"ticketLabels": []` is a real setting, meaning "only issues
+  assigned to me".
+
+The list comes from `gh issue list`, cached for a minute and coalesced exactly as the PR list
+is, and served at `/tickets`. What is cached is GitHub's answer, not the selection, so a drop,
+an intent, or a new hand-written row shows on the next request.
+
+**Each issue appears once.** A tracker issue that a hand-written ticket row already points at
+(by its `url`, or by its leading `#N` in the desk's repo) is left out of the tracker half. The
+hand-written row wins, because someone put it there on purpose. Drop that row and the
+tracker's copy comes back.
+
+**The rail is a shortlist here too.** The tracker half shows the first `ticketLimit`
+qualifying issues (default 8, at most 50), newest first as `gh` orders them. The rest wait on
+the bench, and dropping a shown ticket promotes the next one.
+
+A tracker ticket has the hand-written ticket's three verbs. Because there is no
+`questions.json` row to write them on, they are recorded in the desk config under the issue's
+permalink, and **none of them touches GitHub**:
+
+| Button | Records |
+|---|---|
+| do this next | `ticketIntent[url] = "next"`, tagged *up next*. |
+| agents | `ticketIntent[url] = "agents"`, tagged *to agents*. |
+| drop | adds the permalink to `ticketHidden` and forgets its intent. The issue stays open on GitHub; it is only gone from this desk. |
+
+Intents are keyed by permalink rather than number because a number alone would collide
+across repos, and a desk's repo can change. There is no *land* for a ticket: an issue has
+nothing to merge. Each intent is appended to `audit.jsonl` as `ticket.intent`, and refusals as
+`ticket.intent.refused`. `/ticket` accepts only an exact issue permalink and one of the three
+verbs.
+
+When there is no repo, no `gh`, or `gh` is failing, the tracker half stays empty and a line
+says which. If the pull-request line already says the same thing, the ticket line stays quiet
+rather than repeating it. When `gh` cannot say who the owner is, labelled issues are still
+listed, and the line says that assigned ones cannot be.
+
+&nbsp;
+
+## Opening permalinks
+
 Clicking a permalink does not follow it. Followed normally, a link would navigate the desk
 itself away whenever it is shown in an editor's embedded browser, so the page posts the URL to
 `/open` and the server hands it to the operating system's opener, which starts the browser the
@@ -328,9 +383,12 @@ carrying its shape and nothing else.
 
 - **`desk-config.json`** — `name` (the desk's title, editable by clicking it), `hidden` (put
   away, offered back), `gone` (deletions that failed), `repo` (the `owner/name` whose pull
-  requests the inbox lists), `prIntent` (PR number → `land` or `agent`), `prHidden` (PR numbers
-  dropped from this desk). Merged rather than replaced on every write, because these are
-  written by different controls and one posting alone must not erase the others.
+  requests and issues the inbox lists), `prIntent` (PR number → `land` or `agent`), `prHidden`
+  (PR numbers dropped from this desk), `ticketLabels` (labels that put an open issue in the
+  ticket rail), `ticketLimit` (how many tracker tickets show at once), `ticketIntent` (issue
+  permalink → `next` or `agents`), `ticketHidden` (issue permalinks dropped from this desk).
+  Merged rather than replaced on every write, because these are written by different controls
+  and one posting alone must not erase the others.
 - **`questions.json`** — `{ "questions": [ … ], "reserve": [ … ] }`; each row has `id`,
   `text`, `asked`, and optionally `options`, `kind` (`task` or `ticket`), `stuck`, `url`,
   `answer`, `answeredAt`, `dismissed`, `queued`, `queuedAt`. `reserve` is the bench of tickets
@@ -338,7 +396,8 @@ carrying its shape and nothing else.
 - **`inbox.jsonl`** — append-only, one JSON object per line: `n`, `at`, and whatever the page
   sent, which is usually `kind`, `surface` and `value`.
 - **`audit.jsonl`** — append-only, one JSON object per line: `at`, `action` (`pr.intent`,
-  `pr.intent.refused`, `open.allowed`, `open.refused`), and what it acted on.
+  `pr.intent.refused`, `ticket.intent`, `ticket.intent.refused`, `open.allowed`,
+  `open.refused`), and what it acted on.
 - **`geometry.json`** — overwritten, never appended: only the current frame is interesting.
 
 &nbsp;

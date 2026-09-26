@@ -27,11 +27,12 @@
  *   SELF_EXPRESSION_DESK=~/.desks/mine SELF_EXPRESSION_DESK_PORT=7400 node src/scripts/desk/panel.mjs
  *
  * @example
- *   // With the inbox listing a repo's open pull requests (or set "repo" in desk-config.json):
+ *   // With the inbox listing a repo's open pull requests and the issues waiting on you
+ *   // (or set "repo" in desk-config.json):
  *   SELF_EXPRESSION_DESK_REPO=StoneCypher/self-expression node src/scripts/desk/panel.mjs ~/.desks/mine
  *
  * @see deskcards.mjs — the card deck: what a card is and why it is a directory
- * @see deskinbox.mjs — the inbox: pull requests, intents, permalinks, questions
+ * @see deskinbox.mjs — the inbox: pull requests, tracker tickets, intents, permalinks, questions
  * @see src/doc_md/desk.md — the conventions: dismissal tiers, inbox protocol, hot-swap
  */
 
@@ -44,8 +45,9 @@ import { homedir }        from 'node:os';
 
 import { assemble, removeCard }  from './deskcards.mjs';
 import { requestAllowed }        from './deskguard.mjs';
-import { applyInboxPost, applyPrIntent, auditRow, createPullRequestFeed, ghRunner,
-         openExternally, parseInbox, readAudit }  from './deskinbox.mjs';
+import { applyInboxPost, applyPrIntent, applyTicketIntent, auditRow, createIssueFeed,
+         createPullRequestFeed, createViewerLookup, ghRunner, openExternally, parseInbox,
+         readAudit }  from './deskinbox.mjs';
 
 /** Where the mechanism lives: the shell, the panel, the icons. Shared by every desk. */
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -342,10 +344,27 @@ function audit(action, detail) {
  * which case the inbox says so rather than guessing. `SELF_EXPRESSION_DESK_GH` names the `gh`
  * binary when it is not on the path. See `createPullRequestFeed` for the caching.
  */
+const gh     = ghRunner(process.env.SELF_EXPRESSION_DESK_GH || 'gh');
+/* One owner lookup for both feeds: the login does not change while the server runs. */
+const whoami = createViewerLookup(gh);
 const prFeed = createPullRequestFeed({
-  run:        ghRunner(process.env.SELF_EXPRESSION_DESK_GH || 'gh'),
+  run:        gh,
   readConfig,
   env:        process.env.SELF_EXPRESSION_DESK_REPO,
+  whoami,
+});
+
+/**
+ * The repo's open issues that wait on the owner, as the ticket rail lists them beside the
+ * hand-written tickets in `questions.json`. Which issues is `desk-config.json`'s
+ * `ticketLabels` (or the defaults) plus assignment to the owner; see `createIssueFeed`.
+ */
+const issueFeed = createIssueFeed({
+  run:        gh,
+  readConfig,
+  readInbox:  inboxDoc,
+  env:        process.env.SELF_EXPRESSION_DESK_REPO,
+  whoami,
 });
 
 /**
@@ -524,6 +543,37 @@ const server = createServer((req, res) => {
       try { writeJson(DCFG, next); }
       catch (e) { res.writeHead(500); res.end(); console.log('pr: could not write', e.message); return; }
       audit('pr.intent', { number: Number(got.number), intent: got.action, note: 'recorded only; no GitHub write' });
+      res.writeHead(204); res.end();
+    });
+    return;
+  }
+
+  /* The repo's open issues that are waiting on the owner, for the ticket rail. Never a blank,
+     for the same reasons as `/prs`. */
+  if (req.url === '/tickets') {
+    issueFeed.get().then(
+      data => { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+                res.end(JSON.stringify(data)); },
+      e    => { res.writeHead(500, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ repo: null, viewer: null, tickets: [], bench: 0, labels: [],
+                                         warning: null, fetchedAt: null,
+                                         error: `could not list issues: ${e.message}` })); });
+    return;
+  }
+
+  /* Records what the owner wants done with a tracker ticket — `next`, `agents` or `drop` —
+     keyed by its permalink. Like `/pr`, nothing is written to GitHub. */
+  if (req.method === 'POST' && req.url === '/ticket') {
+    readJson(req, got => {
+      const next = got && typeof got === 'object' ? applyTicketIntent(readConfig(), got.url, got.action) : null;
+      if (next === null) {
+        audit('ticket.intent.refused', { body: JSON.stringify(got ?? null).slice(0, 200) });
+        res.writeHead(400); res.end();
+        return;
+      }
+      try { writeJson(DCFG, next); }
+      catch (e) { res.writeHead(500); res.end(); console.log('ticket: could not write', e.message); return; }
+      audit('ticket.intent', { url: got.url, intent: got.action, note: 'recorded only; no GitHub write' });
       res.writeHead(204); res.end();
     });
     return;

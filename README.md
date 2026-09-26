@@ -1024,6 +1024,7 @@ and threw on every load. Removing a directory cannot miss two of three edits.
 | Card JS | Must be safe to re-run, and must return early when its own element is absent |
 | Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line, tickets in a rail below; answers are one-way and print to the server log |
 | Pull requests | The desk's repo (`SELF_EXPRESSION_DESK_REPO`, else `repo` in `desk-config.json`, never guessed) lists its open PRs in two lists — out by me, out by someone else — by GitHub account, via a cached `gh pr list`. *land*, *agents* and *drop* only record intent in the desk config and `audit.jsonl`; nothing is written to GitHub. No repo or no `gh` shows a line saying so, not a blank |
+| Tracker tickets | The same repo's open issues that wait on you — assigned to you, or carrying one of `ticketLabels` in `desk-config.json` (default `Question`, `Needs answers`, `needs owner`, `Needs research`) — fill the ticket rail via a cached `gh issue list`, after the hand-written tickets and never repeating one. The first `ticketLimit` (default 8) show and the rest wait on the bench. *next*, *agents* and *drop* are recorded by permalink in the desk config and `audit.jsonl`, never on GitHub |
 | Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
 
 ### Drawing an answer onto it (issue #93)

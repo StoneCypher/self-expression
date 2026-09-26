@@ -4,5 +4,9 @@
   "gone": [],
   "repo": "your-account/your-repo",
   "prIntent": { "135": "land", "137": "agent" },
-  "prHidden": [129]
+  "prHidden": [129],
+  "ticketLabels": ["Question", "Needs answers", "needs owner", "Needs research"],
+  "ticketLimit": 8,
+  "ticketIntent": { "https://github.com/your-account/your-repo/issues/137": "agents" },
+  "ticketHidden": ["https://github.com/your-account/your-repo/issues/131"]
 }
