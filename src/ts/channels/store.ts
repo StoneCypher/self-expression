@@ -22,6 +22,7 @@ import { TABLE_DDL, ALL_INDEX_DDL, SCHEMA_VERSION } from './schema.js';
 import { migrate }        from './migrate.js';
 import { dbPath }         from './paths.js';
 import { stamp }          from './time.js';
+import type { HostIdentity } from './host.js';
 
 /** An open database plus the facts established when it was opened. */
 export interface Store {
@@ -30,6 +31,13 @@ export interface Store {
   readonly machineId : string;
   /** Absolute path to the database file. */
   readonly path      : string;
+  /**
+   * The Claude Code host this process runs under (issue #130), if the opener attached one
+   * with {@link ./host.js withHost}. Unscoped turn-context lookups use it to find their
+   * own session among several that share the store. When it is absent, they fall back to
+   * the newest row of any session.
+   */
+  readonly host?     : HostIdentity | undefined;
 }
 
 /** Config values are stored as text; these are the shapes callers may ask for. */

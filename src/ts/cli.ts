@@ -24,6 +24,7 @@ import { renderHistoryToFile } from './mcp/chart_tools.js';
 import { readMessages, formatMessages } from './channels/messages.js';
 import { noteReport }    from './mcp/note_tools.js';
 import { openStore, closeStore } from './channels/store.js';
+import { hookHostIdentity, withHost } from './channels/host.js';
 import { packageRoot }   from './channels/conventions.js';
 import type { Store }    from './channels/store.js';
 
@@ -96,8 +97,10 @@ async function runHook(name: string): Promise<void> {
   let payload: HookPayload = {};
   try { payload = JSON.parse(raw) as HookPayload; } catch { /* allow */ }
 
+  // The host pid (issue #130) rides on the store, so every turn_context row this hook
+  // writes carries it. Reading it costs one environment lookup, with no process walk.
   let store: Store | null = null;
-  try { store = openStore(); } catch { /* allow */ }
+  try { store = withHost(openStore(), hookHostIdentity(process.env, process.ppid)); } catch { /* allow */ }
 
   // The conventions the SessionStart hook injects are resolved from this bundle's own
   // location — `<plugin root>/dist/cli.cjs`, one level below the root — and never from the

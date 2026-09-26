@@ -527,6 +527,23 @@ database later has to be able to separate them without inference. Rows written
 before v7 keep NULL, which honestly means "written by a version that had only the
 hook path"; nothing is backfilled.
 
+**Several sessions can share one store.** Each `turn_context` row also records the
+pid of the Claude Code host process that wrote it, in a `host_pid` column (schema
+v9). The hook reads the pid from `CLAUDE_PID` and falls back to its own parent pid.
+The MCP server uses its own parent pid, which is the same host. When a tool call
+names no `session`, the server adopts **its own host's** newest turn, ignoring
+whichever session wrote last. To guard against a reused pid, the row must also be
+newer than the server's start. Failing that, the server adopts the newest turn of
+the session it was launched into (`CLAUDE_CODE_SESSION_ID`), and failing that, the
+newest turn of any session, as before. Subagents share their parent's host, so
+they resolve to the parent's session, and their rows still carry `agent_id`.
+
+The `Stop` gate checks the turn the close was actually filed under. When a second
+prompt arrived mid-turn (an interjection), a close recorded after it satisfies a
+Stop that names either prompt. A turn no hook observed, such as bash-mode `!`
+input, is allowed through: its close cannot be told apart from the previous
+turn's.
+
 **Absence is stated, not implied.** `turn_signed` has always answered `unknown`
 when it cannot identify the turn. Everything else that could only say `null` now
 says the same word with its reason attached, because `null` in a `context` field

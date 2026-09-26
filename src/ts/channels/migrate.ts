@@ -31,6 +31,7 @@ import {
   NOTES_DDL, NOTE_EVENTS_DDL, NOTE_INDEX_DDL,
   TURN_CONTEXT_SOURCE_COLUMN,
   FORMAT_FINDINGS_DDL, FINDINGS_INDEX_DDL,
+  TURN_CONTEXT_HOST_COLUMN, CONTEXT_HOST_INDEX_DDL,
 } from './schema.js';
 
 /**
@@ -352,6 +353,45 @@ function migrateV7toV8(db: DatabaseSync): void {
 }
 
 /**
+ * The v8→v9 step: give `turn_context` its nullable `host_pid` column and the
+ * `idx_context_host` index (issue #130). A server that was not told its session uses
+ * them to find its own newest turn when several sessions share the store.
+ *
+ * It is the same one-statement widening as v6→v7, and for the same reason: `turn_context`
+ * carries no `CHECK` clause to rebuild around. Existing rows keep NULL. A NULL pid never
+ * matches a host, so those rows are reached only by the older lookups, and nothing is
+ * invented for rows whose host nobody recorded.
+ *
+ * Guarded by {@link hasColumn} so that a re-run, or a database some other path already
+ * widened, is a no-op and not a duplicate-column error. The index statement is
+ * `IF NOT EXISTS` for the same reason.
+ *
+ * @throws {Error} Rethrows any SQLite failure after rolling the transaction back, so a
+ *                 failed step leaves the v8 database exactly as it was.
+ *
+ * @example
+ *   migrateV8toV9(db);   // db's turn_context now has host_pid; the call site stamps the version
+ *
+ * @see ./schema.js TURN_CONTEXT_HOST_COLUMN
+ * @see ./host.js
+ */
+function migrateV8toV9(db: DatabaseSync): void {
+
+  db.exec('BEGIN');
+  try {
+    if (!hasColumn(db, 'turn_context', TURN_CONTEXT_HOST_COLUMN)) {
+      db.exec(`ALTER TABLE turn_context ADD COLUMN ${TURN_CONTEXT_HOST_COLUMN} INTEGER`);
+    }
+    for (const statement of CONTEXT_HOST_INDEX_DDL) { db.exec(statement); }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+
+}
+
+/**
  * Every known version step, ascending. `migrate` walks these; later schema changes
  * append their own step here rather than inventing new machinery.
  */
@@ -363,6 +403,7 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 5, to: 6, apply: migrateV5toV6 },
   { from: 6, to: 7, apply: migrateV6toV7 },
   { from: 7, to: 8, apply: migrateV7toV8 },
+  { from: 8, to: 9, apply: migrateV8toV9 },
 ];
 
 /**

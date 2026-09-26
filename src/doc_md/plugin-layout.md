@@ -410,6 +410,16 @@ without inference. Rows predating v7 keep NULL and are never backfilled. The rea
 loudly to match: `recall` answers `unknown — …` where it used to answer `null`, following
 `turn_signed`'s existing convention rather than inventing a second one.
 
+**Concurrent sessions are told apart by their host process (issue #130).** The server cannot see
+its session, and it used to adopt the newest turn of *any* session, so concurrent sessions stamped
+each other's rows and tripped each other's Stop gate. Each `turn_context` row now carries
+`host_pid` (schema v9). The hook fills it from `CLAUDE_PID`, or from its parent pid when that is
+unset. The server's own identity is its parent pid, its start time and `CLAUDE_CODE_SESSION_ID`,
+attached to its store in `src/ts/channels/host.ts`. The server ignores `CLAUDE_PID` because the
+host does not set it for MCP servers, so a nested session's server inherits the outer host's value.
+Every unscoped lookup (`latestContext`, `latestHookContext`) goes through the same three rungs:
+this host's rows newer than server start, then the launch session's rows, then any row.
+
 **Skills are shared; slash commands cannot be.** Gemini hardcodes `commands/` and wants TOML;
 Claude's path is configurable and wants Markdown with frontmatter. Since the file formats differ
 there is no sharing to be had, so Claude is pointed at `claude-commands/` and Gemini keeps

@@ -24,6 +24,7 @@ import { McpServer }            from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { openStore, closeStore } from '../channels/store.js';
+import { serverHostIdentity, withHost } from '../channels/host.js';
 import { onboardingInstructions } from '../channels/onboarding.js';
 import { injectMode }           from '../channels/config.js';
 import {
@@ -271,7 +272,11 @@ async function loadKitOrNote(root: string): Promise<CardKit | null> {
  */
 export async function startStdio(version: string, dbFile?: string, bundleDir?: string): Promise<void> {
 
-  const store     = dbFile === undefined ? openStore() : openStore(dbFile),
+  // The host identity (issue #130) is attached before anything reads the store. It is
+  // what lets an unscoped express find this session's turn rather than the newest turn
+  // of whichever session wrote last.
+  const opened    = dbFile === undefined ? openStore() : openStore(dbFile),
+        store     = withHost(opened, serverHostIdentity(process.env, process.ppid, new Date())),
         house     = maybeOpenDwelling(store),
         root      = bundleDir === undefined ? undefined : packageRoot(bundleDir),
         picture   = resolveImageFacility(store),

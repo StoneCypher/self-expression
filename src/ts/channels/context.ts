@@ -51,6 +51,12 @@ export interface TurnContext {
    * both real writers state it, and a row that omits it stores NULL rather than a guess.
    */
   readonly source?          : ContextSource | undefined;
+  /**
+   * The pid of the Claude Code host the writer runs under (issue #130). When omitted,
+   * {@link recordContext} takes it from the store's attached host identity, and failing
+   * that it stores NULL, which never matches a host.
+   */
+  readonly hostPid?         : number | undefined;
 }
 
 /**
@@ -65,6 +71,11 @@ export interface TurnContext {
  * through here rather than writing its own row, so the two paths cannot drift into two
  * shapes; they differ only in the `source` value they pass.
  *
+ * Each row also carries the host pid (issue #130): `context.hostPid` when given,
+ * otherwise the pid of the host identity attached to the store. The hook's store carries
+ * the hook's host, and the server's store carries the server's, so both doors stamp the
+ * same pid for one session.
+ *
  * @param context what was observed or volunteered, including which of the two it was
  * @param when    the moment to stamp; injectable so tests need no clock
  *
@@ -72,6 +83,7 @@ export interface TurnContext {
  *   recordContext(store, { session: 'abc', promptId: 'p1', effort: 'high', source: 'hook' });
  *
  * @see recordContextOnce
+ * @see ./host.js
  * @see ../mcp/tools.js handleBeginTurn
  */
 export function recordContext(store: Store, context: TurnContext, when: Date = new Date()): void {
@@ -79,8 +91,8 @@ export function recordContext(store: Store, context: TurnContext, when: Date = n
   store.db.prepare(`
     INSERT INTO turn_context (
       ts_utc, session, prompt_id, turn_index, turn, cwd, git_branch,
-      permission_mode, agent_id, agent_type, effort, compactions, prompt_len, source
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      permission_mode, agent_id, agent_type, effort, compactions, prompt_len, source, host_pid
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     stamp(when).utc,
     context.session,
     context.promptId       ?? null,
@@ -95,6 +107,7 @@ export function recordContext(store: Store, context: TurnContext, when: Date = n
     context.compactions    ?? null,
     context.promptLen      ?? null,
     context.source         ?? null,
+    context.hostPid        ?? store.host?.pid ?? null,
   );
 
 }
@@ -183,16 +196,121 @@ export function hookObservedTurn(
  * convenience and a gate, so the delivery path uses this one and takes no turn identity
  * from a tool argument at all.
  *
+ * Scoped to this process's own host like the unscoped {@link latestContext} is (issue
+ * #130), so a note is never surfaced against another session's observed turn. The
+ * host pid on a hook row comes from the harness's environment, not from any tool
+ * argument, so the scoping gives the model no new lever.
+ *
  * @example
  *   latestHookContext(store)   // => null on a bare MCP client, whatever begin_turn wrote
  *
  * @see hookObservedTurn
+ * @see scopedNewest
  * @see ../mcp/note_tools.js handleSurfaceNote
  */
 export function latestHookContext(store: Store): Record<string, unknown> | null {
-  const row = store.db.prepare(
-    "SELECT * FROM turn_context WHERE source = 'hook' ORDER BY id DESC LIMIT 1").get();
-  return row ?? null;
+  return scopedNewest(store, "source = 'hook'");
+}
+
+/**
+ * The newest `turn_context` row satisfying `filter`, preferring rows from this process's
+ * own host (issue #130).
+ *
+ * The lookup has three rungs. Each is tried only when the one before it found nothing
+ * or does not apply:
+ *
+ * 1. **This host's rows**: `host_pid` equals the store's host pid and, when the
+ *    identity carries a `since`, the row is at least that recent. This is the exact
+ *    answer. A pid is unique among live processes, and the recency guard excludes rows
+ *    a dead host with a reused pid wrote before this server started.
+ * 2. **The launch session's rows**: the session the host named when it launched this
+ *    process. That is right until a `/clear`, and after one, rung 1 has rows again.
+ * 3. **Any row**: the pre-#130 behaviour. It is reached when the store has no host
+ *    identity, or when nothing matches, so no lookup is ever worse than before.
+ *
+ * @param filter a constant SQL predicate over `turn_context`, never built from input;
+ *               `'1'` means no filter
+ *
+ * @example
+ *   scopedNewest(withHost(store, { pid: 4242, since: null, session: null }), '1')
+ *   // => host 4242's newest row, or the global newest when 4242 has none
+ *
+ * @see ./host.js HostIdentity
+ */
+function scopedNewest(store: Store, filter: string): Record<string, unknown> | null {
+
+  const host = store.host;
+
+  if (host !== undefined && host.pid !== null) {
+    const row = host.since === null
+      ? store.db.prepare(`SELECT * FROM turn_context WHERE host_pid = ? AND ${filter} ORDER BY id DESC LIMIT 1`)
+          .get(host.pid)
+      : store.db.prepare(`SELECT * FROM turn_context WHERE host_pid = ? AND ts_utc >= ? AND ${filter} ORDER BY id DESC LIMIT 1`)
+          .get(host.pid, host.since);
+    if (row !== undefined) { return row; }
+  }
+
+  if (host !== undefined && host.session !== null) {
+    const row = store.db.prepare(`SELECT * FROM turn_context WHERE session = ? AND ${filter} ORDER BY id DESC LIMIT 1`)
+      .get(host.session);
+    if (row !== undefined) { return row; }
+  }
+
+  return store.db.prepare(`SELECT * FROM turn_context WHERE ${filter} ORDER BY id DESC LIMIT 1`).get() ?? null;
+
+}
+
+/**
+ * The prompt id a stopping turn's close is filed under. Returns `null` when the turn is
+ * one this host observes turns for but never observed, so nobody can know what its close
+ * was stamped with.
+ *
+ * The Stop payload names one prompt, and `express` stamps a close with the session's
+ * *newest* turn. Those two disagree in two real situations (issue #130):
+ *
+ * - **Two prompts in one turn.** An interjected message fires a second
+ *   `UserPromptSubmit` while the turn is still running. The close is stamped with the
+ *   second prompt, and the Stop payload may name the first. So the answer is the newest
+ *   prompt the *hook* recorded for this session at or after the stopping one. No later
+ *   turn can have started while this one was still running. Rows that `begin_turn`
+ *   volunteered are not followed, because a model-named prompt must never be able to
+ *   move which turn the gate checks.
+ * - **A turn no hook saw.** Bash-mode input (`!`) starts a turn without firing
+ *   `UserPromptSubmit`. That turn's prompt has no row, and its close was stamped with the
+ *   previous turn's prompt, where it cannot be told apart from that turn's own close.
+ *   When the session has hook rows, so this host does report turns, a missing row means
+ *   the turn went unobserved, and the answer is `null`. The gate reads that as "cannot
+ *   know" and allows. A session with no hook rows at all is a hookless host whose turns
+ *   `begin_turn` names, and it keeps the payload's prompt, as before.
+ *
+ * @param session  the stopping turn's session
+ * @param promptId the prompt id the Stop payload named
+ * @returns the prompt id to look the close up under, or `null` for an unobserved turn
+ *
+ * @example
+ *   // hook rows for p1 then p2 (an interjection), close stamped with p2
+ *   stoppedTurnPrompt(store, 's1', 'p1')   // => 'p2'
+ *   stoppedTurnPrompt(store, 's1', 'p9')   // => null — a turn no hook observed
+ *
+ * @see ../mcp/hooks.js stopTurn
+ */
+export function stoppedTurnPrompt(store: Store, session: string, promptId: string): string | null {
+
+  const row = contextForTurn(store, session, promptId);
+
+  if (row === null) {
+    const observes = store.db.prepare(
+      "SELECT 1 AS found FROM turn_context WHERE session = ? AND source = 'hook' LIMIT 1").get(session);
+    return observes === undefined ? promptId : null;
+  }
+
+  const later = store.db.prepare(`
+    SELECT prompt_id FROM turn_context
+     WHERE session = ? AND id > ? AND source = 'hook' AND prompt_id IS NOT NULL AND prompt_id != ''
+     ORDER BY id DESC LIMIT 1`).get(session, Number(row['id']));
+
+  return typeof later?.['prompt_id'] === 'string' ? later['prompt_id'] : promptId;
+
 }
 
 /** What {@link recordContextOnce} did, and the row that stands for the turn afterwards. */
@@ -258,26 +376,29 @@ export function recordContextOnce(
  * must say {@link UNKNOWN_CONTEXT} instead, because a null travelling out to a caller
  * reads as "nothing was happening" rather than "this host does not report it".
  *
- * When `session` is given, the newest context for that session is returned; otherwise
- * the newest of any session. The unscoped form is what a tool call uses to discover
- * which session it is in — the server has no other way to know, since neither the MCP
- * handshake nor any tool argument carries it.
+ * When `session` is given, the newest context for that session is returned. The
+ * unscoped form is what a tool call uses to discover which session it is in, since
+ * neither the MCP handshake nor any tool argument carries it.
  *
- * That unscoped lookup is exact for a single active session and a best guess when two
- * run concurrently against one database. The mitigation is that a caller supplying its
- * own session is always believed; this only fills what was not supplied.
+ * Unscoped, it returns **this process's own host's** newest turn (issue #130), found
+ * through the host identity attached to the store (see {@link scopedNewest}). Several
+ * sessions sharing one database no longer take each other's turns: an `express` from
+ * session A is stamped with A's prompt even when session B started a turn since. With
+ * no host identity, or nothing matching it, the answer is the newest row of any session,
+ * as it always was. A caller supplying its own session is still always believed.
  *
  * @example
- *   latestContext(store)          // => { session: 'abc', promptId: 'p1', … }
+ *   latestContext(store)          // => { session: 'abc', prompt_id: 'p1', … }, this host's newest
  *   latestContext(store, 'zzz')   // => null, when that session has no context
+ *
+ * @see ./host.js withHost
  */
 export function latestContext(store: Store, session?: string): Record<string, unknown> | null {
 
-  const row = session === undefined
-    ? store.db.prepare('SELECT * FROM turn_context ORDER BY id DESC LIMIT 1').get()
-    : store.db.prepare('SELECT * FROM turn_context WHERE session = ? ORDER BY id DESC LIMIT 1').get(session);
+  if (session === undefined) { return scopedNewest(store, '1'); }
 
-  return row ?? null;
+  return store.db.prepare('SELECT * FROM turn_context WHERE session = ? ORDER BY id DESC LIMIT 1')
+    .get(session) ?? null;
 
 }
 
