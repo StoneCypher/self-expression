@@ -14,7 +14,7 @@
  * @see ../channels/context.js
  */
 
-import { recordContext, latestContext, turnCount } from '../channels/context.js';
+import { recordContext, latestContext, stoppedTurnPrompt, turnCount } from '../channels/context.js';
 import { hasClosingSignature, register }           from '../channels/entries.js';
 import type { RegisterRow }                        from '../channels/entries.js';
 import { readConfig }                              from '../channels/store.js';
@@ -833,6 +833,12 @@ export interface StopTurn {
  * A `p1` invented by a hookless host in one session must not close a `p1` in another,
  * which is why both halves are recovered rather than the prompt id alone.
  *
+ * With a known session, the prompt is then resolved to the one the turn's close is
+ * actually filed under ({@link ../channels/context.js stoppedTurnPrompt}, issue #130).
+ * A turn that took an interjected second prompt resolves to that later prompt. A turn
+ * the hook never observed, such as bash-mode input, resolves to `null`, which allows
+ * the stop: its close cannot be told apart from the previous turn's.
+ *
  * @example
  *   stopTurn(store, { session_id: 's1', prompt_id: 'p1' })   // => { session: 's1', promptId: 'p1' }
  *   stopTurn(store, {})                                      // => null on an empty store
@@ -840,14 +846,16 @@ export interface StopTurn {
 export function stopTurn(store: Store, payload: HookPayload): StopTurn | null {
 
   const context  = latestContext(store, payload.session_id),
-        promptId = payload.prompt_id
+        named    = payload.prompt_id
           ?? (typeof context?.['prompt_id'] === 'string' ? context['prompt_id'] : undefined),
         session  = payload.session_id
           ?? (typeof context?.['session']   === 'string' ? context['session']   : undefined);
 
-  if (promptId === undefined || promptId === '') { return null; }
+  if (named === undefined || named === '') { return null; }
 
-  return { session, promptId };
+  const promptId = session === undefined || session === '' ? named : stoppedTurnPrompt(store, session, named);
+
+  return promptId === null ? null : { session, promptId };
 
 }
 

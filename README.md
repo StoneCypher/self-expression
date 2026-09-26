@@ -1,10 +1,10 @@
 # self-expression v0.9.0
 
-> Version 0.9.0 was built on Wednesday, September 23, 2026 at GMT-07:00 `1790181234675` from hash `a35c189`.
+> Version 0.9.0 was built on Saturday, September 26, 2026 at GMT-07:00 `1790436661758` from hash `f3a7981`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1790181234675 Wednesday, September 23, 2026 at GMT-07:00 95.05 360 91 a35c189 50.95 63.06 61.8 63.01 270 2747 89.41 93.89 95.4 2477 0.9.0 -->
+<!-- Supported embeds: 1790436661758 Saturday, September 26, 2026 at GMT-07:00 95.07 360 91 f3a7981 51.89 63.68 63.2 63.69 277 2822 89.5 93.91 95.41 2545 0.9.0 -->
 
 
 
@@ -526,6 +526,23 @@ volunteered it. A volunteered fact and an observed one are not the same evidence
 database later has to be able to separate them without inference. Rows written
 before v7 keep NULL, which honestly means "written by a version that had only the
 hook path"; nothing is backfilled.
+
+**Several sessions can share one store.** Each `turn_context` row also records the
+pid of the Claude Code host process that wrote it, in a `host_pid` column (schema
+v9). The hook reads the pid from `CLAUDE_PID` and falls back to its own parent pid.
+The MCP server uses its own parent pid, which is the same host. When a tool call
+names no `session`, the server adopts **its own host's** newest turn, ignoring
+whichever session wrote last. To guard against a reused pid, the row must also be
+newer than the server's start. Failing that, the server adopts the newest turn of
+the session it was launched into (`CLAUDE_CODE_SESSION_ID`), and failing that, the
+newest turn of any session, as before. Subagents share their parent's host, so
+they resolve to the parent's session, and their rows still carry `agent_id`.
+
+The `Stop` gate checks the turn the close was actually filed under. When a second
+prompt arrived mid-turn (an interjection), a close recorded after it satisfies a
+Stop that names either prompt. A turn no hook observed, such as bash-mode `!`
+input, is allowed through: its close cannot be told apart from the previous
+turn's.
 
 **Absence is stated, not implied.** `turn_signed` has always answered `unknown`
 when it cannot identify the turn. Everything else that could only say `null` now
@@ -1193,19 +1210,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2477</td>
-    <td>95.05<small>%</small></td>
-    <td>89.41<small>%</small></td>
-    <td>93.89<small>%</small></td>
-    <td>95.4<small>%</small></td>
+    <td>2545</td>
+    <td>95.07<small>%</small></td>
+    <td>89.5<small>%</small></td>
+    <td>93.91<small>%</small></td>
+    <td>95.41<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>270</td>
-    <td>63.06<small>%</small></td>
-    <td>50.95<small>%</small></td>
-    <td>61.8<small>%</small></td>
-    <td>63.01<small>%</small></td>
+    <td>277</td>
+    <td>63.68<small>%</small></td>
+    <td>51.89<small>%</small></td>
+    <td>63.2<small>%</small></td>
+    <td>63.69<small>%</small></td>
   </tr>
 </table>
 

@@ -5,6 +5,7 @@ import { join }   from 'node:path';
 import {
   ALL_DDL, TABLE_DDL, ALL_INDEX_DDL, TURN_CONTEXT_DDL, TURN_CONTEXT_SOURCE_COLUMN,
   SCHEMA_VERSION, check, entriesDdl, FORMAT_FINDINGS_DDL, FINDINGS_INDEX_DDL,
+  TURN_CONTEXT_HOST_COLUMN, CONTEXT_HOST_INDEX_DDL, INDEX_DDL,
 } from '../channels/schema.js';
 import {
   CHANNELS, DELTAS, FORECAST_OUTCOMES, SILENCE_KINDS, AUDIENCES, ANCHOR_KINDS,
@@ -306,8 +307,15 @@ describe('SCHEMA_VERSION', () => {
     expect(SCHEMA_VERSION).toBeGreaterThan(0);
   });
 
-  test('is 8 — the format_findings shape', () => {
-    expect(SCHEMA_VERSION).toBe(8);
+  test('is 9 — the turn_context host_pid shape', () => {
+    expect(SCHEMA_VERSION).toBe(9);
+  });
+
+  test('turn_context declares host_pid, and the host index is in the post-migration list only', () => {
+    expect(TURN_CONTEXT_DDL).toContain(`${TURN_CONTEXT_HOST_COLUMN}        INTEGER`);
+    expect(ALL_INDEX_DDL).toEqual(expect.arrayContaining([...CONTEXT_HOST_INDEX_DDL]));
+    // The v1→v2 rebuild re-applies INDEX_DDL to a table without host_pid; it must not be there.
+    for (const statement of INDEX_DDL) { expect(statement).not.toContain(TURN_CONTEXT_HOST_COLUMN); }
   });
 
   test('format_findings is in the fresh-install DDL, constraint-free, with its index', () => {

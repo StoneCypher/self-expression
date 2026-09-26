@@ -81,9 +81,15 @@ import {
  * it did about each. Purely additive like v2→v3 and v4→v5, and constraint-free like
  * `turn_context`, so the step only creates the table and its index.
  *
+ * v9 (issue #130): `turn_context` gained the nullable `host_pid` column and
+ * `idx_context_host`, so a server can find its own session's newest turn among several
+ * sessions sharing the store. Constraint-free, so the step is one `ALTER TABLE … ADD
+ * COLUMN` like v6→v7. Earlier rows keep NULL, which never matches a host, and nothing is
+ * backfilled.
+ *
  * @see ./migrate.js
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /**
  * A SQL `CHECK` clause constraining `column` to a vocabulary, allowing NULL.
@@ -228,6 +234,10 @@ export const ENTRIES_DDL: string = entriesDdl();
  * the table rebuild every `entries` vocabulary growth has needed. The vocabulary is
  * enforced in TypeScript at the one call site that writes it.
  *
+ * `host_pid` (v9, issue #130) is the pid of the Claude Code host process the writer ran
+ * under. It lets a server that was not told its session find its own among several that
+ * share the store. See {@link ./host.js} for how each side learns it.
+ *
  * @see ./vocabulary.js CONTEXT_SOURCES
  */
 // eslint-disable-next-line @typescript-eslint/no-inferrable-types
@@ -247,7 +257,8 @@ CREATE TABLE IF NOT EXISTS turn_context (
   effort          TEXT,
   compactions     INTEGER,
   prompt_len      INTEGER,
-  source          TEXT
+  source          TEXT,
+  host_pid        INTEGER
 )`;
 
 /**
@@ -257,6 +268,25 @@ CREATE TABLE IF NOT EXISTS turn_context (
  * @see ./migrate.js
  */
 export const TURN_CONTEXT_SOURCE_COLUMN = 'source';
+
+/**
+ * The column the v8→v9 step adds to `turn_context` (issue #130), named once so the
+ * migration and the fresh-install DDL cannot drift into two different shapes.
+ *
+ * @see ./migrate.js
+ */
+export const TURN_CONTEXT_HOST_COLUMN = 'host_pid';
+
+/**
+ * The index behind the host-scoped lookup, "this host's newest turn". It is kept out of
+ * {@link INDEX_DDL} because the v1→v2 rebuild re-applies that list to a database that
+ * does not have `host_pid` yet, and an index over a missing column is an error.
+ *
+ * @see ./migrate.js
+ */
+export const CONTEXT_HOST_INDEX_DDL: readonly string[] = [
+  'CREATE INDEX IF NOT EXISTS idx_context_host ON turn_context(host_pid, id)',
+];
 
 /** System state. Not user-editable; changes at install and upgrade only. */
 export const META_DDL = `
@@ -530,9 +560,9 @@ export const TABLE_DDL: readonly string[] = [
   FORMAT_FINDINGS_DDL,
 ];
 
-/** Every index the current schema declares — entries, messagebox, held notes, and format findings. */
+/** Every index the current schema declares — entries, messagebox, held notes, format findings, and the host lookup. */
 export const ALL_INDEX_DDL: readonly string[] =
-  [...INDEX_DDL, ...MESSAGE_INDEX_DDL, ...NOTE_INDEX_DDL, ...FINDINGS_INDEX_DDL];
+  [...INDEX_DDL, ...MESSAGE_INDEX_DDL, ...NOTE_INDEX_DDL, ...FINDINGS_INDEX_DDL, ...CONTEXT_HOST_INDEX_DDL];
 
 /**
  * Every statement needed to bring an **empty** database to the current schema, in
