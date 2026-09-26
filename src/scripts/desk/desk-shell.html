@@ -21,6 +21,20 @@
     --ground-2: oklch(0.20 0.010 90);
     --rule:     oklch(0.30 0.010 90);
     --accent:   oklch(0.84 0.14 95);
+    --hairline: oklch(0.235 0.010 90);   /* the faint rule between groups */
+    /* The drawn inbox buttons. Two tones: the structure a glyph acts on, and the part of it
+       that moves. The green is darker and more saturated than it first was because a 13px
+       render loses chroma to antialiasing — half of every stroke is a blend with the ground. */
+    --ic-body:  oklch(0.60 0.045 245);
+    --ic-land:  oklch(0.72 0.20 152);
+    --ic-queue: oklch(0.82 0.16 72);
+    /* The same land glyph, for a PR that is someone else's. Ownership as hue rather than as
+       a second drawing: the act is identical, only the author differs. */
+    --ic-theirs: oklch(0.74 0.13 215);
+    /* Just above the ground the inbox sits on, so a pill reads as resting on the desk; the
+       separation is carried more by the rim than by the fill. */
+    --pill:      oklch(0.205 0.010 90);
+    --pill-edge: oklch(0.243 0.010 90);
     --ui:   'Space Grotesk', system-ui, sans-serif;
     --disp: 'Fraunces', Georgia, serif;
     --mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -150,13 +164,60 @@
     padding: 0 0 0 7px; font-size: 12px; opacity: .55;
   }
   .inbox button.kill:hover { opacity: 1; color: oklch(0.70 0.17 25); background: transparent; }
+
+  /* Pull requests and tickets: set off by a rule, so "things out on GitHub" and "things I
+     suggest" read as a different register from "things you are owed". Weight rather than
+     size carries the heading, because at this size weight separates better than scale. */
+  .tickhead {
+    margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 700;
+  }
+  .inbox.tickets { margin-top: 6px; }
+  /* Pills. Inline rows in a wrapped list run together — the eye has to find the boundaries
+     from spacing alone, and spacing is exactly what wrapping keeps changing. A ground of its
+     own gives each row an edge that survives any line break, so the bullet goes. */
+  .inbox li.tick {
+    color: var(--ink-dim); background: var(--pill); border: 1px solid var(--pill-edge);
+    border-radius: 999px; padding: 2px 9px 3px; margin: 0 6px 5px 0;
+  }
+  .inbox li.tick::before { content: none; }
+  .inbox li.tick:hover { border-color: var(--rule); }
+  /* Opened by an agent: same lightness, a little chroma. A provenance note, not a warning —
+     the list it sits in already says who answers for it. */
+  .inbox li.byai { color: oklch(0.62 0.045 250); }
+  /* The number is an identifier, not part of the sentence: tinted so the eye can skip it
+     when reading and land on it when hunting. */
+  .inbox .num { color: oklch(0.64 0.09 250); text-decoration: none; cursor: pointer; }
+  .inbox .num:hover { color: oklch(0.74 0.13 250); text-decoration: underline; }
+  .inbox li.agents .num { color: inherit; }
+  /* The action buttons are one cluster: tight between themselves, a full gap from the text. */
+  .inbox button.act { margin-left: 0; }
+  .inbox button.act + button.act { padding-left: 3px; }
+  /* A drawn glyph opts out of the grayscale that mutes the emoji beside it, since that would
+     eat exactly the hue it was drawn to carry. `vertical-align` because an inline-flex box
+     around an <svg> has no baseline of its own to offer. */
+  .inbox button.act.dico {
+    filter: none; opacity: .85; display: inline-flex; align-items: center; vertical-align: -3px;
+  }
+  .inbox button.act.dico:hover { opacity: 1; }
+  .dicon { width: 13px; height: 13px; display: block; color: var(--ic-body); }
+  .dicon.land  .m { stroke: var(--ic-land); }
+  .dicon.queue .m { stroke: var(--ic-queue); }
+  #prtheir .dicon.land .m { stroke: var(--ic-theirs); }
+  /* Why a list is empty, when it is empty for a reason: no repo, no gh, gh failing. */
+  #prnote { color: oklch(0.72 0.12 60); }
 </style></head>
 <body>
 <script>
 /* Self-renewal, deliberately first and deliberately not a module: this is the page's
    own repair mechanism, so it must survive any error in everything below it. If the
    rest of the page throws, editing the file still fixes the open tab. */
-window.DESK = { inits: [], sig: null };
+/* `repo` is the GitHub repo the inbox is about, as the server reports it with the pull
+   requests — never written into this file. It was once hard-coded here, to a different repo
+   than the one being worked on, and every ticket number silently pointed at the wrong
+   tracker. `null` until the server says, and `null` for good when the desk names no repo. */
+window.DESK = { inits: [], sig: null, repo: null };
 
 /**
  * Replace `<main>` in place instead of reloading the document.
@@ -239,6 +300,27 @@ async function deskSwap() {
     <ul class="inbox" id="inboxlist"></ul>
     <div class="cap" id="inboxnone" hidden>nothing outstanding &mdash; anything I need from
       you lands here.</div>
+
+    <!-- The repo's open pull requests, in two lists split by whose GitHub account opened
+         them. Each list hides entirely when empty: an empty heading implies a category you
+         have to check, when the truthful state is silence. The note is the exception — when
+         the lists are empty because something is wrong, the inbox says what. -->
+    <div class="cap" id="prnote" hidden></div>
+    <div id="prminewrap" hidden>
+      <div class="tickhead">pull requests out by me</div>
+      <ul class="inbox tickets" id="prmine"></ul>
+    </div>
+    <div id="prtheirwrap" hidden>
+      <div class="tickhead">pull requests out by someone else</div>
+      <ul class="inbox tickets" id="prtheir"></ul>
+    </div>
+
+    <!-- Tickets sit below everything else on purpose: they are suggestions, not obligations,
+         and should not compete with rows that are actually waiting. -->
+    <div id="ticketwrap" hidden>
+      <div class="tickhead">tickets i&rsquo;d pick up next</div>
+      <ul class="inbox tickets" id="ticketlist"></ul>
+    </div>
   </section>
 </main>
 
@@ -371,23 +453,133 @@ DESK.inits.push(function () {
   function dismiss(id)      { send({ id: id, dismiss: true }); }
   function act(id, what)    { send({ id: id, action: what }); }
 
-  function paint(open) {
-    var el = list();
-    if (!el) return;
-    el.innerHTML = '';
+  /* The two verbs no emoji could say, drawn instead. `m` marks the moving part — the arrow,
+     the thing being placed — which takes the saturated hue while the structure it acts on
+     stays slate. Every emoji candidate leaked a social meaning (the bell says urgent, the
+     pin says permanent), because Unicode has no pictograph for list surgery. */
+  var ICONS = {
+    land:  '<path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/>' +
+           '<path class="m" d="M12 3v9"/><path class="m" d="M8.5 9L12 12.5 15.5 9"/>',
+    queue: '<path d="M4 3h16"/><path d="M4 7h16"/><path d="M4 11h16"/>' +
+           '<path class="m" d="M12 21v-6"/><path class="m" d="M9.5 17.5L12 15l2.5 2.5"/>',
+  };
 
-    /* Three tiers. Stuck first — things already decided that then quietly failed to
-       happen, which must not queue politely behind anything. Then tasks, which are work
-       waiting for a disposition. Then questions, which only need a word. */
-    var stuck   = open.filter(function (q) { return q.stuck; }),
-        tasks   = open.filter(function (q) { return !q.stuck && q.kind === 'task'; }),
-        asks    = open.filter(function (q) { return !q.stuck && q.kind !== 'task'; }),
-        ordered = stuck.concat(tasks, asks);
+  /**
+   * One drawn glyph as inline SVG markup, from the constant table above and nothing else.
+   *
+   * @param name a key of ICONS
+   * @param cls  the class that picks the moving part's hue
+   * @returns SVG markup
+   */
+  function icon(name, cls) {
+    return '<svg class="dicon ' + cls + '" viewBox="0 0 24 24" fill="none" ' +
+           'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+           'stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+
+  /**
+   * Build one row-action button from a `[glyph, title]` spec.
+   *
+   * A glyph that is SVG markup (only ever one of ours, from `icon`) gets `innerHTML` and the
+   * `dico` class; an emoji goes in as text, so nothing from a row is ever parsed as markup.
+   *
+   * @param spec    `[glyph, title]`
+   * @param onclick what the click does
+   * @returns the button
+   */
+  function actBtn(spec, onclick) {
+    var b = document.createElement('button');
+    b.className = 'act'; b.title = spec[1];
+    if (spec[0].charAt(0) === '<') { b.classList.add('dico'); b.innerHTML = spec[0]; }
+    else { b.textContent = spec[0]; }
+    b.onclick = onclick;
+    return b;
+  }
+
+  /* Tasks and tickets want the same three verbs, and would drift apart the first time one
+     of them changed if each carried its own copy. */
+  function actions(li, q) {
+    [[icon('queue', 'queue'), 'do this next', 'next'],
+     ['🤖', 'dispatch to agents', 'agents'],
+     ['🗑️', 'remove from the inbox', 'drop']
+    ].forEach(function (spec) {
+      li.appendChild(actBtn(spec, function () { act(q.id, spec[2]); }));
+    });
+  }
+
+  /**
+   * A permalink that opens in the owner's own browser rather than in the desk's frame.
+   *
+   * A real anchor, so it hovers, copies and middle-clicks like a link — but the click is
+   * intercepted: followed normally, it would navigate the desk itself away whenever the page
+   * is viewed inside an editor's embedded browser. The server hands the URL to the OS.
+   *
+   * @param text the visible label, e.g. `#134`
+   * @param href the issue or pull-request permalink
+   * @returns the anchor
+   */
+  function permalink(text, href) {
+    var a = document.createElement('a');
+    a.className = 'num'; a.textContent = text; a.href = href; a.title = 'open on github';
+    a.onclick = function (e) {
+      e.preventDefault();
+      fetch('/open', { method: 'POST', headers: { 'content-type': 'application/json' },
+                       body: JSON.stringify({ url: href }) }).catch(function () {});
+    };
+    return a;
+  }
+
+  var ISSUE = /^https:\/\/github\.com\/[\w.-]{1,39}\/[\w.-]{1,100}\/(issues|pull)\/\d{1,7}$/;
+
+  /* A ticket's text opens with its issue number (`#134 restore the inbox`). The number
+     becomes a permalink: to the row's own `url` when it carries a valid one, otherwise to
+     the desk's repo, and to nothing at all when the desk names no repo — a link to a guessed
+     tracker is worse than plain text. */
+  function ticketRow(li, q) {
+    var m = /^#(\d+)\s+([\s\S]+)$/.exec(q.text || '');
+    var href = typeof q.url === 'string' && ISSUE.test(q.url) ? q.url
+             : m && DESK.repo ? 'https://github.com/' + DESK.repo + '/issues/' + m[1]
+             : null;
+    if (m && href) {
+      li.appendChild(permalink('#' + m[1], href));
+      li.appendChild(document.createTextNode(' ' + m[2]));
+    } else {
+      li.appendChild(document.createTextNode(q.text));
+    }
+    actions(li, q);
+  }
+
+  function paint(open) {
+    var el = list(), tickEl = document.getElementById('ticketlist'),
+        wrap = document.getElementById('ticketwrap');
+    if (!el || !tickEl) return;
+    el.innerHTML = '';
+    tickEl.innerHTML = '';
+
+    /* Three tiers, then the suggestions. Stuck first — things already decided that then
+       quietly failed to happen, which must not queue politely behind anything. Then tasks,
+       which are work waiting for a disposition. Then questions, which only need a word.
+       Tickets last, in their own rail: they are suggestions, not obligations. */
+    var kind    = function (k) { return function (q) { return !q.stuck && q.kind === k; }; },
+        stuck   = open.filter(function (q) { return q.stuck; }),
+        tasks   = open.filter(kind('task')),
+        tickets = open.filter(kind('ticket')),
+        asks    = open.filter(function (q) {
+                    return !q.stuck && q.kind !== 'task' && q.kind !== 'ticket'; }),
+        ordered = stuck.concat(tasks, asks, tickets);
+    if (wrap) wrap.hidden = !tickets.length;
 
     ordered.forEach(function (q) {
       var li   = document.createElement('li'),
           opts = Array.isArray(q.options) ? q.options : [];
       if (q.stuck) li.className = 'stuck';
+
+      if (q.kind === 'ticket' && !q.stuck) {
+        li.className = 'tick' + (q.queued ? ' queued ' + q.queued : '');
+        ticketRow(li, q);
+        tickEl.appendChild(li);
+        return;
+      }
 
       if (q.kind === 'task') {
         /* The queue name rides along as a class, so "up next" and "out with agents" can
@@ -400,17 +592,7 @@ DESK.inits.push(function () {
           tag.textContent = q.queued === 'agents' ? 'to agents' : 'up next';
           li.appendChild(tag);
         }
-        /* Emoji rather than words: three buttons per row, and at this size a label would
-           cost more width than the whole rest of the line. */
-        [['⏭️', 'do this next', 'next'],
-         ['🤖', 'dispatch to agents', 'agents'],
-         ['🗑️', 'remove from the inbox', 'drop']
-        ].forEach(function (spec) {
-          var b = document.createElement('button');
-          b.className = 'act'; b.textContent = spec[0]; b.title = spec[1];
-          b.onclick = function () { act(q.id, spec[2]); };
-          li.appendChild(b);
-        });
+        actions(li, q);
         el.appendChild(li);
         return;
       }
@@ -438,11 +620,16 @@ DESK.inits.push(function () {
 
       el.appendChild(li);
     });
-    none().hidden = open.length > 0;
-    head().textContent = !open.length ? 'clear'
-                     : stuck.length ? open.length + ' waiting on you, ' + stuck.length + ' stuck'
-                     :                open.length + ' waiting on you';
+    /* Tickets are suggestions, not obligations, so they stay out of the count — "20
+       waiting on you" would be a lie told by the assistant's own to-do list. */
+    var owed = stuck.length + tasks.length + asks.length;
+    none().hidden = owed > 0;
+    head().textContent = !owed ? 'clear'
+                     : stuck.length ? owed + ' waiting on you, ' + stuck.length + ' stuck'
+                     :                owed + ' waiting on you';
   }
+
+  var lastOpen = null;
 
   function load() {
     return fetch('/questions', { cache: 'no-store' })
@@ -450,14 +637,110 @@ DESK.inits.push(function () {
       .then(function (d) {
         var open = (d.questions || []).filter(function (q) { return !q.answer; }),
             key  = JSON.stringify(open);
+        lastOpen = open;
         if (key !== shown) { shown = key; paint(open); }   // repaint only on real change
       })
       .catch(function () {});
   }
 
-  load();
+  /* Pull requests, in two lists split by GitHub authorship. An agent that pushes under the
+     owner's token IS the owner here — the account is the author, not whose hands moved. */
+  var lastPRs = null;
+
+  var PR_TAG = { land: 'land requested', agent: 'to agents' };
+  var REVIEW = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested',
+                 REVIEW_REQUIRED: 'review required' };
+
+  function prRow(pr, repo) {
+    var li = document.createElement('li');
+    /* `ai` tints the text; it never changes which list the row is in. Ownership and
+       authorship are different questions and the layout should not blur them. */
+    li.className = 'tick' + (pr.draft ? ' agents' : '') + (pr.ai ? ' byai' : '');
+    li.appendChild(permalink('#' + pr.number, 'https://github.com/' + repo + '/pull/' + pr.number));
+    li.appendChild(document.createTextNode(' ' + pr.title));
+
+    var word = PR_TAG[pr.intent] || (pr.draft ? 'draft' : '') ||
+               (pr.review ? REVIEW[pr.review] || String(pr.review).toLowerCase() : '');
+    if (word) {
+      var tag = document.createElement('span');
+      tag.className = 'qd'; tag.textContent = word;
+      li.appendChild(tag);
+    }
+
+    /* These RECORD an intention; none of them acts on GitHub. Landing a PR merges it into a
+       protected branch, and that needs asking every time — not a button that does it
+       quietly. So the button says "I want this landed", the desk writes that to its config
+       and its audit log, and the merge stays a thing a person authorises out loud. One
+       drawing for both lists, green where the PR is yours and teal where it is not — keyed
+       in CSS off the list, so a row cannot be tinted for a list it is not in. */
+    [[icon('land', 'land'), 'land this — records the request; the merge still needs asking', 'land'],
+     ['🤖', 'hand this to agents', 'agent'],
+     ['🗑️', 'remove from this list (it stays open on GitHub)', 'drop']
+    ].forEach(function (spec) {
+      li.appendChild(actBtn(spec, function () {
+        fetch('/pr', { method: 'POST', headers: { 'content-type': 'application/json' },
+                       body: JSON.stringify({ number: pr.number, action: spec[2] }) })
+          .then(loadPRs).catch(function () {});
+      }));
+    });
+    return li;
+  }
+
+  function paintPRs(d) {
+    var note = document.getElementById('prnote');
+    if (note) {
+      var say = d.error || d.warning || '';
+      note.textContent = say ? 'pull requests: ' + say : '';
+      note.hidden = !say;
+    }
+    [['prmine', 'prminewrap', d.mine], ['prtheir', 'prtheirwrap', d.theirs]]
+      .forEach(function (spec) {
+        var el = document.getElementById(spec[0]), wrap = document.getElementById(spec[1]),
+            rows = d.repo ? spec[2] || [] : [];
+        if (!el || !wrap) return;
+        el.innerHTML = '';
+        rows.forEach(function (pr) { el.appendChild(prRow(pr, d.repo)); });
+        wrap.hidden = !rows.length;
+      });
+  }
+
+  function loadPRs() {
+    return fetch('/prs', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var repoChanged = DESK.repo !== (d.repo || null);
+        DESK.repo = d.repo || null;
+        lastPRs = d;
+        paintPRs(d);
+        /* Ticket permalinks are built from the repo, so a repo that arrived or changed
+           means the tickets must be drawn again. */
+        if (repoChanged && lastOpen) { shown = JSON.stringify(lastOpen); paint(lastOpen); }
+      })
+      .catch(function () {
+        paintPRs({ repo: DESK.repo, mine: [], theirs: [],
+                   error: 'the desk server did not answer', warning: null });
+      });
+  }
+
+  /* On first paint and after every hot-swap. The swap replaces `<main>`, inbox and all, so
+     the freshly swapped lists are empty while `shown` — a change-detector over the DATA —
+     still matches: the next poll would decide nothing had changed and leave the inbox blank
+     until a question happened to move. So the cache is dropped and the last known rows are
+     painted at once, then both lists reconcile with the server. */
+  DESK.inits.push(function () {
+    shown = null;
+    if (lastOpen) { shown = JSON.stringify(lastOpen); paint(lastOpen); }
+    if (lastPRs) paintPRs(lastPRs);
+    load();
+    loadPRs();
+  });
+
   clearInterval(window.__inboxPoll);          // idempotent: one poll, however often this runs
   window.__inboxPoll = setInterval(load, 3000);
+  /* Far slower than the questions: each refresh can cost a round trip through gh, and open
+     PRs do not change on a three-second cadence. The server caches for the same minute. */
+  clearInterval(window.__prPoll);
+  window.__prPoll = setInterval(loadPRs, 60000);
 })();
 
 // First paint. After this, `deskSwap` re-runs the same list against the swapped subtree.

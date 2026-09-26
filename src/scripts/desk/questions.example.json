@@ -39,6 +39,27 @@
       "asked": "2026-08-28T22:10:00.000Z",
       "answer": "ok",
       "answeredAt": "2026-08-28T22:11:04.000Z"
+    },
+    {
+      "id": "ticket-134",
+      "kind": "ticket",
+      "text": "#134 restore the inbox's issues and pull requests",
+      "asked": "2026-09-26T09:00:00.000Z"
+    },
+    {
+      "id": "ticket-elsewhere",
+      "kind": "ticket",
+      "text": "#712 a ticket on another tracker carries its own permalink",
+      "url": "https://github.com/your-account/another-repo/issues/712",
+      "asked": "2026-09-26T09:00:00.000Z"
+    }
+  ],
+  "reserve": [
+    {
+      "id": "ticket-140",
+      "kind": "ticket",
+      "text": "#140 waits on the bench until a ticket above is dropped",
+      "asked": "2026-09-26T09:00:00.000Z"
     }
   ]
 }

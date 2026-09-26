@@ -1002,7 +1002,7 @@ node src/scripts/desk/panel.mjs <desk directory>
 ```
 
 **The mechanism ships; a desk's contents do not.** `src/scripts/desk/` holds the server
-(`node:http`, `node:sqlite`, `node:fs`, and nothing else), the card module, the structural
+(`node:` modules and nothing else), the card, guard and inbox modules, the structural
 shell, and two icons — identical for every desk. A desk's cards, name, questions, board,
 and vendored libraries live in a desk directory named on the command line, which this
 repository knows nothing about. The state files carry `.example` siblings for their shape
@@ -1022,7 +1022,8 @@ and threw on every load. Removing a directory cannot miss two of three edits.
 | Put away | Reversible; the id joins `hidden` in `desk-config.json` and the tray offers it back |
 | Forget | Deletes the directory outright — no tombstones, no shadow copies |
 | Card JS | Must be safe to re-run, and must return early when its own element is absent |
-| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line; answers are one-way and print to the server log |
+| Inbox | Questions inline (one to three options become buttons), tasks and stuck rows on their own line, tickets in a rail below; answers are one-way and print to the server log |
+| Pull requests | The desk's repo (`SELF_EXPRESSION_DESK_REPO`, else `repo` in `desk-config.json`, never guessed) lists its open PRs in two lists — out by me, out by someone else — by GitHub account, via a cached `gh pr list`. *land*, *agents* and *drop* only record intent in the desk config and `audit.jsonl`; nothing is written to GitHub. No repo or no `gh` shows a line saying so, not a blank |
 | Renewal | `<main>` is swapped in place so paint, fonts, scroll and the element registry survive; a changed script or style signature falls back to a real reload |
 
 ### Drawing an answer onto it (issue #93)
