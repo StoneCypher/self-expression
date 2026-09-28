@@ -84,7 +84,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@commitlint/config-conventional": "^21.2.3",
-    "@eslint/css": "^1.4.0",
+    "@eslint/css": "^2.0.0",
     "@eslint/js": "^10.0.1",
     "@eslint/markdown": "^8.0.3",
     "@faker-js/faker": "^10.6.0",
