@@ -1,0 +1,3 @@
+{"number":135,"intent":"land","note":"recorded only; no GitHub write","at":"2026-09-26T09:12:04.114Z","action":"pr.intent"}
+{"url":"https://github.com/your-account/your-repo/pull/135","via":"explorer.exe","at":"2026-09-26T09:12:31.020Z","action":"open.allowed"}
+{"url":"file:///C:/Windows/System32","at":"2026-09-26T09:13:02.551Z","action":"open.refused"}

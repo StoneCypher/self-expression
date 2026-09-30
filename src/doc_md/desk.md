@@ -24,6 +24,9 @@ src/scripts/desk/                 the mechanism — checked in, identical everyw
 ├── panel.mjs                     the server: node:http, node:sqlite, node:fs, nothing else
 ├── deskcards.mjs                 the card deck: list, render, remove, assemble
 ├── deskcards.d.mts               hand-written types, so the tests see the contract
+├── deskguard.mjs                 the request guard: host, origin, content type
+├── deskinbox.mjs                 the inbox: pull requests, intents, permalinks, questions
+├── deskinbox.d.mts               its hand-written types
 ├── desk-shell.html               structure only, with three card placeholders
 ├── panel.html                    the second surface, still monolithic
 ├── icon-john.svg  icon-claude.svg
@@ -36,9 +39,10 @@ src/scripts/desk/                 the mechanism — checked in, identical everyw
 │       ├── card.html             one <section data-card="sankey"> …
 │       ├── card.css              rules this card owns, and nothing else
 │       └── card.js               a DESK.inits.push(…) builder
-├── desk-config.json              the desk's name and its put-away list
+├── desk-config.json              the desk's name, put-away list, repo, and PR intents
 ├── questions.json                the inbox: what is waiting on the desk's owner
 ├── inbox.jsonl                   append-only record of what the owner sent back
+├── audit.jsonl                   append-only record of PR intents and opened links
 ├── geometry.json                 the last frame the page measured of itself
 ├── board.md                      whatever the desk wants to show as text
 ├── importmap.json                bare specifiers this desk resolves
@@ -56,7 +60,10 @@ node src/scripts/desk/panel.mjs <desk directory>
 The desk directory can also come from `SELF_EXPRESSION_DESK`; with neither, the server prints a
 usage line and exits rather than adopting the working directory — a desk is deliberately not a
 default location, because `gone` deletes card directories beneath it.
-directory. `SELF_EXPRESSION_DESK_PORT` moves it off 7373, which is what a second desk needs.
+`SELF_EXPRESSION_DESK_PORT` moves it off 7373, which is what a second desk needs.
+`SELF_EXPRESSION_DESK_REPO` names the GitHub repo whose pull requests the inbox lists, and
+overrides `desk-config.json`'s `repo`; `SELF_EXPRESSION_DESK_GH` names the `gh` binary when it
+is not on the path.
 `SELF_EXPRESSION_AFFECT_LOG` points at the affect log the history charts read; with no log
 present the server says so once and the rest of the desk works unchanged, because one
 desk's database must never be a requirement of the mechanism.
@@ -198,13 +205,14 @@ owner. It is a file rather than an endpoint on purpose — a restarted server mu
 what is outstanding, and a session can raise a question by writing the file, with no running
 handle required. A row with an `answer` stops being offered; the row stays.
 
-Rows come in three kinds, and each gets the treatment it earns:
+Rows come in four kinds, and each gets the treatment it earns:
 
 | Kind | Marked by | How it reads |
 |---|---|---|
 | Question | neither field | inline, bulleted; one to three `options` become buttons |
 | Task | `"kind": "task"` | its own row, with three action buttons |
 | Stuck | `"stuck": true` | its own row, in red, sorted above everything |
+| Ticket | `"kind": "ticket"` | a pill in its own rail below everything; not counted as owed |
 
 **Questions** are inline because most of them need a word, and a page of full-width rows for
 one-word questions reads as a wall. Options become buttons only up to three: past that they
@@ -229,6 +237,63 @@ Nothing is pushed back into a session, because nothing here can guarantee a sess
 listening, and a channel that claimed delivery it could not make would be worse than no
 channel. An answer is also idempotent — a second click on an answered question is a stray
 double-click, not a change of mind.
+
+**Tickets** are the assistant's suggestions of what to pick up next — `"#134 restore the
+inbox"` — and carry the same three verbs as tasks. They sit in their own rail below every row
+that is actually waiting, and they are left out of the "waiting on you" count, which would
+otherwise be a lie told by the assistant's own to-do list. The leading `#N` becomes a
+permalink to issue N in the desk's repo, or to the row's own `url` when it carries a valid
+issue or PR permalink; with no repo and no `url` it stays plain text, because a link to a
+guessed tracker is worse than none. The rail is a fixed-size shortlist rather than a queue
+that drains: dropping a ticket promotes the next one off `questions.json`'s `reserve` bench,
+and when the bench is empty the rail simply shrinks.
+
+Every write to `questions.json` is atomic (written beside the file and renamed over it), and a
+read that lands mid-edit serves the last good copy, so the inbox never blinks empty because
+someone was saving the file.
+
+&nbsp;
+
+## Pull requests in the inbox
+
+When the desk names a repo, the inbox also lists that repo's **open pull requests**, in two
+lists: *out by me* and *out by someone else*. The split is by the GitHub account that opened
+each PR — an agent pushing under the owner's token is the owner, as far as GitHub and the
+desk are concerned. Whether an agent wrote it is a separate fact: a PR labelled `Created by
+AI` is tinted, but never moved between lists. Each row's number is a permalink, and its tag
+says *land requested*, *to agents*, *draft*, or the review state.
+
+The repo comes from `SELF_EXPRESSION_DESK_REPO`, else `desk-config.json`'s `repo`, else
+nowhere. There is deliberately no fallback — not the working directory's remote, not this
+plugin's own repository — for the same reason there is no default desk: a desk that guessed
+would list someone else's pull requests and point every ticket at the wrong tracker, and
+nothing on the page would say so.
+
+The list comes from `gh pr list`, run by the server with no shell and fixed arguments, and
+cached for a minute; the page asks once a minute too. What is cached is GitHub's answer, not
+the split, so hiding a PR or recording an intent shows on the next request. **The inbox never
+goes blank without saying why**: with no repo configured, no `gh` installed, `gh` not signed
+in, or `gh` failing, the lists stay empty and a line above them says which. When `gh` cannot
+say who the owner is, every PR is listed as someone else's, and the line says that too.
+
+Each PR row has three buttons, and **none of them touches GitHub**:
+
+| Button | Records |
+|---|---|
+| land | `prIntent[N] = "land"` — the owner wants it merged. Merging into a protected branch is a thing to be asked about every time, so the desk writes the wish down and the merge still needs a person to say yes out loud. |
+| agents | `prIntent[N] = "agent"` — hand it to agents. |
+| drop | adds N to `prHidden` and forgets its intent. The PR stays open on GitHub; it is only gone from this desk. |
+
+Each one is also appended to `audit.jsonl` (`"action": "pr.intent"`, `"note": "recorded only;
+no GitHub write"`), along with refusals. The desk is reachable over loopback and never passes
+through a session's permission prompts, so its side effects are logged to be reviewable
+afterwards by someone who was not there; `/audit` serves the newest rows.
+
+Clicking a permalink does not follow it. Followed normally, a link would navigate the desk
+itself away whenever it is shown in an editor's embedded browser, so the page posts the URL to
+`/open` and the server hands it to the operating system's opener, which starts the browser the
+owner actually uses. `/open` accepts only an exact GitHub issue or pull-request permalink and
+refuses everything else, and both outcomes are audited.
 
 &nbsp;
 
@@ -262,14 +327,18 @@ None of these files ship with the mechanism. Each has an `.example` beside `pane
 carrying its shape and nothing else.
 
 - **`desk-config.json`** — `name` (the desk's title, editable by clicking it), `hidden` (put
-  away, offered back), `gone` (deletions that failed). Merged rather than replaced on every
-  write, because the name and the put-away list are written by two different controls and
-  either one posting alone must not erase the other.
-- **`questions.json`** — `{ "questions": [ … ] }`; each row has `id`, `text`, `asked`, and
-  optionally `options`, `kind`, `stuck`, `answer`, `answeredAt`, `dismissed`, `queued`,
-  `queuedAt`.
+  away, offered back), `gone` (deletions that failed), `repo` (the `owner/name` whose pull
+  requests the inbox lists), `prIntent` (PR number → `land` or `agent`), `prHidden` (PR numbers
+  dropped from this desk). Merged rather than replaced on every write, because these are
+  written by different controls and one posting alone must not erase the others.
+- **`questions.json`** — `{ "questions": [ … ], "reserve": [ … ] }`; each row has `id`,
+  `text`, `asked`, and optionally `options`, `kind` (`task` or `ticket`), `stuck`, `url`,
+  `answer`, `answeredAt`, `dismissed`, `queued`, `queuedAt`. `reserve` is the bench of tickets
+  that refill the rail.
 - **`inbox.jsonl`** — append-only, one JSON object per line: `n`, `at`, and whatever the page
   sent, which is usually `kind`, `surface` and `value`.
+- **`audit.jsonl`** — append-only, one JSON object per line: `at`, `action` (`pr.intent`,
+  `pr.intent.refused`, `open.allowed`, `open.refused`), and what it acted on.
 - **`geometry.json`** — overwritten, never appended: only the current frame is interesting.
 
 &nbsp;
@@ -285,6 +354,8 @@ carrying its shape and nothing else.
   exactly the shape of the failure this mechanism exists to end — markup in the shell
   outliving the thing it was added for, and throwing on load. A dependency belongs to the
   card that needs it, and leaves with it.
-- **No dependencies at all.** `panel.mjs` imports from `node:` and from `deskcards.mjs`, and
-  that is the complete list. It is meant to be started, used, killed and forgotten without
-  installing anything or leaving anything behind.
+- **No dependencies at all.** `panel.mjs` imports from `node:` and from `deskcards.mjs`,
+  `deskguard.mjs` and `deskinbox.mjs` beside it, and that is the complete list. It is meant to
+  be started, used, killed and forgotten without installing anything or leaving anything
+  behind. The GitHub CLI is used when present and a repo is named, and never required: without
+  it the inbox says so and every other part of the desk works unchanged.
