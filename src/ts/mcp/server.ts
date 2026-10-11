@@ -25,7 +25,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { openStore, closeStore } from '../channels/store.js';
 import { serverHostIdentity, withHost } from '../channels/host.js';
-import { onboardingInstructions } from '../channels/onboarding.js';
+import { onboardingInstructions, purgeRetiredSettings } from '../channels/onboarding.js';
 import { injectMode }           from '../channels/config.js';
 import {
   availableConventions, conventionsPointer, defaultConventionsRoot, packageRoot,
@@ -85,7 +85,7 @@ export const SERVER_NAME = 'self-expression';
  *
  * @example
  *   serverInstructions(store, availableConventions('/pkg'))
- *   // => 'Onboarding pending (9 questions). … The conventions these tools assume …'
+ *   // => 'Onboarding pending (8 questions). … The conventions these tools assume …'
  *
  * @see ../channels/onboarding.js onboardingInstructions
  * @see ../channels/conventions.js conventionsPointer
@@ -248,8 +248,8 @@ async function loadKitOrNote(root: string): Promise<CardKit | null> {
 }
 
 /**
- * Open the store, run startup retention, build the server, and serve on stdio until
- * the transport closes.
+ * Open the store, delete retired settings, run startup retention, build the server, and
+ * serve on stdio until the transport closes.
  *
  * Resolves when the connection ends. `dbFile` is injectable for tests; it defaults to
  * the resolved data directory.
@@ -276,8 +276,23 @@ export async function startStdio(version: string, dbFile?: string, bundleDir?: s
   // what lets an unscoped express find this session's turn rather than the newest turn
   // of whichever session wrote last.
   const opened    = dbFile === undefined ? openStore() : openStore(dbFile),
-        store     = withHost(opened, serverHostIdentity(process.env, process.ppid, new Date())),
-        house     = maybeOpenDwelling(store),
+        store     = withHost(opened, serverHostIdentity(process.env, process.ppid, new Date()));
+
+  // Retired settings (#42): delete what a removed feature left behind, before anything
+  // reads configuration. Like retention, a failure here must not keep the server from
+  // starting — a leftover row is inert — so it fails open with a stderr note.
+  try {
+    const purged = purgeRetiredSettings(store);
+    if (purged.configRows > 0 || purged.ledgerIds > 0) {
+      process.stderr.write(
+        `${SERVER_NAME}: removed ${String(purged.configRows)} retired config rows and ` +
+        `${String(purged.ledgerIds)} retired onboarding answers\n`);
+    }
+  } catch (error) {
+    process.stderr.write(`${SERVER_NAME}: retired-settings cleanup failed, continuing: ${String(error)}\n`);
+  }
+
+  const house     = maybeOpenDwelling(store),
         root      = bundleDir === undefined ? undefined : packageRoot(bundleDir),
         picture   = resolveImageFacility(store),
         kit       = root === undefined ? null : await loadKitOrNote(root),

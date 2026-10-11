@@ -5,7 +5,7 @@ import { join }                from 'node:path';
 import { openStore, closeStore, writeConfig, deleteConfig, readConfig } from '../channels/store.js';
 import type { Store } from '../channels/store.js';
 import {
-  FORMAT_VERSION, CONFIG_KEYS, configKey,
+  FORMAT_VERSION, CONFIG_KEYS, RETIRED_CONFIG_KEYS, configKey,
   DEFAULT_CHANNEL_MAX_CHARS, MAX_TEXT_CEILING, MIN_CHANNEL_MAX_CHARS,
   channelMaxChars, channelMaxCharsKey,
   validateBool, intValidator, validateChannelList, stringValidator, choiceValidator,
@@ -24,7 +24,7 @@ function withStore<T>(fn: (s: Store) => T): T {
 
 describe('CONFIG_KEYS registry', () => {
 
-  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the two desk keys, the five #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys, and the three format-gate keys', () => {
+  test('registers exactly the settled surface: the eight #30 keys, the three dwelling keys, the two desk keys, the four #42 keys, the two #41 keys, the six #43 mailbox keys, the three #31 share keys, the eleven #44 audio keys, the eleven #78 image keys, the #40 onboarding ledger, the twelve #76 length keys, the #18 quote key, the #16 replay key, and the two window-posture keys, and the three format-gate keys', () => {
     expect(CONFIG_KEYS.map(def => def.key).sort()).toEqual([
       'audio.enabled', 'audio.hourly_budget', 'audio.hourly_budget_attention',
       'audio.min_gap_seconds', 'audio.tts_local', 'audio.volume_ceiling',
@@ -41,7 +41,6 @@ describe('CONFIG_KEYS registry', () => {
       'dwelling.enabled', 'dwelling.path', 'dwelling.size_warn_gb',
       'forecast.enabled', 'format.version', 'gate.checklist', 'gate.lists',
       'gate.open_line', 'gate.signature', 'gate.signature_line',
-      'gifts.enabled',
       'image.api_key_env', 'image.automatic1111.api_key_env', 'image.daily_cap',
       'image.enabled', 'image.local_base_url', 'image.model',
       'image.nanobanana.api_key_env', 'image.openai.api_key_env', 'image.provider',
@@ -113,8 +112,16 @@ describe('CONFIG_KEYS registry', () => {
     expect(configKey('forecast.enabled')).toMatchObject({ kind: 'bool', fallback: 'true' });
     expect(configKey('salience.enabled')).toMatchObject({ kind: 'bool', fallback: 'true' });
     expect(configKey('revision.enabled')).toMatchObject({ kind: 'bool', fallback: 'false' });
-    expect(configKey('gifts.enabled')).toMatchObject({ kind: 'bool', fallback: 'false' });
     expect(configKey('roster.enabled')).toMatchObject({ kind: 'bool', fallback: 'false' });
+  });
+
+  test('gifts.enabled is no longer registered — the never-specified gift register was removed', () => {
+    expect(configKey('gifts.enabled')).toBeUndefined();
+  });
+
+  test('the retired keys are exactly gifts.enabled, and no retired key is still registered', () => {
+    expect(RETIRED_CONFIG_KEYS).toEqual(['gifts.enabled']);
+    for (const key of RETIRED_CONFIG_KEYS) { expect(configKey(key)).toBeUndefined(); }
   });
 
   test("every key with a default validates its own default's canonical form", () => {

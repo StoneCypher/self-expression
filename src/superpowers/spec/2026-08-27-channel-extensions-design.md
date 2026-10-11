@@ -7,6 +7,10 @@ glyph, typed silence, self-state decorations, taste line")
 Nothing below lands until it is approved; the implementation checklist at the end is the
 work that follows approval. This spec must not close #42 — implementation does.
 
+> **2026-10-11:** the gift register (`gifts.enabled`) was removed — config key,
+> conventions flag, and onboarding question — because it was never specified ("spec
+> elsewhere" never arrived) or implemented. Mentions below are kept as history.
+
 ## Goal
 
 Six extensions to the expression vocabulary were agreed in the 2026-08-27 design

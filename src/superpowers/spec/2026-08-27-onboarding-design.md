@@ -7,6 +7,10 @@ already-decided config keys from #30, #42, #45, and the party-roster skill into 
 first-run questionnaire mechanism; it deliberately invents no keys of its own beyond
 the one ledger key that records questionnaire progress.
 
+> **2026-10-11:** the `gifts` question and its `gifts.enabled` key were removed, because
+> the gift register was never specified or implemented. A stored `gifts` ledger id or
+> `gifts.enabled` row is deleted at server startup. Mentions below are kept as history.
+
 ## Goal
 
 Several features of this plugin are durably toggleable, and several of them default

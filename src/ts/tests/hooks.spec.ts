@@ -143,7 +143,7 @@ describe('onUserPromptSubmit', () => {
     const context = String(
       (onUserPromptSubmit(s, { session_id: 'x' }, NOW) as
         { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext);
-    expect(context).toContain('conventions: salience:on revision:off gifts:off roster:off');
+    expect(context).toContain('conventions: salience:on revision:off roster:off');
     expect(context.indexOf('2:05 pm')).toBeLessThan(context.indexOf('conventions:'));
     expect(context.indexOf('conventions:')).toBeLessThan(context.indexOf(OPEN_REMINDER));
   }));
@@ -161,19 +161,30 @@ describe('onUserPromptSubmit', () => {
 describe('conventionFlags', () => {
 
   test('renders the code-side defaults when nothing is configured', () => withStore(s => {
-    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off gifts:off roster:off');
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off roster:off');
   }));
+
+  test('the declared conventions are exactly salience, revision, and roster, in that order', () => {
+    expect(CONVENTION_FLAGS.map(({ label }) => label)).toEqual(['salience', 'revision', 'roster']);
+  });
 
   test('an override flips its flag in the rendered segment', () => withStore(s => {
     writeConfig(s, 'salience.enabled', false);
     writeConfig(s, 'revision.enabled', true);
-    expect(conventionFlags(s)).toBe('conventions: salience:off revision:on gifts:off roster:off');
+    expect(conventionFlags(s)).toBe('conventions: salience:off revision:on roster:off');
   }));
 
   test('only the exact strings true and false override; anything else falls back', () => withStore(s => {
     writeConfig(s, 'salience.enabled', 'off');    // a typo, not a setting
-    writeConfig(s, 'gifts.enabled',    'yes');    // likewise
-    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off gifts:off roster:off');
+    writeConfig(s, 'roster.enabled',   'yes');    // likewise
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off roster:off');
+  }));
+
+  test('a stored row for the removed gifts.enabled key never reaches the segment', () => withStore(s => {
+    writeConfig(s, 'gifts.enabled', 'false');
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off roster:off');
+    writeConfig(s, 'gifts.enabled', 'true');
+    expect(conventionFlags(s)).toBe('conventions: salience:on revision:off roster:off');
   }));
 
   test('every declared convention appears in the segment exactly once', () => withStore(s => {

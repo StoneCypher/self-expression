@@ -293,7 +293,6 @@ The registered keys:
 | `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
 | `salience.enabled` | bool | `true` | The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's `conventions:` segment. |
 | `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
-| `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
 | `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
@@ -389,7 +388,11 @@ window keys that direction is `ask` — the safe one; an unreadable posture is n
 read as permission. The privacy and `time.hook` switches additionally act only on the
 exact string `false` — an ambiguous value records rather than silently suppressing.
 `share.enabled` inverts that: only the exact string `true` enables, and anything else
-means no.
+means no. A stored row for a key this version does not know may have been written by a
+newer version, so it is preserved, listed by `configure list` as unknown, and otherwise
+never read. The one exception is a key this version knows it retired — today only the
+never-specified `gifts.enabled` — whose row, and whose `gifts` onboarding answer, the
+server deletes at startup.
 
 &nbsp;
 
@@ -401,7 +404,7 @@ Several features are durably toggleable and default off precisely because they a
 matters of taste, size, or consent. On a fresh database the server's MCP handshake
 says onboarding is pending, and the assistant offers a short questionnaire — at a
 natural pause, never interrupting the work: the party roster, forecasts, visible
-revision, the ⭑ salience glyph, the taste line, the gift register, held notes (whether
+revision, the ⭑ salience glyph, the taste line, held notes (whether
 the assistant may write something down at a moment of its own choosing for you to read
 later), the dwelling (which requires a directory of your choosing — there is deliberately
 no default path), and trimming the channel set.

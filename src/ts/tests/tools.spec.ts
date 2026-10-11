@@ -9,6 +9,7 @@ import {
 } from '../channels/context.js';
 import { recentEntries, register } from '../channels/entries.js';
 import { pruneExpired }  from '../channels/retention.js';
+import { purgeRetiredSettings } from '../channels/onboarding.js';
 import {
   FORMAT_VERSION, CONFIG_KEYS, MAX_TEXT_CEILING, channelMaxCharsKey,
 } from '../channels/config.js';
@@ -266,8 +267,20 @@ describe('handleConfigure list — D4, effective configuration', () => {
     expect(by('forecast.enabled')).toMatchObject({ value: 'true',  source: 'default' });
     expect(by('salience.enabled')).toMatchObject({ value: 'true',  source: 'default' });
     expect(by('revision.enabled')).toMatchObject({ value: 'false', source: 'default' });
-    expect(by('gifts.enabled')).toMatchObject({ value: 'false', source: 'default' });
     expect(by('roster.enabled')).toMatchObject({ value: 'false', source: 'default' });
+    expect(by('gifts.enabled')).toBeUndefined();
+  }));
+
+  test('after the retired-settings cleanup, configure list shows no gifts.enabled at all, while a genuinely unknown key stays listed', () => withStore(s => {
+    writeConfig(s, 'gifts.enabled', 'false');
+    writeConfig(s, 'someone.elses_key', 'opaque');
+    purgeRetiredSettings(s);
+    const parsed = JSON.parse(text(handleConfigure(s, { op: 'list' }))) as
+      { key: string; value: string | null; source: string; known: boolean }[];
+    expect(parsed.filter(e => e.key === 'gifts.enabled')).toEqual([]);
+    expect(parsed.filter(e => !e.known).map(e => e.key)).toEqual(['someone.elses_key']);
+    expect(parsed.filter(e => e.known).map(e => e.key).sort())
+      .toEqual(CONFIG_KEYS.map(def => def.key).sort());
   }));
 
 });
