@@ -75,7 +75,7 @@ export const FORECAST_KEY = 'forecast.enabled';
  *
  * Deliberately excludes keys that are re-checked per call instead — `messages.enabled`,
  * `mailbox.enabled`, and the hook-time toggles (`salience.enabled`, `revision.enabled`,
- * `gifts.enabled`, `roster.enabled`): those are live immediately, and a restart notice
+ * `roster.enabled`): those are live immediately, and a restart notice
  * on them would be a lie in the other direction. Also excludes `dwelling.enabled` /
  * `dwelling.path`, which carry their own startup-notice mechanism
  * ({@link ../dwelling/config.js dwellingChangeNotice}) predating this one.

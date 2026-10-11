@@ -17,7 +17,7 @@ import { CHANNELS }   from '../channels/vocabulary.js';
 import {
   ANSWERED_KEY, QUESTIONS, QUESTION_IDS, onboardingQuestion, answeredIds,
   questionResolved, pendingQuestions, resolveQuestion, resetOnboarding,
-  onboardingInstructions,
+  onboardingInstructions, RETIRED_QUESTION_IDS, purgeRetiredSettings,
 } from '../channels/onboarding.js';
 import { handleOnboard, ENABLED_KEY } from '../mcp/tools.js';
 import { buildServer } from '../mcp/server.js';
@@ -67,16 +67,22 @@ describe('registry integrity — the questionnaire inherits its keys from their 
     }
   });
 
-  test('the questionnaire matches the issue-thread verdicts: roster off, forecast on, revision off, salience on, taste on, gifts off, dwelling off, channels all', () => {
+  test('the questionnaire matches the issue-thread verdicts: roster off, forecast on, revision off, salience on, taste on, mailbox off, dwelling off, channels all', () => {
     const byId = (id: string): string => onboardingQuestion(id)?.defaultAnswer ?? '(missing)';
     expect(byId('roster')).toBe('false');
     expect(byId('forecast')).toBe('true');
     expect(byId('revision')).toBe('false');
     expect(byId('salience')).toBe('true');
     expect(byId('taste')).toBe('true');
-    expect(byId('gifts')).toBe('false');
+    expect(byId('mailbox')).toBe('false');
     expect(byId('dwelling')).toBe('false');
     expect(byId('channels')).toBe(CHANNELS.join(','));
+  });
+
+  test('the questionnaire is exactly these eight questions, in asking order — the gift register is gone', () => {
+    expect(QUESTION_IDS).toEqual(
+      ['roster', 'forecast', 'revision', 'salience', 'taste', 'mailbox', 'dwelling', 'channels']);
+    expect(onboardingQuestion('gifts')).toBeUndefined();
   });
 
   test('the dwelling is path-gated and names both of its keys', () => {
@@ -265,6 +271,12 @@ describe('onboard answer — one question per call, explicit answers always writ
     expect(out).toContain('roster');   // the valid ids are named
   }));
 
+  test('the removed gifts question can no longer be answered, and nothing is written', () => withStore(s => {
+    const out = text(handleOnboard(s, { op: 'answer', id: 'gifts', value: 'false' }));
+    expect(out).toMatch(/^error: /);
+    expect(allConfig(s)).toEqual({});
+  }));
+
 });
 
 describe('onboard answer — the dwelling carries its consent shape', () => {
@@ -367,6 +379,65 @@ describe('onboard reset — re-run onboarding without touching choices', () => {
     const pending = pendingQuestions(s).map(q => q.id);
     expect(pending).not.toContain('roster');        // answered by row, still resolved
     expect(pending).toContain('forecast');          // skipped, so pending again
+  }));
+
+});
+
+describe('purgeRetiredSettings — removed features leave nothing behind', () => {
+
+  test('the retired question ids are exactly gifts, and none is still asked', () => {
+    expect(RETIRED_QUESTION_IDS).toEqual(['gifts']);
+    for (const id of RETIRED_QUESTION_IDS) { expect(onboardingQuestion(id)).toBeUndefined(); }
+  });
+
+  test('deletes the gifts.enabled row and the gifts ledger answer, keeping everything else in order', () => withStore(s => {
+    writeConfig(s, 'gifts.enabled', 'false');
+    writeConfig(s, 'roster.enabled', 'true');
+    writeConfig(s, 'someone.elses_key', 'opaque');
+    writeConfig(s, ANSWERED_KEY, 'roster,gifts,a-future-question');
+
+    expect(purgeRetiredSettings(s)).toEqual({ configRows: 1, ledgerIds: 1 });
+
+    expect(readConfig(s, 'gifts.enabled')).toBeNull();
+    expect(answeredIds(s)).toEqual(['roster', 'a-future-question']);
+    expect(allConfig(s)).toEqual({
+      'roster.enabled'    : 'true',
+      'someone.elses_key' : 'opaque',
+      [ANSWERED_KEY]      : 'roster,a-future-question',
+    });
+  }));
+
+  test('a second run is a no-op that writes nothing', () => withStore(s => {
+    writeConfig(s, 'gifts.enabled', 'true');
+    writeConfig(s, ANSWERED_KEY, 'gifts,roster');
+    purgeRetiredSettings(s);
+    const after = s.db.prepare('SELECT key, value, updated_utc FROM config ORDER BY key').all();
+    expect(purgeRetiredSettings(s)).toEqual({ configRows: 0, ledgerIds: 0 });
+    expect(s.db.prepare('SELECT key, value, updated_utc FROM config ORDER BY key').all()).toEqual(after);
+  }));
+
+  test('a ledger holding only gifts is deleted outright — nothing resolved', () => withStore(s => {
+    writeConfig(s, ANSWERED_KEY, 'gifts');
+    expect(purgeRetiredSettings(s)).toEqual({ configRows: 0, ledgerIds: 1 });
+    expect(readConfig(s, ANSWERED_KEY)).toBeNull();
+    expect(pendingQuestions(s).map(q => q.id)).toEqual([...QUESTION_IDS]);
+  }));
+
+  test('a clean store is untouched', () => withStore(s => {
+    expect(purgeRetiredSettings(s)).toEqual({ configRows: 0, ledgerIds: 0 });
+    expect(allConfig(s)).toEqual({});
+  }));
+
+  test('after cleanup, onboard status no longer reports gifts and completion is unaffected', () => withStore(s => {
+    writeConfig(s, 'gifts.enabled', 'false');
+    resolveQuestion(s, 'gifts');
+    for (const id of QUESTION_IDS) { resolveQuestion(s, id); }
+    purgeRetiredSettings(s);
+    const parsed = JSON.parse(text(handleOnboard(s, { op: 'status' }))) as
+      { pending: unknown[]; answered: string[]; complete: boolean };
+    expect(parsed.answered).toEqual([...QUESTION_IDS]);
+    expect(parsed.pending).toEqual([]);
+    expect(parsed.complete).toBe(true);
   }));
 
 });

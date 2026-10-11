@@ -8,7 +8,8 @@
  *   question ids plus whatever unknown ids were already present, never dropping one;
  * - hand-configured keys always count as answered, whatever else has happened;
  * - `skip` writes no config rows beyond the ledger;
- * - `reset` clears exactly the ledger and touches nothing else.
+ * - `reset` clears exactly the ledger and touches nothing else;
+ * - the retired-settings cleanup removes only retired keys and ledger ids, and is idempotent.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -21,7 +22,9 @@ import { openStore, closeStore, writeConfig, allConfig } from '../channels/store
 import type { Store } from '../channels/store.js';
 import {
   ANSWERED_KEY, QUESTION_IDS, answeredIds, pendingQuestions, resolveQuestion,
+  RETIRED_QUESTION_IDS, purgeRetiredSettings,
 } from '../channels/onboarding.js';
+import { RETIRED_CONFIG_KEYS } from '../channels/config.js';
 import { handleOnboard } from '../mcp/tools.js';
 
 function withStore<T>(fn: (s: Store) => T): T {
@@ -64,7 +67,7 @@ describe('ledger invariants under arbitrary op interleavings', () => {
       fc.assert(fc.property(
         fc.array(opArb, { maxLength: 8 }),
         fc.constantFrom('roster.enabled', 'forecast.enabled', 'revision.enabled',
-                        'salience.enabled', 'gifts.enabled'),
+                        'salience.enabled', 'mailbox.enabled'),
         (ops, key) => {
 
           writeConfig(s, key, 'true');
@@ -119,6 +122,7 @@ describe('ledger invariants under arbitrary op interleavings', () => {
     withStore(s => {
       fc.assert(fc.property(
         fc.dictionary(
+          // gifts.enabled is a removed key an older version may have left behind.
           fc.constantFrom('roster.enabled', 'gifts.enabled', 'retention.days', 'someone.elses_key'),
           fc.constantFrom('true', 'false', '90', 'opaque'),
           { maxKeys: 4 }),
@@ -141,6 +145,45 @@ describe('ledger invariants under arbitrary op interleavings', () => {
         }));
     });
     // Store-backed like the property above; same flake margin, same widening.
+  }, 60_000);
+
+});
+
+describe('purgeRetiredSettings under arbitrary mixes of retired, known, and unknown data', () => {
+
+  it('removes exactly the retired keys and ledger ids; every other row and id survives in order', () => {
+    withStore(s => {
+      fc.assert(fc.property(
+        fc.dictionary(
+          fc.constantFrom(...RETIRED_CONFIG_KEYS, 'roster.enabled', 'retention.days',
+                          'someone.elses_key', 'from.a.newer.version'),
+          fc.constantFrom('true', 'false', '90', 'opaque'),
+          { maxKeys: 5 }),
+        fc.array(fc.constantFrom(...RETIRED_QUESTION_IDS, ...QUESTION_IDS, 'a-future-question'),
+                 { maxLength: 8 }),
+        (rows, ledger) => {
+
+          for (const [key, value] of Object.entries(rows)) { writeConfig(s, key, value); }
+          const ids = [...new Set(ledger)];
+          if (ids.length > 0) { writeConfig(s, ANSWERED_KEY, ids.join(',')); }
+
+          purgeRetiredSettings(s);
+
+          const after = allConfig(s);
+          for (const [key, value] of Object.entries(rows)) {
+            if (RETIRED_CONFIG_KEYS.includes(key)) { expect(after[key]).toBeUndefined(); }
+            else                                    { expect(after[key]).toBe(value); }
+          }
+          expect(answeredIds(s)).toEqual(ids.filter(id => !RETIRED_QUESTION_IDS.includes(id)));
+          expect(purgeRetiredSettings(s)).toEqual({ configRows: 0, ledgerIds: 0 });
+
+          for (const k of Object.keys(allConfig(s))) {
+            s.db.prepare('DELETE FROM config WHERE key = ?').run(k);
+          }
+
+        }));
+    });
+    // Store-backed like the properties above; same flake margin, same widening.
   }, 60_000);
 
 });

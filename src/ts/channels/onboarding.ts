@@ -23,6 +23,7 @@ import { readConfig, writeConfig, deleteConfig } from './store.js';
 import type { Store }                            from './store.js';
 import { CHANNELS }                              from './vocabulary.js';
 import type { Channel }                          from './vocabulary.js';
+import { RETIRED_CONFIG_KEYS }                   from './config.js';
 
 /**
  * Config key holding the comma-separated list of question ids that have been
@@ -93,8 +94,6 @@ export const QUESTIONS: readonly Question[] = [
     prompt: 'The # 🎨 taste line — a scarce aesthetic observation about the work ' +
             'itself? On by default; taste is a channel, so no means trimming it from ' +
             'the channel set.' },
-  { id: 'gifts', kind: 'boolean', keys: ['gifts.enabled'], defaultAnswer: 'false',
-    prompt: 'The gift register? Off by default.' },
   { id: 'mailbox', kind: 'boolean', keys: ['mailbox.enabled'], defaultAnswer: 'false',
     prompt: 'Held notes — may the assistant write something down at a moment of its own ' +
             'choosing (including an unattended wakeup) for you to read at the start of a ' +
@@ -213,6 +212,66 @@ export function resolveQuestion(store: Store, id: string): boolean {
  */
 export function resetOnboarding(store: Store): boolean {
   return deleteConfig(store, ANSWERED_KEY);
+}
+
+/**
+ * Question ids an earlier version asked and this version deliberately retired; their
+ * ledger entries are removed at server startup rather than preserved.
+ *
+ * The narrow counterpart of the unknown-ids rule above: an id merely unknown here may
+ * belong to a newer version and survives, but an id listed here is one this version
+ * knows it removed. `gifts` asked about the never-specified gift register (#42).
+ *
+ * @see purgeRetiredSettings
+ * @see ./config.js RETIRED_CONFIG_KEYS
+ */
+export const RETIRED_QUESTION_IDS: readonly string[] = ['gifts'];
+
+/** What one {@link purgeRetiredSettings} run removed. */
+export interface PurgedSettings {
+  /** Retired config rows deleted. */
+  readonly configRows : number;
+  /** Retired ids dropped from the onboarding ledger. */
+  readonly ledgerIds  : number;
+}
+
+/**
+ * Delete stored data belonging to settings this version retired: every
+ * {@link ../channels/config.js RETIRED_CONFIG_KEYS} row, and every
+ * {@link RETIRED_QUESTION_IDS} entry in the onboarding ledger.
+ *
+ * Exists so a removed feature leaves nothing behind in a user's database, rather than a
+ * row `configure list` labels unknown forever. Touches nothing else: unknown keys and
+ * unknown ledger ids — possibly a newer version's — survive verbatim, and the remaining
+ * ledger keeps its order. A ledger left empty is deleted outright, which is what "nothing
+ * resolved" already means. Idempotent: a second run finds nothing and writes nothing.
+ * Run once per server process, at startup, beside retention.
+ *
+ * @returns how many config rows and ledger ids were removed; both zero on a clean store
+ *
+ * @example
+ *   writeConfig(store, 'gifts.enabled', 'false');
+ *   writeConfig(store, 'onboarding.answered', 'roster,gifts,a-future-question');
+ *   purgeRetiredSettings(store)   // => { configRows: 1, ledgerIds: 1 }
+ *   answeredIds(store)            // => ['roster', 'a-future-question']
+ *   purgeRetiredSettings(store)   // => { configRows: 0, ledgerIds: 0 }
+ *
+ * @see ../mcp/server.js startStdio
+ */
+export function purgeRetiredSettings(store: Store): PurgedSettings {
+
+  const configRows = RETIRED_CONFIG_KEYS.filter(key => deleteConfig(store, key)).length,
+        ledger     = answeredIds(store),
+        kept       = ledger.filter(id => !RETIRED_QUESTION_IDS.includes(id)),
+        ledgerIds  = ledger.length - kept.length;
+
+  if (ledgerIds > 0) {
+    if (kept.length === 0) { deleteConfig(store, ANSWERED_KEY); }
+    else                   { writeConfig(store, ANSWERED_KEY, kept.join(',')); }
+  }
+
+  return { configRows, ledgerIds };
+
 }
 
 /**

@@ -122,11 +122,13 @@ export function describeMoment(now: Date): string {
  * code-side defaults.
  *
  * Skills are static Markdown and cannot vary by configuration, so a config key that
- * governs a pure-prose convention (the salience glyph, visible revision, the gift
- * register, the party roster) has no tool schema to be baked into. This table is the
- * transport instead: the turn-start hook reads each key and appends a compact flags
- * segment to the context line it already injects, and the skills obey the flags the
- * line carries. Adding a future skill-level toggle means adding one row here.
+ * governs a pure-prose convention (the salience glyph, visible revision, the party
+ * roster) has no tool schema to be baked into. This table is the transport instead:
+ * the turn-start hook reads each key and appends a compact flags segment to the context
+ * line it already injects, and the skills obey the flags the line carries. Adding a
+ * future skill-level toggle means adding one row here; removing one means deleting its
+ * row here and listing its key in {@link ../channels/config.js RETIRED_CONFIG_KEYS}, so
+ * the server deletes any stored row for it at startup.
  *
  * Key names and defaults coordinate with #30 (which owns the config surface); the key
  * name is the interface, not the transport.
@@ -134,13 +136,12 @@ export function describeMoment(now: Date): string {
 export const CONVENTION_FLAGS: readonly { label: string; key: string; fallback: boolean }[] = [
   { label: 'salience', key: 'salience.enabled', fallback: true  },
   { label: 'revision', key: 'revision.enabled', fallback: false },
-  { label: 'gifts',    key: 'gifts.enabled',    fallback: false },
   { label: 'roster',   key: 'roster.enabled',   fallback: false },
 ];
 
 /**
  * The context line's conventions-flags segment, e.g.
- * `conventions: salience:on revision:off gifts:off roster:off`.
+ * `conventions: salience:on revision:off roster:off`.
  *
  * Reads through the tolerant effective-value accessor (issue #30, D5), so a stored
  * override that fails its key's validator behaves as unset; the registered defaults
@@ -153,7 +154,7 @@ export const CONVENTION_FLAGS: readonly { label: string; key: string; fallback: 
  *
  * @example
  *   conventionFlags(store)
- *   // => 'conventions: salience:on revision:off gifts:off roster:off'
+ *   // => 'conventions: salience:on revision:off roster:off'
  *
  * @see CONVENTION_FLAGS
  * @see onUserPromptSubmit

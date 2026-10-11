@@ -586,9 +586,6 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
   { key: 'revision.enabled', kind: 'bool', fallback: 'false',
     description: 'the visible-revision prose convention; carried via the conventions flags',
     validate: validateBool },
-  { key: 'gifts.enabled', kind: 'bool', fallback: 'false',
-    description: 'the gift register prose convention; carried via the conventions flags',
-    validate: validateBool },
   { key: 'roster.enabled', kind: 'bool', fallback: 'false',
     description: 'the party-roster prose convention (#40); carried via the conventions flags',
     validate: validateBool },
@@ -763,6 +760,25 @@ export const CONFIG_KEYS: readonly ConfigKeyDef[] = [
       'from the next one',
     validate: choiceValidator(INJECT_MODES) },
 ];
+
+/**
+ * Config keys an earlier version registered and this version deliberately retired, whose
+ * stored rows are deleted at server startup rather than preserved.
+ *
+ * This is the one exception to D3's preserve-unknown-keys rule, and it is kept narrow on
+ * purpose: a key merely *unknown* to this version may have been written by a newer one
+ * and must survive, but a key listed here is one this version knows it removed, so a
+ * leftover row is dead data rather than someone else's setting. `gifts.enabled` was the
+ * toggle for a "gift register" convention that was never specified or implemented, and
+ * was removed on 2026-10-11 (#42).
+ *
+ * @example
+ *   RETIRED_CONFIG_KEYS.includes('gifts.enabled')      // => true
+ *   RETIRED_CONFIG_KEYS.includes('someone.elses_key')  // => false — unknown is not retired
+ *
+ * @see ./onboarding.js purgeRetiredSettings
+ */
+export const RETIRED_CONFIG_KEYS: readonly string[] = ['gifts.enabled'];
 
 /**
  * Look up one registered key's definition, or `undefined` for a key this version does

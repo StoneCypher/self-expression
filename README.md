@@ -1,10 +1,10 @@
-# self-expression v0.9.0
+# self-expression v0.9.2
 
-> Version 0.9.0 was built on Saturday, September 26, 2026 at GMT-07:00 `1790436661758` from hash `f3a7981`.
+> Version 0.9.2 was built on Sunday, October 11, 2026 at GMT-07:00 `1791743922009` from hash `060b4a5`.
 
 TODO Put the project description here, please.
 
-<!-- Supported embeds: 1790436661758 Saturday, September 26, 2026 at GMT-07:00 95.07 360 91 f3a7981 51.89 63.68 63.2 63.69 277 2822 89.5 93.91 95.41 2545 0.9.0 -->
+<!-- Supported embeds: 1791743922009 Sunday, October 11, 2026 at GMT-07:00 95 360 91 060b4a5 51.86 63.82 63.75 63.81 278 2836 89.42 93.92 95.32 2558 0.9.2 -->
 
 
 
@@ -293,7 +293,6 @@ The registered keys:
 | `forecast.enabled` | bool | `true` | Whether the `predicted` confidence ground is offered. Baked into the tool schema at server startup, like `channels.enabled`. |
 | `salience.enabled` | bool | `true` | The ⭑ salience-glyph prose convention. Carried to the static skills via the hook context line's `conventions:` segment. |
 | `revision.enabled` | bool | `false` | The visible-revision prose convention; same transport. |
-| `gifts.enabled` | bool | `false` | The gift register prose convention; same transport. |
 | `roster.enabled` | bool | `false` | The party-roster prose convention (#40); same transport. |
 | `messages.enabled` | bool | `true` | The messagebox facility (#41): kill switch for `post_message` / `read_messages`, the CLI door, and every hook delivery moment. Checked per call, so flipping it takes effect immediately. |
 | `messages.notify` | bool | `true` | The per-turn unread-count line specifically. `SessionStart` injection is governed by `messages.enabled` alone, since compaction recovery is the point of the facility. |
@@ -389,7 +388,11 @@ window keys that direction is `ask` — the safe one; an unreadable posture is n
 read as permission. The privacy and `time.hook` switches additionally act only on the
 exact string `false` — an ambiguous value records rather than silently suppressing.
 `share.enabled` inverts that: only the exact string `true` enables, and anything else
-means no.
+means no. A stored row for a key this version does not know may have been written by a
+newer version, so it is preserved, listed by `configure list` as unknown, and otherwise
+never read. The one exception is a key this version knows it retired — today only the
+never-specified `gifts.enabled` — whose row, and whose `gifts` onboarding answer, the
+server deletes at startup.
 
 &nbsp;
 
@@ -401,7 +404,7 @@ Several features are durably toggleable and default off precisely because they a
 matters of taste, size, or consent. On a fresh database the server's MCP handshake
 says onboarding is pending, and the assistant offers a short questionnaire — at a
 natural pause, never interrupting the work: the party roster, forecasts, visible
-revision, the ⭑ salience glyph, the taste line, the gift register, held notes (whether
+revision, the ⭑ salience glyph, the taste line, held notes (whether
 the assistant may write something down at a moment of its own choosing for you to read
 later), the dwelling (which requires a directory of your choosing — there is deliberately
 no default path), and trimming the channel set.
@@ -1210,19 +1213,19 @@ dwelling can `keep` the path.
   </tr>
   <tr>
     <th>Unit</th>
-    <td>2545</td>
-    <td>95.07<small>%</small></td>
-    <td>89.5<small>%</small></td>
-    <td>93.91<small>%</small></td>
-    <td>95.41<small>%</small></td>
+    <td>2558</td>
+    <td>95<small>%</small></td>
+    <td>89.42<small>%</small></td>
+    <td>93.92<small>%</small></td>
+    <td>95.32<small>%</small></td>
   </tr>
   <tr>
     <th>Stochastic</th>
-    <td>277</td>
-    <td>63.68<small>%</small></td>
-    <td>51.89<small>%</small></td>
-    <td>63.2<small>%</small></td>
-    <td>63.69<small>%</small></td>
+    <td>278</td>
+    <td>63.82<small>%</small></td>
+    <td>51.86<small>%</small></td>
+    <td>63.75<small>%</small></td>
+    <td>63.81<small>%</small></td>
   </tr>
 </table>
 
