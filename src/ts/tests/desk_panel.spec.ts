@@ -13,7 +13,7 @@
 
 import { describe, test, expect, afterEach } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,19 +101,29 @@ describe('panel.mjs, over a real socket', () => {
    * Start a real `panel.mjs` child process against a fresh scratch desk directory, on an
    * OS-assigned port, and resolve once its own startup log confirms it is listening.
    *
+   * The child never reaches the real GitHub: `SELF_EXPRESSION_DESK_GH` names a program that
+   * does not exist, so any `gh` run fails exactly the way a machine without `gh` does, and an
+   * inherited `SELF_EXPRESSION_DESK_REPO` is removed so the test decides the repo.
+   *
+   * @param files desk-relative paths to write before the server starts, with their contents
+   * @param env   extra environment for the child
    * @returns the base URL it actually bound to, with no trailing slash
    *
    * @example
-   * const base = await startPanel();
-   * await fetch(base + '/edition');
+   * const base = await startPanel({ 'desk-config.json': '{"repo":"o/r"}' });
+   * await fetch(base + '/prs');
    */
-  function startPanel(): Promise<string> {
+  function startPanel(files: Record<string, string> = {}, env: Record<string, string> = {}): Promise<string> {
     desk = mkdtempSync(join(tmpdir(), 'se-desk-panel-'));
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(desk, name), body);
+    const inherited = { ...process.env };
+    delete inherited['SELF_EXPRESSION_DESK_REPO'];
     return new Promise((settle, fail) => {
       const proc = spawn(process.execPath, [PANEL, desk as string], {
         windowsHide: true,
-        env: { ...process.env, SELF_EXPRESSION_DESK_PORT: '0',
-               SELF_EXPRESSION_AFFECT_LOG: join(desk as string, 'no-such-log.sqlite3') },
+        env: { ...inherited, SELF_EXPRESSION_DESK_PORT: '0',
+               SELF_EXPRESSION_AFFECT_LOG: join(desk as string, 'no-such-log.sqlite3'),
+               SELF_EXPRESSION_DESK_GH: 'se-no-such-gh-binary-134', ...env },
       });
       child = proc;
       let out = '';
@@ -188,6 +198,117 @@ describe('panel.mjs, over a real socket', () => {
        second — `lastIndexOf` — that kit.js must precede: that call needs the kit's runtime
        already defined, exactly as it needs every card's own script already defined. */
     expect(page.indexOf(kitJs)).toBeLessThan(page.lastIndexOf('DESK.inits.forEach'));
+  }, 15000);
+
+  /**
+   * POST a JSON body the way the desk's own page does.
+   *
+   * @param base the panel's base URL
+   * @param path the route
+   * @param body the value to send
+   * @returns the response
+   */
+  function postJson(base: string, path: string, body: unknown): Promise<Response> {
+    return fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base },
+                                body: JSON.stringify(body) });
+  }
+
+  /**
+   * The desk's audit log as parsed rows.
+   *
+   * @returns every row, oldest first; `[]` when nothing has been audited
+   */
+  function auditRows(): Record<string, unknown>[] {
+    let text = '';
+    try { text = readFileSync(join(desk as string, 'audit.jsonl'), 'utf8'); } catch { /* none yet */ }
+    return text.split('\n').filter(Boolean).map(l => JSON.parse(l) as Record<string, unknown>);
+  }
+
+  test('the desk page carries both pull-request lists and the ticket rail', async () => {
+    const page = await getText(`${await startPanel()}/desk`);
+    for (const id of ['prminewrap', 'prmine', 'prtheirwrap', 'prtheir', 'prnote', 'ticketwrap', 'ticketlist']) {
+      expect(page).toContain(`id="${id}"`);
+    }
+    /* The repo is served, never baked into the page. */
+    expect(page).not.toMatch(/repo:\s*'[^']+\/[^']+'/);
+  }, 15000);
+
+  test('/prs with no repo configured says so rather than going blank', async () => {
+    const base = await startPanel();
+    const res  = await fetch(`${base}/prs`);
+    expect(res.status).toBe(200);
+    const got = await res.json() as Record<string, unknown>;
+    expect(got).toEqual(expect.objectContaining({ repo: null, mine: [], theirs: [] }));
+    expect(got['error']).toMatch(/no repo configured/);
+  }, 15000);
+
+  test('/prs with a repo but no gh says gh is missing', async () => {
+    const base = await startPanel({ 'desk-config.json': JSON.stringify({ repo: 'StoneCypher/self-expression' }) });
+    const got  = await (await fetch(`${base}/prs`)).json() as Record<string, unknown>;
+    expect(got).toEqual(expect.objectContaining({ repo: 'StoneCypher/self-expression', mine: [], theirs: [] }));
+    expect(got['error']).toBe('gh is not installed or not on PATH (se-no-such-gh-binary-134)');
+  }, 15000);
+
+  test('SELF_EXPRESSION_DESK_REPO overrides the desk config', async () => {
+    const base = await startPanel({ 'desk-config.json': JSON.stringify({ repo: 'cfg/repo' }) },
+                                  { SELF_EXPRESSION_DESK_REPO: 'env/repo' });
+    const got  = await (await fetch(`${base}/prs`)).json() as Record<string, unknown>;
+    expect(got['repo']).toBe('env/repo');
+  }, 15000);
+
+  test('a PR intent is recorded in the config and the audit log, and nothing else changes', async () => {
+    const base = await startPanel({ 'desk-config.json': JSON.stringify({ name: 'mine', hidden: ['weather'] }) });
+    expect((await postJson(base, '/pr', { number: 135, action: 'land' })).status).toBe(204);
+    expect((await postJson(base, '/pr', { number: 136, action: 'drop' })).status).toBe(204);
+    const cfg = JSON.parse(readFileSync(join(desk as string, 'desk-config.json'), 'utf8')) as Record<string, unknown>;
+    expect(cfg).toEqual({ name: 'mine', hidden: ['weather'], prIntent: { 135: 'land' }, prHidden: [136] });
+    expect(auditRows()).toEqual([
+      expect.objectContaining({ action: 'pr.intent', number: 135, intent: 'land', note: 'recorded only; no GitHub write' }),
+      expect.objectContaining({ action: 'pr.intent', number: 136, intent: 'drop' }),
+    ]);
+
+    /* A rename from the page merges rather than replaces, so the intents survive it. */
+    expect((await postJson(base, '/desk-config', { name: 'renamed' })).status).toBe(204);
+    const after = JSON.parse(readFileSync(join(desk as string, 'desk-config.json'), 'utf8')) as Record<string, unknown>;
+    expect(after).toEqual(expect.objectContaining({ name: 'renamed', prIntent: { 135: 'land' }, prHidden: [136] }));
+  }, 15000);
+
+  test('a PR intent that is not one of the three verbs is refused, audited, and not written', async () => {
+    const base = await startPanel();
+    expect((await postJson(base, '/pr', { number: 135, action: 'merge' })).status).toBe(400);
+    expect((await postJson(base, '/pr', { number: 'x', action: 'land' })).status).toBe(400);
+    expect(() => readFileSync(join(desk as string, 'desk-config.json'))).toThrow();
+    expect(auditRows().map(r => r['action'])).toEqual(['pr.intent.refused', 'pr.intent.refused']);
+  }, 15000);
+
+  test('/open refuses anything but a permalink, audits it, and /audit shows it', async () => {
+    const base = await startPanel();
+    /* Only refusals are exercised here: an accepted permalink would open a real browser. */
+    expect((await postJson(base, '/open', { url: 'file:///C:/Windows/System32' })).status).toBe(400);
+    expect((await postJson(base, '/open', { url: 'https://example.com/a/b/issues/1' })).status).toBe(400);
+    const got = await (await fetch(`${base}/audit?n=5`)).json() as { rows: Record<string, unknown>[]; showing: number };
+    expect(got.showing).toBe(2);
+    expect(got.rows.map(r => r['action'])).toEqual(['open.refused', 'open.refused']);
+  }, 15000);
+
+  test('answering keeps the ticket bench, and dropping a ticket promotes the next', async () => {
+    const inbox = {
+      questions: [{ id: 'q', text: 'ok?' }, { id: 'k', kind: 'ticket', text: '#134 restore the inbox' }],
+      reserve:   [{ id: 'r', kind: 'ticket', text: '#140 next' }],
+    };
+    const base = await startPanel({ 'questions.json': JSON.stringify(inbox) });
+    const read = () => JSON.parse(readFileSync(join(desk as string, 'questions.json'), 'utf8')) as typeof inbox;
+
+    expect((await postJson(base, '/questions', { id: 'q', answer: 'yes' })).status).toBe(204);
+    expect(read().reserve).toEqual(inbox.reserve);
+    expect(read().questions[0]).toEqual(expect.objectContaining({ id: 'q', answer: 'yes' }));
+
+    expect((await postJson(base, '/questions', { id: 'k', action: 'drop' })).status).toBe(204);
+    expect(read().questions.map(q => q.id)).toEqual(['q', 'r']);
+    expect(read().reserve).toEqual([]);
+
+    const served = await (await fetch(`${base}/questions`)).json() as { questions: { id: string }[] };
+    expect(served.questions.map(q => q.id)).toEqual(['q', 'r']);
   }, 15000);
 
 });
